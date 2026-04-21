@@ -15,9 +15,9 @@ public class AppDbContext : DbContext
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "AgentZero");
+        "AgentZeroLite");
 
-    private static readonly string _dbPath = Path.Combine(_dbDir, "agentZero.db");
+    private static readonly string _dbPath = Path.Combine(_dbDir, "agentZeroLite.db");
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options

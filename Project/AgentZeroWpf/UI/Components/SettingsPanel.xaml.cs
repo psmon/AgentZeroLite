@@ -88,8 +88,8 @@ public partial class SettingsPanel : UserControl
         // Exact match — already registered
         if (string.Equals(trimmed, currentAppDir, StringComparison.OrdinalIgnoreCase))
             return true;
-        // Previous version paths: contains AgentZeroWpf.exe in that directory
-        string exe = Path.Combine(trimmed, "AgentZeroWpf.exe");
+        // Previous version paths: contains AgentZeroLite.exe in that directory
+        string exe = Path.Combine(trimmed, "AgentZeroLite.exe");
         if (File.Exists(exe))
             return true;
         return false;

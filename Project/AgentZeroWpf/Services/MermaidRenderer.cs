@@ -43,7 +43,7 @@ public sealed class MermaidRenderer : IDisposable
         _host.Content = _webView;
 
         var env = await CoreWebView2Environment.CreateAsync(
-            userDataFolder: Path.Combine(Path.GetTempPath(), "AgentZero_Mermaid"));
+            userDataFolder: Path.Combine(Path.GetTempPath(), "AgentZeroLite_Mermaid"));
         await _webView.EnsureCoreWebView2Async(env);
 
         // Load a blank page, inject mermaid.js

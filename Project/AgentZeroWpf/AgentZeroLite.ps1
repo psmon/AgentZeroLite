@@ -1,8 +1,8 @@
-# AgentZero.ps1
-# AgentZeroWpf CLI 래퍼 - WinExe 콘솔 출력 문제를 해결합니다.
-# Usage: AgentZero.ps1 <command> [options]
+# AgentZeroLite.ps1
+# AgentZeroWpf CLI wrapper - routes console output from the WinExe binary.
+# Usage: AgentZeroLite.ps1 <command> [options]
 
-$ExePath = Join-Path $PSScriptRoot "AgentZeroWpf.exe"
+$ExePath = Join-Path $PSScriptRoot "AgentZeroLite.exe"
 
 if (-not (Test-Path $ExePath)) {
     Write-Host "[ERROR] 실행 파일을 찾을 수 없습니다: $ExePath" -ForegroundColor Red

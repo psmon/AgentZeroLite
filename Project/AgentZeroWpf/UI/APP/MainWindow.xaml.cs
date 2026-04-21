@@ -258,20 +258,21 @@ public partial class MainWindow : Window
         _sessionTickTimer.Tick += (_, _) => RefreshSessionList();
         _sessionTickTimer.Start();
 
+        // Wire up settings/CLI events BEFORE DB init so that a DB failure
+        // never leaves the Settings close (X) button orphaned.
+        SettingsPanel.CliDefinitionsChanged += RebuildCliContextMenu;
+        SettingsPanel.OnboardingDismissed += () =>
+        {
+            SwitchToCliPanel();
+            if (_activeGroupIndex >= 0) ActivateGroup(_activeGroupIndex);
+        };
+
         // DB 초기화 + 상태 복원
         try
         {
             AppDbContext.InitializeDatabase();
             RestoreWindowState();
             RebuildCliContextMenu();
-            SettingsPanel.CliDefinitionsChanged += RebuildCliContextMenu;
-            // "일반 화면으로 가기" / Settings close button → return to the CLI panel.
-            // (Event name is legacy from the removed onboarding flow.)
-            SettingsPanel.OnboardingDismissed += () =>
-            {
-                SwitchToCliPanel();
-                if (_activeGroupIndex >= 0) ActivateGroup(_activeGroupIndex);
-            };
             RestoreCliGroups();
             InitializeDockManager();
 
@@ -341,7 +342,7 @@ public partial class MainWindow : Window
     //  WM_COPYDATA IPC — receive commands from CLI
     // =========================================================================
 
-    private const int CYCOPYDATA_COMMAND = 0x4147; // "AG" marker
+    private const int CYCOPYDATA_COMMAND = 0x414C; // "AL" marker — AgentZero Lite (PRO uses "AG" 0x4147)
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -416,16 +417,6 @@ public partial class MainWindow : Window
                 return;
             }
 
-            if (command == "bot-signal")
-            {
-                string kind = root.TryGetProperty("kind", out var kp) ? kp.GetString() ?? "chat" : "chat";
-                string from = root.TryGetProperty("from", out var fp) ? fp.GetString() ?? "CLI" : "CLI";
-                string? to = root.TryGetProperty("to", out var tp) ? tp.GetString() : null;
-                string message = root.TryGetProperty("message", out var mp) ? mp.GetString() ?? "" : "";
-                HandleBotSignal(kind, from, to, message);
-                return;
-            }
-
             AppLogger.Log($"[IPC] 알 수 없는 명령: {command}");
         }
         catch (Exception ex)
@@ -434,7 +425,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private const string StatusMmfName = "AgentZero_Status_Response";
+    private const string StatusMmfName = "AgentZeroLite_Status_Response";
     private const int StatusMmfSize = 8192;
 
     private void WriteStatusResponse()
@@ -476,7 +467,7 @@ public partial class MainWindow : Window
     //  IPC: terminal-list — return active terminal sessions
     // =========================================================================
 
-    private const string TerminalListMmfName = "AgentZero_TerminalList_Response";
+    private const string TerminalListMmfName = "AgentZeroLite_TerminalList_Response";
     private const int TerminalListMmfSize = 32768;
 
     private void HandleTerminalList()
@@ -512,7 +503,7 @@ public partial class MainWindow : Window
     //  IPC: terminal-send — send text to a specific terminal
     // =========================================================================
 
-    private const string TerminalSendMmfName = "AgentZero_TerminalSend_Response";
+    private const string TerminalSendMmfName = "AgentZeroLite_TerminalSend_Response";
     private const int TerminalSendMmfSize = 1024;
 
     private void HandleTerminalSend(int groupIdx, int tabIdx, string text)
@@ -659,7 +650,7 @@ public partial class MainWindow : Window
     //  IPC: terminal-read — read console output text from a terminal
     // =========================================================================
 
-    private const string TerminalReadMmfName = "AgentZero_TerminalRead_Response";
+    private const string TerminalReadMmfName = "AgentZeroLite_TerminalRead_Response";
     private const int TerminalReadMmfSize = 65536;
 
     private void HandleTerminalRead(int groupIdx, int tabIdx, int lastN)
@@ -721,10 +712,8 @@ public partial class MainWindow : Window
     //  IPC: bot-chat — send chat message to AgentBot
     // =========================================================================
 
-    private const string BotChatMmfName = "AgentZero_BotChat_Response";
+    private const string BotChatMmfName = "AgentZeroLite_BotChat_Response";
     private const int BotChatMmfSize = 1024;
-    private const string BotSignalMmfName = "AgentZero_BotSignal_Response";
-    private const int BotSignalMmfSize = 1024;
 
     // DONE 파싱: "DONE(from, msg)" 또는 "DONE(msg)" 두 형태 모두 지원
     private static readonly System.Text.RegularExpressions.Regex DonePatternWithFrom = new(
@@ -781,55 +770,6 @@ public partial class MainWindow : Window
 
         IpcMemoryMappedResponseWriter.WriteJson(BotChatMmfName, BotChatMmfSize, resultJson, "[IPC] bot-chat 응답 쓰기 오류");
     }
-
-    private void HandleBotSignal(string kind, string from, string? to, string message)
-    {
-        string resultJson;
-
-        if (_botWindow is null || !_botWindow.IsLoaded)
-        {
-            resultJson = "{\"ok\":false,\"error\":\"AgentBot window is not open. Click the Bot button in AgentZero first.\"}";
-            IpcMemoryMappedResponseWriter.WriteJson(BotSignalMmfName, BotSignalMmfSize, resultJson, "[IPC] bot-signal 응답 쓰기 오류");
-            return;
-        }
-
-        var normalizedKind = (kind ?? "").Trim().ToLowerInvariant();
-        var signalLabel = string.IsNullOrWhiteSpace(to)
-            ? $"SIGNAL:{normalizedKind}({from})"
-            : $"SIGNAL:{normalizedKind}({from}->{to})";
-
-        switch (normalizedKind)
-        {
-            case "done":
-            case "complete":
-                AppLogger.Log($"[IPC] bot-signal done: from={from}, to={to ?? "-"}, len={message.Length}");
-                _botWindow.ReceiveExternalChat(signalLabel, message);
-                resultJson = $"{{\"ok\":true,\"kind\":\"{EscapeJson(normalizedKind)}\"}}";
-                break;
-
-            case "status":
-            case "error":
-            case "partial":
-            case "chat":
-                _botWindow.ReceiveExternalChat(signalLabel, message);
-                resultJson = $"{{\"ok\":true,\"kind\":\"{EscapeJson(normalizedKind)}\"}}";
-                AppLogger.Log($"[IPC] bot-signal {normalizedKind}: from={from}, to={to ?? "-"}, len={message.Length}");
-                break;
-
-            default:
-                resultJson = $"{{\"ok\":false,\"error\":\"unknown signal kind: {EscapeJson(normalizedKind)}\"}}";
-                AppLogger.Log($"[IPC] bot-signal unknown kind={normalizedKind}, from={from}, to={to ?? "-"}");
-                break;
-        }
-
-        IpcMemoryMappedResponseWriter.WriteJson(BotSignalMmfName, BotSignalMmfSize, resultJson, "[IPC] bot-signal 응답 쓰기 오류");
-    }
-
-    // =========================================================================
-    //  IPC: tell-ai — external prompt → AgentBot AI LLM (fire-and-forget trigger)
-    // =========================================================================
-
-
 
     // =========================================================================
     //  DB persistence (Window state, CLI groups/tabs, CLI definitions)
@@ -1446,6 +1386,10 @@ public partial class MainWindow : Window
             _activeGroupIndex = -1;
             terminalDocPane.Children.Clear();
         }
+
+        // Sync SESSIONS panel — terminals of the removed workspace must disappear.
+        RefreshSessionList();
+        SaveCliGroups();
     }
 
     private void SwitchToCliPanel()

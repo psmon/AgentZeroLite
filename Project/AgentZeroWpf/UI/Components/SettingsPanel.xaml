@@ -292,7 +292,7 @@
                                        Margin="0,0,0,6">
                                 <Run>Register AgentZero CLI path to user PATH environment variable.</Run>
                                 <LineBreak/>
-                                <Run>After registration, AgentZero.ps1 can be used from anywhere.</Run>
+                                <Run>After registration, AgentZeroLite.ps1 can be used from anywhere.</Run>
                             </TextBlock>
                             <DockPanel Margin="0,0,0,4">
                                 <Button x:Name="btnRegisterPath" DockPanel.Dock="Right"

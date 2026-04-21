@@ -27,7 +27,7 @@ macros to whichever terminal is in focus — nothing more, nothing less.
 - **Notes with live rendering** — a second bottom panel with a Markdown viewer that
   also renders Mermaid diagrams and Pencil files, scoped to the active workspace
   folder.
-- **CLI remote-control** — run `AgentZeroWpf.exe -cli terminal-send 0 0 "npm test"`
+- **CLI remote-control** — run `AgentZeroLite.exe -cli terminal-send 0 0 "npm test"`
   from any script and drive the GUI over `WM_COPYDATA` + memory-mapped files.
 - **Actor model (Akka.NET)** — terminal lifecycle, workspace routing and chat input
   all run through supervised actors, so a crashing session does not take the window
@@ -131,7 +131,7 @@ dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Debug
 dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release
 
 # Launch the GUI
-Project/AgentZeroWpf/bin/Debug/net10.0-windows/AgentZeroWpf.exe
+Project/AgentZeroWpf/bin/Debug/net10.0-windows/AgentZeroLite.exe
 
 # Run headless tests (shared logic)
 dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj
@@ -163,7 +163,7 @@ normal shell also works because it does not steal stdio.
 
 ## CLI — drive the GUI from any script
 
-Every scriptable action goes through `AgentZeroWpf.exe -cli <command>`. The GUI must
+Every scriptable action goes through `AgentZeroLite.exe -cli <command>`. The GUI must
 be running; the CLI speaks to it over `WM_COPYDATA` (marker `0x4147 "AG"`) and reads
 responses back from named memory-mapped files. A 5-second poll timeout protects
 scripts from a hung GUI; add `--no-wait` for fire-and-forget.
@@ -182,7 +182,7 @@ scripts from a hung GUI; add `--no-wait` for fire-and-forget.
 | `bot-chat [--from X] "text"`    | Display an external chat bubble in the bot window         |
 | `help`                          | Command reference                                         |
 
-A PowerShell wrapper is shipped at `Project/AgentZeroWpf/AgentZero.ps1` for convenience
+A PowerShell wrapper is shipped at `Project/AgentZeroWpf/AgentZeroLite.ps1` for convenience
 once the app directory is on `PATH` (do this from the Settings pane: **AgentZero CLI →
 Register PATH**).
 
@@ -196,7 +196,7 @@ Two tabs only:
   custom entries). Built-ins cannot be deleted. New definitions appear in the `+` menu
   of every workspace.
 - **AgentZero CLI** — one-click button to register the app directory in the user
-  `PATH` so `AgentZero.ps1` and `AgentZeroWpf.exe -cli …` resolve from any shell.
+  `PATH` so `AgentZeroLite.ps1` and `AgentZeroLite.exe -cli …` resolve from any shell.
 
 Persistence lives in `%LOCALAPPDATA%\AgentZero\agentZero.db` (SQLite, migrated by
 EF Core on first run).

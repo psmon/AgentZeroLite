@@ -32,7 +32,7 @@ public partial class App : Application
 
         // GUI 모드: 단일 인스턴스 가드
         _singleInstanceMutex = new Mutex(initiallyOwned: true,
-            name: @"Local\AgentZeroWpf.SingleInstance", out var createdNew);
+            name: @"Local\AgentZeroLite.SingleInstance", out var createdNew);
         if (!createdNew)
         {
             System.Windows.MessageBox.Show(
