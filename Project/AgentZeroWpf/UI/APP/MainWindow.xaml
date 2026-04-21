@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:components="clr-namespace:AgentZeroWpf.UI.Components"
         xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
-        Title="AgentZero"
+        Title="AgentZero Lite"
         Width="600" Height="500"
         MinWidth="300" MinHeight="300"
         WindowStartupLocation="CenterScreen"
@@ -22,6 +22,8 @@
         <Color x:Key="CyberCyan">#3794FF</Color>
         <Color x:Key="CyberMagenta">#C586C0</Color>
         <Color x:Key="CyberPurple">#4EC9B0</Color>
+        <!-- "LITE" accent — fresh spring-mint green -->
+        <Color x:Key="CyberMint">#7CFDB0</Color>
         <Color x:Key="CyberYellow">#DCDCAA</Color>
         <Color x:Key="CyberTextPrimary">#D4D4D4</Color>
         <Color x:Key="CyberTextDim">#858585</Color>
@@ -42,6 +44,7 @@
         <SolidColorBrush x:Key="CyberCyanBrush"    Color="{StaticResource CyberCyan}"/>
         <SolidColorBrush x:Key="CyberMagentaBrush" Color="{StaticResource CyberMagenta}"/>
         <SolidColorBrush x:Key="CyberPurpleBrush"  Color="{StaticResource CyberPurple}"/>
+        <SolidColorBrush x:Key="CyberMintBrush"    Color="{StaticResource CyberMint}"/>
         <SolidColorBrush x:Key="CyberYellowBrush"  Color="{StaticResource CyberYellow}"/>
         <SolidColorBrush x:Key="SelectionBrush"    Color="{StaticResource SelectionBgColor}"/>
 
@@ -520,9 +523,15 @@
                                        Foreground="{StaticResource CyberCyanBrush}"/>
                             <TextBlock Text="ZERO" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
                                        Foreground="{StaticResource CyberMagentaBrush}" Margin="0,0,0,0"/>
-                            <TextBlock Text=" // HUB" FontFamily="Consolas" FontSize="10"
-                                       Foreground="{StaticResource TextDim}" VerticalAlignment="Center"
-                                       Margin="6,1,0,0"/>
+                            <TextBlock Text="LITE" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                                       Foreground="{StaticResource CyberMintBrush}"
+                                       Margin="6,0,0,0"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect Color="#7CFDB0" BlurRadius="10"
+                                                      ShadowDepth="0" Opacity="0.55"/>
+                                </TextBlock.Effect>
+                            </TextBlock>
                             <TextBlock x:Name="txtVersion" FontFamily="Consolas" FontSize="9"
                                        Foreground="{StaticResource TextDim}" VerticalAlignment="Center"
                                        Margin="6,2,0,0" Opacity="0.6"/>

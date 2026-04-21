@@ -2,14 +2,21 @@
 
 **AI 시대를 위한 미니멀 IDE — 여러 개의 CLI를 한 화면에서 나란히 다루세요.**
 
+> 영문 원본: [README.md](README.md)
+
+![AgentZero Lite — multi-CLI multi-view](Home/main.png)
+
+같은 워크스페이스에서든 다른 워크스페이스에서든, CLI로 돌아가는 AI(Claude,
+Codex, 종류 무관)에게 명령 하나를 바로 꽂아 넣을 수 있습니다. 서로 다른 모델의
+AI들을 동시에 띄워두고, 같은 경로로 둘을 대화시킬 수도 있습니다 — 별도 중계
+서버나 커스텀 브로커 없이, 모델 간 크로스 대화.
+
 AgentZero Lite는 단순한 아이디어로 만들어진 Windows 데스크톱 셸입니다. AI 시대에
 하루의 대부분은 *커맨드라인 도구와 대화하는 시간*입니다. `claude`, `codex`, `gh`,
 `docker`, `pwsh`, REPL, 빌드 로그 tail — 각각 자기만의 터미널을 원하고, 사용자는
 이 모두를 창을 옮기지 않고 동시에 보고 싶습니다. AgentZero Lite는 진짜 멀티탭·
 멀티워크스페이스 ConPTY 터미널과, 포커스된 터미널로 텍스트·스킬 매크로를 전달하는
 작은 채팅 창을 제공합니다. 그 이상도 이하도 아닙니다.
-
-> 영문 원본: [README.md](README.md)
 
 ---
 

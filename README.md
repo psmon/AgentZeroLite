@@ -4,6 +4,13 @@
 
 > 🇰🇷 한국어 문서: [README-KR.md](README-KR.md)
 
+![AgentZero Lite — multi-CLI multi-view](Home/main.png)
+
+Pipe a single instruction to an AI CLI (Claude, Codex, any model you can run in
+a shell) living in the same workspace — or in a different one — and have it act.
+Run two different AI models side by side and let them talk to each other through
+the same mechanism: cross-model dialogue, no custom broker required.
+
 
 AgentZero Lite is a Windows desktop shell built around a simple idea: in the AI era most
 of your day is spent *talking to command-line tools*. `claude`, `codex`, `gh`, `docker`,
