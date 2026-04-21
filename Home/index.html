@@ -164,7 +164,13 @@ footer a:hover{color:var(--mint)}
   <p class="sub ko">여러 AI CLI를 한 창에 나란히 띄우고, 명령을 쏘고, 모델끼리 대화시키세요.</p>
   <p class="sub en">Run many AI CLIs side by side, pipe instructions to any of them, and let different models talk to each other.</p>
   <div class="cta-row">
-    <a class="btn primary" href="https://github.com/psmon/AgentZeroLite/releases/latest" target="_blank" rel="noopener"><span class="ko">⬇ 최신 버전 다운로드</span><span class="en">⬇ Download latest</span></a>
+    <a class="btn primary"
+       data-az-asset="setup"
+       href="https://github.com/psmon/AgentZeroLite/releases/latest"
+       target="_blank" rel="noopener">
+      <span class="ko">⬇ 최신 버전 다운로드 <span data-az-version></span></span>
+      <span class="en">⬇ Download latest <span data-az-version></span></span>
+    </a>
     <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
     <a class="btn" href="#install"><span class="ko">🛠 설치 옵션</span><span class="en">🛠 Install options</span></a>
     <a class="btn" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">GitHub</span><span class="en">GitHub</span></a>
@@ -395,10 +401,18 @@ Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` 
       <p class="ko">더블클릭 → 다음 → 완료. 시작 메뉴/바탕화면 아이콘 등록, 언인스톨러 포함.</p>
       <p class="en">Double-click → Next → Finish. Adds Start Menu / desktop icons and an uninstaller.</p>
       <p style="margin-top:10px">
-        <a class="btn primary" href="https://github.com/psmon/AgentZeroLite/releases/latest" target="_blank" rel="noopener"><span class="ko">⬇ 최신 Setup.exe 받기</span><span class="en">⬇ Download latest Setup.exe</span></a>
+        <a class="btn primary"
+           data-az-asset="setup"
+           href="https://github.com/psmon/AgentZeroLite/releases/latest"
+           target="_blank" rel="noopener">
+          <span class="ko">⬇ Setup.exe <span data-az-version>최신</span> 받기</span>
+          <span class="en">⬇ Download Setup.exe <span data-az-version>(latest)</span></span>
+        </a>
       </p>
-      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="ko">Releases 페이지에서 <code>AgentZeroLite-v&lt;version&gt;-Setup.exe</code>를 고르세요.</p>
-      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="en">Pick <code>AgentZeroLite-v&lt;version&gt;-Setup.exe</code> from the Releases page.</p>
+      <p style="margin-top:8px;color:var(--text-dim);font-size:12px">
+        <span class="ko">파일명: </span><span class="en">Filename: </span>
+        <code data-az-filename="setup">AgentZeroLite-v&lt;latest&gt;-Setup.exe</code>
+      </p>
     </div>
 
     <div class="card">
@@ -408,10 +422,18 @@ Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` 
       <p class="ko">압축만 풀면 끝. 레지스트리를 건드리지 않고, USB에서도 실행 가능합니다.</p>
       <p class="en">Unzip and run. Nothing touches the registry — USB-friendly.</p>
       <p style="margin-top:10px">
-        <a class="btn" href="https://github.com/psmon/AgentZeroLite/releases/latest" target="_blank" rel="noopener"><span class="ko">⬇ 최신 ZIP 받기</span><span class="en">⬇ Download latest ZIP</span></a>
+        <a class="btn"
+           data-az-asset="zip"
+           href="https://github.com/psmon/AgentZeroLite/releases/latest"
+           target="_blank" rel="noopener">
+          <span class="ko">⬇ ZIP <span data-az-version>최신</span> 받기</span>
+          <span class="en">⬇ Download ZIP <span data-az-version>(latest)</span></span>
+        </a>
       </p>
-      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="ko">파일명: <code>AgentZeroLite-v&lt;version&gt;-win-x64.zip</code></p>
-      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="en">Filename: <code>AgentZeroLite-v&lt;version&gt;-win-x64.zip</code></p>
+      <p style="margin-top:8px;color:var(--text-dim);font-size:12px">
+        <span class="ko">파일명: </span><span class="en">Filename: </span>
+        <code data-az-filename="zip">AgentZeroLite-v&lt;latest&gt;-win-x64.zip</code>
+      </p>
     </div>
 
     <div class="card accent-yellow">
@@ -457,6 +479,7 @@ dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release</code></pre>
 
 <script>
 (function(){
+  // ─── Language toggle ────────────────────────────────────────────
   var root = document.body;
   function apply(lang){
     root.setAttribute('data-lang', lang);
@@ -472,6 +495,88 @@ dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release</code></pre>
   document.querySelectorAll('.lang-toggle button').forEach(function(b){
     b.addEventListener('click', function(){ apply(b.dataset.setLang); });
   });
+})();
+
+(function(){
+  // ─── Latest release resolver ────────────────────────────────────
+  // Hit the GitHub Releases API once, pick the setup.exe and the ZIP
+  // from the assets, and rewrite any [data-az-asset="setup|zip"] link
+  // to point straight at the binary (so users don't bounce through
+  // the Releases page). Falls back silently to the /releases/latest
+  // redirect if the API is unavailable or rate-limited.
+  var OWNER='psmon', REPO='AgentZeroLite';
+  var API='https://api.github.com/repos/'+OWNER+'/'+REPO+'/releases/latest';
+  var CACHE_KEY='azl.release.v1';
+  var CACHE_TTL_MS=30*60*1000; // 30 min — same tag rarely changes
+
+  function matchAsset(assets, kind){
+    if(!assets) return null;
+    // exact suffix match — the CI always emits *-Setup.exe and *-win-x64.zip
+    var suffix = kind === 'setup' ? '-Setup.exe' : '-win-x64.zip';
+    for(var i=0;i<assets.length;i++){
+      var n=assets[i].name||'';
+      if(n.indexOf('AgentZeroLite-')===0 && n.slice(-suffix.length)===suffix){
+        return assets[i];
+      }
+    }
+    return null;
+  }
+
+  function apply(release){
+    if(!release || !release.tag_name) return;
+    var tag = release.tag_name;
+    var assets = release.assets || [];
+
+    var map = {
+      setup: matchAsset(assets, 'setup'),
+      zip:   matchAsset(assets, 'zip')
+    };
+
+    // Rewrite every [data-az-asset] link
+    document.querySelectorAll('[data-az-asset]').forEach(function(el){
+      var kind = el.getAttribute('data-az-asset');
+      var a = map[kind];
+      if(a && a.browser_download_url){
+        el.setAttribute('href', a.browser_download_url);
+        el.setAttribute('download', a.name);
+      }
+    });
+
+    // Fill in [data-az-version] placeholders
+    document.querySelectorAll('[data-az-version]').forEach(function(el){
+      el.textContent = tag;
+    });
+
+    // Fill in [data-az-filename] code boxes
+    document.querySelectorAll('[data-az-filename]').forEach(function(el){
+      var kind = el.getAttribute('data-az-filename');
+      var a = map[kind];
+      if(a && a.name) el.textContent = a.name;
+    });
+  }
+
+  // Try cache first (keeps the offline/offline-friendly experience)
+  try{
+    var raw = localStorage.getItem(CACHE_KEY);
+    if(raw){
+      var cached = JSON.parse(raw);
+      if(cached && cached.ts && (Date.now()-cached.ts) < CACHE_TTL_MS){
+        apply(cached.release);
+      }
+    }
+  }catch(e){}
+
+  // And refresh in the background (cache may have aged out or missed)
+  try{
+    fetch(API, { headers: { 'Accept':'application/vnd.github+json' } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(release){
+        if(!release) return;
+        apply(release);
+        try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), release:release})); }catch(e){}
+      })
+      .catch(function(){ /* silent — fallback href still works */ });
+  }catch(e){}
 })();
 </script>
 </body>
