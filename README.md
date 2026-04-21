@@ -182,7 +182,7 @@ normal shell also works because it does not steal stdio.
 ## CLI — drive the GUI from any script
 
 Every scriptable action goes through `AgentZeroLite.exe -cli <command>`. The GUI must
-be running; the CLI speaks to it over `WM_COPYDATA` (marker `0x4147 "AG"`) and reads
+be running; the CLI speaks to it over `WM_COPYDATA` (marker `0x414C "AL"`) and reads
 responses back from named memory-mapped files. A 5-second poll timeout protects
 scripts from a hung GUI; add `--no-wait` for fire-and-forget.
 
@@ -252,7 +252,7 @@ Two tabs only:
 - **AgentZero CLI** — one-click button to register the app directory in the user
   `PATH` so `AgentZeroLite.ps1` and `AgentZeroLite.exe -cli …` resolve from any shell.
 
-Persistence lives in `%LOCALAPPDATA%\AgentZero\agentZero.db` (SQLite, migrated by
+Persistence lives in `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db` (SQLite, migrated by
 EF Core on first run).
 
 ---

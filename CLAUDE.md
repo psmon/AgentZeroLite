@@ -23,10 +23,10 @@ dotnet test Project/AgentTest/AgentTest.csproj
 dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj --filter "FullyQualifiedName~ApprovalParserTests.ParsesBashPrompt"
 
 # Launch the GUI
-Project/AgentZeroWpf/bin/Debug/net10.0-windows/AgentZeroWpf.exe
+Project/AgentZeroWpf/bin/Debug/net10.0-windows/AgentZeroLite.exe
 
 # Drive a running GUI from any shell (exe double-dispatches on `-cli`)
-Project/AgentZeroWpf/bin/Release/net10.0-windows/AgentZeroWpf.exe -cli status
+Project/AgentZeroWpf/bin/Release/net10.0-windows/AgentZeroLite.exe -cli status
 ```
 
 There is a third build configuration `AgentCLI` declared alongside Debug/Release — leave it in the csproj even though the runtime CLI/GUI split is decided inside `App.OnStartup` by checking `-cli` in args, not by configuration.
@@ -46,9 +46,9 @@ The app hosts real ConPTY terminals inside WPF tabs. If the IDE attaches its own
 Two C# projects with a strict dependency rule: **`AgentZeroWpf → ZeroCommon`, never reversed.** Anything that doesn't need WPF/Win32 APIs belongs in `ZeroCommon` so it stays testable headlessly. `AgentTest` references both; `ZeroCommon.Tests` references only `ZeroCommon`.
 
 ### Single exe, two modes
-`AgentZeroWpf.exe` is a WinExe. In `App.OnStartup` (`Project/AgentZeroWpf/App.xaml.cs`):
+`AgentZeroLite.exe` is a WinExe (assembly name set in `AgentZeroWpf.csproj`; project/namespace stay `AgentZeroWpf.*`). In `App.OnStartup` (`Project/AgentZeroWpf/App.xaml.cs`):
 - If args contain `-cli`, `CliHandler.Run` takes over, calls `Environment.Exit`, and the WPF message loop never starts.
-- Otherwise a named mutex `Local\AgentZeroWpf.SingleInstance` guards single-instance GUI, then `ActorSystemManager.Initialize()` builds the Akka system before `MainWindow` shows.
+- Otherwise a named mutex `Local\AgentZeroLite.SingleInstance` guards single-instance GUI, then `ActorSystemManager.Initialize()` builds the Akka system before `MainWindow` shows.
 
 ### Actor topology (Akka.NET)
 All message types live in one file: `Project/ZeroCommon/Actors/Messages.cs`. The hierarchy is:
@@ -68,10 +68,10 @@ Actor names sometimes contain user input (workspace names, terminal IDs). Route 
 `ActorSystemManager.Shutdown()` is fire-and-forget by design. Previously `ShutdownAsync().GetAwaiter().GetResult()` on the UI thread deadlocked the `synchronized-dispatcher` (which needs to post back to the UI thread), leaving the process alive and the single-instance mutex held. The Akka config sets `coordinated-shutdown.exit-clr = on` so CLR termination happens from the shutdown phases, not from user code.
 
 ### CLI ↔ GUI IPC
-`AgentZeroWpf.exe -cli <cmd>` talks to the running GUI over `WM_COPYDATA` with marker `0x4147 "AG"` (send side in `CliHandler.cs`, receive in `CliTerminalIpcHelper.cs` / `MainWindow`). The GUI writes JSON responses to a named memory-mapped file that the CLI side polls (default 5s timeout; `--no-wait` skips the wait entirely). Helper wrapper: `Project/AgentZeroWpf/AgentZero.ps1` (launches with `-NoNewWindow -Wait` to make stdio visible).
+`AgentZeroLite.exe -cli <cmd>` talks to the running GUI over `WM_COPYDATA` with marker `0x414C "AL"` (send side in `CliHandler.cs`, receive in `CliTerminalIpcHelper.cs` / `MainWindow`). The GUI writes JSON responses to named memory-mapped files with the `AgentZeroLite_*` prefix; the CLI side polls (default 5s timeout; `--no-wait` skips the wait entirely). Helper wrapper: `Project/AgentZeroWpf/AgentZeroLite.ps1` (launches with `-NoNewWindow -Wait` to make stdio visible).
 
 ### Persistence
-EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZero\agentZero.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude) are marked `IsBuiltIn = true` and must not be deletable from the UI.
+EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude) are marked `IsBuiltIn = true` and must not be deletable from the UI.
 
 ### Native DLLs
 `conpty.dll` and `Microsoft.Terminal.Control.dll` are pulled from the `CI.Microsoft.*` NuGet packages via hard-coded `$(NuGetPackageRoot)` paths in `AgentZeroWpf.csproj`. If you bump those packages, update the version segments in the two `<Content Include=...>` entries or the copy step will silently drop — the app runs but ConPTY tabs won't start.
