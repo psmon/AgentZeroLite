@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentZero Lite — AI 시대의 미니멀 멀티-CLI IDE</title>
+<meta name="description" content="Windows WPF 기반 멀티탭 ConPTY 터미널. Claude · Codex 어느 AI CLI든 나란히 띄우고, 명령을 쏘고, 모델 간 대화를 시키세요.">
+<meta property="og:title" content="AgentZero Lite">
+<meta property="og:description" content="AI 시대의 미니멀 멀티-CLI IDE. 서로 다른 모델을 탭으로 띄우고 대화시키세요.">
+<meta property="og:image" content="main.png">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   VS Code dark theme + AgentZero Lite palette
+   ─ cyan #3794FF / magenta #C586C0 / mint #7CFDB0
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --bg-deep:#1E1E1E;
+  --bg-panel:#252526;
+  --bg-toolbar:#2D2D30;
+  --bg-card:#1A1A2E;
+  --border-dim:#3E3E42;
+  --border-accent:#2A2A5E;
+  --cyan:#3794FF;
+  --magenta:#C586C0;
+  --mint:#7CFDB0;
+  --yellow:#DCDCAA;
+  --purple:#4EC9B0;
+  --text-primary:#D4D4D4;
+  --text-dim:#858585;
+  --text-soft:#C8C8D8;
+  --selection:#264F78;
+  --mono:'Cascadia Mono','Consolas','Source Code Pro',ui-monospace,Menlo,monospace;
+  --sans:'Inter','Segoe UI',-apple-system,BlinkMacSystemFont,'Pretendard',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg-deep);color:var(--text-primary);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none;border-bottom:1px dashed rgba(55,148,255,.4)}
+a:hover{color:var(--mint);border-bottom-color:var(--mint)}
+code,kbd,pre{font-family:var(--mono);font-size:.92em}
+code:not(pre code){background:#0F0F1A;color:var(--mint);padding:.1em .4em;border-radius:3px;border:1px solid var(--border-accent)}
+pre{background:#0A0A14;border:1px solid var(--border-accent);border-radius:4px;padding:14px 16px;overflow-x:auto;color:#B5CEA8;font-size:13px;line-height:1.55}
+h1,h2,h3,h4{font-family:var(--sans);font-weight:700;letter-spacing:-.01em;margin:0 0 .6em}
+h2{font-size:clamp(22px,3vw,28px);color:var(--text-primary);padding-bottom:10px;border-bottom:1px solid var(--border-dim);margin-top:3em}
+h3{font-size:18px;color:var(--cyan);margin-top:2em}
+::selection{background:var(--selection)}
+
+/* ─── Top bar ─── */
+.topbar{position:sticky;top:0;z-index:50;background:rgba(30,30,30,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--border-dim)}
+.topbar .inner{max-width:1100px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px}
+.wordmark{font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:.02em;display:flex;align-items:center;gap:2px}
+.wordmark .logo{width:14px;height:14px;background:var(--cyan);opacity:.8;transform:rotate(45deg);margin-right:8px}
+.wordmark .agent{color:var(--cyan)}
+.wordmark .zero{color:var(--magenta)}
+.wordmark .lite{color:var(--mint);margin-left:8px;text-shadow:0 0 12px rgba(124,253,176,.55)}
+.spacer{flex:1}
+.lang-toggle{display:flex;gap:4px;background:var(--bg-card);border:1px solid var(--border-accent);border-radius:4px;padding:3px;font-family:var(--mono);font-size:11px}
+.lang-toggle button{background:transparent;border:0;color:var(--text-dim);font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;border-radius:3px;letter-spacing:.05em}
+.lang-toggle button.active{background:var(--cyan);color:#0A0A14}
+.topbar a.gh{font-family:var(--mono);font-size:11px;color:var(--text-dim);border:0;padding:4px 10px;background:var(--bg-card);border:1px solid var(--border-accent);border-radius:4px}
+.topbar a.gh:hover{color:var(--mint);border-color:var(--mint)}
+
+/* ─── Hero ─── */
+.hero{max-width:1100px;margin:0 auto;padding:56px 24px 24px;text-align:center}
+.hero .big-mark{font-family:var(--mono);font-weight:900;font-size:clamp(36px,7vw,68px);letter-spacing:-.02em;line-height:1;margin-bottom:18px}
+.hero .big-mark .agent{color:var(--cyan)}
+.hero .big-mark .zero{color:var(--magenta)}
+.hero .big-mark .lite{color:var(--mint);text-shadow:0 0 22px rgba(124,253,176,.55);margin-left:.3em}
+.hero .tagline{font-size:clamp(15px,1.8vw,19px);color:var(--text-soft);margin:0 auto 8px;max-width:720px}
+.hero .sub{font-size:14px;color:var(--text-dim);max-width:720px;margin:0 auto 28px}
+.hero-card{max-width:1100px;margin:0 auto 12px;padding:0 24px}
+.hero-card .frame{position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border-accent);box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 0 1px rgba(124,253,176,.1),0 0 48px rgba(124,253,176,.08);background:var(--bg-panel)}
+.hero-card .frame::after{content:"";position:absolute;inset:0;border-radius:8px;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(55,148,255,.14)}
+.hero-card img{display:block;width:100%;height:auto}
+.hero-pitch{max-width:820px;margin:24px auto 0;padding:0 24px;color:var(--text-soft);font-size:15px;line-height:1.75}
+
+/* ─── Sections ─── */
+.section{max-width:1100px;margin:0 auto;padding:0 24px}
+.cta-row{display:flex;gap:10px;justify-content:center;margin:28px 0 0;flex-wrap:wrap}
+.btn{display:inline-block;padding:10px 18px;border-radius:4px;font-family:var(--mono);font-size:13px;font-weight:700;border:1px solid var(--border-accent);background:var(--bg-card);color:var(--text-primary);cursor:pointer;letter-spacing:.02em}
+.btn:hover{border-color:var(--mint);color:var(--mint);border-bottom-color:var(--mint)}
+.btn.primary{background:linear-gradient(180deg,#1a3049,#14143A);border-color:var(--cyan);color:var(--cyan)}
+.btn.primary:hover{border-color:var(--mint);color:var(--mint);background:linear-gradient(180deg,#132430,#14143A)}
+
+/* ─── Feature grid ─── */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:18px}
+.card{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:6px;padding:18px 18px 16px;transition:border-color .15s}
+.card:hover{border-color:var(--cyan)}
+.card .tag{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--mint);border:1px solid var(--mint);padding:2px 7px;border-radius:3px;margin-bottom:10px}
+.card h4{font-size:15px;margin:0 0 8px;color:var(--text-primary)}
+.card p{margin:0;color:var(--text-soft);font-size:13.5px;line-height:1.65}
+.card.accent-cyan .tag{color:var(--cyan);border-color:var(--cyan)}
+.card.accent-magenta .tag{color:var(--magenta);border-color:var(--magenta)}
+.card.accent-yellow .tag{color:var(--yellow);border-color:var(--yellow)}
+
+/* ─── Step recipe ─── */
+.recipe{margin-top:14px;background:var(--bg-card);border:1px solid var(--border-accent);border-radius:6px;padding:22px 24px}
+.recipe ol{padding-left:0;list-style:none;margin:0;counter-reset:step}
+.recipe li{counter-increment:step;padding:12px 0 12px 46px;border-bottom:1px dashed var(--border-dim);position:relative;color:var(--text-soft)}
+.recipe li:last-child{border-bottom:0}
+.recipe li::before{content:counter(step);position:absolute;left:0;top:14px;width:30px;height:30px;border-radius:50%;background:#0A0A14;border:1px solid var(--mint);color:var(--mint);font-family:var(--mono);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.recipe li strong{color:var(--text-primary);display:block;margin-bottom:4px;font-size:14px}
+.recipe li code{display:block;margin-top:6px;padding:6px 10px;background:#0A0A14;border:1px solid var(--border-accent);border-radius:3px;color:#B5CEA8;font-size:12.5px;white-space:pre-wrap}
+
+/* ─── Dialogue ascii ─── */
+.ascii{background:#0A0A14;border:1px solid var(--border-accent);border-radius:4px;padding:18px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--text-soft);margin:16px 0}
+.ascii .arrow{color:var(--mint)}
+.ascii .cmd{color:var(--yellow)}
+.ascii .src{color:var(--magenta)}
+.ascii .dst{color:var(--cyan)}
+
+/* ─── Command table ─── */
+.cmd-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+.cmd-table th,.cmd-table td{padding:9px 12px;border-bottom:1px solid var(--border-dim);text-align:left;vertical-align:top}
+.cmd-table th{background:var(--bg-panel);color:var(--cyan);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.cmd-table td:first-child{font-family:var(--mono);color:var(--mint);white-space:nowrap;font-size:12px}
+.cmd-table td:last-child{color:var(--text-soft)}
+
+/* ─── Footer ─── */
+footer{max-width:1100px;margin:60px auto 40px;padding:24px;border-top:1px solid var(--border-dim);color:var(--text-dim);font-size:12.5px;display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+footer .spacer{flex:1}
+footer a{color:var(--text-dim)}
+footer a:hover{color:var(--mint)}
+
+/* ─── Language switching ─── */
+[data-lang="en"] .ko{display:none}
+[data-lang="ko"] .en{display:none}
+
+/* ─── Responsive ─── */
+@media (max-width:640px){
+  .hero{padding-top:32px}
+  .topbar .inner{padding:10px 14px}
+  .hero-card{padding:0 14px}
+  .hero-pitch,.section{padding:0 18px}
+  .recipe{padding:16px 18px}
+  .recipe li{padding-left:38px}
+}
+</style>
+</head>
+<body data-lang="ko">
+
+<!-- ═════════════════════ Top bar ═════════════════════ -->
+<div class="topbar">
+  <div class="inner">
+    <div class="wordmark">
+      <span class="logo"></span>
+      <span class="agent">AGENT</span><span class="zero">ZERO</span><span class="lite">LITE</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="lang-toggle" role="tablist">
+      <button data-set-lang="ko" class="active" aria-label="한국어">KO</button>
+      <button data-set-lang="en" aria-label="English">EN</button>
+    </div>
+    <a class="gh" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</div>
+
+<!-- ═════════════════════ Hero ═════════════════════ -->
+<section class="hero">
+  <div class="big-mark">
+    <span class="agent">AGENT</span><span class="zero">ZERO</span><span class="lite">LITE</span>
+  </div>
+  <p class="tagline ko">AI 시대를 위한 미니멀 멀티-CLI IDE</p>
+  <p class="tagline en">A minimalist multi-CLI IDE for the AI era</p>
+  <p class="sub ko">여러 AI CLI를 한 창에 나란히 띄우고, 명령을 쏘고, 모델끼리 대화시키세요.</p>
+  <p class="sub en">Run many AI CLIs side by side, pipe instructions to any of them, and let different models talk to each other.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">⚡ GitHub에서 받기</span><span class="en">⚡ Get it on GitHub</span></a>
+    <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
+    <a class="btn" href="#install"><span class="ko">🛠 설치 & 빌드</span><span class="en">🛠 Install & build</span></a>
+  </div>
+</section>
+
+<!-- ═════════════════════ Hero image ═════════════════════ -->
+<div class="hero-card">
+  <div class="frame">
+    <img src="main.png" alt="AgentZero Lite — multi-CLI multi-view screenshot" loading="lazy">
+  </div>
+</div>
+
+<!-- ═════════════════════ One-paragraph pitch ═════════════════════ -->
+<div class="hero-pitch">
+  <p class="ko">같은 워크스페이스에서든 다른 워크스페이스에서든, CLI로 돌아가는 AI(Claude, Codex, 종류 무관)에게 <strong style="color:var(--mint)">명령 한 줄</strong>을 바로 꽂아 넣을 수 있습니다. 서로 다른 모델의 AI들을 동시에 띄워두고, <strong style="color:var(--mint)">같은 경로로 둘을 대화시킬 수도 있습니다</strong> — 별도 중계 서버나 커스텀 브로커 없이, 모델 간 크로스 대화.</p>
+  <p class="en">Pipe a single instruction to an AI CLI (Claude, Codex, any model you can run in a shell) living in the same workspace — or in a different one — and have it act. Run two different AI models side by side and let them talk to each other through the same mechanism: <strong style="color:var(--mint)">cross-model dialogue, no custom broker required</strong>.</p>
+</div>
+
+<!-- ═════════════════════ Features ═════════════════════ -->
+<section class="section">
+  <h2 class="ko">이 제품이 해주는 일</h2>
+  <h2 class="en">What it does for you</h2>
+
+  <div class="grid">
+    <div class="card accent-cyan">
+      <span class="tag">TERMINAL</span>
+      <h4 class="ko">진짜 멀티탭 ConPTY</h4>
+      <h4 class="en">Real multi-tab ConPTY</h4>
+      <p class="ko">각 탭이 Windows Terminal과 동일한 <code>conhost</code> 렌더러로 돌아갑니다. 흉내가 아닌 진짜 PTY.</p>
+      <p class="en">Every tab is a real <code>conhost</code> session — the same renderer Windows Terminal uses. Not a pseudo-PTY pretending.</p>
+    </div>
+
+    <div class="card accent-cyan">
+      <span class="tag">WORKSPACES</span>
+      <h4 class="ko">폴더 = 작업 공간</h4>
+      <h4 class="en">Folder = workspace</h4>
+      <p class="ko">프로젝트마다 탭 세트를 따로 유지합니다. 좌측 사이드바에서 한 번 클릭하면 해당 폴더에서 새 Claude가 바로 시작됩니다.</p>
+      <p class="en">Each project keeps its own set of tabs. One click in the sidebar = a fresh shell in that directory, ready to launch Claude.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">AI ↔ AI</span>
+      <h4 class="ko">모델 간 티키타카</h4>
+      <h4 class="en">Cross-model tiki-taka</h4>
+      <p class="ko">Claude가 탭 0에서 탭 1의 Codex에게 말을 걸고, Codex가 답하고, 사람은 중간에서 감독만 합니다. 클라우드 중계 없음.</p>
+      <p class="en">Claude in tab 0 talks to Codex in tab 1, Codex replies, you supervise from the middle. No cloud relay.</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">CHATBOT</span>
+      <h4 class="ko">텍스트 / 키 브로커</h4>
+      <h4 class="en">Text / key broker</h4>
+      <p class="ko">도킹 가능한 채팅 패널. 입력한 텍스트를 활성 터미널로 보냅니다. KEY 모드는 Ctrl+C·화살표 같은 제어키도 전송.</p>
+      <p class="en">A dockable chat pane that forwards text into the active terminal. KEY mode ships raw control keys (Ctrl+C, arrows, Tab) too.</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">SKILL SYNC</span>
+      <h4 class="ko">/ 슬래시 매크로</h4>
+      <h4 class="en">/ slash macros</h4>
+      <p class="ko">Claude의 <code>/skills</code> 목록을 자동 파싱해 채팅창의 / 팝업 메뉴로 노출합니다. LLM 호출 없이 매크로로 발사.</p>
+      <p class="en">Parses Claude's <code>/skills</code> output and exposes it as a <code>/</code> popup menu. Fires as a macro — no LLM round-trip.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">NOTE</span>
+      <h4 class="ko">마크다운 + Mermaid 뷰어</h4>
+      <h4 class="en">Markdown + Mermaid viewer</h4>
+      <p class="ko">워크스페이스 폴더의 .md / Pencil 파일을 바로 렌더링합니다. 다이어그램까지.</p>
+      <p class="en">Renders .md / Pencil files straight from the workspace folder — including Mermaid diagrams.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">CLI</span>
+      <h4 class="ko">스크립트에서 GUI 구동</h4>
+      <h4 class="en">Drive the GUI from scripts</h4>
+      <p class="ko"><code>AgentZeroLite.exe -cli terminal-send 0 0 "npm test"</code> 한 줄로 원격 제어 가능. WM_COPYDATA + 메모리 맵 기반 IPC.</p>
+      <p class="en"><code>AgentZeroLite.exe -cli terminal-send 0 0 "npm test"</code> from any script. IPC over WM_COPYDATA + memory-mapped files.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">AKKA</span>
+      <h4 class="ko">액터 감독</h4>
+      <h4 class="en">Supervised actors</h4>
+      <p class="ko">터미널/워크스페이스/봇이 Akka.NET 액터로 감독됩니다. 한 세션이 죽어도 창 전체는 멀쩡.</p>
+      <p class="en">Terminals, workspaces and the bot live under Akka.NET supervision. One crashing session never takes the window down.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════ AI ↔ AI ═════════════════════ -->
+<section class="section" id="ai-talk">
+  <h2 class="ko">🤝 두 AI CLI 대화시키기 — 1분 레시피</h2>
+  <h2 class="en">🤝 Make two AI CLIs talk — the 1-minute recipe</h2>
+
+  <div class="ascii">
+<span class="src">Tab 0 (Claude)</span>                 <span class="dst">Tab 1 (Codex)</span>
+  │                                │
+  │    "Greet the Codex tab."      │
+  │            │                   │
+  │            ▼                   │
+  │ <span class="cmd">AgentZeroLite.ps1 terminal-send 0 1 "hi Codex"</span> ─▶
+  │                                │
+  │                         Codex reads prompt,
+  │                         composes reply
+  │                                │
+  ◀─ <span class="cmd">AgentZeroLite.ps1 terminal-send 0 0 "hey Claude, let's design an API"</span>
+  │                                │
+  │ <span class="cmd">terminal-read 0 1 --last 2000</span>   ─▶  <span class="cmd">terminal-read 0 0 --last 2000</span>
+  │            (continue turn-by-turn)            │
+  </div>
+
+  <div class="recipe">
+    <ol class="ko">
+      <li>
+        <strong>CLI 경로 등록 (1회)</strong>
+        Settings → <em>AgentZero CLI</em> → <code>Register PATH</code> 버튼. 이후 어느 셸에서든 <code>AgentZeroLite.ps1</code>이 잡힙니다.
+      </li>
+      <li>
+        <strong>같은 워크스페이스에 AI 탭 2개</strong>
+        예: 그룹 0 탭 0 = <code>claude</code>, 그룹 0 탭 1 = <code>codex</code>. 자연어 지시를 받는 AI CLI면 어느 것이든.
+      </li>
+      <li>
+        <strong>각 AI에게 도구 가르치기 (탭마다 한 번 붙여넣기)</strong>
+        <code>Learn `AgentZeroLite.ps1 help` and use it for cross-terminal talk.
+Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` to speak by name, and `terminal-read &lt;grp&gt; &lt;tab&gt; --last 2000` to read a peer's reply.</code>
+      </li>
+      <li>
+        <strong>대화 시작</strong>
+        Claude 탭에서 <em>"Codex라는 이름의 탭에 인사하고, REST 엔드포인트를 같이 설계하자고 제안해."</em> — Claude는 <code>terminal-send</code>로 메시지를 보내고, Codex는 프롬프트에서 받아 답장을 쏩니다. 두 탭에 대화가 실시간 흐름.
+      </li>
+    </ol>
+    <ol class="en">
+      <li>
+        <strong>Register the CLI path (once)</strong>
+        Settings → <em>AgentZero CLI</em> → <code>Register PATH</code>. <code>AgentZeroLite.ps1</code> resolves from any shell after this.
+      </li>
+      <li>
+        <strong>Open two AI tabs in the same workspace</strong>
+        e.g. group 0 tab 0 = <code>claude</code>, group 0 tab 1 = <code>codex</code>. Any CLI-native AI works.
+      </li>
+      <li>
+        <strong>Teach each AI the tool (paste once per tab)</strong>
+        <code>Learn `AgentZeroLite.ps1 help` and use it for cross-terminal talk.
+Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` to speak by name, and `terminal-read &lt;grp&gt; &lt;tab&gt; --last 2000` to read a peer's reply.</code>
+      </li>
+      <li>
+        <strong>Kick it off</strong>
+        In the Claude tab: <em>"Greet the tab named Codex and propose we co-design a REST endpoint."</em> Claude issues <code>terminal-send</code>, Codex sees it, composes a reply, and sends it back. The conversation streams in both tabs.
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ═════════════════════ How it works ═════════════════════ -->
+<section class="section">
+  <h2 class="ko">작동 방식 (짧게)</h2>
+  <h2 class="en">How it works (in short)</h2>
+
+  <div class="grid">
+    <div class="card accent-cyan">
+      <span class="tag">IPC</span>
+      <h4 class="ko">WM_COPYDATA + MMF</h4>
+      <h4 class="en">WM_COPYDATA + MMF</h4>
+      <p class="ko">CLI가 GUI에 명령을 보낼 땐 Windows의 <code>WM_COPYDATA</code>, 응답은 네임드 메모리 맵 파일에서 폴링합니다. 기본 5초 타임아웃, <code>--no-wait</code>로 fire-and-forget.</p>
+      <p class="en">Commands travel via <code>WM_COPYDATA</code>, responses come back through named memory-mapped files. Default 5s poll; <code>--no-wait</code> skips it entirely.</p>
+    </div>
+    <div class="card">
+      <span class="tag">LOCAL</span>
+      <h4 class="ko">전부 로컬</h4>
+      <h4 class="en">Everything local</h4>
+      <p class="ko">브로커 서버도, 클라우드 중계도 없습니다. 두 AI가 서로의 텍스트를 교환해도 모든 것은 같은 Windows 사용자 세션 안에서만.</p>
+      <p class="en">No broker server, no cloud relay. When two AIs exchange text, everything stays inside one Windows user session.</p>
+    </div>
+    <div class="card accent-magenta">
+      <span class="tag">ACTORS</span>
+      <h4 class="ko">Stage → Workspace → Terminal</h4>
+      <h4 class="en">Stage → Workspace → Terminal</h4>
+      <p class="ko">Akka.NET 액터 트리로 터미널 생명주기·라우팅·장애 격리를 관리합니다. 탭이 죽어도 다른 탭은 살아남습니다.</p>
+      <p class="en">An Akka.NET actor tree manages lifecycle, routing and fault isolation. A crashing tab never takes the rest down.</p>
+    </div>
+    <div class="card accent-yellow">
+      <span class="tag">ZERO AI</span>
+      <h4 class="ko">내장 LLM 없음</h4>
+      <h4 class="en">No embedded LLM</h4>
+      <p class="ko">AgentZero Lite 자체는 AI 추론을 하지 않습니다. 배관(plumbing)만 제공하고, 지능은 당신이 띄운 AI CLI가 맡습니다.</p>
+      <p class="en">Lite itself runs no LLM. It's plumbing. The intelligence belongs to whatever AI CLIs you launch.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════ CLI ═════════════════════ -->
+<section class="section">
+  <h2 class="ko">CLI 치트시트</h2>
+  <h2 class="en">CLI cheat sheet</h2>
+  <p class="ko" style="color:var(--text-dim);font-size:14px">GUI가 떠 있는 상태에서만 동작합니다. <code>open-win</code>으로 띄우세요.</p>
+  <p class="en" style="color:var(--text-dim);font-size:14px">Requires a running GUI — launch it with <code>open-win</code>.</p>
+  <table class="cmd-table">
+    <thead>
+      <tr><th>Command</th><th class="ko">동작</th><th class="en">What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>status</td><td class="ko">GUI 상태 JSON</td><td class="en">GUI state JSON</td></tr>
+      <tr><td>open-win · close-win</td><td class="ko">메인 창 표시 / 숨김</td><td class="en">Show or hide the main window</td></tr>
+      <tr><td>terminal-list</td><td class="ko">전체 워크스페이스/탭 세션 JSON</td><td class="en">JSON list of every workspace/tab session</td></tr>
+      <tr><td>terminal-send &lt;g&gt; &lt;t&gt; "text"</td><td class="ko">탭 <code>&lt;t&gt;</code>로 텍스트 전송</td><td class="en">Send text to tab <code>&lt;t&gt;</code> in workspace <code>&lt;g&gt;</code></td></tr>
+      <tr><td>terminal-key &lt;g&gt; &lt;t&gt; &lt;key&gt;</td><td class="ko">제어키 전송 (Ctrl+C, Enter, 화살표 …)</td><td class="en">Send a control key (Ctrl+C, Enter, arrows …)</td></tr>
+      <tr><td>terminal-read &lt;g&gt; &lt;t&gt; --last N</td><td class="ko">스크롤백 마지막 N바이트 읽기</td><td class="en">Read the last N bytes from a tab</td></tr>
+      <tr><td>bot-chat "text" --from X</td><td class="ko">Bot 창에 외부 메시지 버블 표시</td><td class="en">Display an external chat bubble in the bot window</td></tr>
+      <tr><td>copy · log · help</td><td class="ko">클립보드 / 액션 히스토리 / 도움말</td><td class="en">Clipboard / action history / help</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════ Install ═════════════════════ -->
+<section class="section" id="install">
+  <h2 class="ko">설치 & 빌드</h2>
+  <h2 class="en">Install & build</h2>
+  <p class="ko">Windows 10/11 · <a href="https://dotnet.microsoft.com/" target="_blank" rel="noopener">.NET 10 SDK</a> 필요.</p>
+  <p class="en">Requires Windows 10/11 and the <a href="https://dotnet.microsoft.com/" target="_blank" rel="noopener">.NET 10 SDK</a>.</p>
+
+<pre><code># clone
+git clone https://github.com/psmon/AgentZeroLite.git
+cd AgentZeroLite
+
+# build
+dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release
+
+# run
+./Project/AgentZeroWpf/bin/Release/net10.0-windows/AgentZeroLite.exe</code></pre>
+
+  <h3 class="ko">⚠️ IDE에서 디버깅할 때</h3>
+  <h3 class="en">⚠️ When debugging in an IDE</h3>
+  <p class="ko">IDE가 프로세스 stdio를 가로채면 ConPTY 탭이 뜨지 않습니다. <strong>외부 콘솔(External Terminal) 옵션을 반드시 켜세요.</strong></p>
+  <p class="en">If the IDE attaches its own terminal to the process, ConPTY tabs won't start. <strong>Always run with an external console.</strong></p>
+  <table class="cmd-table">
+    <thead><tr><th>IDE</th><th class="ko">설정</th><th class="en">Setting</th></tr></thead>
+    <tbody>
+      <tr><td>Rider</td><td class="ko">Run/Debug config → <code>Use external console = ON</code></td><td class="en">Run/Debug config → <code>Use external console = ON</code></td></tr>
+      <tr><td>Visual Studio</td><td class="ko">Debug 속성 → "Redirect standard output" <b>해제</b></td><td class="en">Debug properties → <b>uncheck</b> "Redirect standard output"</td></tr>
+      <tr><td>VS Code</td><td class="ko"><code>launch.json</code>에서 <code>"console":"externalTerminal"</code></td><td class="en"><code>launch.json</code>: <code>"console":"externalTerminal"</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════ Footer ═════════════════════ -->
+<footer>
+  <div class="wordmark">
+    <span class="logo"></span>
+    <span class="agent">AGENT</span><span class="zero">ZERO</span><span class="lite">LITE</span>
+  </div>
+  <div class="spacer"></div>
+  <a href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener">GitHub</a>
+  <a href="../README.md">README</a>
+  <a href="../README-KR.md">한국어</a>
+  <span style="color:var(--text-dim)">© AgentZero Lite · alpha</span>
+</footer>
+
+<script>
+(function(){
+  var root = document.body;
+  function apply(lang){
+    root.setAttribute('data-lang', lang);
+    document.querySelectorAll('.lang-toggle button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.setLang === lang);
+    });
+    try{ localStorage.setItem('azl.lang', lang); }catch(e){}
+    document.documentElement.setAttribute('lang', lang === 'ko' ? 'ko' : 'en');
+  }
+  var saved;
+  try{ saved = localStorage.getItem('azl.lang'); }catch(e){}
+  if(saved === 'en' || saved === 'ko') apply(saved);
+  document.querySelectorAll('.lang-toggle button').forEach(function(b){
+    b.addEventListener('click', function(){ apply(b.dataset.setLang); });
+  });
+})();
+</script>
+</body>
+</html>
