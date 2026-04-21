@@ -164,9 +164,10 @@ footer a:hover{color:var(--mint)}
   <p class="sub ko">여러 AI CLI를 한 창에 나란히 띄우고, 명령을 쏘고, 모델끼리 대화시키세요.</p>
   <p class="sub en">Run many AI CLIs side by side, pipe instructions to any of them, and let different models talk to each other.</p>
   <div class="cta-row">
-    <a class="btn primary" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">⚡ GitHub에서 받기</span><span class="en">⚡ Get it on GitHub</span></a>
+    <a class="btn primary" href="https://github.com/psmon/AgentZeroLite/releases/latest" target="_blank" rel="noopener"><span class="ko">⬇ 최신 버전 다운로드</span><span class="en">⬇ Download latest</span></a>
     <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
-    <a class="btn" href="#install"><span class="ko">🛠 설치 & 빌드</span><span class="en">🛠 Install & build</span></a>
+    <a class="btn" href="#install"><span class="ko">🛠 설치 옵션</span><span class="en">🛠 Install options</span></a>
+    <a class="btn" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">GitHub</span><span class="en">GitHub</span></a>
   </div>
 </section>
 
@@ -379,25 +380,56 @@ Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` 
   </table>
 </section>
 
-<!-- ═════════════════════ Install ═════════════════════ -->
+<!-- ═════════════════════ Install (end-user) ═════════════════════ -->
 <section class="section" id="install">
-  <h2 class="ko">설치 & 빌드</h2>
-  <h2 class="en">Install & build</h2>
-  <p class="ko">Windows 10/11 · <a href="https://dotnet.microsoft.com/" target="_blank" rel="noopener">.NET 10 SDK</a> 필요.</p>
-  <p class="en">Requires Windows 10/11 and the <a href="https://dotnet.microsoft.com/" target="_blank" rel="noopener">.NET 10 SDK</a>.</p>
+  <h2 class="ko">설치</h2>
+  <h2 class="en">Install</h2>
+  <p class="ko" style="color:var(--text-soft)">Windows 10/11 x64. <strong>자가 포함(self-contained)</strong> 빌드라 .NET SDK를 따로 설치할 필요가 없습니다.</p>
+  <p class="en" style="color:var(--text-soft)">Windows 10/11 x64. The build is <strong>self-contained</strong>, so no separate .NET SDK is required.</p>
 
-<pre><code># clone
-git clone https://github.com/psmon/AgentZeroLite.git
+  <div class="grid" style="margin-top:18px">
+    <div class="card accent-cyan">
+      <span class="tag">INSTALLER</span>
+      <h4 class="ko">Inno Setup 인스톨러 (추천)</h4>
+      <h4 class="en">Inno Setup installer (recommended)</h4>
+      <p class="ko">더블클릭 → 다음 → 완료. 시작 메뉴/바탕화면 아이콘 등록, 언인스톨러 포함.</p>
+      <p class="en">Double-click → Next → Finish. Adds Start Menu / desktop icons and an uninstaller.</p>
+      <p style="margin-top:10px">
+        <a class="btn primary" href="https://github.com/psmon/AgentZeroLite/releases/latest" target="_blank" rel="noopener"><span class="ko">⬇ 최신 Setup.exe 받기</span><span class="en">⬇ Download latest Setup.exe</span></a>
+      </p>
+      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="ko">Releases 페이지에서 <code>AgentZeroLite-v&lt;version&gt;-Setup.exe</code>를 고르세요.</p>
+      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="en">Pick <code>AgentZeroLite-v&lt;version&gt;-Setup.exe</code> from the Releases page.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">PORTABLE</span>
+      <h4 class="ko">ZIP 포터블 빌드</h4>
+      <h4 class="en">Portable ZIP build</h4>
+      <p class="ko">압축만 풀면 끝. 레지스트리를 건드리지 않고, USB에서도 실행 가능합니다.</p>
+      <p class="en">Unzip and run. Nothing touches the registry — USB-friendly.</p>
+      <p style="margin-top:10px">
+        <a class="btn" href="https://github.com/psmon/AgentZeroLite/releases/latest" target="_blank" rel="noopener"><span class="ko">⬇ 최신 ZIP 받기</span><span class="en">⬇ Download latest ZIP</span></a>
+      </p>
+      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="ko">파일명: <code>AgentZeroLite-v&lt;version&gt;-win-x64.zip</code></p>
+      <p style="margin-top:8px;color:var(--text-dim);font-size:12px" class="en">Filename: <code>AgentZeroLite-v&lt;version&gt;-win-x64.zip</code></p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">DEV</span>
+      <h4 class="ko">소스 빌드</h4>
+      <h4 class="en">Build from source</h4>
+      <p class="ko">기여하거나 수정하고 싶다면 저장소를 클론하세요.</p>
+      <p class="en">Clone the repo if you want to contribute or patch locally.</p>
+<pre style="margin-top:10px"><code>git clone https://github.com/psmon/AgentZeroLite.git
 cd AgentZeroLite
+dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release</code></pre>
+      <p style="margin-top:6px;color:var(--text-dim);font-size:12px" class="ko">요구사항: <a href="https://dotnet.microsoft.com/" target="_blank" rel="noopener">.NET 10 SDK</a>.</p>
+      <p style="margin-top:6px;color:var(--text-dim);font-size:12px" class="en">Requires the <a href="https://dotnet.microsoft.com/" target="_blank" rel="noopener">.NET 10 SDK</a>.</p>
+    </div>
+  </div>
 
-# build
-dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release
-
-# run
-./Project/AgentZeroWpf/bin/Release/net10.0-windows/AgentZeroLite.exe</code></pre>
-
-  <h3 class="ko">⚠️ IDE에서 디버깅할 때</h3>
-  <h3 class="en">⚠️ When debugging in an IDE</h3>
+  <h3 class="ko" style="margin-top:2em">⚠️ IDE에서 디버깅할 때</h3>
+  <h3 class="en" style="margin-top:2em">⚠️ When debugging in an IDE</h3>
   <p class="ko">IDE가 프로세스 stdio를 가로채면 ConPTY 탭이 뜨지 않습니다. <strong>외부 콘솔(External Terminal) 옵션을 반드시 켜세요.</strong></p>
   <p class="en">If the IDE attaches its own terminal to the process, ConPTY tabs won't start. <strong>Always run with an external console.</strong></p>
   <table class="cmd-table">

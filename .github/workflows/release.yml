@@ -1,0 +1,85 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (without the leading v, e.g. 0.1.0). Used only for manual runs; tag push uses the tag.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $ref = "${{ github.ref }}"
+          if ($ref.StartsWith("refs/tags/v")) {
+            $tag = $ref.Substring("refs/tags/".Length)
+            $ver = $tag.TrimStart('v')
+          } elseif ("${{ github.event.inputs.version }}" -ne "") {
+            $ver = "${{ github.event.inputs.version }}"
+            $tag = "v$ver"
+          } else {
+            $ver = (Get-Content Project/AgentZeroWpf/version.txt -Raw).Trim()
+            $tag = "v$ver"
+          }
+          echo "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          echo "tag=$tag"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Resolved version=$ver  tag=$tag"
+
+      - name: Restore dependencies
+        run: dotnet restore Project/AgentZeroWpf/AgentZeroWpf.csproj
+
+      - name: Publish (self-contained, win-x64)
+        run: |
+          dotnet publish Project/AgentZeroWpf/AgentZeroWpf.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -o ./publish
+
+      - name: Create ZIP
+        run: |
+          $zip = "./AgentZeroLite-${{ steps.ver.outputs.tag }}-win-x64.zip"
+          Compress-Archive -Path ./publish/* -DestinationPath $zip
+
+      # --- Inno Setup installer ---
+      - name: Create installer (Inno Setup)
+        run: |
+          iscc /DAppVersion="${{ steps.ver.outputs.version }}" installer/AgentZeroLite.iss
+
+      - name: List artifacts (debug)
+        run: |
+          Get-ChildItem -Path . -Filter 'AgentZeroLite-*' -Recurse | Format-Table FullName,Length
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          files: |
+            ./AgentZeroLite-${{ steps.ver.outputs.tag }}-win-x64.zip
+            ./output/AgentZeroLite-${{ steps.ver.outputs.tag }}-Setup.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
