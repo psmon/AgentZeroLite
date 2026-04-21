@@ -31,6 +31,10 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Create the Pages site on first run if it does not exist yet
+          # (requires repo `pages: write` permission, already granted above).
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
