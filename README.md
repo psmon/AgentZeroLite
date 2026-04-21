@@ -2,6 +2,9 @@
 
 **A minimalist IDE for the AI era — driving many CLIs side by side, from a single window.**
 
+> 🇰🇷 한국어 문서: [README-KR.md](README-KR.md)
+
+
 AgentZero Lite is a Windows desktop shell built around a simple idea: in the AI era most
 of your day is spent *talking to command-line tools*. `claude`, `codex`, `gh`, `docker`,
 `pwsh`, a REPL, a build log tail — each wants its own terminal, and you want all of them
@@ -20,6 +23,14 @@ macros to whichever terminal is in focus — nothing more, nothing less.
 - **AgentChatBot** — a dockable chat pane that forwards whatever you type into the
   **active** terminal. `CHT` mode types text, `KEY` mode forwards raw keystrokes
   (Ctrl+C, arrows, Tab). It is **not** an AI; it is an input broker.
+- **AI ↔ AI conversation (the headline trick)** — teach `AgentZeroLite.ps1` to a
+  Claude tab or a Codex tab *once* ("learn `AgentZeroLite.ps1 help` and use it for
+  cross-terminal talk"), and from that point on either AI can greet the other
+  terminal *by name* and strike up a real dialogue. Claude in tab 0 writes to Codex
+  in tab 1, Codex replies back, each reads the peer's last output with
+  `terminal-read`. No extra broker, no cloud relay — just the two CLIs poking each
+  other through AgentZero's IPC. This is the tiki-taka between models that the Lite
+  edition exists for.
 - **Skill Sync `/` macros** — when Claude is running in a tab, press `[+] → Skill Sync`.
   AgentZero reads the skill list out of Claude's own `/skills` view and turns it into
   a slash-command menu in the chat box. Type `/`, pick a skill, Enter — the macro text
@@ -185,6 +196,42 @@ scripts from a hung GUI; add `--no-wait` for fire-and-forget.
 A PowerShell wrapper is shipped at `Project/AgentZeroWpf/AgentZeroLite.ps1` for convenience
 once the app directory is on `PATH` (do this from the Settings pane: **AgentZero CLI →
 Register PATH**).
+
+---
+
+## Making two AI CLIs talk to each other
+
+This is the Lite edition's signature use case and it takes about one minute to set up.
+
+1. **Register the CLI path once.** Open Settings → *AgentZero CLI* → click
+   `Register PATH`. Now `AgentZeroLite.ps1` resolves from any shell.
+2. **Open two AI tabs in the same workspace.** For example, group 0 tab 0 =
+   `claude`, group 0 tab 1 = `codex` (any AI CLI that accepts natural-language
+   instructions works).
+3. **Teach each AI the tool.** In each tab, paste one line:
+   > Learn `AgentZeroLite.ps1 help` and use it for cross-terminal talk.
+   > Use `terminal-list` to see the tabs, `terminal-send <grp> <tab> "text"` to
+   > speak to another AI tab by name, and `terminal-read <grp> <tab> --last 2000`
+   > to read the peer's reply.
+4. **Start the dialogue.** In the Claude tab say:
+   *"Greet the tab named Codex and propose we co-design a REST endpoint."*
+   Claude will run `AgentZeroLite.ps1 terminal-send 0 1 "hi Codex, ..."`.
+   Codex sees it at its prompt, composes a reply, and sends it back with
+   `terminal-send 0 0 "..."`. You watch the conversation stream in both tabs.
+
+What makes this work:
+
+- Each AI runs in its **own ConPTY** — no shared memory, no context leakage.
+- Messages traverse **AgentZero's IPC** (`WM_COPYDATA` + memory-mapped files),
+  not a cloud relay; nothing leaves your machine.
+- The tab layout means you can interrupt, nudge, or splice in at any step —
+  the human stays the supervisor.
+- Because the broker is just a shell command the AI already understands,
+  you can swap `claude` for any CLI-native agent (Aider, Copilot, a local
+  `ollama` chat, …) and keep the same protocol.
+
+This is the "tiki-taka between models" the Lite edition was built for. Terminal
+multiplexers let you *watch* many prompts; AgentZero Lite lets them **talk**.
 
 ---
 

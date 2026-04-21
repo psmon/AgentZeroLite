@@ -273,13 +273,11 @@
 
             <!-- AgentZero CLI Tab -->
             <TabItem Header="&#x1F4BB; AgentZero CLI" Style="{StaticResource SettingsTabItem}">
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,0,0">
 
                     <!-- Path Setup -->
-                    <Border Grid.Row="0" Background="#1A1A2E" BorderBrush="#3E3E42"
+                    <Border Background="#1A1A2E" BorderBrush="#3E3E42"
                             BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
@@ -312,7 +310,65 @@
                                        Foreground="#556677" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
-                </Grid>
+
+                    <!-- AI ↔ AI Talk (teach the CLI to Claude / Codex) -->
+                    <Border Background="#1A1A2E" BorderBrush="#3E3E42"
+                            BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Rectangle Width="3" Height="10" Fill="#8B00FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                <TextBlock Text="AI &#x2194; AI TALK" FontSize="11" FontWeight="Bold"
+                                           Foreground="#8B00FF" FontFamily="Consolas"/>
+                            </StackPanel>
+
+                            <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                       Foreground="#C8C8D8" LineHeight="16"
+                                       Margin="0,0,0,6">
+                                <Run FontWeight="Bold" Foreground="#00FFF0">Teach the CLI to your AI once — they can talk to each other forever.</Run>
+                            </TextBlock>
+
+                            <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                       Foreground="#808080" LineHeight="16"
+                                       Margin="0,0,0,6">
+                                <Run>After PATH registration, open a Claude / Codex tab and paste:</Run>
+                            </TextBlock>
+
+                            <Border Background="#0A0A14" BorderBrush="#2A2A5E" BorderThickness="1"
+                                    CornerRadius="2" Padding="8,6" Margin="0,0,0,8">
+                                <TextBox IsReadOnly="True" BorderThickness="0"
+                                         Background="Transparent" Foreground="#B5CEA8"
+                                         FontFamily="Consolas" FontSize="10"
+                                         TextWrapping="Wrap" AcceptsReturn="True"
+                                         Text="Learn `AgentZeroLite.ps1 help` and use it for cross-terminal talk.&#x0a;Use `terminal-list` to see the tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; &quot;text&quot;` to speak to another AI tab by name."/>
+                            </Border>
+
+                            <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                       Foreground="#808080" LineHeight="16"
+                                       Margin="0,0,0,6">
+                                <Run>Then say, for example:</Run>
+                            </TextBlock>
+
+                            <Border Background="#0A0A14" BorderBrush="#2A2A5E" BorderThickness="1"
+                                    CornerRadius="2" Padding="8,6">
+                                <TextBox IsReadOnly="True" BorderThickness="0"
+                                         Background="Transparent" Foreground="#C8C8D8"
+                                         FontFamily="Consolas" FontSize="10"
+                                         TextWrapping="Wrap" AcceptsReturn="True"
+                                         Text="&#x25B8; You (in Claude tab):  Greet the tab named Codex.&#x0a;&#x25B8; Claude runs:           AgentZeroLite.ps1 terminal-send 0 1 &quot;hi Codex, this is Claude&quot;&#x0a;&#x25B8; Codex replies back:    AgentZeroLite.ps1 terminal-send 0 0 &quot;hey Claude, let's design the API&quot;&#x0a;&#x25B8; Each AI reads the peer's reply with: terminal-read 0 &lt;peer-tab&gt; --last 2000"/>
+                            </Border>
+
+                            <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                       Foreground="#556677" LineHeight="16"
+                                       Margin="0,6,0,0">
+                                <Run>No shared memory, no broker — the shell pipes through AgentZero's</Run>
+                                <LineBreak/>
+                                <Run>IPC (WM_COPYDATA + memory-mapped files). You stay in control.</Run>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
     </Grid>
