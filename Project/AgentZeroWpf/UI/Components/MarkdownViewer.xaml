@@ -1,0 +1,17 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.MarkdownViewer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#1E1E1E">
+
+    <RichTextBox x:Name="rtbContent"
+                 Background="#1E1E1E"
+                 Foreground="#D4D4D4"
+                 BorderThickness="0"
+                 FontFamily="Consolas"
+                 FontSize="12"
+                 IsReadOnly="True"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto"
+                 Padding="10,8"
+                 IsDocumentEnabled="True"/>
+</UserControl>

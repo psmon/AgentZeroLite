@@ -1,0 +1,179 @@
+<Window x:Class="AgentZeroWpf.UI.APP.CliDefEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CLI Definition" Width="420" Height="400"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip"
+        WindowStyle="None"
+        Background="#252526"
+        StateChanged="OnWindowStateChanged">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="BgToolbar"    Color="#2D2D30"/>
+        <SolidColorBrush x:Key="BorderColor"  Color="#3E3E42"/>
+        <SolidColorBrush x:Key="AccentBrush"  Color="#3794FF"/>
+        <SolidColorBrush x:Key="DangerBrush"  Color="#C42B1C"/>
+        <SolidColorBrush x:Key="TextPrimary"  Color="#D4D4D4"/>
+        <SolidColorBrush x:Key="TextDim"      Color="#858585"/>
+        <SolidColorBrush x:Key="InputBg"      Color="#1F1F1F"/>
+        <SolidColorBrush x:Key="InputBorder"  Color="#3E3E42"/>
+        <SolidColorBrush x:Key="ButtonBg"     Color="#2D2D30"/>
+        <SolidColorBrush x:Key="ButtonHover"  Color="#383B3F"/>
+
+        <Style x:Key="TitleBarButton" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource ButtonHover}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TitleBarCloseButton" TargetType="Button" BasedOn="{StaticResource TitleBarButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource DangerBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1,0,1,1" CornerRadius="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="32"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="OnTitleBarMouseDown">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#1E1E1E" Offset="0"/>
+                        <GradientStop Color="#2D2D30" Offset="0.5"/>
+                        <GradientStop Color="#1E1E1E" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="&#xE921;" Style="{StaticResource TitleBarButton}"
+                                Click="OnMinimizeClick"/>
+                        <Button x:Name="MaxRestoreButton" Content="&#xE922;" Style="{StaticResource TitleBarButton}"
+                                Click="OnMaximizeClick"/>
+                        <Button Content="&#xE8BB;" Style="{StaticResource TitleBarCloseButton}"
+                                Click="OnCloseClick"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE756;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="CLI Definition" FontSize="13" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentBrush}" FontFamily="Consolas" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Name" Foreground="{StaticResource TextPrimary}" FontFamily="Consolas"
+                   VerticalAlignment="Center" Margin="0,0,0,8"/>
+        <TextBox Grid.Row="0" Grid.Column="1" x:Name="tbName"
+                 FontFamily="Consolas" FontSize="12" Margin="0,0,0,8"
+                 Background="{StaticResource InputBg}" Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource InputBorder}"
+                 Padding="4,3"/>
+
+        <TextBlock Grid.Row="1" Text="ExePath" Foreground="{StaticResource TextPrimary}" FontFamily="Consolas"
+                   VerticalAlignment="Center" Margin="0,0,0,8"/>
+        <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="cbExePreset" Grid.Column="0" Width="140"
+                      FontFamily="Consolas" FontSize="12"
+                      Background="{StaticResource InputBg}" Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource InputBorder}"
+                      Padding="4,3" Margin="0,0,6,0"
+                      SelectionChanged="OnExePresetChanged">
+                <ComboBoxItem Content="CMD" Tag="cmd.exe"/>
+                <ComboBoxItem Content="PowerShell5" Tag="powershell.exe"/>
+                <ComboBoxItem Content="PowerShell7" Tag="pwsh.exe"/>
+                <ComboBoxItem Content="Custom" Tag=""/>
+            </ComboBox>
+            <TextBox x:Name="tbExePath" Grid.Column="1"
+                     FontFamily="Consolas" FontSize="12"
+                     Background="{StaticResource InputBg}" Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource InputBorder}"
+                     Padding="4,3" IsEnabled="False"/>
+        </Grid>
+
+        <TextBlock Grid.Row="2" Text="Args" Foreground="{StaticResource TextPrimary}" FontFamily="Consolas"
+                   VerticalAlignment="Center" Margin="0,0,0,8"/>
+        <TextBox Grid.Row="2" Grid.Column="1" x:Name="tbArgs"
+                 FontFamily="Consolas" FontSize="12" Margin="0,0,0,8"
+                 Background="{StaticResource InputBg}" Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource InputBorder}"
+                 Padding="4,3"/>
+
+        <!-- Tips (텍스트 선택 가능) -->
+        <Border Grid.Row="3" Grid.ColumnSpan="2" Background="{StaticResource BgToolbar}" BorderBrush="{StaticResource BorderColor}"
+                BorderThickness="1" CornerRadius="0" Padding="10,8" Margin="0,4,0,0">
+            <TextBox IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                     FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextDim}"
+                     TextWrapping="Wrap" AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     Cursor="Arrow"
+                     Text="TIP&#x0a;Runs as: conhost.exe {ExePath} {Args}&#x0a;&#x0a;Example) Auto-launch claude with PW7:&#x0a;  ExePath: pwsh.exe&#x0a;  Args:    -NoExit -Command claude&#x0a;&#x0a;Example) Git Bash:&#x0a;  ExePath: C:\Program Files\Git\bin\bash.exe&#x0a;  Args:    --login"/>
+        </Border>
+
+        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="OK" Padding="20,6" Margin="0,0,8,0"
+                    FontFamily="Consolas" FontWeight="Bold"
+                    Foreground="{StaticResource TextPrimary}" Background="#333337"
+                    BorderBrush="{StaticResource AccentBrush}" Cursor="Hand"
+                    Click="OnOk"/>
+            <Button Content="Cancel" Padding="20,6"
+                    FontFamily="Consolas" FontWeight="Bold"
+                    Foreground="{StaticResource TextPrimary}" Background="{StaticResource ButtonBg}"
+                    BorderBrush="{StaticResource BorderColor}" Cursor="Hand"
+                    Click="OnCancel"/>
+        </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

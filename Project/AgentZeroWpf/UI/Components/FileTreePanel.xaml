@@ -1,0 +1,90 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.FileTreePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#252526">
+
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="TreeBg"        Color="#252526"/>
+        <SolidColorBrush x:Key="TreeFg"        Color="#D4D4D4"/>
+        <SolidColorBrush x:Key="TreeDim"       Color="#858585"/>
+        <SolidColorBrush x:Key="TreeAccent"    Color="#3794FF"/>
+        <SolidColorBrush x:Key="TreeHover"     Color="#2A2D2E"/>
+        <SolidColorBrush x:Key="TreeSelected"  Color="#264F78"/>
+        <SolidColorBrush x:Key="TreeBorder"    Color="#3E3E42"/>
+
+        <!-- TreeViewItem style -->
+        <Style TargetType="TreeViewItem">
+            <Setter Property="Foreground" Value="{StaticResource TreeFg}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="2,1"/>
+            <Setter Property="IsExpanded" Value="False"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource TreeSelected}"/>
+                    <Setter Property="Foreground" Value="{StaticResource TreeAccent}"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource TreeHover}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2D2D30" BorderBrush="{StaticResource TreeBorder}"
+                BorderThickness="0,0,0,1" Padding="8,5">
+            <DockPanel>
+                <Button x:Name="btnRefresh" DockPanel.Dock="Right" Content="&#xE72C;"
+                        FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        Foreground="{StaticResource TreeDim}" Background="Transparent"
+                        BorderThickness="0" Cursor="Hand" Padding="4,2"
+                        ToolTip="Refresh" Click="OnRefreshClick"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                               Foreground="{StaticResource TreeAccent}" VerticalAlignment="Center"
+                               Margin="0,0,6,0"/>
+                    <TextBlock x:Name="txtRootName" Text="EXPLORER" FontSize="10" FontWeight="Bold"
+                               Foreground="{StaticResource TreeAccent}" FontFamily="Consolas"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Tree -->
+        <TreeView x:Name="tvFiles" Grid.Row="1"
+                  Background="{StaticResource TreeBg}"
+                  BorderThickness="0"
+                  VirtualizingStackPanel.IsVirtualizing="True"
+                  VirtualizingStackPanel.VirtualizationMode="Recycling"
+                  SelectedItemChanged="OnSelectedItemChanged">
+            <TreeView.ContextMenu>
+                <ContextMenu x:Name="ctxTree">
+                    <MenuItem x:Name="mnuNewNote" Header="New Note (.md)" Click="OnNewNoteClick">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       Foreground="{StaticResource TreeAccent}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator/>
+                    <MenuItem Header="Open in Explorer" Click="OnOpenInExplorer">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       Foreground="{StaticResource TreeFg}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator/>
+                    <MenuItem Header="Copy Absolute Path" Click="OnCopyAbsolutePath"/>
+                    <MenuItem Header="Copy Relative Path" Click="OnCopyRelativePath"/>
+                    <MenuItem Header="Copy Name" Click="OnCopyName"/>
+                </ContextMenu>
+            </TreeView.ContextMenu>
+        </TreeView>
+    </Grid>
+</UserControl>

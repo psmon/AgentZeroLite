@@ -1,0 +1,104 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>agentzero.ico</ApplicationIcon>
+    <Configurations>Debug;Release;AgentCLI</Configurations>
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dirkster.AvalonDock" Version="4.72.1" />
+    <PackageReference Include="Dirkster.AvalonDock.Themes.VS2013" Version="4.72.1" />
+    <PackageReference Include="EasyWindowsTerminalControl" Version="1.0.36" />
+    <PackageReference Include="CI.Microsoft.Terminal.Wpf" Version="1.22.250204002" />
+    <PackageReference Include="Microsoft.Build" Version="17.14.28" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28" />
+    <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageReference Include="Docnet.Core" Version="2.6.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3124.44" />
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
+    <PackageReference Include="Akka" Version="1.5.40" />
+    <PackageReference Include="Akka.DependencyInjection" Version="1.5.40" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0-preview.3.25171.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0-preview.3.25171.6">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="AgentZero.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="AgentWpf.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Icon resources -->
+  <ItemGroup>
+    <Resource Include="agentzero.ico" />
+  </ItemGroup>
+
+  <!-- Mermaid.js bundle for offline rendering -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\mermaid.min.js" LogicalName="mermaid.min.js" />
+  </ItemGroup>
+
+  <!-- Auto-version: read from version.txt, embed as assembly version -->
+  <PropertyGroup>
+    <VersionFile>$(MSBuildProjectDirectory)\version.txt</VersionFile>
+    <AppVersion>$([System.IO.File]::ReadAllText($(VersionFile)).Trim())</AppVersion>
+    <Version>$(AppVersion)</Version>
+    <AssemblyVersion>$(AppVersion)</AssemblyVersion>
+    <FileVersion>$(AppVersion)</FileVersion>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- Release 빌드 후 version.txt 자동 증가: patch+1, 9→minor+1 -->
+  <Target Name="BumpVersionAfterBuild" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <_CurVer>$([System.IO.File]::ReadAllText($(VersionFile)).Trim())</_CurVer>
+      <_Parts>$(_CurVer.Split('.'))</_Parts>
+      <_Major>$(_CurVer.Split('.')[0])</_Major>
+      <_Minor>$(_CurVer.Split('.')[1])</_Minor>
+      <_Patch>$(_CurVer.Split('.')[2])</_Patch>
+      <_NextPatch>$([MSBuild]::Add($(_Patch), 1))</_NextPatch>
+    </PropertyGroup>
+    <PropertyGroup Condition="$(_NextPatch) &lt; 10">
+      <_NextVer>$(_Major).$(_Minor).$(_NextPatch)</_NextVer>
+    </PropertyGroup>
+    <PropertyGroup Condition="$(_NextPatch) &gt;= 10">
+      <_BumpMinor>$([MSBuild]::Add($(_Minor), 1))</_BumpMinor>
+      <_NextVer Condition="$(_BumpMinor) &lt; 10">$(_Major).$(_BumpMinor).0</_NextVer>
+      <_NextVer Condition="$(_BumpMinor) &gt;= 10">$([MSBuild]::Add($(_Major), 1)).0.0</_NextVer>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(VersionFile)" Lines="$(_NextVer)" Overwrite="true" />
+    <Message Importance="high" Text="Version bumped: $(_CurVer) → $(_NextVer)" />
+  </Target>
+
+  <!-- ConPTY + Terminal 네이티브 DLL을 출력 디렉토리에 항상 복사 -->
+  <ItemGroup>
+    <Content Include="$(NuGetPackageRoot)/ci.microsoft.windows.console.conpty/1.22.250314001/runtimes/win10-x64/native/conpty.dll">
+      <Link>conpty.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)/ci.microsoft.terminal.wpf/1.22.250204002/runtimes/win-x64/native/Microsoft.Terminal.Control.dll">
+      <Link>Microsoft.Terminal.Control.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

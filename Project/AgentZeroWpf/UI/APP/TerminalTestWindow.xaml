@@ -1,0 +1,16 @@
+<Window x:Class="AgentZeroWpf.UI.APP.TerminalTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:term="clr-namespace:EasyWindowsTerminalControl;assembly=EasyWindowsTerminalControl"
+        Title="Terminal Test" Width="800" Height="500"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E">
+    <Grid>
+        <term:EasyTerminalControl x:Name="TestTerm"
+            StartupCommandLine="cmd.exe"
+            FontFamilyWhenSettingTheme="Consolas"
+            FontSizeWhenSettingTheme="12"
+            LogConPTYOutput="True"
+            Win32InputMode="True" />
+    </Grid>
+</Window>

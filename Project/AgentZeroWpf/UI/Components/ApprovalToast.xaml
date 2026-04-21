@@ -1,0 +1,50 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.ApprovalToast"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border x:Name="toastRoot" Background="#2D2D30" BorderBrush="#3E3E42"
+            BorderThickness="1" CornerRadius="0" Padding="12,8,12,8"
+            Opacity="0" MaxWidth="400">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header row: icon + title + close button -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,4">
+                <Button x:Name="btnClose" DockPanel.Dock="Right"
+                        Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                        Foreground="#858585" Background="Transparent" BorderThickness="0"
+                        Cursor="Hand" Padding="4,2" VerticalAlignment="Top"
+                        Click="OnCloseClick"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                               Foreground="#C42B1C" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="Approval Required" FontFamily="Consolas" FontSize="11"
+                               FontWeight="Bold" Foreground="#C42B1C" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Command description -->
+            <TextBlock x:Name="txtCommand" Grid.Row="1" Text="" FontFamily="Consolas" FontSize="11"
+                       Foreground="#D4D4D4" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                       MaxHeight="40" Margin="0,0,0,6"/>
+
+            <!-- Option buttons (populated in code) -->
+            <StackPanel x:Name="pnlOptions" Grid.Row="2" Margin="0,0,0,4"/>
+
+            <!-- Mute checkbox + countdown -->
+            <DockPanel Grid.Row="3">
+                <TextBlock x:Name="txtCountdown" DockPanel.Dock="Right"
+                           FontFamily="Consolas" FontSize="9" Foreground="#858585"
+                           VerticalAlignment="Center"/>
+                <CheckBox x:Name="chkMute" Content="Mute 5 min" FontFamily="Consolas" FontSize="9"
+                          Foreground="#858585" VerticalAlignment="Center" Cursor="Hand"
+                          Checked="OnMuteChecked"/>
+            </DockPanel>
+        </Grid>
+    </Border>
+</UserControl>

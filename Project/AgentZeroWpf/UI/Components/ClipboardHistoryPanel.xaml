@@ -1,0 +1,151 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.ClipboardHistoryPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#252526" Width="260">
+
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="PanelBg"      Color="#252526"/>
+        <SolidColorBrush x:Key="ItemBg"       Color="#2D2D30"/>
+        <SolidColorBrush x:Key="ItemHover"    Color="#333337"/>
+        <SolidColorBrush x:Key="Border"       Color="#3E3E42"/>
+        <SolidColorBrush x:Key="Accent"       Color="#3794FF"/>
+        <SolidColorBrush x:Key="TextPri"      Color="#D4D4D4"/>
+        <SolidColorBrush x:Key="TextDim"      Color="#858585"/>
+        <SolidColorBrush x:Key="FilterActive" Color="#3794FF"/>
+        <SolidColorBrush x:Key="FilterInactive" Color="#858585"/>
+
+        <!-- Filter toggle button style -->
+        <Style x:Key="FilterBtn" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="{StaticResource FilterInactive}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="0" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource FilterActive}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#264F78"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource ItemHover}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2D2D30"
+                BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"
+                Padding="8,5">
+            <DockPanel>
+                <Button x:Name="btnClear" DockPanel.Dock="Right" Content="&#xE74D;"
+                        FontFamily="Segoe MDL2 Assets" FontSize="11"
+                        Foreground="{StaticResource TextDim}" Background="Transparent"
+                        BorderThickness="0" Cursor="Hand" Padding="4,2"
+                        ToolTip="Clear History" Click="OnClearClick"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                               Foreground="{StaticResource Accent}" VerticalAlignment="Center"
+                               Margin="0,0,6,0"/>
+                    <TextBlock Text="HISTORY" FontSize="10" FontWeight="Bold"
+                               Foreground="{StaticResource Accent}" FontFamily="Consolas"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Filter bar -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBg}"
+                BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"
+                Padding="6,3">
+            <StackPanel Orientation="Horizontal">
+                <ToggleButton x:Name="filterAll" Content="All" IsChecked="True"
+                              Style="{StaticResource FilterBtn}"
+                              Checked="OnFilterChanged" Unchecked="OnFilterChanged"/>
+                <ToggleButton x:Name="filterFile" Content="File"
+                              Style="{StaticResource FilterBtn}" Margin="4,0,0,0"
+                              Checked="OnFilterChanged" Unchecked="OnFilterChanged"/>
+                <ToggleButton x:Name="filterClip" Content="Clipboard"
+                              Style="{StaticResource FilterBtn}" Margin="4,0,0,0"
+                              Checked="OnFilterChanged" Unchecked="OnFilterChanged"/>
+            </StackPanel>
+        </Border>
+
+        <!-- List -->
+        <ListBox x:Name="lbHistory" Grid.Row="2"
+                 Background="{StaticResource PanelBg}"
+                 BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 SelectionChanged="OnItemSelected">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Background" Value="{StaticResource ItemBg}"/>
+                    <Setter Property="Foreground" Value="{StaticResource TextPri}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                    <Setter Property="Padding" Value="8,6"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="Bd"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource ItemHover}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#264F78"/>
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                        <Setter TargetName="Bd" Property="BorderThickness" Value="1,0,0,1"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding Source}"
+                                       FontSize="9" Foreground="#4EC9B0" FontFamily="Consolas"
+                                       VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            <TextBlock Text="{Binding TimeLabel}" FontSize="9"
+                                       Foreground="{StaticResource TextDim}" FontFamily="Consolas"/>
+                        </DockPanel>
+                        <TextBlock Text="{Binding Preview}" FontSize="11"
+                                   Foreground="{StaticResource TextPri}" FontFamily="Consolas"
+                                   TextTrimming="CharacterEllipsis" MaxHeight="36"
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

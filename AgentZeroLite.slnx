@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="Project/AgentZeroWpf/AgentZeroWpf.csproj" />
+  <Configurations>
+    <BuildType Name="AgentCLI" />
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+  </Configurations>
+  <Project Path="Project/AgentTest/AgentTest.csproj" />
+  <Project Path="Project/ZeroCommon/ZeroCommon.csproj" />
+  <Project Path="Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj" />
+</Solution>

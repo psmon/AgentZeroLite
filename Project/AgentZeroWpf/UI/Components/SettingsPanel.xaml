@@ -1,0 +1,319 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.SettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="clr-namespace:AgentZeroWpf.UI.Components"
+             Background="#08081A">
+
+    <UserControl.Resources>
+        <!-- Dark TextBox -->
+        <Style x:Key="DarkTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="#12122A"/>
+            <Setter Property="Foreground" Value="#D4D4D4"/>
+            <Setter Property="CaretBrush" Value="#00E5FF"/>
+            <Setter Property="BorderBrush" Value="#2A2A5E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Padding" Value="6,3"/>
+        </Style>
+
+        <!-- Dark ComboBox -->
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="#12122A"/>
+            <Setter Property="Foreground" Value="#D4D4D4"/>
+            <Setter Property="BorderBrush" Value="#2A2A5E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Padding" Value="4,3"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleBtn" Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Focusable="False" ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition/>
+                                                    <ColumnDefinition Width="20"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="1" Background="Transparent">
+                                                    <TextBlock Text="▾" Foreground="#556677"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               FontSize="10"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="6,3,24,3" VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" IsHitTestVisible="False"/>
+                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                        MaxHeight="200" MinWidth="{TemplateBinding ActualWidth}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark ComboBoxItem -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#1A1A2E"/>
+            <Setter Property="Foreground" Value="#D4D4D4"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#264F78"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0D4477"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark PasswordBox -->
+        <Style x:Key="DarkPasswordBox" TargetType="PasswordBox">
+            <Setter Property="Background" Value="#12122A"/>
+            <Setter Property="Foreground" Value="#D4D4D4"/>
+            <Setter Property="CaretBrush" Value="#00E5FF"/>
+            <Setter Property="BorderBrush" Value="#2A2A5E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Padding" Value="6,3"/>
+        </Style>
+
+        <!-- Dark Button -->
+        <Style x:Key="DarkButton" TargetType="Button">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#00E5FF"/>
+            <Setter Property="Background" Value="#14143A"/>
+            <Setter Property="BorderBrush" Value="#2A2A5E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E1E5E"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0A0A2E"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tab item style -->
+        <Style x:Key="SettingsTabItem" TargetType="TabItem">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#556677"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                BorderThickness="0,0,0,2" BorderBrush="Transparent"
+                                Cursor="Hand">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="#00FFF0"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#00FFF0"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#0D0D1A"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#12122A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="True">
+            <Button x:Name="btnSettingsClose" DockPanel.Dock="Right"
+                    Content="&#x2715;" Width="28" Height="22" Padding="0"
+                    Background="Transparent" BorderThickness="0"
+                    Foreground="#888899" FontSize="13" FontFamily="Segoe UI"
+                    Cursor="Hand" ToolTip="닫기 (일반 화면으로)"
+                    Click="OnSettingsCloseClick">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                            BorderThickness="0" CornerRadius="2">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="#E81123"/>
+                                            <Setter Property="Foreground" Value="#FFFFFF"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Rectangle Width="3" Height="14" Fill="#00E5FF" RadiusX="1" RadiusY="1" Margin="0,0,8,0"/>
+                <TextBlock Text="SETTINGS" FontSize="14" FontWeight="Bold"
+                           Foreground="#00E5FF" FontFamily="Consolas"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Tabs -->
+        <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0"
+                    Padding="0">
+            <!-- CLI Definitions Tab -->
+            <TabItem Header="&#x2699; CLI Definitions" Style="{StaticResource SettingsTabItem}">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" BorderBrush="#3E3E42" BorderThickness="1" CornerRadius="2"
+                            Background="#1E1E1E">
+                        <ListView x:Name="lvCliDefs" Background="Transparent" BorderThickness="0"
+                                  Foreground="#D4D4D4" FontFamily="Consolas" FontSize="12"
+                                  SelectionChanged="OnCliDefSelectionChanged">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Name" Width="100"
+                                                    DisplayMemberBinding="{Binding Name}"/>
+                                    <GridViewColumn Header="ExePath" Width="200"
+                                                    DisplayMemberBinding="{Binding ExePath}"/>
+                                    <GridViewColumn Header="Args" Width="100"
+                                                    DisplayMemberBinding="{Binding Arguments}"/>
+                                    <GridViewColumn Header="BuiltIn" Width="60"
+                                                    DisplayMemberBinding="{Binding IsBuiltIn}"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0" HorizontalAlignment="Left">
+                        <Button Content="+ ADD" Padding="12,6" Margin="0,0,6,0"
+                                FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                Foreground="#00E5FF" Background="#2D2D30"
+                                BorderBrush="#3E3E42" BorderThickness="1"
+                                Cursor="Hand" Click="OnAddCliDef"/>
+                        <Button x:Name="btnEditCliDef" Content="EDIT" Padding="12,6" Margin="0,0,6,0"
+                                FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                Foreground="#D4D4D4" Background="#2D2D30"
+                                BorderBrush="#3E3E42" BorderThickness="1"
+                                Cursor="Hand" Click="OnEditCliDef" IsEnabled="False"/>
+                        <Button x:Name="btnDelCliDef" Content="DELETE" Padding="12,6"
+                                FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                Foreground="#D13438" Background="#2D2D30"
+                                BorderBrush="#3E3E42" BorderThickness="1"
+                                Cursor="Hand" Click="OnDeleteCliDef" IsEnabled="False"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- AgentZero CLI Tab -->
+            <TabItem Header="&#x1F4BB; AgentZero CLI" Style="{StaticResource SettingsTabItem}">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Path Setup -->
+                    <Border Grid.Row="0" Background="#1A1A2E" BorderBrush="#3E3E42"
+                            BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Rectangle Width="3" Height="10" Fill="#FF2D95" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                <TextBlock Text="PATH SETUP" FontSize="11" FontWeight="Bold"
+                                           Foreground="#FF2D95" FontFamily="Consolas"/>
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                       Foreground="#808080" LineHeight="16"
+                                       Margin="0,0,0,6">
+                                <Run>Register AgentZero CLI path to user PATH environment variable.</Run>
+                                <LineBreak/>
+                                <Run>After registration, AgentZero.ps1 can be used from anywhere.</Run>
+                            </TextBlock>
+                            <DockPanel Margin="0,0,0,4">
+                                <Button x:Name="btnRegisterPath" DockPanel.Dock="Right"
+                                        Content="Register PATH" Padding="14,5"
+                                        FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                        Foreground="#00FFF0" Background="#14143A"
+                                        BorderBrush="#2A2A5E" BorderThickness="1"
+                                        Cursor="Hand" Click="OnRegisterPath"
+                                        Margin="8,0,0,0"/>
+                                <TextBox x:Name="tbCurrentPath" IsReadOnly="True"
+                                         Background="#12122A" Foreground="#556677"
+                                         BorderBrush="#2A2A5E" BorderThickness="1"
+                                         FontFamily="Consolas" FontSize="10"
+                                         Padding="8,4" VerticalContentAlignment="Center"/>
+                            </DockPanel>
+                            <TextBlock x:Name="lblPathStatus" FontFamily="Consolas" FontSize="10"
+                                       Foreground="#556677" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

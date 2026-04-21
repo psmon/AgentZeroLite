@@ -1,0 +1,122 @@
+// ───────────────────────────────────────────────────────────
+// TerminalActor — 개별 터미널 세션 래퍼
+//
+// 역할:
+//   1. 터미널 세션(ITerminalSession) 래핑
+//   2. 단순 텍스트/키 입출력
+//   3. 출력 이벤트를 구독자(Stage)에 발행
+//
+// 경로: /user/stage/ws-{workspace}/term-{id}
+// ───────────────────────────────────────────────────────────
+
+using Akka.Actor;
+using Akka.Event;
+using Agent.Common.Services;
+
+namespace Agent.Common.Actors;
+
+public sealed class TerminalActor : ReceiveActor
+{
+    private readonly ILoggingAdapter _log = Context.GetLogger();
+    private string _terminalId;
+    private readonly string _sessionId;
+    private readonly string _workspaceName;
+
+    private ITerminalSession? _session;
+    private nint _hwnd;
+
+    public TerminalActor(string terminalId, string sessionId, string workspaceName)
+    {
+        _terminalId = terminalId;
+        _sessionId = sessionId;
+        _workspaceName = workspaceName;
+
+        BuildHandlers();
+    }
+
+    private void BuildHandlers()
+    {
+        Receive<Ping>(_ => Sender.Tell(new Pong("Terminal", Self.Path.ToString(),
+            $"Id={_terminalId}")));
+
+        Receive<BindSession>(msg =>
+        {
+            if (ReferenceEquals(_session, msg.Session))
+                return;
+
+            if (_session is not null)
+                _session.OutputReceived -= OnSessionOutput;
+
+            _session = msg.Session;
+            _session.OutputReceived += OnSessionOutput;
+            _log.Info("Session bound: {0} (terminal: {1})", _session.SessionId, _terminalId);
+        });
+
+        Receive<UnbindSession>(_ =>
+        {
+            if (_session is not null)
+            {
+                _session.OutputReceived -= OnSessionOutput;
+                _session = null;
+                _log.Info("Session unbound: {0}", _terminalId);
+            }
+        });
+
+        Receive<UpdateTerminalHwnd>(msg =>
+        {
+            if (_hwnd == msg.Hwnd) return;
+            _hwnd = msg.Hwnd;
+            _log.Info("Terminal HWND updated: {0} → 0x{1:X}", _terminalId, _hwnd);
+        });
+
+        Receive<RenameTerminal>(msg =>
+        {
+            _log.Info("Terminal ID updated: {0} → {1}", _terminalId, msg.NewTerminalId);
+            _terminalId = msg.NewTerminalId;
+        });
+
+        Receive<QueryTerminalStatus>(_ =>
+        {
+            Sender.Tell(new TerminalStatusResponse(
+                _terminalId, _sessionId, _session?.IsRunning ?? false));
+        });
+
+        Receive<WriteToTerminal>(msg =>
+        {
+            if (_session is null) { _log.Warning("[CLI] Write: no session bound"); return; }
+            _session.WriteAndSubmit(msg.Text);
+        });
+
+        Receive<SendTerminalControl>(msg =>
+        {
+            if (_session is null) return;
+            if (Enum.TryParse<TerminalControl>(msg.ControlKey, true, out var ctrl))
+                _session.SendControl(ctrl);
+        });
+
+        Receive<TerminalOutput>(_ => { /* no-op in Lite */ });
+    }
+
+    private void OnSessionOutput(TerminalOutputFrame frame)
+    {
+        Self.Tell(new TerminalOutput(_terminalId, frame.Text, frame.Timestamp));
+    }
+
+    protected override void PreStart()
+    {
+        _log.Info("TerminalActor started: {0} (session: {1}, workspace: {2})",
+            _terminalId, _sessionId, _workspaceName);
+        base.PreStart();
+    }
+
+    protected override void PostStop()
+    {
+        if (_session is not null)
+        {
+            _session.OutputReceived -= OnSessionOutput;
+            _session = null;
+        }
+        _log.Info("TerminalActor stopped: {0}", _terminalId);
+        base.PostStop();
+    }
+}

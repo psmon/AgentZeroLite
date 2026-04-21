@@ -1,0 +1,132 @@
+<Window x:Class="AgentZeroWpf.UI.APP.NewNoteDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="New Note"
+        Width="360" Height="150"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        Background="#252526"
+        ShowInTaskbar="False"
+        StateChanged="OnWindowStateChanged">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="BgToolbar"    Color="#2D2D30"/>
+        <SolidColorBrush x:Key="BorderColor"  Color="#3E3E42"/>
+        <SolidColorBrush x:Key="AccentBrush"  Color="#3794FF"/>
+        <SolidColorBrush x:Key="DangerBrush"  Color="#C42B1C"/>
+        <SolidColorBrush x:Key="TextPrimary"  Color="#D4D4D4"/>
+        <SolidColorBrush x:Key="TextDim"      Color="#858585"/>
+
+        <Style x:Key="TitleBarButton" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#383B3F"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TitleBarCloseButton" TargetType="Button" BasedOn="{StaticResource TitleBarButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#C42B1C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="#3E3E42" BorderThickness="1,0,1,1" CornerRadius="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="32"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="OnTitleBarMouseDown">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#1E1E1E" Offset="0"/>
+                        <GradientStop Color="#2D2D30" Offset="0.5"/>
+                        <GradientStop Color="#1E1E1E" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="&#xE921;" Style="{StaticResource TitleBarButton}"
+                                Click="OnMinimizeClick"/>
+                        <Button x:Name="MaxRestoreButton" Content="&#xE922;" Style="{StaticResource TitleBarButton}"
+                                Click="OnMaximizeClick"/>
+                        <Button Content="&#xE8BB;" Style="{StaticResource TitleBarCloseButton}"
+                                Click="OnCloseClick"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                   Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="New Note" FontSize="13" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentBrush}" FontFamily="Consolas" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Input -->
+            <DockPanel Grid.Row="1" Margin="16,12,16,12">
+                <TextBlock DockPanel.Dock="Right" Text=".md" FontSize="13"
+                           Foreground="#858585" FontFamily="Consolas"
+                           VerticalAlignment="Center" Margin="4,0,0,0"/>
+                <TextBox x:Name="txtName" FontSize="13" FontFamily="Consolas"
+                         Background="#1F1F1F" Foreground="#D4D4D4"
+                         BorderBrush="#3E3E42" BorderThickness="1"
+                         CaretBrush="#3794FF" Padding="8,5"
+                         MaxLength="100"
+                         PreviewTextInput="OnPreviewTextInput"
+                         KeyDown="OnKeyDown"/>
+            </DockPanel>
+
+            <!-- Buttons -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="16,0,16,12">
+                <Button Content="Cancel" Padding="14,4" Margin="0,0,8,0"
+                        FontFamily="Consolas" FontSize="11"
+                        Foreground="#858585" Background="#2D2D30"
+                        BorderBrush="#3E3E42" BorderThickness="1"
+                        Cursor="Hand" Click="OnCancelClick"/>
+                <Button Content="Create" Padding="14,4"
+                        FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                        Foreground="#D4D4D4" Background="#333337"
+                        BorderBrush="#3794FF" BorderThickness="1"
+                        Cursor="Hand" Click="OnCreateClick"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

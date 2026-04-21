@@ -1,0 +1,72 @@
+● Update(Project\AgentZeroWpf\UI\APP\AgentBotWindow.xaml)
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────── Edit file
+Project\AgentZeroWpf\UI\APP\AgentBotWindow.xaml
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ ss="0,1,0,0"                109 +                Padding="8,4" Visibility="Collapsed">                                             110 +            <StackPanel Orientation="Horizontal">
+
+ 111 +                <Border Background="#1A1A5E" CornerRadius="4" Padding="8,3" Cursor="Hand"
+
+ 112 +                        MouseLeftButtonDown="OnClipboardTagClick">
+
+ 113 +                    <StackPanel Orientation="Horizontal">
+
+ 114 +                        <TextBlock Text="&#xE77F;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+
+ 115 +                                   Foreground="{StaticResource CyanBrush}" VerticalAlignment="Cen
+
+     +ter"
+
+ 116 +                                   Margin="0,0,5,0"/>
+
+ 117 +                        <TextBlock x:Name="txtClipboardTag" Text="[클립보드 0자]"
+
+ 118 +                                   FontFamily="Consolas" FontSize="11"
+
+ 119 +                                   Foreground="{StaticResource CyanBrush}" VerticalAlignment="Cen
+
+     +ter"/>
+
+ 120 +                        <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+
+ 121 +                                Foreground="{StaticResource TextDim}" Background="Transparent"
+
+ 122 +                                BorderThickness="0" Padding="6,0,0,0" Cursor="Hand"
+
+ 123 +                                VerticalAlignment="Center" Click="OnClipboardTagRemove"/>
+
+ 124 +                    </StackPanel>
+
+ 125 +                </Border>
+
+ 126 +            </StackPanel>
+
+ 127 +        </Border>
+
+ 128 +
+
+ 129          <!-- ===== Input Area ===== -->
+
+ 107 -        <Border Grid.Row="4" Background="{StaticResource BgToolbar}"
+
+ 130 +        <Border Grid.Row="5" Background="{StaticResource BgToolbar}"
+
+ 131                  BorderBrush="{StaticResource BorderDim}" BorderThickness="0,1,0,0"
+
+ 132                  Padding="8,6">
+
+ 133              <Grid>
+
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+ Do you want to make this edit to AgentBotWindow.xaml?
+
+ > 1. Yes
+
+   2. Yes, allow all edits during this session (shift+tab)
+
+   3. No
+
+
+
+ Esc to cancel · Tab to amend
