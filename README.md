@@ -273,3 +273,36 @@ thinks." Windows Terminal, Conemu, Hyper — they all optimise for the single-pr
 case. AgentZero Lite optimises for the opposite: many concurrent prompts, grouped by
 project, with a notepad and a text-broker chat pane living next to them. That is the
 whole product.
+
+---
+
+## Roadmap
+
+> **Why Akka.NET, starting from a standalone Lite build?**
+> Today it runs on a single device, but the same actor model extends naturally to
+> **Remote / Cluster** — remote assistants, on-device AI clusters, and beyond.
+> This is a long-term **experiment in progress**; whether the bet pays off is
+> something we invite you to watch. `LiteMode` ships as open source, so the
+> multi-view CLI control surface doubles as a hands-on reference for the
+> Akka.NET basic actor model.
+
+### AgentZero **PRO** Roadmap
+
+#### 🧩 AkkaStacks — Distributed Runtime
+
+| Stage | Name | Description |
+| --- | --- | --- |
+| 1 | **AgentZeroRemote** | Drive a single AgentZero device remotely |
+| 2 | **AgentZeroCluster** | Cluster N AgentZero devices for multi-host use |
+
+#### 🧠 LLMStacks — Intelligence & I/O
+
+| Name | Description |
+| --- | --- |
+| **AgentZeroAIMODE** | On-device model, built-in AI chat mode |
+| **AgentZeroVoice** | Voice input / output support |
+| **AgentZeroOS** | Native OS automation |
+
+---
+
+🚧 **In preparation** · <https://blumn.ai/>
