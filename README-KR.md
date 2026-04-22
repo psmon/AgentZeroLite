@@ -292,9 +292,9 @@ EF Core가 자동 마이그레이션).
 
 | 이름 | 설명 |
 | --- | --- |
-| **AgentZeroAIMODE** | 온디바이스 모델 탑재 AI 채팅 모드 |
-| **AgentZeroVoice** | 음성 입출력 지원 |
-| **AgentZeroOS** | OS 네이티브 자동화 지원 |
+| **AgentZeroAIMODE** | 온디바이스 모델 탑재 AI 채팅 모드 — 예: *Gemma 4* ↔ *Claude Code* 간 대화, 온디바이스 LLM 컨트롤러에 TASK 처리 위임 |
+| **AgentZeroVoice** | 음성 입출력 지원 — 예: *Gemma 4*를 음성 제어기로, 출력은 **Windows 11 내장 Natural Voices**(무료 뉴럴 TTS) 활용 |
+| **AgentZeroOS** | OS 네이티브 자동화 지원 — 스크린샷 캡처 기반이 아닌 **OS 메타정보(UI Automation) 기반 화면 해석기**로 AI 제어, 매크로급 처리 속도 |
 
 ---
 

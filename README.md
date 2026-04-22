@@ -299,9 +299,9 @@ whole product.
 
 | Name | Description |
 | --- | --- |
-| **AgentZeroAIMODE** | On-device model, built-in AI chat mode |
-| **AgentZeroVoice** | Voice input / output support |
-| **AgentZeroOS** | Native OS automation |
+| **AgentZeroAIMODE** | On-device model, built-in AI chat mode — e.g. *Gemma 4* ↔ *Claude Code* dialogues, delegating task execution to an on-device LLM controller |
+| **AgentZeroVoice** | Voice input / output — e.g. *Gemma 4* as the voice controller, with output via **Windows 11 built-in Natural Voices** (free neural TTS) |
+| **AgentZeroOS** | Native OS automation — AI control via an **OS metadata (UI Automation) screen parser** instead of screenshot capture, delivering macro-level responsiveness |
 
 ---
 
