@@ -8,7 +8,7 @@
 
 🎬 **Demo** — driving Claude and Codex in parallel:
 
-<a href="https://www.youtube.com/watch?v=FCX0wBcBfOw"><img src="https://img.youtube.com/vi/FCX0wBcBfOw/mqdefault.jpg" width="240" alt="Watch on YouTube"></a>
+<a href="https://www.youtube.com/watch?v=Bpj8n29W6wY"><img src="https://img.youtube.com/vi/Bpj8n29W6wY/mqdefault.jpg" width="240" alt="Watch on YouTube"></a>
 
 Pipe a single instruction to an AI CLI (Claude, Codex, any model you can run in
 a shell) living in the same workspace — or in a different one — and have it act.
