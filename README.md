@@ -6,6 +6,10 @@
 
 ![AgentZero Lite — multi-CLI multi-view](Home/main.png)
 
+🎬 **Demo** — driving Claude and Codex in parallel:
+
+<a href="https://www.youtube.com/watch?v=kXQjohrpA8o"><img src="https://img.youtube.com/vi/kXQjohrpA8o/mqdefault.jpg" width="240" alt="Watch on YouTube"></a>
+
 Pipe a single instruction to an AI CLI (Claude, Codex, any model you can run in
 a shell) living in the same workspace — or in a different one — and have it act.
 Run two different AI models side by side and let them talk to each other through
@@ -38,10 +42,19 @@ macros to whichever terminal is in focus — nothing more, nothing less.
   `terminal-read`. No extra broker, no cloud relay — just the two CLIs poking each
   other through AgentZero's IPC. This is the tiki-taka between models that the Lite
   edition exists for.
-- **Skill Sync `/` macros** — when Claude is running in a tab, press `[+] → Skill Sync`.
-  AgentZero reads the skill list out of Claude's own `/skills` view and turns it into
-  a slash-command menu in the chat box. Type `/`, pick a skill, Enter — the macro text
-  is fired at the terminal. No LLM round-trip.
+- **AgentBot `[+]` menu — 3 ways to arm a terminal AI** —
+  - **`AgentZeroCLI Helper`** — drops a ready-made briefing into the chat input that
+    teaches any terminal AI (Claude, Codex, shell-hosted model) how to call
+    `AgentZeroLite.exe -cli` once, no skill install. Review, hit Send, done. If the
+    CLI is not on PATH the menu nudges you to *Settings → Register PATH* and
+    restart first.
+  - **`Import Starter Skills`** — copies the shipped `agent-zero-lite` skill into
+    the active workspace's `.claude/skills/` so Claude Code picks it up persistently
+    on next session.
+  - **`Skill Sync`** — with Claude already running in a tab, reads the skill list
+    out of its own `/skills` view and turns it into a slash-command menu in the
+    chat box. Type `/`, pick a skill, Enter — the macro text is fired at the
+    terminal. No LLM round-trip.
 - **Notes with live rendering** — a second bottom panel with a Markdown viewer that
   also renders Mermaid diagrams and Pencil files, scoped to the active workspace
   folder.
