@@ -17,6 +17,16 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
+    <!-- Pin Microsoft.Build.Tasks.Core above EF Core Design's transitive 17.7.2
+         (NU1903 / GHSA-h4j7-5rxr-p4wc, High). PrivateAssets=all keeps these
+         build-time-only overrides. Also pin System.Security.Cryptography.Xml
+         above 17.14.28's bundled 9.0.0 (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf). -->
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <!-- OnDevice LLamaSharp was removed 2026-04-18 due to ggml.dll conflict with
          Whisper.net — both bundle their own ggml and reuse whichever loads first,
          breaking the second. Local LLM now goes exclusively through Ollama.
