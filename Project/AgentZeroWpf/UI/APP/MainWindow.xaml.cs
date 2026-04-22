@@ -727,9 +727,16 @@ public partial class MainWindow : Window
     {
         string resultJson;
 
-        if (_botWindow is null || !_botWindow.IsLoaded)
+        // When AgentBot is docked into MainWindow (the default), `_botWindow` is created
+        // but `IsLoaded == false` because the window itself was never `.Show()`n — its
+        // content was reparented into BotDockHost. `ReceiveExternalChat` still works in
+        // that state because the AgentBotWindow instance keeps direct references to its
+        // child controls and dispatches UI updates through them. So the only case we
+        // genuinely cannot deliver into is when the bot hasn't been instantiated yet
+        // (user never clicked the Bot sidebar button).
+        if (_botWindow is null)
         {
-            resultJson = "{\"ok\":false,\"error\":\"AgentBot window is not open. Click the Bot button in AgentZero first.\"}";
+            resultJson = "{\"ok\":false,\"error\":\"AgentBot is not open. Click the Bot button in AgentZero first.\"}";
         }
         else
         {
