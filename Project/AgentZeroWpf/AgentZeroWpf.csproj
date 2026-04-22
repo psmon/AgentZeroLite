@@ -59,6 +59,13 @@
     <EmbeddedResource Include="Assets\mermaid.min.js" LogicalName="mermaid.min.js" />
   </ItemGroup>
 
+  <!-- Starter-pack skills shipped next to the exe (copied into user workspaces via + menu) -->
+  <ItemGroup>
+    <Content Include="Assets\skills-starter-pack\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- Auto-version: read from version.txt, embed as assembly version -->
   <PropertyGroup>
     <VersionFile>$(MSBuildProjectDirectory)\version.txt</VersionFile>

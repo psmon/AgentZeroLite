@@ -557,7 +557,7 @@ public partial class AgentBotWindow : Window
     //  + Menu button
     // ------------------------------------------------------------------
 
-    private void OnPlusClick(object sender, RoutedEventArgs e)
+    private async void OnPlusClick(object sender, RoutedEventArgs e)
     {
         AppLogger.Log("[AgentBot +] OnPlusClick ENTER");
         try
@@ -566,10 +566,33 @@ public partial class AgentBotWindow : Window
 
             var workspaceDir = _getActiveDirectory?.Invoke();
             bool hasClaudeSkills = false;
+            bool hasLiteSkill = false;
             if (!string.IsNullOrEmpty(workspaceDir))
             {
                 var skillsDir = Path.Combine(workspaceDir, ".claude", "skills");
                 hasClaudeSkills = Directory.Exists(skillsDir);
+                var liteSkillMd = Path.Combine(skillsDir, LiteStarterSkillName, "SKILL.md");
+                hasLiteSkill = File.Exists(liteSkillMd);
+            }
+
+            // Detect Claude CLI on PATH (required for Import / Sync to make sense)
+            var claudeCheck = await RunShellAsync("where claude");
+            bool hasClaudeCli = claudeCheck.ExitCode == 0;
+
+            // Detect starter pack shipped next to the exe
+            var starterPackDir = FindStarterPackDir();
+            bool hasStarterPack = starterPackDir != null;
+
+            AppLogger.Log(
+                $"[AgentBot +] cli={hasClaudeCli} skills={hasClaudeSkills} " +
+                $"liteSkill={hasLiteSkill} pack={hasStarterPack} ({starterPackDir})");
+
+            // Import: agent-zero-lite 가 현재 워크스페이스에 아직 설치되어 있지 않을 때
+            if (hasClaudeCli && hasStarterPack && !hasLiteSkill)
+            {
+                var miImport = new MenuItem { Header = "Import Starter Skills" };
+                miImport.Click += OnImportStarterSkillsClick;
+                ctxPlusMenu.Items.Add(miImport);
             }
 
             if (hasClaudeSkills)
@@ -578,6 +601,11 @@ public partial class AgentBotWindow : Window
                 miSync.Click += OnSkillSyncClick;
                 ctxPlusMenu.Items.Add(miSync);
             }
+
+            // AgentZeroCLI Helper: 항상 노출. 설치 없이 현재 터미널 AI에게 CLI 사용법을 1회 학습
+            var miCliHelper = new MenuItem { Header = "AgentZeroCLI Helper" };
+            miCliHelper.Click += OnAgentZeroCliHelperClick;
+            ctxPlusMenu.Items.Add(miCliHelper);
 
             ctxPlusMenu.PlacementTarget = btnPlus;
             ctxPlusMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
@@ -914,6 +942,225 @@ public partial class AgentBotWindow : Window
     //  Import Starter Skills (from Assets/skills-starter-pack)
     // ==================================================================
 
+    private const string LiteStarterSkillName = "agent-zero-lite";
+
+    private async void OnImportStarterSkillsClick(object sender, RoutedEventArgs e)
+    {
+        btnPlus.IsEnabled = false;
+
+        var workspaceDir = _getActiveDirectory?.Invoke();
+        if (string.IsNullOrEmpty(workspaceDir))
+        {
+            AddSystemMessage("No active workspace detected. Open a terminal first.");
+            btnPlus.IsEnabled = true;
+            return;
+        }
+
+        AddSystemMessage($"Workspace: {workspaceDir}");
+
+        var claudeSkillsDir = Path.Combine(workspaceDir, ".claude", "skills");
+        if (!Directory.Exists(claudeSkillsDir))
+        {
+            Directory.CreateDirectory(claudeSkillsDir);
+            AddSystemMessage($"Created: {claudeSkillsDir}");
+        }
+
+        var starterPackDir = FindStarterPackDir();
+        if (starterPackDir == null)
+        {
+            AddSystemMessage("Starter pack not found next to AgentZeroLite.exe.");
+            btnPlus.IsEnabled = true;
+            return;
+        }
+        AddSystemMessage($"Source: {starterPackDir}");
+
+        AddSystemMessage($"Importing {LiteStarterSkillName}...");
+        NotifyBot("Starter skill import started.");
+
+        int copied = 0, skipped = 0;
+
+        await Task.Run(() =>
+        {
+            var srcDir = Path.Combine(starterPackDir, LiteStarterSkillName);
+            var destDir = Path.Combine(claudeSkillsDir, LiteStarterSkillName);
+
+            if (!Directory.Exists(srcDir))
+            {
+                Dispatcher.Invoke(() => AddSystemMessage($"  Skip: {LiteStarterSkillName} (source missing)"));
+                skipped++;
+                return;
+            }
+
+            var destSkillMd = Path.Combine(destDir, "SKILL.md");
+            if (Directory.Exists(destDir) && File.Exists(destSkillMd))
+            {
+                bool isComplete = true;
+                foreach (var srcFile in Directory.GetFiles(srcDir, "*", SearchOption.AllDirectories))
+                {
+                    var rel = Path.GetRelativePath(srcDir, srcFile);
+                    if (!File.Exists(Path.Combine(destDir, rel))) { isComplete = false; break; }
+                }
+
+                if (isComplete)
+                {
+                    Dispatcher.Invoke(() => AddSystemMessage($"  OK: {LiteStarterSkillName} (already complete)"));
+                    skipped++;
+                    return;
+                }
+            }
+
+            if (Directory.Exists(destDir))
+                Directory.Delete(destDir, true);
+
+            CopyDirectory(srcDir, destDir);
+            copied++;
+            Dispatcher.Invoke(() => AddSystemMessage($"  Copied: {LiteStarterSkillName}"));
+        });
+
+        var summary = $"Import complete: {copied} copied, {skipped} skipped.";
+        AddSystemMessage(summary);
+        NotifyBot(summary);
+
+        btnPlus.IsEnabled = true;
+    }
+
+    private void NotifyBot(string message) => ReceiveExternalChat("Setup", message);
+
+    // ==================================================================
+    //  AgentZeroCLI Helper (one-shot teaching — no skill install required)
+    // ==================================================================
+
+    private async void OnAgentZeroCliHelperClick(object sender, RoutedEventArgs e)
+    {
+        btnPlus.IsEnabled = false;
+        try
+        {
+            // 1. Verify AgentZeroLite CLI is resolvable on PATH.
+            //    Prefer .ps1 (the wrapper the helper text references) and fall back to .exe.
+            var psCheck = await RunShellAsync("where AgentZeroLite.ps1");
+            var exeCheck = psCheck.ExitCode == 0 ? psCheck : await RunShellAsync("where AgentZeroLite.exe");
+            bool onPath = exeCheck.ExitCode == 0;
+
+            if (!onPath)
+            {
+                AddSystemMessage(
+                    "AgentZeroLite CLI가 현재 터미널의 PATH에 없습니다.\n" +
+                    "  1) Settings → AgentZero CLI → Register PATH 를 눌러 경로를 등록하세요.\n" +
+                    "  2) AgentZero Lite를 재시작한 뒤 이 기능을 다시 실행하세요.\n" +
+                    "  (이유: 현재 터미널 세션이 이전 PATH를 캐싱하고 있어, 재시작 전에는 새로 등록된 CLI를 인식하지 못할 수 있습니다.)");
+                return;
+            }
+
+            // 2. Populate the chat input with a language-agnostic teaching prompt.
+            //    User reviews and hits Send themselves — this is a one-shot
+            //    lesson for whichever AI is running in the active terminal.
+            txtInput.Text = BuildAgentZeroCliHelperPrompt();
+            txtInput.CaretIndex = txtInput.Text.Length;
+            txtInput.Focus();
+
+            AddSystemMessage(
+                "AgentZeroCLI Helper 문구를 입력창에 넣었습니다. 활성 터미널의 AI에게 전송하면 " +
+                "그 세션 한정으로 AgentZeroLite CLI 사용법을 학습시킬 수 있습니다.");
+        }
+        finally
+        {
+            btnPlus.IsEnabled = true;
+        }
+    }
+
+    private static string BuildAgentZeroCliHelperPrompt()
+    {
+        return
+            "[AgentZero Lite — one-shot Terminal CLI briefing]\n" +
+            "\n" +
+            "You are running inside a ConPTY terminal tab hosted by AgentZero Lite. " +
+            "You can drive *other* terminal tabs in the same window (other AI sessions, shells, build logs, etc.) " +
+            "and the AgentBot chat panel through the AgentZero Lite CLI. " +
+            "The CLI is already on PATH, so you can invoke it directly — no skill install required.\n" +
+            "\n" +
+            "## How to invoke (shell-agnostic form first)\n" +
+            "- **Any shell (bash / Git Bash / pwsh / cmd)**: `AgentZeroLite.exe -cli <command>` — call the exe directly. Works everywhere.\n" +
+            "- **PowerShell only**: `AgentZeroLite.ps1 <command>` is a thin wrapper around the exe. Do NOT use `.ps1` from bash — it will be parsed as a shell script and fail.\n" +
+            "- If GUI not running: `AgentZeroLite.exe -cli open-win` starts it (single-instance).\n" +
+            "\n" +
+            "## Core commands\n" +
+            "- `AgentZeroLite.exe -cli terminal-list` — list active sessions (use the group_index / tab_index it prints)\n" +
+            "- `AgentZeroLite.exe -cli terminal-send <grp> <tab> <text>` — send text + Enter to another tab\n" +
+            "- `AgentZeroLite.exe -cli terminal-key  <grp> <tab> <key>` — control key: cr / esc / tab / ctrlc / up / down / hex:XX, ...\n" +
+            "- `AgentZeroLite.exe -cli terminal-read <grp> <tab> [--last N]` — read terminal output (ANSI stripped)\n" +
+            "- `AgentZeroLite.exe -cli bot-chat <msg> --from <name>` — show a notice in the AgentBot panel (display only, no LLM trigger)\n" +
+            "- `AgentZeroLite.exe -cli status` — Lite app state\n" +
+            "- Global options: `--no-wait` (fire-and-forget), `--timeout N` (ms, default 5000)\n" +
+            "\n" +
+            "## TUI Enter handling (important)\n" +
+            "- Claude Code / bash / pwsh / cmd: `terminal-send` alone submits (text + Enter in one call)\n" +
+            "- OpenAI Codex and similar: `terminal-send` → wait 1 s → `terminal-key <g> <t> cr` (two steps)\n" +
+            "\n" +
+            "## Typical workflow\n" +
+            "1. `terminal-list` to pick a target tab → 2. `terminal-send` to deliver the instruction → " +
+            "3. wait for the response (short: 1–2 s, normal: 3 s, long/code: 5–6 s, Claude Code Opus on a complex topic: 60–90 s) → " +
+            "4. `terminal-read ... --last 3000` to read the result.\n" +
+            "\n" +
+            "## Cautions\n" +
+            "- Never `terminal-send` to your own tab — it loops your own input back. The `*` marker in `terminal-list` is the active tab (yours).\n" +
+            "- Lite does NOT provide mouse / keyboard / screenshot / UI-tree automation — those live in the PRO edition only.\n" +
+            "- The AgentZero Lite GUI must be running for the CLI to respond.\n" +
+            "\n" +
+            "Use this briefing as your reference when you need to reach for the CLI. " +
+            "For now, a short acknowledgement that you've read and understood is enough.";
+    }
+
+    /// <summary>Locate the skills-starter-pack directory shipped next to the exe.</summary>
+    private static string? FindStarterPackDir()
+    {
+        var exeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var candidate = Path.Combine(exeDir, "Assets", "skills-starter-pack");
+        return Directory.Exists(candidate) ? candidate : null;
+    }
+
+    private static void CopyDirectory(string sourceDir, string destDir)
+    {
+        Directory.CreateDirectory(destDir);
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var destFile = Path.Combine(destDir, Path.GetFileName(file));
+            File.Copy(file, destFile, true);
+        }
+        foreach (var subDir in Directory.GetDirectories(sourceDir))
+        {
+            var dirName = Path.GetFileName(subDir);
+            if (dirName == "__pycache__") continue;
+            CopyDirectory(subDir, Path.Combine(destDir, dirName));
+        }
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunShellAsync(string command)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c {command}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) return (1, "Failed to start process");
+            var stdout = await proc.StandardOutput.ReadToEndAsync();
+            var stderr = await proc.StandardError.ReadToEndAsync();
+            await proc.WaitForExitAsync();
+            var output = string.IsNullOrEmpty(stdout) ? stderr : stdout;
+            return (proc.ExitCode, output);
+        }
+        catch (Exception ex)
+        {
+            return (1, ex.Message);
+        }
+    }
 
     // ==================================================================
     //  Approval prompt display

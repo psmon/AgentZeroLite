@@ -12,6 +12,9 @@ namespace AgentZeroWpf;
 
 internal static class CliHandler
 {
+    // Must match MainWindow.xaml `Title` attribute — FindWindow looks up by exact title.
+    private const string MainWindowTitle = "AgentZero Lite";
+
     // === Global CLI Options ===
     private static bool _noWait = false;
     private static int _timeoutMs = 5000;   // default 5 seconds
@@ -142,10 +145,10 @@ internal static class CliHandler
 
     private static int GetStatus()
     {
-        IntPtr agentWnd = NativeMethods.FindWindow(null, "AgentZero");
+        IntPtr agentWnd = LocateAgentZeroWindow();
         if (agentWnd == IntPtr.Zero)
         {
-            Console.Error.WriteLine("Error: AgentZero WPF is not running.");
+            PrintNotRunning();
             return 1;
         }
 
@@ -154,51 +157,24 @@ internal static class CliHandler
         string? json = TryReadMmf("AgentZeroLite_Status_Response", 8192);
         if (json == null) return _noWait ? 0 : 1;
 
-        // Pretty-print the status
         using var doc = JsonDocument.Parse(json);
         var r = doc.RootElement;
 
-        bool capturing = r.GetProperty("capturing").GetBoolean();
-        string captureStatus = r.GetProperty("capture_status").GetString() ?? "";
-        string statusBar = r.GetProperty("status_bar").GetString() ?? "";
-        string hwnd = r.GetProperty("selected_hwnd").GetString() ?? "none";
-        string winClass = r.GetProperty("window_class").GetString() ?? "";
-        string winTitle = r.GetProperty("window_title").GetString() ?? "";
-        string filterStart = r.GetProperty("filter_start").GetString() ?? "";
-        string filterEnd = r.GetProperty("filter_end").GetString() ?? "";
-        int scrollDelay = r.GetProperty("scroll_delay").GetInt32();
-        int scrollMax = r.GetProperty("scroll_max").GetInt32();
-        int scrollDelta = r.GetProperty("scroll_delta").GetInt32();
-        int capturedLen = r.GetProperty("captured_length").GetInt32();
+        // Lite status schema: { "status_bar": string, "groups": int }
+        // (PRO-era capture/filter/scroll fields are intentionally absent.)
+        string statusBar = r.TryGetProperty("status_bar", out var sbProp)
+            ? (sbProp.GetString() ?? "")
+            : "";
+        int groupCount = r.TryGetProperty("groups", out var grpProp) && grpProp.ValueKind == JsonValueKind.Number
+            ? grpProp.GetInt32()
+            : 0;
 
-        Console.WriteLine("=== AgentZero WPF Status ===");
+        Console.WriteLine("=== AgentZero Lite Status ===");
         Console.WriteLine();
-
-        string stateIcon = capturing ? "[CAPTURING]" : "[IDLE]";
-        Console.WriteLine($"  State:      {stateIcon}  {captureStatus}");
-        Console.WriteLine($"  Status Bar: {statusBar}");
+        Console.WriteLine($"  Status Bar:   {(string.IsNullOrEmpty(statusBar) ? "(empty)" : statusBar)}");
+        Console.WriteLine($"  Workspaces:   {groupCount}");
         Console.WriteLine();
-
-        Console.WriteLine("  Target Window:");
-        if (hwnd != "none")
-        {
-            Console.WriteLine($"    HWND:     {hwnd}");
-            Console.WriteLine($"    Class:    {winClass}");
-            Console.WriteLine($"    Title:    {(winTitle.Length > 70 ? winTitle[..70] + "..." : winTitle)}");
-        }
-        else
-        {
-            Console.WriteLine("    (none selected)");
-        }
-        Console.WriteLine();
-
-        Console.WriteLine("  Date Filter:");
-        Console.WriteLine($"    Start:    {(string.IsNullOrEmpty(filterStart) ? "(none)" : filterStart)}");
-        Console.WriteLine($"    End:      {(string.IsNullOrEmpty(filterEnd) ? "(none)" : filterEnd)}");
-        Console.WriteLine();
-
-        Console.WriteLine($"  Scroll:     delay={scrollDelay}ms  max={scrollMax}  delta={scrollDelta}");
-        Console.WriteLine($"  Captured:   {capturedLen:N0} chars");
+        Console.WriteLine("  (Run 'terminal-list' for per-tab details.)");
 
         return 0;
     }
@@ -209,10 +185,10 @@ internal static class CliHandler
 
     private static int CopyToClipboard()
     {
-        IntPtr agentWnd = NativeMethods.FindWindow(null, "AgentZero");
+        IntPtr agentWnd = LocateAgentZeroWindow();
         if (agentWnd == IntPtr.Zero)
         {
-            Console.Error.WriteLine("Error: AgentZero WPF is not running.");
+            PrintNotRunning();
             return 1;
         }
 
@@ -240,12 +216,12 @@ internal static class CliHandler
 
     private static int OpenWin()
     {
-        IntPtr existing = NativeMethods.FindWindow(null, "AgentZero");
+        IntPtr existing = LocateAgentZeroWindow();
         if (existing != IntPtr.Zero)
         {
             // Already running — bring to foreground
             NativeMethods.SetForegroundWindow(existing);
-            Console.WriteLine("AgentZero WPF is already running. Brought to foreground.");
+            Console.WriteLine("AgentZero Lite is already running. Brought to foreground.");
             return 0;
         }
 
@@ -277,10 +253,10 @@ internal static class CliHandler
 
     private static int CloseWin()
     {
-        IntPtr agentWnd = NativeMethods.FindWindow(null, "AgentZero");
+        IntPtr agentWnd = LocateAgentZeroWindow();
         if (agentWnd == IntPtr.Zero)
         {
-            Console.Error.WriteLine("Error: AgentZero WPF is not running.");
+            PrintNotRunning();
             return 1;
         }
 
@@ -376,14 +352,51 @@ internal static class CliHandler
     //  AgentZero discovery helper
     // =========================================================================
 
+    /// <summary>
+    /// Locate the AgentZero Lite main window. First tries <c>FindWindow</c> by exact
+    /// title (fast path). If that fails for any reason — title drift, window not in
+    /// the normal top-level enumeration at that instant, etc. — falls back to scanning
+    /// the <c>AgentZeroLite</c> processes for a live MainWindowHandle. This avoids
+    /// false "not running" errors when the GUI is alive but title lookup races.
+    /// Returns <see cref="IntPtr.Zero"/> if GUI genuinely isn't running; error-message
+    /// printing is left to the caller.
+    /// </summary>
+    private static IntPtr LocateAgentZeroWindow()
+    {
+        IntPtr hwnd = NativeMethods.FindWindow(null, MainWindowTitle);
+        if (hwnd != IntPtr.Zero) return hwnd;
+
+        int selfPid = Environment.ProcessId;
+        foreach (var proc in Process.GetProcessesByName("AgentZeroLite"))
+        {
+            try
+            {
+                if (proc.Id == selfPid) continue;   // skip the current CLI process
+                var mw = proc.MainWindowHandle;
+                if (mw != IntPtr.Zero) return mw;
+            }
+            catch
+            {
+                // Access denied or process exited between enumeration and probe — skip.
+            }
+            finally
+            {
+                proc.Dispose();
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    private static void PrintNotRunning()
+    {
+        Console.Error.WriteLine("Error: AgentZero Lite GUI is not running.");
+        Console.Error.WriteLine("Start AgentZeroLite.exe first (GUI mode), then retry.");
+    }
+
     private static IntPtr FindAgentZero()
     {
-        IntPtr hwnd = NativeMethods.FindWindow(null, "AgentZero");
-        if (hwnd == IntPtr.Zero)
-        {
-            Console.Error.WriteLine("Error: AgentZero is not running.");
-            Console.Error.WriteLine("Start AgentZeroLite.exe first (GUI mode), then retry.");
-        }
+        IntPtr hwnd = LocateAgentZeroWindow();
+        if (hwnd == IntPtr.Zero) PrintNotRunning();
         return hwnd;
     }
 
