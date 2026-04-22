@@ -305,4 +305,13 @@ whole product.
 
 ---
 
+### 🔬 Sister AI Research Repos
+
+| Repo | One-liner |
+| --- | --- |
+| [**harness-kakashi**](https://github.com/psmon/harness-kakashi) | A solo training harness — a *Naruto*-themed sandbox for getting a feel for harness design. Sample pulls in experts from [Aaronontheweb/dotnet-skills](https://github.com/Aaronontheweb/dotnet-skills) as harness evaluators |
+| [**pencil-creator**](https://github.com/psmon/pencil-creator) | Harness-driven experiment for seeding design systems with new templates. **Three input axes**: ① MS Blend XAML research, ② import from ordinary web pages, ③ `designmd.ai` MD-search-based templates |
+
+---
+
 🚧 **In preparation** · <https://blumn.ai/>

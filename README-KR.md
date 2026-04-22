@@ -298,4 +298,13 @@ EF Core가 자동 마이그레이션).
 
 ---
 
+### 🔬 함께 연구 중인 AI 패밀리 저장소
+
+| 저장소 | 한 줄 소개 |
+| --- | --- |
+| [**harness-kakashi**](https://github.com/psmon/harness-kakashi) | 하네스 입문을 위한 1인용 연습 하네스 — *나루토* 세계관을 통해 하네스의 감을 잡는 샌드박스. 샘플로 [Aaronontheweb/dotnet-skills](https://github.com/Aaronontheweb/dotnet-skills)의 전문가를 하네스 평가자로 영입 |
+| [**pencil-creator**](https://github.com/psmon/pencil-creator) | 하네스를 활용해 디자인 시스템에 새 템플릿을 들이는 실험. **3축 지원**: ① MS Blend XAML 리서칭, ② 일반 웹페이지 디자인 이식, ③ `designmd.ai` MD 검색 기반 템플릿 |
+
+---
+
 🚧 **준비 중** · <https://blumn.ai/>
