@@ -271,6 +271,308 @@
                 </Grid>
             </TabItem>
 
+            <!-- LLM (Gemma) Tab -->
+            <TabItem Header="&#x1F916; LLM (Gemma)" Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,0,0">
+
+                        <!-- Experimental Banner -->
+                        <Border Background="#2A0E1F" BorderBrush="#FF2D95" BorderThickness="1"
+                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="&#x26A0;" FontSize="14" Foreground="#FF2D95"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="온디바이스 실험중" FontSize="13" FontWeight="Bold"
+                                               Foreground="#FF2D95" FontFamily="Consolas"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#E0C8D8" LineHeight="16">
+                                    <Run>AgentBot AI Mode의 온디바이스 탑재를 위해 시도되고 있는 기능입니다.</Run>
+                                    <LineBreak/>
+                                    <Run FontWeight="Bold" Foreground="#00FFAA">CPU 백엔드는 테스트 통과</Run><Run> — Load / 멀티턴 채팅 / 함수콜 모두 안정.</Run>
+                                    <LineBreak/>
+                                    <Run FontWeight="Bold" Foreground="#FF2D95">GPU(Vulkan) 백엔드는 아직 불안정</Run><Run> — Gemma 4 + Vulkan 조합의 네이티브 크래시 원인들을 추적 중.</Run>
+                                    <LineBreak/>
+                                    <Run Foreground="#888899">세부 실패 사례: Docs/gemma4-gpu-load-failures.md</Run>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Model Status -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#00E5FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="MODEL" FontSize="11" FontWeight="Bold"
+                                               Foreground="#00E5FF" FontFamily="Consolas"/>
+                                    <TextBlock x:Name="tbLlmModelState" Text="[Missing]" FontSize="10"
+                                               Foreground="#FF2D95" FontFamily="Consolas"
+                                               Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBox x:Name="tbLlmModelPath" Style="{StaticResource DarkTextBox}"
+                                         IsReadOnly="True" Margin="0,0,0,6"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ProgressBar x:Name="pbLlmDownload" Grid.Column="0" Height="14"
+                                                 Minimum="0" Maximum="100" Value="0"
+                                                 Foreground="#00E5FF" Background="#12122A"
+                                                 BorderBrush="#2A2A5E"/>
+                                    <Button x:Name="btnLlmDownload" Grid.Column="1"
+                                            Content="Download" Padding="12,5" Margin="8,0,0,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnLlmDownloadClick"/>
+                                </Grid>
+                                <TextBlock x:Name="tbLlmDownloadStatus" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#556677" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Runtime Options -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#8B00FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="RUNTIME OPTIONS" FontSize="11" FontWeight="Bold"
+                                               Foreground="#8B00FF" FontFamily="Consolas"/>
+                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Backend" Grid.Row="0" Grid.Column="0"
+                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                    <ComboBox x:Name="cbLlmBackend" Grid.Row="0" Grid.Column="1"
+                                              Style="{StaticResource DarkComboBox}" Margin="0,3,12,3">
+                                        <ComboBoxItem Content="Cpu"/>
+                                        <ComboBoxItem Content="Vulkan"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="GPU Layers" Grid.Row="0" Grid.Column="2"
+                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                    <TextBox x:Name="tbLlmGpuLayers" Grid.Row="0" Grid.Column="3"
+                                             Style="{StaticResource DarkTextBox}" Margin="0,3,0,3"/>
+
+                                    <TextBlock Text="GPU Device" Grid.Row="2" Grid.Column="2"
+                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                    <ComboBox x:Name="cbLlmGpuDevice" Grid.Row="2" Grid.Column="3"
+                                              Style="{StaticResource DarkComboBox}" Margin="0,3,0,3"/>
+
+                                    <TextBlock Text="Context Size" Grid.Row="1" Grid.Column="0"
+                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                    <TextBox x:Name="tbLlmContextSize" Grid.Row="1" Grid.Column="1"
+                                             Style="{StaticResource DarkTextBox}" Margin="0,3,12,3"/>
+
+                                    <TextBlock Text="Max Tokens" Grid.Row="1" Grid.Column="2"
+                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                    <TextBox x:Name="tbLlmMaxTokens" Grid.Row="1" Grid.Column="3"
+                                             Style="{StaticResource DarkTextBox}" Margin="0,3,0,3"/>
+
+                                    <TextBlock Text="Temperature" Grid.Row="2" Grid.Column="0"
+                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                    <TextBox x:Name="tbLlmTemperature" Grid.Row="2" Grid.Column="1"
+                                             Style="{StaticResource DarkTextBox}" Margin="0,3,12,3"/>
+                                </Grid>
+
+                                <!-- KV Cache & Attention (experimental, user-tunable) -->
+                                <Border BorderBrush="#2A2A5E" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,8,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="KV CACHE / ATTENTION (experimental)"
+                                                   FontSize="10" FontWeight="Bold"
+                                                   Foreground="#FF2D95" FontFamily="Consolas"
+                                                   Margin="0,0,0,6"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="110"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="110"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Text="Flash Attention" Grid.Row="0" Grid.Column="0"
+                                                       Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                       VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                            <CheckBox x:Name="chkLlmFlashAttn" Grid.Row="0" Grid.Column="1"
+                                                      Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                      VerticalAlignment="Center" Margin="0,3,12,3"
+                                                      Content="enable"/>
+
+                                            <TextBlock Text="No KQV Offload" Grid.Row="0" Grid.Column="2"
+                                                       Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                       VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                            <CheckBox x:Name="chkLlmNoKqvOffload" Grid.Row="0" Grid.Column="3"
+                                                      Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                      VerticalAlignment="Center" Margin="0,3,0,3"
+                                                      Content="KV stays on CPU RAM"/>
+
+                                            <TextBlock Text="KV Type K" Grid.Row="1" Grid.Column="0"
+                                                       Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                       VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                            <ComboBox x:Name="cbLlmKvTypeK" Grid.Row="1" Grid.Column="1"
+                                                      Style="{StaticResource DarkComboBox}" Margin="0,3,12,3">
+                                                <ComboBoxItem Content="F16 (default)"/>
+                                                <ComboBoxItem Content="F32"/>
+                                                <ComboBoxItem Content="Q8_0"/>
+                                                <ComboBoxItem Content="Q4_0"/>
+                                            </ComboBox>
+
+                                            <TextBlock Text="KV Type V" Grid.Row="1" Grid.Column="2"
+                                                       Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                       VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                            <ComboBox x:Name="cbLlmKvTypeV" Grid.Row="1" Grid.Column="3"
+                                                      Style="{StaticResource DarkComboBox}" Margin="0,3,0,3">
+                                                <ComboBoxItem Content="F16 (default)"/>
+                                                <ComboBoxItem Content="F32"/>
+                                                <ComboBoxItem Content="Q8_0"/>
+                                                <ComboBoxItem Content="Q4_0"/>
+                                            </ComboBox>
+                                        </Grid>
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <TextBlock Text="Use mmap" Foreground="#C8C8D8"
+                                                       FontFamily="Consolas" FontSize="10"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <CheckBox x:Name="chkLlmUseMmap" Foreground="#C8C8D8"
+                                                      FontFamily="Consolas" FontSize="10"
+                                                      VerticalAlignment="Center"
+                                                      Content="keep model pages resident (faster reload, ~5GB RSS)"/>
+                                        </StackPanel>
+                                        <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="9"
+                                                   Foreground="#556677" Margin="0,6,0,0"
+                                                   Text="Vulkan + Gemma 4 crash triage: try in order — (1) Flash Attention OFF (default), (2) No KQV Offload ON (KV stays on CPU, safer), (3) KV Type K/V = Q8_0 (smaller cache), (4) mmap OFF (frees up to 5GB RAM after GPU upload). Changes apply on next Load."/>
+                                    </StackPanel>
+                                </Border>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button x:Name="btnLlmAutoRecommend" Content="&#x1F3AF; Auto Recommend"
+                                            Padding="12,5" Margin="0,0,6,0"
+                                            Style="{StaticResource DarkButton}"
+                                            ToolTip="Compute safe options based on current GPU/RAM state. Applies to fields only — click Save Options + Load to use."
+                                            Click="OnLlmAutoRecommendClick"/>
+                                    <Button x:Name="btnLlmSaveOptions" Content="Save Options"
+                                            Padding="12,5" Margin="0,0,6,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnLlmSaveOptionsClick"/>
+                                    <Button x:Name="btnLlmLoad" Content="Load Model"
+                                            Padding="12,5" Margin="0,0,6,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnLlmLoadClick"/>
+                                    <Button x:Name="btnLlmUnload" Content="Unload"
+                                            Padding="12,5" Margin="0,0,6,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnLlmUnloadClick" IsEnabled="False"/>
+                                    <TextBlock x:Name="tbLlmRuntimeState" Text="State: Unloaded"
+                                               FontFamily="Consolas" FontSize="10"
+                                               Foreground="#556677" VerticalAlignment="Center"
+                                               Margin="10,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Chat Test -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#00FFAA" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="CHAT TEST (MULTI-TURN SESSION)" FontSize="11" FontWeight="Bold"
+                                               Foreground="#00FFAA" FontFamily="Consolas"/>
+                                    <TextBlock x:Name="tbLlmTurnCount" Text="turns: 0" FontFamily="Consolas"
+                                               FontSize="10" Foreground="#556677" Margin="12,0,0,0"
+                                               VerticalAlignment="Center"/>
+                                    <Button x:Name="btnLlmNewSession" Content="New Session"
+                                            Padding="8,2" Margin="12,0,0,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnLlmNewSessionClick" IsEnabled="False"/>
+                                </StackPanel>
+                                <Border Background="#0A0A14" BorderBrush="#2A2A5E" BorderThickness="1"
+                                        Height="180" CornerRadius="2">
+                                    <ScrollViewer x:Name="svLlmChat" VerticalScrollBarVisibility="Auto">
+                                        <TextBox x:Name="tbLlmChatHistory" IsReadOnly="True"
+                                                 TextWrapping="Wrap" AcceptsReturn="True"
+                                                 BorderThickness="0" Background="Transparent"
+                                                 Foreground="#C8C8D8" FontFamily="Consolas"
+                                                 FontSize="10" Padding="8"/>
+                                    </ScrollViewer>
+                                </Border>
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="tbLlmChatInput" Grid.Column="0"
+                                             Style="{StaticResource DarkTextBox}"
+                                             KeyDown="OnLlmChatInputKeyDown" IsEnabled="False"/>
+                                    <Button x:Name="btnLlmChatSend" Grid.Column="1" Content="Send"
+                                            Padding="12,5" Margin="8,0,0,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnLlmChatSendClick" IsEnabled="False"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Monitor -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#FFB800" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="MONITOR" FontSize="11" FontWeight="Bold"
+                                               Foreground="#FFB800" FontFamily="Consolas"/>
+                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Process RAM" FontFamily="Consolas" FontSize="10" Foreground="#556677"/>
+                                        <TextBlock x:Name="tbLlmRam" Text="—" FontFamily="Consolas"
+                                                   FontSize="14" FontWeight="Bold" Foreground="#00E5FF"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="GPU Memory" FontFamily="Consolas" FontSize="10" Foreground="#556677"/>
+                                        <TextBlock x:Name="tbLlmGpu" Text="—" FontFamily="Consolas"
+                                                   FontSize="14" FontWeight="Bold" Foreground="#00FFAA"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Tokens/sec (last)" FontFamily="Consolas" FontSize="10" Foreground="#556677"/>
+                                        <TextBlock x:Name="tbLlmTps" Text="—" FontFamily="Consolas"
+                                                   FontSize="14" FontWeight="Bold" Foreground="#FFB800"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- AgentZero CLI Tab -->
             <TabItem Header="&#x1F4BB; AgentZero CLI" Style="{StaticResource SettingsTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">

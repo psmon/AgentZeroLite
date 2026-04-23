@@ -1,3 +1,5 @@
+using LLama.Native;
+
 namespace Agent.Common.Llm;
 
 public sealed record LocalLlmOptions
@@ -13,4 +15,13 @@ public sealed record LocalLlmOptions
     public float Temperature { get; init; } = 0.7f;
 
     public int GpuLayerCount { get; init; } = 999;
+
+    public bool FlashAttention { get; init; } = false;
+
+    public bool NoKqvOffload { get; init; } = false;
+
+    public GGMLType KvCacheTypeK { get; init; } = GGMLType.GGML_TYPE_F16;
+    public GGMLType KvCacheTypeV { get; init; } = GGMLType.GGML_TYPE_F16;
+
+    public bool UseMemoryMap { get; init; } = true;
 }

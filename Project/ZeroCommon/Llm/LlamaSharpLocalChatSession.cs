@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Agent.Common;
 using LLama;
 using LLama.Common;
 using LLama.Sampling;
@@ -20,8 +21,13 @@ public sealed class LlamaSharpLocalChatSession : ILocalChatSession
     internal LlamaSharpLocalChatSession(LocalLlmOptions options, LLamaWeights weights, ModelParams modelParams)
     {
         _options = options;
+
+        AppLogger.Log($"[LLM] Session ctor: CreateContext begin (ctx={modelParams.ContextSize}, gpuLayers={modelParams.GpuLayerCount})");
         _context = weights.CreateContext(modelParams);
+        AppLogger.Log("[LLM] Session ctor: CreateContext done");
+
         _executor = new InteractiveExecutor(_context);
+        AppLogger.Log("[LLM] Session ctor: InteractiveExecutor ready");
     }
 
     public int TurnCount => _turnCount;

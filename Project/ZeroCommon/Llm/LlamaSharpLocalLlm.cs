@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Agent.Common;
 using LLama;
 using LLama.Common;
 using LLama.Native;
@@ -32,7 +33,12 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm
         var modelParams = new ModelParams(options.ModelPath)
         {
             ContextSize = options.ContextSize,
-            GpuLayerCount = options.Backend == LocalLlmBackend.Vulkan ? options.GpuLayerCount : 0
+            GpuLayerCount = options.Backend == LocalLlmBackend.Vulkan ? options.GpuLayerCount : 0,
+            FlashAttention = options.FlashAttention,
+            NoKqvOffload = options.NoKqvOffload,
+            TypeK = options.KvCacheTypeK,
+            TypeV = options.KvCacheTypeV,
+            UseMemorymap = options.UseMemoryMap
         };
 
         var weights = await LLamaWeights.LoadFromFileAsync(modelParams, ct);
@@ -100,6 +106,15 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm
                 throw new FileNotFoundException(
                     $"Native llama.dll not found at {llamaDll}. " +
                     "Ensure the runtimes/{rid}/native folder is copied to output.", llamaDll);
+
+            // Route llama.cpp's own log (normally stderr) into our AppLogger so
+            // native failure reasons — Vulkan device errors, GGUF parse issues,
+            // allocation failures — surface in app-log.txt instead of being lost.
+            NativeLibraryConfig.All.WithLogCallback((level, msg) =>
+            {
+                if (level < LLamaLogLevel.Warning) return; // skip Debug/Info noise
+                AppLogger.Log($"[llama.cpp][{level}] {msg.TrimEnd('\r', '\n')}");
+            });
 
             NativeLibraryConfig.All.WithLibrary(llamaPath: llamaDll, mtmdPath: null);
             _nativeConfigured = true;

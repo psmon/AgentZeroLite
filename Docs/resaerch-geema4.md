@@ -153,6 +153,11 @@ runtimes/
 - `LocalLlmBackend` — `Cpu` / `Vulkan`.
 - `LlamaSharpLocalLlm` — 엔진. 가중치 로드(`LLamaWeights`) 1회, 세션마다 컨텍스트 복제.
 - `LlamaSharpLocalChatSession` — 세션. `InteractiveExecutor` + 자체 KV 캐시 + Gemma 턴 마커 관리.
+- `LlmService` — 프로세스당 싱글톤. Load/Unload 상태 머신 (`Unloaded`/`Loading`/`Loaded`/`Unloading`) + `StateChanged` 이벤트 + Vulkan 디바이스 env var 주입.
+- `LlmSettingsStore` — `%LOCALAPPDATA%\AgentZeroLite\llm-settings.json` 직렬화.
+- `LlmModelLocator` — 경로 우선순위 (dev `D:\Code\AI\GemmaNet\models\...` → user `%LOCALAPPDATA%\...\models\...`).
+- `LlmModelDownloader` — HttpClient + Range 헤더 resume, `IProgress<DownloadProgress>` 리포트.
+- `VulkanDeviceEnumerator` / `VulkanDeviceInfo` — `vulkaninfo --summary` 파싱으로 GPU 목록 얻기 (§11 참조).
 
 ### 네이티브 로드 로직 (핵심)
 
@@ -306,10 +311,78 @@ Vulkan 백엔드 실측은 별도 테스트 프로세스 분리 필요 (NativeLi
 - 이번 구조는 **LLamaSharp.Backend 패키지를 배제**하고 우리 경로만 `NativeLibraryConfig.All.WithLibrary`로 주입. Whisper.net이 먼저 로드되어도 자기 ggml 경로를 쓰면 되고, 우리 LLM이 명시 경로로 로드하면 우리 ggml로 귀결됨.
 - 단 **같은 프로세스 내에서 동시에 추론**을 돌리면 여전히 불안할 수 있음 (ggml 심볼이 두 번 로드된 상태이므로 내부 전역 상태가 경합할 가능성). 실제 동시 사용 필요 시 별도 프로세스 분리 권장.
 
-## 11. 알려진 제약 / 향후 작업
+## 11. 멀티-GPU (iGPU + dGPU) 디바이스 선택
+
+랩탑 (또는 iGPU 내장 데스크탑 CPU) + dGPU 구성에서 Vulkan 백엔드의 **기본 동작이 크래시 원인**이 되는 경우가 있어 실측 추적한 결과 정리.
+
+### 실제 겪은 증상
+
+- 환경: Ryzen AI 300 (Strix Point) 랩탑, Radeon 890M iGPU + RTX 4060 Laptop GPU
+- Load Model 클릭 → GPU 메모리 사용량 잠깐 상승 → **네이티브 AV 크래시** (WPF 프로세스 사일런트 종료, `DispatcherUnhandledException` / `AppDomain.UnhandledException` 모두 미발화)
+- `app-log.txt`에 크래시 직전 관리 코드 로그까지만 남음
+
+### 근본 원인
+
+llama.cpp의 Vulkan 백엔드는 `vkEnumeratePhysicalDevices()` 결과 **첫 번째 디바이스**를 기본 사용함. WDDM 상에서 **iGPU가 index 0**으로 열거되는 경우가 흔하다. `vulkaninfo --summary`로 확인:
+
+```
+GPU0: AMD Radeon(TM) 890M Graphics          PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+GPU1: NVIDIA GeForce RTX 4060 Laptop GPU    PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+```
+
+iGPU는 전용 VRAM이 없고 시스템 RAM에서 WDDM 할당을 받음. Gemma 4 E4B Q4 (약 5 GB 연속 블록) 할당을 시도하다 드라이버가 거부 → ggml-vulkan 내부 assert → 프로세스 강제 종료.
+
+### 해결 — 디바이스 필터링
+
+llama.cpp는 `GGML_VK_VISIBLE_DEVICES` 환경변수를 읽어 열거 결과를 사전 필터링. CUDA의 `CUDA_VISIBLE_DEVICES`와 동일 개념. **네이티브 DLL이 로드되기 전** 혹은 최소한 **모델 로드 전**에 프로세스 환경에 설정하면 됨.
+
+```csharp
+Environment.SetEnvironmentVariable(
+    "GGML_VK_VISIBLE_DEVICES",
+    settings.VulkanDeviceIndex.ToString(CultureInfo.InvariantCulture));
+// 이후 LLamaWeights.LoadFromFileAsync(...) → 필터된 목록에서만 선택
+```
+
+### 구현 자산
+
+- `Agent.Common.Llm.VulkanDeviceInfo` — record(Index, Name, IsDiscrete, VendorId). VendorId는 0x10DE=NVIDIA, 0x1002=AMD, 0x8086=Intel, 0x106B=Apple.
+- `Agent.Common.Llm.VulkanDeviceEnumerator` — `%WINDIR%\System32\vulkaninfo.exe` 또는 `%VULKAN_SDK%\Bin\vulkaninfoSDK.exe`를 `--summary` 플래그로 실행 후 regex 파싱.
+- `LlmRuntimeSettings.VulkanDeviceIndex` — `int`, 기본 -1. -1 = **auto** (첫 PHYSICAL_DEVICE_TYPE_DISCRETE_GPU 선택, 없으면 0).
+- UI: 설정 탭의 "GPU Device" 드롭다운. 첫 항목 `(auto - prefer discrete)`, 이후 열거된 장치 나열. Vulkan 백엔드 선택 시에만 의미 있음 (CPU 모드는 무시).
+- `LlmService.LoadAsync` 내부에서 Vulkan 백엔드이고 `VulkanDeviceIndex >= 0`일 때만 env var 주입. 이후 `LLamaWeights.LoadFromFileAsync` 호출.
+
+### 디바이스 역할 가이드 (이 프로젝트 맥락)
+
+| 용도 | 권장 | 이유 |
+|---|---|---|
+| Gemma 4 추론 | dGPU (NVIDIA) | 메모리 대역폭·텐서코어 필요 |
+| Whisper.net 음성 인식 | iGPU (DirectML/Vulkan) 또는 CPU | 모델 작아서 dGPU 점유 안 해도 됨 |
+| WPF UI 렌더링 | iGPU (OS 자동) | 배터리 효율 |
+| 하드웨어 비디오 코덱 | iGPU (AMF / QSV) | dGPU보다 저전력 |
+
+이원화 가능성: Gemma는 NVIDIA, Whisper는 AMD — 서로 다른 네이티브 라이브러리가 각자 환경변수(`GGML_VK_VISIBLE_DEVICES`, Whisper.net 해당 옵션)로 선택하므로 프로세스 내 간섭 없음.
+
+### 검증 신호
+
+로드 시작 로그에 `vkDev=<index>`가 찍히면 디바이스 필터가 적용된 것:
+
+```
+[LLM] Vulkan devices: GPU0: AMD Radeon(TM) 890M Graphics (AMD, integrated) | GPU1: NVIDIA GeForce RTX 4060 Laptop GPU (NVIDIA, discrete)
+[LLM] Load start backend=Vulkan vkDev=1 ctx=4096 gpuLayers=999 model=gemma-4-E4B-it-UD-Q4_K_XL.gguf
+[LLM] Load complete
+```
+
+`vkDev=0`으로 지정되어 AMD iGPU를 가리키고 있으면 거의 확실히 크래시 → 드롭다운에서 discrete 선택으로 교체.
+
+### `vulkaninfo` 부재 시
+
+Vulkan SDK 미설치 + 드라이버가 `vulkaninfo.exe`를 함께 배포하지 않은 드문 경우 열거 실패 → 드롭다운이 `(auto)`만 표시. 이때는 `LlmSettingsStore`의 JSON을 직접 편집해 `VulkanDeviceIndex`를 명시 지정 권장.
+
+## 12. 알려진 제약 / 향후 작업
 
 - **백엔드 런타임 전환 불가** (NativeLibraryConfig 1회 제약). 설정 변경 시 앱 재시작 필요. 토글 UI를 둘 거면 "재시작 후 적용" 안내 필요.
 - **Vulkan 이식성 경계**: Vulkan SDK 1.4 기능 사용 여부가 ggml-vulkan 셰이더에 영향. 최종 배포 대상 GPU 드라이버는 **Vulkan 1.2 이상 대응** 필요 (NVIDIA 560+ / AMD 20.11+ / Intel Xe 드라이버 등). 실질 문제는 거의 없지만 엣지 케이스 존재.
+- **네이티브 재-load 불가**: 같은 프로세스 내에서 `LlmService.UnloadAsync` 이후 다시 `LoadAsync`는 금지 (iGPU 경유 크래시 후 상태 꼬임 재현됨). UI 레이어의 `_hasLoadedOnceInProcess` 가드로 차단, 사용자에겐 "재시작 후 다시 로드" 안내.
 - **LLamaSharp 0.27 NuGet 릴리스 대기**: 정식 릴리스 나오면 `Backend` 패키지의 네이티브도 Gemma 4 지원. 다만 Whisper.net 공존 이슈 해결이 우선이라 자체 빌드 경로 유지가 당분간 안전.
 - **32K+ 컨텍스트**: 현재 모델 선택은 16K 기준. 32K 이상 필요하면 UD-IQ2_M / UD-Q3_K_XL로 다운그레이드 검토.
 - **세션 영속화 없음**: `ILocalChatSession`의 KV 캐시는 프로세스 수명 동안만 유효. 앱 재시작 후 대화 이력을 잇고 싶으면 히스토리 문자열(turn별 user/model 메시지)을 직렬화해서 다음 실행 때 prefill로 재주입 필요. 첫 재주입은 느리고 이후는 다시 빠름.
@@ -318,7 +391,7 @@ Vulkan 백엔드 실측은 별도 테스트 프로세스 분리 필요 (NativeLi
 - **멀티모달(vision)**: Gemma 4 E4B는 vision 입력 지원. `NativeLibraryConfig.WithLibrary`의 `mtmdPath`에 추가 DLL(`mtmd.dll`)을 빌드해 넘기면 활용 가능. audio는 llama.cpp 측 미구현 상태(issue #21325).
 - **Git repo 크기**: `runtimes/` 아래 총 66MB 추가됨 (`ggml-vulkan.dll`이 59MB 차지). 모노레포 크기에 영향. 필요 시 Git LFS 도입 검토 지점.
 
-## 12. 참고 링크
+## 13. 참고 링크
 
 - [llama.cpp PR #21309 — Gemma 4 지원 초도 구현](https://github.com/ggml-org/llama.cpp/pull/21309)
 - [llama.cpp PR #21343 — Gemma 4 tokenizer 수정](https://github.com/ggml-org/llama.cpp/pull/21343)
