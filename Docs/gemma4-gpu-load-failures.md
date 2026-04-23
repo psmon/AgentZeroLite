@@ -103,6 +103,19 @@ Environment.SetEnvironmentVariable("GGML_VK_DISABLE_COOPMAT2", "1");
 
 `VK_KHR_shader_bfloat16` (Vulkan 1.4 최신)까지 원인이면 환경변수로 못 막음 — llama.cpp 소스 패치 + 재빌드 필요. 메시지에 extension 이름이 함께 찍혀 있으면 정확한 타겟 지정 가능.
 
+### 2차 확정된 진짜 원인 (2026-04-24)
+
+위 가설 중 `VK_KHR_shader_bfloat16`가 실제 범인이었음. **그리고 더 깊은 원인 포착**: `GGML_VK_DISABLE_BFLOAT16` env var는 맞는 해결책이었으나 `.NET`의 관리 API로 설정한 것이 **네이티브까지 전달 안 됐음**. 아래 "실패 #6" 참고.
+
+`VK_LOADER_DEBUG=error,extension`을 설정하고 실행하면 Vulkan Loader가 직접 확장 이름을 찍어줌:
+
+```
+[Vulkan Loader] ERROR: loader_validate_device_extensions:
+Device extension VK_KHR_shader_bfloat16 not supported by selected physical device
+```
+
+이 로그 기법은 향후 다른 확장 누락 진단 시 최우선 도구.
+
 ---
 
 ## 실패 #3 — CreateContext에서 GPU KV offload 경로 AV
@@ -198,6 +211,66 @@ if (_hasLoadedOnceInProcess)
 ```
 
 사용자에게는 "설정 바꾸려면 앱 재시작" 안내. 불편하지만 안정적.
+
+---
+
+## 실패 #7 — .NET `Environment.SetEnvironmentVariable`이 네이티브 `getenv()`에 전파 안 됨
+
+> 이 실패는 #6 (네이티브 로그 부재)가 해결된 *이후에야* 포착 가능했음 — 네이티브 스택의 진짜 에러 메시지가 로그에 찍히기 전에는 ".NET에서 설정한 env var가 왜 씹히는지" 자체를 몰랐기 때문.
+
+### 증상
+
+- C# 쪽에서 `Environment.SetEnvironmentVariable("GGML_VK_DISABLE_BFLOAT16", "1")` 호출
+- 관리 코드에서 `Environment.GetEnvironmentVariable` 로 읽으면 `"1"` 반환됨
+- 그러나 **`ggml-vulkan.dll`의 `getenv("GGML_VK_DISABLE_BFLOAT16")`은 NULL 반환**
+- 결과: env var 비활성 로직이 스킵되고 해당 확장이 `device_extensions`에 그대로 들어감 → `ErrorExtensionNotPresent`
+
+### 원인
+
+Windows에서 환경 변수는 두 군데에 저장됨:
+1. **프로세스 환경 블록** — `SetEnvironmentVariableW` / `GetEnvironmentVariableW` 로 접근. .NET의 `Environment.SetEnvironmentVariable`이 여기를 업데이트.
+2. **MSVC CRT의 캐시된 환경** — 프로세스 시작 시 위 블록에서 한 번 복사. 이후 `getenv` / `_wgetenv`는 이 캐시만 읽음.
+
+MSVC CRT는 프로세스 시작 이후 두 저장소를 자동 동기화하지 않음. CRT 캐시를 업데이트하려면 CRT 내장 함수 `_putenv_s` / `_wputenv_s`를 호출해야 함.
+
+CoreCLR/`.NET 10`의 `Environment.SetEnvironmentVariable`은 **프로세스 환경 블록만 업데이트** — 다른 네이티브 DLL의 CRT 캐시는 못 건드림. 그래서 `ggml-vulkan.dll`의 `getenv`는 모름.
+
+같은 env var를 **셸 레벨**에서 설정 (`set GGML_VK_DISABLE_BFLOAT16=1` 또는 bash `GGML_VK_DISABLE_BFLOAT16=1 ...`)하면 프로세스 시작 시 CRT가 캐시할 때 포함되므로 `getenv`에서 보임. 이 차이로 "셸에서 설정하면 동작, 코드에서 설정하면 미동작" 현상.
+
+### 대응
+
+`ucrtbase.dll`의 `_putenv_s`를 P/Invoke로 호출:
+
+```csharp
+[DllImport("ucrtbase.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+private static extern int _putenv_s(string name, string value);
+
+private static void SetNativeEnv(string name, string value)
+{
+    Environment.SetEnvironmentVariable(name, value);   // Windows env block
+    try { _putenv_s(name, value); } catch { }          // MSVC CRT cache
+}
+```
+
+`LlmService.LoadAsync`에서 env var 설정을 모두 이 헬퍼로 교체.
+
+### 검증 신호
+
+적용 후 첫 vkCreateDevice가 즉시 성공 (재시도 불필요):
+
+```
+[LLM] Load start backend=Vulkan vkDev=1 ctx=2048 ...
+[llama.cpp][Warning] load: control-looking token ...
+(ErrorExtensionNotPresent 없음)
+[LLM] Load complete (attempt 1)                      ← 한 번에 성공
+[LLM] Session ctor: CreateContext begin
+[LLM] Session ctor: CreateContext done              ← 세션 생성도 성공
+[LLM] Chat session opened
+```
+
+### 일반화된 교훈
+
+이 프로젝트만의 이슈가 아님. **.NET에서 네이티브 DLL이 `getenv`로 읽는 구성 값을 동적으로 변경할 때는 반드시 `_putenv_s`도 함께 호출해야 함.** Python/Java/Node.js 등 다른 관리 런타임도 같은 CRT 격리 문제를 가짐 (각각의 워크어라운드가 있음). llama.cpp, ONNX Runtime, CUDA 라이브러리 등 C/C++ 네이티브 인프라 통합 시 범용 패턴.
 
 ---
 

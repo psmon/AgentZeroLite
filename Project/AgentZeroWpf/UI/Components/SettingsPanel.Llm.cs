@@ -20,16 +20,32 @@ public partial class SettingsPanel
     private CancellationTokenSource? _llmChatCts;
     private double _llmLastTps;
 
-    // Native llama.cpp + Vulkan doesn't cleanly support dispose-then-reload
-    // inside the same process (internal global state retained across dispose).
-    // Track whether we've already loaded at least once; if so, require an app
-    // restart before loading again.
+    // Atomic re-entry guard for Load — covers the narrow window between the
+    // user's click and ApplyRuntimeState disabling the button. Without this,
+    // rapid double-clicks (or racing Auto Recommend → Load → Unload sequences)
+    // could kick off two LoadAsync calls before the state transition is
+    // visible to the UI.
+    private int _llmLoadInFlight;
+
+    // Historical guard — kept as a field because multiple sites still reference
+    // it, but left permanently false now that LlmProbe's `reload` phase
+    // verified Unload → Load → Session works cleanly in the same process on
+    // top of the bfloat16 + iGPU fixes. Remove if no references remain after
+    // any follow-up refactor.
     private static bool _hasLoadedOnceInProcess;
 
     private IReadOnlyList<VulkanDeviceInfo> _vulkanDevices = Array.Empty<VulkanDeviceInfo>();
 
+    private LlmModelCatalogEntry CurrentModelEntry =>
+        LlmModelCatalog.FindById(
+            cbLlmModel.SelectedItem is LlmModelCatalogEntry e ? e.Id : null);
+
     private void InitializeLlmTab()
     {
+        // Populate model catalog dropdown
+        cbLlmModel.ItemsSource = LlmModelCatalog.All;
+        cbLlmModel.DisplayMemberPath = nameof(LlmModelCatalogEntry.DisplayName);
+
         // Enumerate Vulkan devices once — dropdown repopulated each tab open
         _vulkanDevices = VulkanDeviceEnumerator.Enumerate();
         cbLlmGpuDevice.Items.Clear();
@@ -68,6 +84,8 @@ public partial class SettingsPanel
 
     private void ApplySettingsToUi(LlmRuntimeSettings s)
     {
+        var entry = LlmModelCatalog.FindById(s.ModelId);
+        cbLlmModel.SelectedItem = entry;
         cbLlmBackend.SelectedIndex = s.Backend == LocalLlmBackend.Vulkan ? 1 : 0;
         tbLlmGpuLayers.Text = s.GpuLayerCount.ToString(CultureInfo.InvariantCulture);
         tbLlmContextSize.Text = s.ContextSize.ToString(CultureInfo.InvariantCulture);
@@ -138,6 +156,7 @@ public partial class SettingsPanel
             var devIdx = ReadSelectedGpuDeviceIndex();
             return new LlmRuntimeSettings
             {
+                ModelId = CurrentModelEntry.Id,
                 Backend = backend,
                 GpuLayerCount = gpuLayers,
                 ContextSize = ctx,
@@ -159,7 +178,8 @@ public partial class SettingsPanel
 
     private void RefreshLlmModelStatus()
     {
-        var path = LlmModelLocator.ResolveExistingOrTarget();
+        var entry = CurrentModelEntry;
+        var path = LlmModelLocator.ResolveExistingOrTarget(entry);
         tbLlmModelPath.Text = path;
 
         if (File.Exists(path))
@@ -179,8 +199,17 @@ public partial class SettingsPanel
             pbLlmDownload.Value = 0;
             btnLlmDownload.IsEnabled = true;
             btnLlmDownload.Content = "Download";
-            tbLlmDownloadStatus.Text = $"Will download to {LlmModelLocator.UserPath} (~4.9 GB)";
+            var approxGb = entry.ApproxBytes / (double)(1024 * 1024 * 1024);
+            tbLlmDownloadStatus.Text = $"Will download {entry.FileName} (~{approxGb:0.0} GB) to {LlmModelLocator.UserPathFor(entry)}";
         }
+    }
+
+    private void OnLlmModelSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Re-render model status for the newly selected catalog entry so the
+        // user sees Ready/Missing + file path instantly. Does NOT auto-save
+        // settings — user clicks Save Options or Load to persist.
+        if (cbLlmModel.IsLoaded) RefreshLlmModelStatus();
     }
 
     // ── Download ─────────────────────────────────────────────────────────
@@ -193,10 +222,20 @@ public partial class SettingsPanel
             return;
         }
 
-        var dest = LlmModelLocator.UserPath;
+        if (LlmService.State != LlmServiceState.Unloaded || _llmLoadInFlight != 0)
+        {
+            AppLogger.Log("[LLM] Download blocked — load/unload in progress or model already loaded");
+            return;
+        }
+
+        var entry = CurrentModelEntry;
+        var dest = LlmModelLocator.UserPathFor(entry);
         _llmDownloadCts = new CancellationTokenSource();
         btnLlmDownload.Content = "Cancel";
         pbLlmDownload.Value = 0;
+        btnLlmLoad.IsEnabled = false;
+        btnLlmAutoRecommend.IsEnabled = false;
+        AppLogger.Log($"[LLM] Download start: {entry.FileName} → {dest}");
 
         var progress = new Progress<DownloadProgress>(p =>
         {
@@ -211,7 +250,7 @@ public partial class SettingsPanel
         try
         {
             await LlmModelDownloader.DownloadAsync(
-                LlmModelLocator.DownloadUrl, dest, progress, _llmDownloadCts.Token);
+                entry.DownloadUrl, dest, progress, _llmDownloadCts.Token);
             tbLlmDownloadStatus.Text = "Download complete.";
         }
         catch (OperationCanceledException)
@@ -227,6 +266,9 @@ public partial class SettingsPanel
             _llmDownloadCts?.Dispose();
             _llmDownloadCts = null;
             RefreshLlmModelStatus();
+            // Restore load/recommend buttons now that download finished/cancelled.
+            btnLlmAutoRecommend.IsEnabled = true;
+            btnLlmLoad.IsEnabled = LlmService.State == LlmServiceState.Unloaded && !_hasLoadedOnceInProcess;
         }
     }
 
@@ -234,8 +276,9 @@ public partial class SettingsPanel
 
     private void OnLlmAutoRecommendClick(object sender, RoutedEventArgs e)
     {
-        long modelBytes = 0;
-        var modelPath = LlmModelLocator.ResolveExistingOrTarget();
+        var entry = CurrentModelEntry;
+        long modelBytes = entry.ApproxBytes;
+        var modelPath = LlmModelLocator.ResolveExistingOrTarget(entry);
         try
         {
             if (File.Exists(modelPath))
@@ -260,8 +303,11 @@ public partial class SettingsPanel
                 VulkanDevices: _vulkanDevices,
                 ModelFileName: Path.GetFileName(modelPath)));
 
+            // Preserve the user's model selection — Auto Recommend tunes the
+            // runtime dials but leaves the choice of model alone.
+            recommendation.Settings.ModelId = entry.Id;
             ApplySettingsToUi(recommendation.Settings);
-            AppLogger.Log($"[LLM] Auto-recommend applied. freeGpuMb={(snap.GpuTotalMb - snap.GpuUsedMb)?.ToString() ?? "?"} freeRamMb={freeMb} modelMb={modelBytes / (1024 * 1024)}");
+            AppLogger.Log($"[LLM] Auto-recommend applied. model={entry.Id} freeGpuMb={(snap.GpuTotalMb - snap.GpuUsedMb)?.ToString() ?? "?"} freeRamMb={freeMb} modelMb={modelBytes / (1024 * 1024)}");
             foreach (var r in recommendation.Reasons)
                 AppLogger.Log("  · " + r);
             tbLlmRuntimeState.Text = $"State: Auto-recommend applied — {recommendation.Reasons.Count} reasons in log";
@@ -287,22 +333,42 @@ public partial class SettingsPanel
 
     private async void OnLlmLoadClick(object sender, RoutedEventArgs e)
     {
+        // Atomic swap: 0 → 1 means we got the token. Anyone else re-entering
+        // while we hold it sees the previous "1" and bails out immediately.
+        if (System.Threading.Interlocked.CompareExchange(ref _llmLoadInFlight, 1, 0) != 0)
+        {
+            AppLogger.Log("[LLM] Load click ignored — another load is already in flight");
+            return;
+        }
+
+        try
+        {
+            await DoLoadAsync();
+        }
+        finally
+        {
+            System.Threading.Volatile.Write(ref _llmLoadInFlight, 0);
+        }
+    }
+
+    private async Task DoLoadAsync()
+    {
         if (LlmService.State != LlmServiceState.Unloaded)
         {
             AppLogger.Log($"[LLM] Load click ignored — current state={LlmService.State}");
             return;
         }
 
-        if (_hasLoadedOnceInProcess)
-        {
-            tbLlmRuntimeState.Text = "State: Restart the app before loading again (native state cannot be cleanly reset in-process).";
-            AppLogger.Log("[LLM] Reload blocked — native reload within same process is unsafe, restart required");
-            return;
-        }
+        // Formerly blocked reload here with _hasLoadedOnceInProcess; LlmProbe
+        // verified in-process Unload→Load→Session works correctly after the
+        // bfloat16 / iGPU / _putenv_s fixes landed. Guard removed so the user
+        // can change options (backend, context size, KV cache type, etc.) and
+        // re-Load without an app restart.
 
-        if (!LlmModelLocator.IsAvailable())
+        var entry = CurrentModelEntry;
+        if (!LlmModelLocator.IsAvailable(entry))
         {
-            tbLlmRuntimeState.Text = "State: Model file missing";
+            tbLlmRuntimeState.Text = $"State: Model file missing — {entry.DisplayName}";
             return;
         }
 
@@ -322,13 +388,27 @@ public partial class SettingsPanel
             tbLlmContextSize.Text = "2048";
         }
 
+        // llama.cpp requires Flash Attention for V-cache quantization. Turning
+        // on FA silently here avoids a mystifying CreateContext failure when
+        // the user picks Q8_0/Q4_0 for V but forgets to enable FA.
+        var vQuantized = s.KvCacheTypeV != GGMLType.GGML_TYPE_F16 && s.KvCacheTypeV != GGMLType.GGML_TYPE_F32;
+        if (vQuantized && !s.FlashAttention)
+        {
+            AppLogger.Log($"[LLM] V-cache is quantized ({s.KvCacheTypeV}) → auto-enabling Flash Attention (required).");
+            s.FlashAttention = true;
+            chkLlmFlashAttn.IsChecked = true;
+        }
+
         AppLogger.Log($"[LLM] Options pre-load: fa={s.FlashAttention} noKqv={s.NoKqvOffload} typeK={s.KvCacheTypeK} typeV={s.KvCacheTypeV}");
         LlmSettingsStore.Save(s);
 
-        var modelPath = LlmModelLocator.ResolveExistingOrTarget();
+        var modelPath = LlmModelLocator.ResolveExistingOrTarget(entry);
         AppLogger.Log($"[LLM] Load start backend={s.Backend} vkDev={s.VulkanDeviceIndex} ctx={s.ContextSize} gpuLayers={s.GpuLayerCount} model={Path.GetFileName(modelPath)}");
 
-        btnLlmLoad.IsEnabled = false;  // immediate feedback, don't wait for state event
+        // Disable every other mutating action for the duration of the load so
+        // the user can't kick off a competing Download / Auto Recommend / Save
+        // while native initialization is in flight.
+        SetLoadMutatorsEnabled(false);
         tbLlmRuntimeState.Text = "State: Loading...";
 
         // Laptop NVIDIA Optimus + AMD switchable-graphics layer cold-start:
@@ -351,7 +431,8 @@ public partial class SettingsPanel
             try
             {
                 await LlmService.LoadAsync(s, modelPath);
-                _hasLoadedOnceInProcess = true;
+                // _hasLoadedOnceInProcess retained in code but no longer
+                // flipped — reload is supported after LlmProbe verification.
                 AppLogger.Log($"[LLM] Load complete (attempt {attempt})");
                 return;
             }
@@ -363,6 +444,23 @@ public partial class SettingsPanel
         }
 
         tbLlmRuntimeState.Text = $"State: Load failed after {maxAttempts} attempts — {lastEx?.Message}";
+        // Failed to reach Loaded state — re-enable mutators so the user can try
+        // again with different options. On success, ApplyRuntimeState takes
+        // over button management via the StateChanged event.
+        SetLoadMutatorsEnabled(true);
+    }
+
+    // Centralised gating of buttons that mutate LLM state — called around the
+    // async load path so a user can't race Auto Recommend / Download / Save /
+    // Load while another is in progress.
+    private void SetLoadMutatorsEnabled(bool enabled)
+    {
+        btnLlmLoad.IsEnabled = enabled && LlmService.State == LlmServiceState.Unloaded && !_hasLoadedOnceInProcess;
+        btnLlmSaveOptions.IsEnabled = enabled;
+        btnLlmAutoRecommend.IsEnabled = enabled;
+        // Download button: stays available if a download is already in flight
+        // (the same button doubles as Cancel), otherwise gate it.
+        btnLlmDownload.IsEnabled = enabled || _llmDownloadCts is not null;
     }
 
     private async void OnLlmUnloadClick(object sender, RoutedEventArgs e)

@@ -4,6 +4,10 @@ namespace Agent.Common.Llm;
 
 public sealed class LlmRuntimeSettings
 {
+    // Which entry from LlmModelCatalog to load. Persisted as a string id so
+    // the JSON file is stable across catalog additions/reorders.
+    public string ModelId { get; set; } = LlmModelCatalog.Default.Id;
+
     public LocalLlmBackend Backend { get; set; } = LocalLlmBackend.Cpu;
 
     public uint ContextSize { get; set; } = 4096;
@@ -20,7 +24,11 @@ public sealed class LlmRuntimeSettings
 
     // Advanced — KV cache / attention tuning (exposed for manual testing when
     // the default combination crashes on a given GPU/driver/model).
-    public bool FlashAttention { get; set; } = false;          // Gemma 4 + Vulkan FA often crashes → off by default
+    // Flash Attention: default ON. Early testing suspected FA as a Gemma 4 +
+    // Vulkan crash source, but after fixing the VK_KHR_shader_bfloat16 env-var
+    // propagation bug the real culprit was identified and FA itself is safe +
+    // required for V-cache quantization (Q8_0/Q4_0 V) to work.
+    public bool FlashAttention { get; set; } = true;
 
     public bool NoKqvOffload { get; set; } = false;            // true = keep KV cache in system RAM (safer, slower)
 

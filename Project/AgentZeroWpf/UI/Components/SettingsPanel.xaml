@@ -312,6 +312,9 @@
                                                Foreground="#FF2D95" FontFamily="Consolas"
                                                Margin="10,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
+                                <ComboBox x:Name="cbLlmModel" Style="{StaticResource DarkComboBox}"
+                                          Margin="0,0,0,6"
+                                          SelectionChanged="OnLlmModelSelectionChanged"/>
                                 <TextBox x:Name="tbLlmModelPath" Style="{StaticResource DarkTextBox}"
                                          IsReadOnly="True" Margin="0,0,0,6"/>
                                 <Grid>
@@ -463,7 +466,7 @@
                                         </StackPanel>
                                         <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="9"
                                                    Foreground="#556677" Margin="0,6,0,0"
-                                                   Text="Vulkan + Gemma 4 crash triage: try in order — (1) Flash Attention OFF (default), (2) No KQV Offload ON (KV stays on CPU, safer), (3) KV Type K/V = Q8_0 (smaller cache), (4) mmap OFF (frees up to 5GB RAM after GPU upload). Changes apply on next Load."/>
+                                                   Text="KV constraints: (1) V-cache quantization (Q8_0/Q4_0 V) requires Flash Attention ON — if you pick Q8_0 for V without FA, llama.cpp will refuse to allocate the context. (2) K can always be quantized independently (Q8_0 K + F16 V works with or without FA). (3) mmap OFF frees up to 5GB RAM after GPU upload. Changes apply on next Load."/>
                                     </StackPanel>
                                 </Border>
 

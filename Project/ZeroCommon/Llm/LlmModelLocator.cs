@@ -2,28 +2,38 @@ namespace Agent.Common.Llm;
 
 public static class LlmModelLocator
 {
-    public const string ModelFileName = "gemma-4-E4B-it-UD-Q4_K_XL.gguf";
+    // Legacy single-file constants kept for back-compat with callers that
+    // haven't been updated to use LlmModelCatalog yet. These point at the
+    // default catalog entry (E4B UD-Q4_K_XL).
+    public static string ModelFileName => LlmModelCatalog.Default.FileName;
+    public static string DownloadUrl => LlmModelCatalog.Default.DownloadUrl;
+    public static long ExpectedSizeBytes => LlmModelCatalog.Default.ApproxBytes;
 
-    public const string DownloadUrl =
-        "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-UD-Q4_K_XL.gguf";
-
-    // Approximate expected file size (bytes). Used for sanity checks and progress
-    // reporting when the HTTP server doesn't return Content-Length on resume.
-    public const long ExpectedSizeBytes = 5_101_718_208L;
-
-    private static readonly string DevPath =
-        Path.Combine(@"D:\Code\AI\GemmaNet\models", ModelFileName);
+    private const string DevModelsDir = @"D:\Code\AI\GemmaNet\models";
 
     public static string UserModelsDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "AgentZeroLite", "models");
 
-    public static string UserPath => Path.Combine(UserModelsDir, ModelFileName);
+    // Path resolution per catalog entry: dev-path wins if the file lives
+    // there (developer workflow), otherwise the user-data path.
+    public static string DevPath(LlmModelCatalogEntry entry)
+        => Path.Combine(DevModelsDir, entry.FileName);
 
-    // Developer-priority resolution: if a local dev copy exists, prefer it so
-    // engineers don't re-download into %LOCALAPPDATA%.
-    public static string ResolveExistingOrTarget()
-        => File.Exists(DevPath) ? DevPath : UserPath;
+    public static string UserPathFor(LlmModelCatalogEntry entry)
+        => Path.Combine(UserModelsDir, entry.FileName);
 
-    public static bool IsAvailable() => File.Exists(ResolveExistingOrTarget());
+    public static string ResolveExistingOrTarget(LlmModelCatalogEntry entry)
+    {
+        var dev = DevPath(entry);
+        return File.Exists(dev) ? dev : UserPathFor(entry);
+    }
+
+    public static bool IsAvailable(LlmModelCatalogEntry entry)
+        => File.Exists(ResolveExistingOrTarget(entry));
+
+    // Legacy zero-arg overloads — default to the first catalog entry.
+    public static string UserPath => UserPathFor(LlmModelCatalog.Default);
+    public static string ResolveExistingOrTarget() => ResolveExistingOrTarget(LlmModelCatalog.Default);
+    public static bool IsAvailable() => IsAvailable(LlmModelCatalog.Default);
 }

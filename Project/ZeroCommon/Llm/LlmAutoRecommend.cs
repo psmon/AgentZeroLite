@@ -102,9 +102,13 @@ public static class LlmAutoRecommend
             reasons.Add($"mmap ON — free RAM ({x.FreeRamMb} MB) has headroom beyond model size.");
 
         // ---- Flash Attention ----
-        // Known-unstable with Gemma 4 + Vulkan; safe on CPU but marginal gain.
-        bool flashAttn = false;
-        reasons.Add("Flash Attention = OFF — Gemma 4 SWA + FA path has reported crashes; stability > 10% throughput.");
+        // Turned back ON after 2026-04-24 root-cause analysis: the initial
+        // suspicion of FA-induced crashes was actually the bfloat16 extension
+        // env-var bug (fixed via _putenv_s). FA is safe AND required for V
+        // cache quantization (Q8/Q4 V) to function — needed if KvCacheType
+        // chooses quantization below.
+        bool flashAttn = true;
+        reasons.Add("Flash Attention = ON — ~2-4x prefill speedup and unlocks V-cache quantization.");
 
         // ---- GPU Layer count ----
         int gpuLayers;
