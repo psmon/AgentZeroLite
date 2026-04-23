@@ -27,10 +27,27 @@
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <!-- OnDevice LLamaSharp was removed 2026-04-18 due to ggml.dll conflict with
-         Whisper.net — both bundle their own ggml and reuse whichever loads first,
-         breaking the second. Local LLM now goes exclusively through Ollama.
-         See SciSharp/LLamaSharp#974 + Docs/LLM/DotNet-Integration.md. -->
+    <!-- On-device LLM via self-compiled llama.cpp DLLs under runtimes/ loaded
+         explicitly with NativeLibraryConfig.WithLibrary() — this bypasses the
+         earlier ggml.dll collision with Whisper.net because the load path and
+         ABI are controlled here rather than inherited from NuGet-bundled natives.
+         DLLs built from llama.cpp commit 3f7c29d (= LLamaSharp 0.26.0 ABI + Gemma 4). -->
+    <PackageReference Include="LLamaSharp" Version="0.26.0" />
+  </ItemGroup>
+
+  <!-- Self-built llama.cpp natives: CPU baseline + Vulkan GPU variant.
+       Custom RID-like folder names (win-x64-cpu / win-x64-vulkan) prevent
+       auto-loading; LlamaSharpLocalLlm selects the folder at runtime from
+       LocalLlmOptions.Backend. -->
+  <ItemGroup>
+    <Content Include="runtimes\win-x64-cpu\native\*.dll">
+      <Link>runtimes\win-x64-cpu\native\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="runtimes\win-x64-vulkan\native\*.dll">
+      <Link>runtimes\win-x64-vulkan\native\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
