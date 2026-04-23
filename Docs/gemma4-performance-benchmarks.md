@@ -43,9 +43,18 @@ CLI 인터페이스: `LlmProbe.exe <backend> <phase>`
 
 ### 측정 제한
 
-- **Prefill이 포함된 측정치**라 순수 decode throughput보다 낮게 나옴. 짧은 프롬프트 환경 근사로는 유효.
+- **Prefill이 포함된 측정치**라 순수 decode throughput보다 낮게 나옴. probe bench 값은 **보수적 하한**으로 취급. 실사용 (멀티턴 + 중간 길이 프롬프트)에서는 prefill 비용이 여러 턴에 걸쳐 amortize 되어 더 높게 나옴.
 - 단일 실행 기준. 분산 확인 위해 N회 반복 평균은 아직 미적용 (향후 개선 포인트).
 - UI Monitor 탭의 "Tokens/sec (last)" 값은 같은 계산식이지만 프롬프트마다 달라 variance 큼. 따라서 공식 비교는 probe bench를 기준.
+
+### 실사용 관측치 vs probe bench 격차
+
+| 환경 | E4B tok/s |
+|---|---|
+| probe bench (짧은 프롬프트, 고정) | 21.8 |
+| 실사용 WPF UI Monitor (멀티턴/중간 프롬프트) | ~40 (사용자 관측) |
+
+차이 주 원인: probe의 6행 시 생성은 ~60 토큰인데 prefill이 ~40% 시간을 차지. 멀티턴에서는 이전 KV가 재사용돼 prefill이 새로 들어오는 유저 입력분만 처리 → decode 비중이 지배적 → 체감 속도 ~2배.
 
 ## 3. 벤치마크 결과 — Gemma 4 E4B (UD-Q4_K_XL, 5.10 GB)
 
@@ -84,10 +93,12 @@ CPU는 안정적이지만 Vulkan 대비 E4B=1.7배, E2B=3.3배 느림. 크래시
 
 ### Vulkan 백엔드, RTX 4060 Laptop, A 구성 (COOPMAT ON, NoKqvOffload ON)
 
-| 모델 | 파일 크기 | 가중치 유효 | GPU VRAM | Run 1 | Run 2 | **평균 tok/s** |
-|---|---|---|---|---|---|---|
-| **E4B** UD-Q4_K_XL | 5.10 GB | 4.5B 유효 | ~5.5 GB | 62 tok / 2.84s → 21.8 | — | **21.8** |
-| **E2B** UD-Q4_K_XL | 3.17 GB | 2.3B 유효 | ~3.5 GB | 55 tok / 0.94s → 58.6 | 61 tok / 1.01s → 60.4 | **59.5** |
+| 모델 | 파일 크기 | 가중치 유효 | GPU VRAM | probe bench | 실사용 체감 (UI) |
+|---|---|---|---|---|---|
+| **E4B** UD-Q4_K_XL | 5.10 GB | 4.5B 유효 | ~5.5 GB | **21.8** tok/s | **~40** tok/s |
+| **E2B** UD-Q4_K_XL | 3.17 GB | 2.3B 유효 | ~3.5 GB | **59.5** tok/s | ~70+ 추정 |
+
+실사용 체감이 probe bench의 약 1.8-2배 나오는 이유는 위 §2 측정 제한 참조 — 멀티턴 KV 재사용 + decode 비중 지배.
 
 ### 관찰
 
