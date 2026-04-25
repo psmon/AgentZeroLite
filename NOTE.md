@@ -32,7 +32,8 @@ https://github.com/JFan5/X-MCP-2.0
 # 글게시 자동화
 https://www.notion.so/AI-DOC-34db85459d5580f2a56ae5b07653a370?pvs=12
 
-
+공개링크:
+https://luxuriant-brazil-09c.notion.site/AI-DOC-34db85459d5580f2a56ae5b07653a370
 
 하위에 테크지식공유에 노션이용해 기술자료 퍼블리싱 
 
