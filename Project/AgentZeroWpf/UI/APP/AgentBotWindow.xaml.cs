@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Akka.Actor;
+using Agent.Common.Llm;
 using AgentZeroWpf.Actors;
 using AgentZeroWpf.Services;
 using Regex = System.Text.RegularExpressions.Regex;
@@ -13,7 +14,7 @@ using Match = System.Text.RegularExpressions.Match;
 
 namespace AgentZeroWpf.UI.APP;
 
-public enum ChatMode { Chat, Key }
+public enum ChatMode { Chat, Key, Ai }
 
 public partial class AgentBotWindow : Window
 {
@@ -79,7 +80,9 @@ public partial class AgentBotWindow : Window
     private int _clipboardInsertPos;          // caret position at paste time
     private const int ClipboardPasteThreshold = 200;
 
-    // Chat mode (cycled via Shift+Tab): Chat ↔ Key
+    // Chat mode (cycled via Shift+Tab): Chat → Key → Ai → Chat.
+    // Ai is skipped in the cycle when no on-device LLM is loaded
+    // (LlmService.Llm == null). See CycleChatMode + UpdateChatModeBadge.
     private static ChatMode s_lastChatMode = ChatMode.Chat;
     private ChatMode _chatMode = s_lastChatMode;
 
@@ -1562,13 +1565,33 @@ public partial class AgentBotWindow : Window
 
     private void CycleChatMode()
     {
-        _chatMode = _chatMode == ChatMode.Chat ? ChatMode.Key : ChatMode.Chat;
+        var hasLlm = LlmService.Llm is not null;
+        _chatMode = _chatMode switch
+        {
+            ChatMode.Chat => ChatMode.Key,
+            ChatMode.Key  => hasLlm ? ChatMode.Ai : ChatMode.Chat,   // skip Ai when no LLM
+            ChatMode.Ai   => ChatMode.Chat,
+            _             => ChatMode.Chat,
+        };
         s_lastChatMode = _chatMode;
         UpdateChatModeBadge();
     }
 
     private void UpdateChatModeBadge()
     {
+        // Defensive downgrade: if persisted state had us in Ai but no LLM is
+        // loaded right now (e.g. window reopened before LlmService.LoadAsync
+        // ran), drop back to Chat with a hint. The send-time gate in Mode 7
+        // (TODO) will be the real safety net; this is just to keep the badge
+        // honest at startup.
+        if (_chatMode == ChatMode.Ai && LlmService.Llm is null)
+        {
+            _chatMode = ChatMode.Chat;
+            s_lastChatMode = _chatMode;
+            ShowModeToast("AI mode needs a loaded LLM — Settings → AI Mode");
+            // fall through to render the Chat badge
+        }
+
         switch (_chatMode)
         {
             case ChatMode.Chat:
@@ -1582,6 +1605,12 @@ public partial class AgentBotWindow : Window
                 btnCycleMode.Foreground = new SolidColorBrush(Color.FromRgb(0x37, 0x94, 0xFF));
                 txtInput.Foreground = (System.Windows.Media.Brush)FindResource("TextDim");
                 ShowModeToast("KEY : Key send mode");
+                break;
+            case ChatMode.Ai:
+                btnCycleMode.Content = "AI";
+                btnCycleMode.Foreground = new SolidColorBrush(Color.FromRgb(0xC5, 0x86, 0xC0)); // violet — distinct from CHT/KEY
+                txtInput.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimary");
+                ShowModeToast("AI : On-device agent mode (input → tool loop)");
                 break;
         }
     }
