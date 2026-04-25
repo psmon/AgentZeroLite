@@ -347,6 +347,7 @@ whole product.
 | --- | --- |
 | [**harness-kakashi**](https://github.com/psmon/harness-kakashi) | A solo training harness — a *Naruto*-themed sandbox for getting a feel for harness design. Sample pulls in experts from [Aaronontheweb/dotnet-skills](https://github.com/Aaronontheweb/dotnet-skills) as harness evaluators |
 | [**pencil-creator**](https://github.com/psmon/pencil-creator) | Harness-driven experiment for seeding design systems with new templates. **Three input axes**: ① MS Blend XAML research, ② import from ordinary web pages, ③ `designmd.ai` MD-search-based templates |
+| [**memorizer-v1**](https://github.com/psmon/memorizer-v1) | Fork of [Aaronontheweb/memorizer-v1](https://github.com/Aaronontheweb/memorizer-v1) — a *vector-search-powered agent memory MCP server*. Planned next step: graduate this into the **harness's document/memory subsystem**, so harness agents share long-lived, searchable memory instead of one-shot context |
 
 ---
 
