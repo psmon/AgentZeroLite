@@ -130,3 +130,161 @@ public sealed record UnregisterBot;
 public sealed record IntroduceTerminalIfFirst(int GroupIndex, int TabIndex);
 public sealed record IntroduceTerminalReply(bool WasFirstContact);
 public sealed record ResetIntroductions;
+
+// ═══════════════════════════════════════════════════════════════
+// 8. AgentReactor (AIMODE 추론 FSM) 메시지
+// ═══════════════════════════════════════════════════════════════
+//
+// AIMODE 추론은 AgentBotActor의 자식 AgentReactorActor에서 수행된다.
+// (경로: /user/stage/bot/reactor)
+//
+// 책임 분리:
+//   - AgentBotActor    : 채팅 UI 상태 + 첫 접촉 추적 + Reactor 자식 관리
+//   - AgentReactorActor: AgentToolLoop 라이프사이클 + Idle/Thinking/Acting/Done FSM
+//                        + LLamaContext 보관 + 진행 상황 부모로 푸시
+//
+// UI ↔ 액터 통신은 모두 Tell 기반:
+//   - SetReactorCallbacks: UI delegate 등록 (Bot이 보관, Reactor 메시지 수신 시 호출)
+//   - StartReactor       : 사용자 발화로 새 turn loop 시작
+//   - ReactorProgress    : Thinking/Acting/Generating 상태 변화 → UI 갱신
+//   - ReactorResult      : 최종 응답(성공) 또는 실패 사유
+//   - CancelReactor      : 진행 중인 turn loop 취소
+//   - ResetReactorSession: KV cache + introductions 리셋, 다음 Start에서 새 세션
+
+/// <summary>UI에 Reactor 진행 상황을 전달할 콜백 등록 (UI → Bot).</summary>
+public sealed record SetReactorCallbacks(
+    Action<ReactorProgress> OnProgress,
+    Action<ReactorResult> OnResult);
+
+/// <summary>AIMODE 추론 시작 (UI → Bot → Reactor).</summary>
+public sealed record StartReactor(string UserRequest);
+
+/// <summary>Reactor 진행 상황 (Reactor → Bot → UI).</summary>
+public sealed record ReactorProgress(
+    ReactorPhase Phase,
+    string Text,
+    int Round)
+{
+    /// <summary>Acting 단계에서 완료된 도구 호출 정보 (Phase=Acting일 때만).</summary>
+    public ReactorToolCallInfo? ToolCall { get; init; }
+
+    /// <summary>Generating 단계 누적 토큰 수 (Phase=Generating일 때만).</summary>
+    public int Tokens { get; init; }
+}
+
+/// <summary>Reactor 최종 결과 (Reactor → Bot → UI).</summary>
+public sealed record ReactorResult(
+    bool Success,
+    string FinalMessage,
+    int TurnCount,
+    long ElapsedMs,
+    string? FailureReason = null);
+
+/// <summary>도구 호출 정보 — UI 카드 표시용.</summary>
+public sealed record ReactorToolCallInfo(
+    string Tool,
+    string ArgsJson,
+    string Result);
+
+/// <summary>Reactor FSM 단계.</summary>
+public enum ReactorPhase
+{
+    Idle,        // 대기
+    Thinking,    // 첫 토큰 대기 (prefill)
+    Generating,  // 토큰 스트리밍 중 (per-N tokens 갱신)
+    Acting,      // 도구 실행 직후 (tool result 확보)
+    Done,        // 정상 종료
+    Error        // 비정상 종료
+}
+
+/// <summary>진행 중 추론 취소 (UI → Bot → Reactor).</summary>
+public sealed record CancelReactor;
+
+/// <summary>
+/// 현재 Reactor 세션 폐기 (KV cache + tool loop dispose). 다음 StartReactor가
+/// 새 KV cache로 재시작하게 한다. UI의 "New Session" 버튼이 사용.
+/// 부수 효과: AgentBotActor의 introductions도 함께 클리어.
+/// </summary>
+public sealed record ResetReactorSession;
+
+/// <summary>
+/// Reactor 자식 생성에 필요한 호스트 의존성. UI가 첫 SetReactorCallbacks
+/// 시점에 함께 전달 — 액터는 IAgentToolHost를 직접 참조하지 않고
+/// 호출 시점의 LLM(LlmService.Llm)과 결합한다.
+/// </summary>
+public sealed record ReactorBindings(
+    Func<Agent.Common.Llm.Tools.IAgentToolHost> HostFactory,
+    Func<Agent.Common.Llm.Tools.ChatTemplate> TemplateFactory,
+    Func<Agent.Common.Llm.Tools.AgentToolLoopOptions> OptionsFactory,
+    Func<Agent.Common.Llm.LlamaSharpLocalLlm?> LlmAccessor);
+
+// ─── Peer-signal protocol (terminal → bot push, primary path) ───
+//
+// Design principle: during an active conversation, AgentBot prefers to
+// REACT to terminal-pushed messages over polling read_terminal. The
+// terminal AI calls back into AgentZero via the existing
+// `AgentZeroLite.exe -cli bot-chat <message> --from <peerName>` CLI
+// command — that CLI already exists and uses WM_COPYDATA IPC to reach
+// the running GUI. This protocol routes that CLI-delivered message
+// from MainWindow.HandleBotChat into the actor system so the reactor
+// can wake up and react.
+//
+// IDs are STRINGS (peerName) because:
+//   - CLI's `--from <name>` is a free-form string
+//   - TerminalActor knows (workspace, terminalId) — no native (g, t)
+//   - LLM's tool calls use (g, t) but the bot can map (g, t) → display
+//     name when marking conversations active
+// The string IS the contract between the peer's `--from` value and
+// the bot's bookkeeping.
+
+/// <summary>
+/// A peer terminal AI sent a message addressed to AgentBot via the
+/// CLI bot-chat path. <paramref name="PeerName"/> matches the
+/// <c>--from</c> value used at the CLI (e.g. "Claude").
+/// </summary>
+public sealed record TerminalSentToBot(string PeerName, string Text);
+
+/// <summary>
+/// Mark <paramref name="PeerName"/> as an active conversation context.
+/// While active, <see cref="TerminalSentToBot"/> for this peer triggers
+/// a continuation cycle on the reactor. When inactive, peer signals
+/// are logged and dropped (peer signals from un-asked-for terminals
+/// are noise, not invitations).
+/// </summary>
+public sealed record MarkConversationActive(string PeerName);
+
+/// <summary>End the active conversation context for the named peer.</summary>
+public sealed record ClearConversationActive(string PeerName);
+
+/// <summary>Ask pattern → <see cref="ActiveConversationsReply"/>.</summary>
+public sealed record QueryActiveConversations;
+
+/// <summary>Reply for QueryActiveConversations.</summary>
+public sealed record ActiveConversationsReply(IReadOnlyList<string> Active);
+
+// ─── Handshake state (per peer) ───
+//
+// Conversation lifecycle:
+//   NotConnected      — peer never proved it can call back via bot-chat
+//   HandshakeSent     — bot sent handshake message; awaiting peer's bot-chat
+//   Connected         — at least one bot-chat received from this peer
+//
+// On `MarkHandshakeSent` → state becomes HandshakeSent.
+// On `TerminalSentToBot` → state becomes Connected (and the signal still
+//   gets routed to the reactor as a continuation trigger).
+
+public enum HandshakeState
+{
+    NotConnected,
+    HandshakeSent,
+    Connected
+}
+
+/// <summary>Bot records that a handshake message was just dispatched to PeerName.</summary>
+public sealed record MarkHandshakeSent(string PeerName);
+
+/// <summary>Ask pattern → <see cref="HandshakeStateReply"/>.</summary>
+public sealed record QueryHandshakeState(string PeerName);
+
+/// <summary>Reply for QueryHandshakeState.</summary>
+public sealed record HandshakeStateReply(string PeerName, HandshakeState State);

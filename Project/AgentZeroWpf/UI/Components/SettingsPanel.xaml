@@ -356,6 +356,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
                                     <TextBlock Text="Backend" Grid.Row="0" Grid.Column="0"
@@ -385,9 +386,10 @@
                                     <TextBox x:Name="tbLlmContextSize" Grid.Row="1" Grid.Column="1"
                                              Style="{StaticResource DarkTextBox}" Margin="0,3,12,3"/>
 
-                                    <TextBlock Text="Max Tokens" Grid.Row="1" Grid.Column="2"
+                                    <TextBlock Text="Chat MaxTok" Grid.Row="1" Grid.Column="2"
                                                Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
-                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                               VerticalAlignment="Center" Margin="0,3,6,3"
+                                               ToolTip="TestBot free-form answer length cap. Not used by AIMODE."/>
                                     <TextBox x:Name="tbLlmMaxTokens" Grid.Row="1" Grid.Column="3"
                                              Style="{StaticResource DarkTextBox}" Margin="0,3,0,3"/>
 
@@ -396,6 +398,16 @@
                                                VerticalAlignment="Center" Margin="0,3,6,3"/>
                                     <TextBox x:Name="tbLlmTemperature" Grid.Row="2" Grid.Column="1"
                                              Style="{StaticResource DarkTextBox}" Margin="0,3,12,3"/>
+
+                                    <TextBlock Text="AIMODE MaxTok" Grid.Row="3" Grid.Column="0"
+                                               Foreground="#9D87FF" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"
+                                               ToolTip="Per-turn token budget for the AIMODE tool-call loop. Default 2048. Lower = faster fail on grammar trailing-whitespace stall but risks `done` JSON truncation."/>
+                                    <TextBox x:Name="tbLlmAgentLoopMaxTokens" Grid.Row="3" Grid.Column="1"
+                                             Style="{StaticResource DarkTextBox}" Margin="0,3,12,3"/>
+                                    <TextBlock Text="(per AIMODE turn)" Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="2"
+                                               Foreground="#7C7C8C" FontFamily="Consolas" FontSize="9"
+                                               VerticalAlignment="Center" Margin="0,3,0,3"/>
                                 </Grid>
 
                                 <!-- KV Cache & Attention (experimental, user-tunable) -->

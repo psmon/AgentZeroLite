@@ -318,6 +318,11 @@
                     <Button x:Name="btnCycleMode" Content="CHT" Tag="mode"
                             Style="{StaticResource MiniKeyButton}" FontSize="9" FontWeight="Bold"
                             Click="OnCycleModeClick" ToolTip="Switch mode (Shift+Tab)"/>
+                    <!-- AIMODE session reset (visible only in AI mode) -->
+                    <Button x:Name="btnAiNewSession" Content="&#xE72C;" FontFamily="Segoe MDL2 Assets"
+                            Style="{StaticResource MiniKeyButton}" FontSize="11"
+                            Visibility="Collapsed"
+                            Click="OnAiNewSessionClick" ToolTip="New AI session (clear KV cache + introductions)"/>
                     <Border Width="1" Margin="4,2" Background="{StaticResource BorderDim}"/>
                     <!-- Key panel toggle -->
                     <Button x:Name="btnToggleKeys" Content="&#xE76C;" FontFamily="Segoe MDL2 Assets"

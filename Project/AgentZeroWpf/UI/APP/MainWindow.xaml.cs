@@ -771,6 +771,25 @@ public partial class MainWindow : Window
                 _botWindow.ReceiveExternalChat(from, message);
             }
 
+            // Route the inbound peer signal into the actor system so the
+            // AIMODE reactor can wake up. The Bot decides whether the peer
+            // is in an active conversation (continuation cycle) or just
+            // dropped (un-asked-for chatter). Use the DONE-extracted
+            // payload when present, otherwise the raw message.
+            var peerName = doneFrom ?? from;
+            var payload = doneMsg ?? message;
+            try
+            {
+                Agent.Common.AppLogger.Log($"[IPC] forwarding peer signal to Bot: peer=\"{peerName}\" len={payload.Length}");
+                Actors.ActorSystemManager.System
+                    .ActorSelection("/user/stage/bot")
+                    .Tell(new Agent.Common.Actors.TerminalSentToBot(peerName, payload));
+            }
+            catch (System.Exception ex)
+            {
+                Agent.Common.AppLogger.Log($"[IPC] forwarding peer signal FAILED: {ex.Message}");
+            }
+
             resultJson = $"{{\"ok\":true,\"from\":\"{EscapeJson(from)}\",\"message_length\":{message.Length}}}";
             AppLogger.Log($"[IPC] bot-chat from={from}, len={message.Length}");
         }

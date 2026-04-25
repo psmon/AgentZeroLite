@@ -163,8 +163,21 @@ public sealed class AgentToolLoop : IAsyncDisposable
         };
 
         var sb = new StringBuilder();
+        var tokensSeen = 0;
+        var interval = Math.Max(1, _opts.ProgressTokenInterval);
+        // Fire once at turn start so the UI can switch from "thinking" to
+        // "generating" immediately (not only after 64 tokens land).
+        try { _opts.OnGenerationProgress?.Invoke("generating", 0); } catch { }
         await foreach (var tok in _executor.InferAsync(prompt, inferenceParams, ct))
+        {
             sb.Append(tok);
+            tokensSeen++;
+            if (tokensSeen % interval == 0)
+            {
+                try { _opts.OnGenerationProgress?.Invoke("generating", tokensSeen); }
+                catch { /* UI errors must not break the loop */ }
+            }
+        }
 
         return StripTrailingAntiPrompt(sb.ToString()).Trim();
     }
@@ -198,6 +211,18 @@ public sealed class AgentToolLoop : IAsyncDisposable
                 var key = ReadString(call.Args, "key", "");
                 var ok = await _host.SendKeyAsync(g, t, key, ct);
                 return JsonSerializer.Serialize(new { ok });
+            }
+
+            case "wait":
+            {
+                // Pure time delay — no host involvement. Clamped to [1, 30]
+                // so the model can't accidentally stall the loop with wait(9999).
+                // Returns a synthesized result so the next turn sees confirmation
+                // and decides what to do next.
+                var requested = ReadInt(call.Args, "seconds", 5);
+                var seconds = Math.Clamp(requested, 1, 30);
+                await Task.Delay(TimeSpan.FromSeconds(seconds), ct);
+                return JsonSerializer.Serialize(new { ok = true, waited_seconds = seconds });
             }
 
             default:
@@ -266,8 +291,13 @@ public sealed class AgentToolLoop : IAsyncDisposable
 
 public sealed record AgentToolLoopOptions
 {
-    /// <summary>Max model turns before the loop gives up without seeing <c>done</c>.</summary>
-    public int MaxIterations { get; init; } = 8;
+    /// <summary>
+    /// Max model turns before the loop gives up without seeing <c>done</c>.
+    /// 12 budgets ~3 round-trips (send + wait + read = 3 calls) for a Mode 2
+    /// relay; for autonomous N-turn discussions plan ~4N tool calls so a
+    /// 5-turn conversation needs the caller to bump this further if desired.
+    /// </summary>
+    public int MaxIterations { get; init; } = 12;
 
     /// <summary>
     /// Max tokens emitted per model turn. Pretty-printed JSON for tool calls
@@ -300,4 +330,25 @@ public sealed record AgentToolLoopOptions
     /// model-feedback loops.
     /// </summary>
     public Action<ToolTurn>? OnTurnCompleted { get; init; }
+
+    /// <summary>
+    /// Optional callback fired periodically while the model is generating
+    /// tokens for ONE turn. Lets the UI distinguish "model is slow" from
+    /// "model is stuck" — without this the user sees nothing for 5–60s on
+    /// a CPU first-turn, then either a sudden tool call or silence forever.
+    ///
+    /// Fires every <see cref="ProgressTokenInterval"/> tokens of streamed
+    /// output. The callback receives a phase tag ("generating") and the
+    /// running token count for the current turn (resets to 0 between turns).
+    /// Same threading caveat as <see cref="OnTurnCompleted"/>: marshal to
+    /// UI thread inside the callback if needed.
+    /// </summary>
+    public Action<string, int>? OnGenerationProgress { get; init; }
+
+    /// <summary>
+    /// Number of streamed tokens between progress callbacks. 64 keeps the
+    /// UI responsive (~1 update / 0.5–4s depending on CPU/GPU) without
+    /// flooding the dispatcher. Tuneable for tests.
+    /// </summary>
+    public int ProgressTokenInterval { get; init; } = 64;
 }

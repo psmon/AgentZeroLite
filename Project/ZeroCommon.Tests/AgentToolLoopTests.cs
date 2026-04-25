@@ -280,6 +280,242 @@ public sealed class AgentToolLoopTests
     }
 
     // ────────────────────────────────────────────────────────────────────
+    //  T5G — Mode 1 (direct answer) discrimination
+    //  Greetings / smalltalk addressed to the assistant must NOT route to a
+    //  terminal. The model should call `done` directly with a reply.
+    // ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Greetings should land in Mode 1 (call <c>done</c> with a reply) rather
+    /// than Mode 2 (route to a terminal). Tests both English and Korean
+    /// hellos because the prompt explicitly lists Korean trigger words for
+    /// the *opposite* mode and the boundary needs to hold both ways.
+    /// Pass condition: at least 2/3 of these greetings finish cleanly via
+    /// <c>done</c> with no <c>send_to_terminal</c> turn anywhere in the
+    /// session. (3/3 is ideal but at temp 0.1 a small wobble is tolerable.)
+    /// </summary>
+    [SkippableFact]
+    public async Task T5G_greeting_is_answered_directly_not_relayed_to_terminal_gemma()
+    {
+        Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
+
+        var greetings = new[] { "안녕", "hello", "hi there" };
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
+
+        int directAnswers = 0;
+        var trace = new List<string>();
+        foreach (var greeting in greetings)
+        {
+            var host = new MockAgentToolHost();
+            await using var loop = new AgentToolLoop(llm, host,
+                new AgentToolLoopOptions { MaxIterations = 3 });
+
+            var sw = Stopwatch.StartNew();
+            var session = await loop.RunAsync(greeting);
+            sw.Stop();
+
+            var routedToTerminal = session.Turns.Any(t => t.Call.Tool == "send_to_terminal");
+            var endedClean = session.TerminatedCleanly;
+            var firstCall = session.Turns.Count > 0
+                ? session.Turns[0].Call.Tool
+                : (endedClean ? "done" : "(none)");
+
+            // "Direct answer" = ended cleanly AND never routed via send_to_terminal.
+            // The bot may legitimately call list_terminals/read_terminal as a
+            // status check first and still answer directly; that's not the
+            // failure mode we're guarding against. The failure is "send my
+            // greeting to a terminal as if I told you to forward it".
+            var isDirect = endedClean && !routedToTerminal;
+            if (isDirect) directAnswers++;
+
+            trace.Add($"\"{greeting}\" → first={firstCall} clean={endedClean} routed={routedToTerminal} ({sw.ElapsedMilliseconds}ms)");
+        }
+
+        _output.WriteLine("T5G results:");
+        foreach (var line in trace) _output.WriteLine($"  {line}");
+        _output.WriteLine($"  direct_answers={directAnswers}/{greetings.Length}");
+
+        Assert.True(directAnswers >= 2,
+            $"expected ≥ 2/3 greetings to be answered directly (no send_to_terminal); got {directAnswers}/{greetings.Length}: {string.Join(" | ", trace)}");
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    //  T6G — Multi-cycle continuation (5 sequential RunAsync on the same loop)
+    //
+    //  Codifies the "ONE cycle per run" rule that the prompt now enforces:
+    //  each separate RunAsync should be SHORT (a single round-trip with the
+    //  terminal, not a 5-turn discussion). KV cache is preserved across
+    //  RunAsync calls so the model retains conversation history without us
+    //  re-feeding it.
+    //
+    //  Pass condition: 5 cycles complete cleanly AND each cycle uses ≤ 6
+    //  iterations. (Old behaviour pre-prompt-change: one run could chain
+    //  7-12+ iterations trying to do "the whole 5-turn discussion" itself.)
+    // ────────────────────────────────────────────────────────────────────
+
+    [SkippableFact]
+    public async Task T6G_five_continuation_cycles_each_stay_short_gemma()
+    {
+        Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
+        var host = new ScriptedTerminalHost();
+        await using var loop = new AgentToolLoop(llm, host,
+            new AgentToolLoopOptions { MaxIterations = 8 });
+
+        var prompts = new[]
+        {
+            "Claude에게 인사하고 자기소개해달라고 요청해줘",
+            "Claude가 뭐라고 했어? 응답을 확인해서 알려줘",
+            "이번엔 Claude에게 좋아하는 색을 물어봐줘",
+            "방금 응답 확인해줘",
+            "Claude한테 고맙다고 말하고 대화 마무리해줘",
+        };
+
+        // Pre-load Claude's "responses" to each cycle. The host serves these
+        // as read_terminal output so the model sees a real reply instead of
+        // a thinking indicator. Each cycle should ideally do: send → wait
+        // → read → done, around 4 iterations max.
+        host.ScriptedReplies.Enqueue("Hi! I'm Claude, an Anthropic AI assistant. Nice to meet you.");
+        host.ScriptedReplies.Enqueue("Hi! I'm Claude, an Anthropic AI assistant. Nice to meet you.");
+        host.ScriptedReplies.Enqueue("My favorite color is blue, like the sky.");
+        host.ScriptedReplies.Enqueue("My favorite color is blue, like the sky.");
+        host.ScriptedReplies.Enqueue("You're welcome! Anytime.");
+
+        var perCycleIterations = new List<int>();
+        for (int i = 0; i < prompts.Length; i++)
+        {
+            var sw = Stopwatch.StartNew();
+            var session = await loop.RunAsync(prompts[i]);
+            sw.Stop();
+
+            _output.WriteLine($"  cycle {i + 1}: turns={session.TurnCount} clean={session.TerminatedCleanly} ({sw.ElapsedMilliseconds}ms) final=\"{Truncate(session.FinalMessage, 80)}\"");
+            perCycleIterations.Add(session.TurnCount);
+            // Defensive: even if the model doesn't follow the prompt
+            // perfectly, the loop must terminate cleanly.
+            Assert.True(session.TerminatedCleanly,
+                $"cycle {i + 1} did not terminate cleanly: {session.FailureReason ?? session.FinalMessage}");
+        }
+
+        _output.WriteLine($"T6G iterations per cycle: [{string.Join(", ", perCycleIterations)}]");
+        _output.WriteLine($"  total tool calls: {host.Calls.Count}");
+        _output.WriteLine($"  send_to_terminal: {host.Calls.Count(c => c.Tool == "send_to_terminal")}");
+        _output.WriteLine($"  read_terminal:    {host.Calls.Count(c => c.Tool == "read_terminal")}");
+        _output.WriteLine($"  wait:             {host.Calls.Count(c => c.Tool == "wait")}");
+
+        // Each cycle should be a SHORT round-trip — pre-prompt-change runs
+        // would chain 7+ iterations trying to do everything in one cycle.
+        // Tolerance: ≤ 6 iterations per cycle. If one cycle bursts above
+        // that, the prompt regression has likely returned.
+        Assert.All(perCycleIterations, n => Assert.True(n <= 6,
+            $"cycle exceeded 6 iterations (got {n}); prompt 'one cycle per run' rule may have regressed"));
+
+        Assert.Equal(5, loop.UserSendCount);
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    //  T7G — Vague Mode 2 requests must STILL trigger send_to_terminal
+    //
+    //  Guards against the "ONE CYCLE PER RUN" prompt rule's failure mode:
+    //  the model getting so cautious it refuses to act on a vague-but-clear
+    //  Mode 2 request (e.g. "Claude한테 토론 시작해", "talk to Claude").
+    //  The anti-denial + reasonable-default rules in the prompt say:
+    //  pick a sensible opener and SEND, don't bounce back demanding a topic.
+    //
+    //  Pass condition: at least 2/3 of the vague-Mode-2 prompts produce a
+    //  send_to_terminal turn somewhere in the session. (3/3 ideal but at
+    //  temp 0.1 a small wobble is tolerable.)
+    // ────────────────────────────────────────────────────────────────────
+
+    [SkippableFact]
+    public async Task T7G_vague_relay_request_still_sends_to_terminal_gemma()
+    {
+        Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
+
+        var prompts = new[]
+        {
+            "Claude랑 자유롭게 이야기해봐",
+            "Claude한테 토론 시작해줘",
+            "talk to Claude about anything",
+        };
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
+        int sent = 0;
+        var trace = new List<string>();
+        foreach (var prompt in prompts)
+        {
+            var host = new ScriptedTerminalHost();
+            // Pre-load a reply so if the model DOES send + read, it sees content
+            // and can naturally complete with done.
+            host.ScriptedReplies.Enqueue("Sure, I'd be happy to chat. What's on your mind?");
+            await using var loop = new AgentToolLoop(llm, host,
+                new AgentToolLoopOptions { MaxIterations = 6 });
+
+            var sw = Stopwatch.StartNew();
+            var session = await loop.RunAsync(prompt);
+            sw.Stop();
+
+            var didSend = host.Calls.Any(c => c.Tool == "send_to_terminal");
+            var firstNonInfo = session.Turns.FirstOrDefault(t =>
+                t.Call.Tool != "list_terminals")?.Call.Tool ?? "(none)";
+            if (didSend) sent++;
+            trace.Add($"\"{prompt}\" → sent={didSend} firstAction={firstNonInfo} clean={session.TerminatedCleanly} ({sw.ElapsedMilliseconds}ms)");
+        }
+
+        _output.WriteLine("T7G results:");
+        foreach (var line in trace) _output.WriteLine($"  {line}");
+        _output.WriteLine($"  vague_prompts_that_sent={sent}/{prompts.Length}");
+
+        Assert.True(sent >= 2,
+            $"expected ≥ 2/3 vague Mode 2 prompts to actually send_to_terminal; got {sent}/{prompts.Length}: {string.Join(" | ", trace)}");
+    }
+
+    /// <summary>
+    /// Stateful host that yields scripted replies on read_terminal — emulates
+    /// a peer terminal AI that's actually responding, so the model sees real
+    /// content (not just a thinking indicator) and can summarize + done.
+    /// Each read consumes the next scripted reply; if the queue is empty,
+    /// returns an empty string to mimic "nothing new yet".
+    /// </summary>
+    internal sealed class ScriptedTerminalHost : IAgentToolHost
+    {
+        public List<(string Tool, string Args)> Calls { get; } = new();
+        public Queue<string> ScriptedReplies { get; } = new();
+
+        public string ListTerminalsResult { get; set; } =
+            """{"groups":[{"index":0,"name":"AgentZeroLite","tabs":[{"index":0,"title":"Claude","running":true}]}]}""";
+
+        public Task<string> ListTerminalsAsync(CancellationToken ct)
+        {
+            Calls.Add(("list_terminals", "{}"));
+            return Task.FromResult(ListTerminalsResult);
+        }
+
+        public Task<string> ReadTerminalAsync(int group, int tab, int lastN, CancellationToken ct)
+        {
+            Calls.Add(("read_terminal", $"{{\"group\":{group},\"tab\":{tab},\"last_n\":{lastN}}}"));
+            var text = ScriptedReplies.Count > 0 ? ScriptedReplies.Dequeue() : "";
+            var resp = $"{{\"ok\":true,\"group_index\":{group},\"tab_index\":{tab},\"length\":{text.Length},\"text\":\"{EscapeJson(text)}\"}}";
+            return Task.FromResult(resp);
+        }
+
+        public Task<bool> SendToTerminalAsync(int group, int tab, string text, CancellationToken ct)
+        {
+            Calls.Add(("send_to_terminal", JsonSerializer.Serialize(new { group, tab, text })));
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> SendKeyAsync(int group, int tab, string key, CancellationToken ct)
+        {
+            Calls.Add(("send_key", JsonSerializer.Serialize(new { group, tab, key })));
+            return Task.FromResult(true);
+        }
+
+        private static string EscapeJson(string s)
+            => s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
+    }
+
+    // ────────────────────────────────────────────────────────────────────
     //  Nemotron Nano 8B v1 (Llama-3.1 chat template) — Phase 2 backend tests
     // ────────────────────────────────────────────────────────────────────
 

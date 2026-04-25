@@ -90,6 +90,7 @@ public partial class SettingsPanel
         tbLlmGpuLayers.Text = s.GpuLayerCount.ToString(CultureInfo.InvariantCulture);
         tbLlmContextSize.Text = s.ContextSize.ToString(CultureInfo.InvariantCulture);
         tbLlmMaxTokens.Text = s.MaxTokens.ToString(CultureInfo.InvariantCulture);
+        tbLlmAgentLoopMaxTokens.Text = s.AgentToolLoopMaxTokens.ToString(CultureInfo.InvariantCulture);
         tbLlmTemperature.Text = s.Temperature.ToString("0.0#", CultureInfo.InvariantCulture);
         SelectGpuDeviceInUi(s.VulkanDeviceIndex);
         chkLlmFlashAttn.IsChecked = s.FlashAttention;
@@ -152,6 +153,7 @@ public partial class SettingsPanel
             var gpuLayers = int.Parse(tbLlmGpuLayers.Text, CultureInfo.InvariantCulture);
             var ctx = uint.Parse(tbLlmContextSize.Text, CultureInfo.InvariantCulture);
             var maxTok = int.Parse(tbLlmMaxTokens.Text, CultureInfo.InvariantCulture);
+            var agentLoopMaxTok = int.Parse(tbLlmAgentLoopMaxTokens.Text, CultureInfo.InvariantCulture);
             var temp = float.Parse(tbLlmTemperature.Text, CultureInfo.InvariantCulture);
             var devIdx = ReadSelectedGpuDeviceIndex();
             return new LlmRuntimeSettings
@@ -161,6 +163,7 @@ public partial class SettingsPanel
                 GpuLayerCount = gpuLayers,
                 ContextSize = ctx,
                 MaxTokens = maxTok,
+                AgentToolLoopMaxTokens = agentLoopMaxTok,
                 Temperature = temp,
                 VulkanDeviceIndex = devIdx,
                 FlashAttention = chkLlmFlashAttn.IsChecked == true,

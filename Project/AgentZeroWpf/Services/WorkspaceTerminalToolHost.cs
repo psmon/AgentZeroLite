@@ -102,11 +102,28 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolHost
             var reply = await bot.Ask<IntroduceTerminalReply>(
                 new IntroduceTerminalIfFirst(group, tab),
                 System.TimeSpan.FromSeconds(2));
+            // The peer name string is the contract between AgentBot's
+            // first-contact handshake instructions ("call back with --from
+            // <peerName>") and the bot-chat IPC routing. Use the terminal
+            // tab's display title — it's stable, user-visible, and what the
+            // intro tells the peer to use.
+            var peerName = ResolvePeerName(group, tab);
             if (reply.WasFirstContact)
             {
-                text = BuildFirstContactHeader() + "\n\n" + text;
-                AppLogger.Log($"[AIMODE] prepended first-contact intro for [{group}:{tab}]");
+                text = BuildFirstContactHeader(peerName) + "\n\n" + text;
+                AppLogger.Log($"[AIMODE] prepended first-contact intro for peer=\"{peerName}\" [{group}:{tab}]");
+                // First contact = handshake initiation. Tell Bot we're
+                // awaiting a bot-chat callback for this peer.
+                try
+                {
+                    bot.Tell(new MarkHandshakeSent(peerName));
+                }
+                catch { /* not load-bearing */ }
             }
+            // Mark conversation active on EVERY send so peer signals route
+            // back to the reactor as continuations. Idempotent on the bot side.
+            try { bot.Tell(new MarkConversationActive(peerName)); }
+            catch { /* not load-bearing */ }
         }
         catch (System.Exception ex)
         {
@@ -133,16 +150,40 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolHost
     // terminals (Claude, Codex, etc.) default to English for tokenization
     // efficiency and stability across model families. See harness/knowledge/
     // llm-prompt-conventions.md.
-    private static string BuildFirstContactHeader() =>
-        "[AgentBot self-introduction]\n"
-        + "Hi! I'm AgentBot — an on-device AI agent running inside the AgentZero Lite shell. "
-        + "The user asked me to relay a message to this terminal, so I connected here to talk with you.\n"
-        + "How to talk back: just type your reply normally into this terminal. "
-        + "I read your output via a read_terminal function call and use it to decide what to do next.\n"
-        + "If you ever need to message a DIFFERENT terminal tab, you can use: "
-        + "`AgentZeroLite.ps1 terminal-send <group> <tab> \"text\"`. "
-        + "There is no reverse function-call channel back to me — just answer here and I will see it.\n"
-        + "You will only see this introduction once per AIMODE session.\n"
+    //
+    // Identity convention: peerName == terminal tab name (e.g. "Claude").
+    // Both parties refer to the peer by this name AND use it as the
+    // `--from` value when calling back via bot-chat. So the same string
+    // ties together: (a) "who you are" in the handshake, (b) the
+    // identity tag in bot-chat replies, (c) the bot's per-peer
+    // bookkeeping (active conversation set, handshake state).
+    //
+    // Handshake flow: VERIFY CLI exists → ACKNOWLEDGE via that same CLI.
+    // Two explicit steps so the peer commits to the channel before the
+    // bot trusts it.
+    private static string BuildFirstContactHeader(string peerName = "Claude") =>
+        "[AgentBot Handshake — first contact, please read carefully]\n"
+        + "\n"
+        + "You are " + peerName + " and I am AgentBot, an on-device AI agent running inside the AgentZero Lite shell.\n"
+        + "\"" + peerName + "\" is the name of YOUR terminal tab — both of us will use that name to refer to you, and you will use it as your --from identity when replying.\n"
+        + "\n"
+        + "Step 1 — Verify the CLI channel exists.\n"
+        + "  Run this in your terminal RIGHT NOW to confirm the channel works:\n"
+        + "      AgentZeroLite.exe -cli help\n"
+        + "  If you see a usage list with a 'bot-chat' command, the reverse channel is available.\n"
+        + "\n"
+        + "Step 2 — Acknowledge using the same CLI.\n"
+        + "  Once Step 1 succeeds, send your handshake reply:\n"
+        + "      AgentZeroLite.exe -cli bot-chat \"DONE(handshake-ok)\" --from " + peerName + "\n"
+        + "  The DONE(...) wrapper is the signal envelope. --from " + peerName + " names you so I know who answered. After this acknowledgement, the user can ask me to relay real tasks to you.\n"
+        + "\n"
+        + "Ongoing replies use the same shape:\n"
+        + "      AgentZeroLite.exe -cli bot-chat \"DONE(your reply text)\" --from " + peerName + "\n"
+        + "  PowerShell wrapper if PATH-friendly: AgentZeroLite.ps1 bot-chat \"DONE(...)\" --from " + peerName + "\n"
+        + "\n"
+        + "Fallback: if AgentZeroLite.exe is not reachable from your terminal, just reply normally here and I will fall back to polling read_terminal — but the CLI path is more reliable.\n"
+        + "\n"
+        + "You'll only see this introduction once per AIMODE session.\n"
         + "─── original message follows ───";
 
     public Task<bool> SendKeyAsync(int group, int tab, string key, CancellationToken ct)
@@ -168,6 +209,32 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolHost
             AppLogger.Log($"[AIMODE] send_key FAILED [{group}:{tab}] key={key} {ex.GetType().Name}: {ex.Message}");
             return Task.FromResult(false);
         }
+    }
+
+    /// <summary>
+    /// Returns the user-visible tab title for (group, tab) — used as the
+    /// peer-name string that ties together first-contact handshake
+    /// instructions and bot-chat `--from` routing. Falls back to a
+    /// synthetic name if the indices don't resolve.
+    /// </summary>
+    private string ResolvePeerName(int group, int tab)
+    {
+        try
+        {
+            var groups = _groupsProvider();
+            if (group >= 0 && group < groups.Count)
+            {
+                var g = groups[group];
+                if (g.Tabs is not null && tab >= 0 && tab < g.Tabs.Count)
+                {
+                    var title = g.Tabs[tab].Title;
+                    if (!string.IsNullOrWhiteSpace(title))
+                        return title;
+                }
+            }
+        }
+        catch { /* fall through */ }
+        return $"Term-{group}-{tab}";
     }
 
     private bool TryResolveOrError(int group, int tab, out ConPtyTerminalSession? session, out string? errorJson)
