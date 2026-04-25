@@ -76,6 +76,13 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm
     public ILocalChatSession CreateSession()
         => new LlamaSharpLocalChatSession(_options, _weights, _modelParams);
 
+    // Same-assembly accessor so the Agent.Common.Llm.Tools layer can build a
+    // grammar-constrained InteractiveExecutor against the loaded weights
+    // without going through ILocalChatSession (which is the Q&A surface and
+    // intentionally doesn't take a Grammar).
+    internal (LLamaWeights weights, ModelParams modelParams) GetInternals()
+        => (_weights, _modelParams);
+
     public ValueTask DisposeAsync()
     {
         _weights.Dispose();

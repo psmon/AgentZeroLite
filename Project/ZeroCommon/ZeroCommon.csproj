@@ -9,6 +9,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!-- Test project sees internals (ParseToolCall, GetInternals, etc.) -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ZeroCommon.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Akka" Version="1.5.40" />
     <PackageReference Include="Akka.DependencyInjection" Version="1.5.40" />
