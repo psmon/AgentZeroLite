@@ -45,6 +45,14 @@ because:
    path. Scaffolds in `AgentZeroWpf/Data/Migrations/` are bugs.
 6. **Release workflow** — GitHub Actions release workflow + Inno Setup script;
    verify they consume the bumped `version.txt` and the correct artifact path.
+7. **Build-environment correlation for crash dumps** — when `security-guard`
+   surfaces a `*.stackdump` / `*.dmp` from the working tree, cross-check what
+   build step was running at the time (per
+   `harness/knowledge/crash-dump-forensics.md`). Recurring fork-emulation crashes
+   (MSYS2 `bash.exe`) under build load mean the build environment itself needs
+   hardening — see `harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md`
+   for the canonical example. Forensics ownership stays with `security-guard`;
+   build-doctor only adds the build-context correlation.
 
 ## Procedure
 

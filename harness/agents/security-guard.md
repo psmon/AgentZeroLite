@@ -7,7 +7,11 @@ triggers:
   - "security check"
   - "보안 점검해"
   - "보안 리뷰해"
-description: OWASP Top 10 + prompt-injection-aware security review tailored to AgentZero Lite's CLI-brokering surface. Mandatory gate before release builds.
+  - "analyze crash dump"
+  - "analyze stackdump"
+  - "크래시 덤프 분석"
+  - "스택덤프 분석"
+description: OWASP Top 10 + prompt-injection-aware security review tailored to AgentZero Lite's CLI-brokering surface. Mandatory gate before release builds. Also primary owner of crash dump forensics (*.stackdump, *.dmp) — memory-forensic artifacts can leak credentials/paths and may signal exploitation.
 ---
 
 # Security Guard
@@ -48,6 +52,13 @@ Cross-reference: `harness/knowledge/security-surface.md` — this project's inje
    (`IsBuiltIn = true`) must remain undeletable from UI.
 6. **Dependency drift** — any dependency added to `*.csproj` since the last security log;
    call out unsigned, deprecated, or unmaintained packages.
+7. **Crash dump forensics** — any `*.stackdump`, `*.dmp`, `core`, or `crash-*.log`
+   present in the working tree. Cross-reference `harness/knowledge/crash-dump-forensics.md`
+   for the playbook (triage flow, dump-type guidance, redaction rules) and
+   `harness/knowledge/cases/` for prior incidents. If `git ls-files | grep`
+   surfaces *any* dump pattern as tracked, that itself is a finding (the
+   `.gitignore` should be catching them — investigate the regression).
+   Build-environment correlation goes through `build-doctor`.
 
 ## Procedure
 
@@ -72,6 +83,6 @@ Cross-reference: `harness/knowledge/security-surface.md` — this project's inje
 
 | Axis | Measure | Scale |
 |------|---------|-------|
-| Coverage | Did the pass touch every one of the 6 scope items? | 0–6 |
+| Coverage | Did the pass touch every one of the 7 scope items? | 0–7 |
 | Severity calibration | Findings tied to OWASP/CWE refs, not vibes | A/B/C/D |
 | Actionability | Each finding names file:line + concrete fix | A/B/C/D |
