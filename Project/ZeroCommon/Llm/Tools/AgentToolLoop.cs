@@ -9,37 +9,44 @@ using LLama.Sampling;
 namespace Agent.Common.Llm.Tools;
 
 /// <summary>
-/// Drives a Gemma-style on-device LLM through a multi-turn tool-calling
-/// session against an <see cref="IAgentToolHost"/>. Output is constrained at
-/// the sampler level by <see cref="AgentToolGrammar.Gbnf"/> so every turn
-/// produces parseable JSON; the loop dispatches to the host, appends the
-/// result to context, and continues until the model emits <c>done</c> or
+/// Drives an on-device LLM through a multi-turn tool-calling session against
+/// an <see cref="IAgentToolHost"/>. Output is constrained at the sampler
+/// level by <see cref="AgentToolGrammar.Gbnf"/> so every turn produces
+/// parseable JSON; the loop dispatches to the host, appends the result to
+/// context, and continues until the model emits <c>done</c> or
 /// <see cref="AgentToolLoopOptions.MaxIterations"/> is reached.
 ///
-/// This is the Gemma 4 backend (no native tool tokens). The Nemotron Nano
-/// path will be a sibling class (<c>NativeAgentToolLoop</c>) added in Phase 2;
-/// shared driver code stays inline here until a third backend forces the
-/// extraction of an <c>IAgentToolBackend</c> interface (per CLAUDE.md
-/// "no premature abstractions").
+/// Model-family specifics (chat markers, anti-prompts) live in
+/// <see cref="ChatTemplate"/>. The constructor takes the template; default is
+/// <see cref="ChatTemplates.Gemma"/> (back-compat for callers built when this
+/// class was Gemma-only). Pass <see cref="ChatTemplates.Llama31"/> for
+/// Nemotron Nano. Per CLAUDE.md "no premature abstractions" we keep this
+/// single class with template injection rather than splitting into
+/// <c>GemmaAgentToolLoop</c> + <c>NemotronAgentToolLoop</c> — the divergence
+/// is small (markers + anti-prompts only).
 /// </summary>
 public sealed class AgentToolLoop : IAsyncDisposable
 {
-    private static readonly string[] AntiPrompts = { "<end_of_turn>", "<eos>" };
-
     private readonly LlamaSharpLocalLlm _llm;
     private readonly IAgentToolHost _host;
     private readonly AgentToolLoopOptions _opts;
+    private readonly ChatTemplate _template;
     private readonly LLamaContext _context;
     private readonly InteractiveExecutor _executor;
     private readonly Grammar _grammar;
     private bool _firstTurn = true;
     private bool _disposed;
 
-    public AgentToolLoop(LlamaSharpLocalLlm llm, IAgentToolHost host, AgentToolLoopOptions? opts = null)
+    public AgentToolLoop(
+        LlamaSharpLocalLlm llm,
+        IAgentToolHost host,
+        AgentToolLoopOptions? opts = null,
+        ChatTemplate? template = null)
     {
         _llm = llm;
         _host = host;
         _opts = opts ?? new AgentToolLoopOptions();
+        _template = template ?? ChatTemplates.Gemma;
         var (weights, modelParams) = llm.GetInternals();
         _context = weights.CreateContext(modelParams);
         _executor = new InteractiveExecutor(_context);
@@ -113,15 +120,13 @@ public sealed class AgentToolLoop : IAsyncDisposable
 
     private async Task<string> GenerateOneTurnAsync(string promptForThisTurn, CancellationToken ct)
     {
-        var prompt = _firstTurn
-            ? $"<start_of_turn>user\n{promptForThisTurn}<end_of_turn>\n<start_of_turn>model\n"
-            : $"\n<start_of_turn>user\n{promptForThisTurn}<end_of_turn>\n<start_of_turn>model\n";
+        var prompt = _template.Format(promptForThisTurn, _firstTurn);
         _firstTurn = false;
 
         var inferenceParams = new InferenceParams
         {
             MaxTokens = _opts.MaxTokensPerTurn,
-            AntiPrompts = AntiPrompts,
+            AntiPrompts = _template.AntiPrompts,
             SamplingPipeline = new DefaultSamplingPipeline
             {
                 Temperature = _opts.Temperature,
@@ -211,9 +216,9 @@ public sealed class AgentToolLoop : IAsyncDisposable
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max] + "…";
 
-    private static string StripTrailingAntiPrompt(string text)
+    private string StripTrailingAntiPrompt(string text)
     {
-        foreach (var anti in AntiPrompts)
+        foreach (var anti in _template.AntiPrompts)
             for (var len = anti.Length; len > 0; len--)
                 if (text.EndsWith(anti[..len], StringComparison.Ordinal))
                     return text[..^len];

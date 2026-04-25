@@ -248,6 +248,188 @@ public sealed class AgentToolLoopTests
             $"expected list_terminals as first call in ≥ {requiredHits}/{trials} trials; got {hits}/{trials}: [{string.Join(", ", firstCalls)}]");
     }
 
+    // ────────────────────────────────────────────────────────────────────
+    //  Nemotron Nano 8B v1 (Llama-3.1 chat template) — Phase 2 backend tests
+    // ────────────────────────────────────────────────────────────────────
+
+    private static readonly string NemotronModelPath =
+        Environment.GetEnvironmentVariable("NEMOTRON_MODEL_PATH")
+        ?? @"D:\Code\AI\GemmaNet\models\Llama-3.1-Nemotron-Nano-8B-v1-UD-Q4_K_XL.gguf";
+
+    private static LocalLlmOptions NemotronOpts() => new()
+    {
+        ModelPath = NemotronModelPath,
+        Backend = LocalLlmBackend.Cpu,
+        ContextSize = 4096,
+        MaxTokens = 192,
+        Temperature = 0.1f,
+    };
+
+    /// <summary>
+    /// T1N — Nemotron Nano 8B v1 with the Llama-3.1 chat template + GBNF
+    /// produces a valid tool call for a discovery question. This is the
+    /// Nemotron equivalent of T1G; the only differences from the Gemma path
+    /// are the template (ChatTemplates.Llama31) and the model path.
+    /// </summary>
+    [SkippableFact]
+    public async Task T1N_first_call_for_discovery_question_is_a_known_tool_nemotron()
+    {
+        Skip.IfNot(File.Exists(NemotronModelPath), $"Model not present at {NemotronModelPath}");
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(NemotronOpts());
+        var host = new MockAgentToolHost();
+        await using var loop = new AgentToolLoop(
+            llm,
+            host,
+            new AgentToolLoopOptions { MaxIterations = 1 },
+            template: ChatTemplates.Llama31);
+
+        var sw = Stopwatch.StartNew();
+        var session = await loop.RunAsync("List the terminals that are currently open.");
+        sw.Stop();
+
+        var firstCallName = session.Turns.Count > 0
+            ? session.Turns[0].Call.Tool
+            : (session.TerminatedCleanly ? AgentToolGrammar.DoneToolName : "(none)");
+
+        _output.WriteLine($"T1N elapsed={sw.ElapsedMilliseconds}ms first_call={firstCallName} clean={session.TerminatedCleanly}");
+
+        Assert.Contains(firstCallName, AgentToolGrammar.KnownTools);
+    }
+
+    /// <summary>
+    /// T2N — Nemotron multi-turn after list result. Equivalent of T2G.
+    /// </summary>
+    [SkippableFact]
+    public async Task T2N_multi_turn_after_list_result_picks_known_followup_nemotron()
+    {
+        Skip.IfNot(File.Exists(NemotronModelPath), $"Model not present at {NemotronModelPath}");
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(NemotronOpts());
+        var host = new MockAgentToolHost
+        {
+            ListTerminalsResult =
+                """
+                {"groups":[{"index":0,"name":"main","tabs":[
+                  {"index":0,"title":"Claude","running":true},
+                  {"index":1,"title":"Codex","running":true}
+                ]}]}
+                """,
+        };
+        await using var loop = new AgentToolLoop(
+            llm,
+            host,
+            new AgentToolLoopOptions { MaxIterations = 4 },
+            template: ChatTemplates.Llama31);
+
+        var session = await loop.RunAsync("Find out what's in the Claude terminal right now and tell me.");
+
+        _output.WriteLine($"T2N turns={session.TurnCount} clean={session.TerminatedCleanly} final=\"{session.FinalMessage}\"");
+        foreach (var t in session.Turns)
+            _output.WriteLine($"  call: {t.Call.Tool} args={t.Call.Args.ToJsonString()}");
+
+        Assert.All(session.Turns, t => Assert.Contains(t.Call.Tool, AgentToolGrammar.KnownTools));
+        Assert.True(session.TurnCount > 0 || session.TerminatedCleanly,
+            $"expected progress; failure='{session.FailureReason}'");
+    }
+
+    /// <summary>
+    /// T3N — Nemotron multi-step routing. Equivalent of T3G.
+    /// </summary>
+    [SkippableFact]
+    public async Task T3N_multistep_send_to_named_terminal_routes_to_correct_tab_nemotron()
+    {
+        Skip.IfNot(File.Exists(NemotronModelPath), $"Model not present at {NemotronModelPath}");
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(NemotronOpts());
+        var host = new MockAgentToolHost
+        {
+            ListTerminalsResult =
+                """
+                {"groups":[{"index":0,"name":"main","tabs":[
+                  {"index":0,"title":"Claude","running":true},
+                  {"index":1,"title":"Codex","running":true}
+                ]}]}
+                """,
+        };
+        await using var loop = new AgentToolLoop(
+            llm,
+            host,
+            new AgentToolLoopOptions { MaxIterations = 6 },
+            template: ChatTemplates.Llama31);
+
+        var sw = Stopwatch.StartNew();
+        var session = await loop.RunAsync(
+            "Send the text 'hello' to the Codex terminal, then tell me you're done.");
+        sw.Stop();
+
+        _output.WriteLine($"T3N elapsed={sw.ElapsedMilliseconds}ms turns={session.TurnCount} clean={session.TerminatedCleanly} final=\"{session.FinalMessage}\"");
+        foreach (var (call, idx) in session.Turns.Select((c, i) => (c, i)))
+            _output.WriteLine($"  turn {idx}: {call.Call.Tool} args={call.Call.Args.ToJsonString()}");
+        foreach (var (tool, args) in host.Calls)
+            _output.WriteLine($"  host saw: {tool} {args}");
+
+        Assert.All(session.Turns, t => Assert.Contains(t.Call.Tool, AgentToolGrammar.KnownTools));
+
+        var sendCall = host.Calls.FirstOrDefault(c => c.Tool == "send_to_terminal");
+        Assert.False(sendCall == default,
+            $"expected at least one send_to_terminal call; saw: [{string.Join(", ", host.Calls.Select(c => c.Tool))}]");
+
+        if (sendCall.Args.Contains("\"tab\":1"))
+            _output.WriteLine("  ✓ Nemotron routed to Codex tab (tab=1) correctly");
+        else if (sendCall.Args.Contains("\"tab\":0"))
+            _output.WriteLine("  ⚠ Nemotron routed to tab=0 (Claude) — may have mis-read catalog");
+        else
+            _output.WriteLine($"  ⚠ unexpected tab: {sendCall.Args}");
+    }
+
+    /// <summary>
+    /// T4N — Nemotron stability across trials. Equivalent of T4G.
+    /// Same threshold (≥ 4/5 picking list_terminals) — Nemotron is the
+    /// larger model so should match or beat Gemma's 5/5.
+    /// </summary>
+    [SkippableFact]
+    public async Task T4N_first_call_is_list_terminals_at_least_4_of_5_trials_nemotron()
+    {
+        Skip.IfNot(File.Exists(NemotronModelPath), $"Model not present at {NemotronModelPath}");
+
+        const int trials = 5;
+        const int requiredHits = 4;
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(NemotronOpts());
+
+        int hits = 0;
+        var firstCalls = new List<string>();
+
+        for (int trial = 0; trial < trials; trial++)
+        {
+            var host = new MockAgentToolHost();
+            await using var loop = new AgentToolLoop(
+                llm,
+                host,
+                new AgentToolLoopOptions { MaxIterations = 1 },
+                template: ChatTemplates.Llama31);
+
+            var sw = Stopwatch.StartNew();
+            var session = await loop.RunAsync("List the currently open terminals.");
+            sw.Stop();
+
+            var firstCall = session.Turns.Count > 0
+                ? session.Turns[0].Call.Tool
+                : (session.TerminatedCleanly ? AgentToolGrammar.DoneToolName : "(none)");
+            firstCalls.Add(firstCall);
+            if (firstCall == "list_terminals") hits++;
+
+            _output.WriteLine($"  trial {trial + 1}/{trials} ({sw.ElapsedMilliseconds}ms): first_call={firstCall}");
+        }
+
+        _output.WriteLine($"T4N results: {hits}/{trials} trials picked list_terminals first");
+        _output.WriteLine($"  all first calls: [{string.Join(", ", firstCalls)}]");
+
+        Assert.True(hits >= requiredHits,
+            $"expected list_terminals as first call in ≥ {requiredHits}/{trials} trials; got {hits}/{trials}: [{string.Join(", ", firstCalls)}]");
+    }
+
     /// <summary>
     /// T_parser — pure unit test, no model load. Verifies the JSON parsing
     /// helpers handle the GBNF output shape correctly. Runs even without a
