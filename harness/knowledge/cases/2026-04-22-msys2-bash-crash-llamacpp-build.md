@@ -84,27 +84,69 @@ causes — fork emulation pressure under parallel build load, or ASLR variance.
 |------------|---------------|-------|
 | `rebaseall` | Low | No DLL injection visible; classic BLODA fix unlikely to help |
 | Reduce `make -j` parallelism | Medium | Cheap to try; would slow but stabilize |
-| Switch build env to PowerShell + native CMake/Ninja | **High** | Avoids the MSYS2 fork path entirely; matches Microsoft-stewarded stack the rest of this project leans on |
+| Use VS 2022 bundled CMake + `Visual Studio 17 2022` MSBuild generator (bash stays as a thin wrapper) | **Applied** | The actual chosen path — see Resolution below |
+| Switch build env entirely to PowerShell + native Ninja | High alternative | Same goal (escape MSYS2 fork emulation); not the path taken |
 | Antivirus exclusion for MSYS2 paths | Low | Module list shows no AV present; leaving here for completeness |
 | Restart bash session between large builds | Low | Workaround, not fix |
 
-The third option (PowerShell + Ninja) aligns with the project's broader posture
+The applied option (VS-bundled CMake + MSBuild generator) achieves the same
+goal as the alternative (escape MSYS2 fork emulation) while keeping bash usable
+for short orchestrating commands. It aligns with the project's broader posture
 documented in `README.md` (project-concept section): *MS-managed channels for the
-native niche*. Removing MSYS2 from the critical build path also reduces one more
-non-MS-managed surface, which is a security-adjacent win — fewer fork-emulation
-shims = fewer places where a bad day silently corrupts a build.
+native niche*. Pulling MSYS2's `cmake` and `make` out of the critical path also
+reduces one more non-MS-managed surface, which is a security-adjacent win —
+fewer fork-emulation shims = fewer places where a bad day silently corrupts a
+build.
 
 ---
 
 ## Resolution
 
-**Status**: maintainer-confirmed resolved during the Gemma 4 build effort.
-**Specific applied mitigation**: *to be filled in by maintainer*.
+**Status**: resolved. The fix is documented in the on-device build tutorial at
+[`Docs/llm/en/gemma4-ondevice-tutorial.md` §3–§4](../../../Docs/llm/en/gemma4-ondevice-tutorial.md)
+(also Korean: [`Docs/llm/ko/gemma4-ondevice-tutorial.md`](../../../Docs/llm/ko/gemma4-ondevice-tutorial.md)).
 
-> When the actual fix is known, replace this section with what was done so the
-> next time this signature appears, the resolution is one click away.
-> Likely candidate based on this project's MS-managed-stack posture: the build was
-> moved off MSYS2 to PowerShell + native Ninja. Maintainer can confirm or amend.
+**Applied mitigation** — the canonical Gemma 4 build path was settled on:
+
+- **Toolchain**: Visual Studio 2022 (Community or Professional) — MSVC + bundled
+  CMake, **not** MSYS2's CMake.
+- **CMake binary**: the one shipped under
+  `C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe`.
+- **Generator**: `"Visual Studio 17 2022" -A x64` — produces an MSBuild-driven
+  build, **not** `make` or `ninja` running under MSYS2 fork emulation.
+- **Build invocation**: `cmake --build build --config Release --target llama -j`
+  — the `-j` parallelism is handled by MSBuild natively on Windows, not by a
+  POSIX-emulated `make -jN` that would stress the MSYS2 fork path.
+
+Why this resolves the crash signature seen above: the original crash was a fork
+emulation failure inside `msys-2.0.dll` under heavy parallel build load. The
+documented build path keeps **CMake and the actual compiler/linker fully native to
+Windows (MSBuild + MSVC)**. Bash is only used as a thin wrapper to invoke commands
+— it never runs the build itself, so the MSYS2 fork path is never exercised at
+scale. This sidesteps the entire class of crashes regardless of which specific
+trigger first kicked it off.
+
+This also matches the project's stated stack posture in `README.md`
+(*MS-managed channels — NuGet, MSBuild, MSVC — for the AI-CLI / OS-native niche*):
+the build environment is consistent with the rest of the project's Microsoft-
+stewarded native stack.
+
+### What to do if the same signature returns
+
+For the **next** on-device model self-build (per
+`memory/project_gemma4_self_build_lifecycle.md`, the self-build loop is preserved
+beyond this Gemma 4 instance):
+
+1. Verify the build is using the **VS-bundled CMake**, not MSYS2's `cmake`.
+2. Verify the generator is `"Visual Studio 17 2022" -A x64` (or a newer VS
+   generator), not `Unix Makefiles` / `Ninja` from a bash environment.
+3. Check `which cmake` inside the bash session that crashed — if it resolves to
+   `/usr/bin/cmake` or a MinGW-style path, that's the regression. Re-point
+   `$CMAKE` (or `PATH`) to the VS-bundled binary as in the tutorial §4.
+4. If the project ever moves to a non-VS toolchain (e.g. clang-cl + Ninja for
+   reproducibility), replicate this case study with the new toolchain — the
+   class of crash and the redirection logic stay the same; only the specific
+   binary paths change.
 
 ---
 

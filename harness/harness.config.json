@@ -3,7 +3,7 @@
   "$schemaVersion": "1.0.0",
   "name": "AgentZero Lite Harness",
   "description": "QA & research garden for AgentZero Lite — Windows-native multi-CLI shell with on-device LLM experiments and prompt-injection-aware security review",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "agents": ["tamer", "security-guard", "build-doctor", "test-sentinel", "code-coach"],
   "engine": ["release-build-pipeline", "pre-commit-review"],
   "created": "2026-04-25",
