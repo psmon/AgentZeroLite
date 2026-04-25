@@ -30,7 +30,38 @@ public sealed class AgentToolLoopTests
     };
 
     /// <summary>
-    /// T0 — sanity: with GBNF + the tool system prompt, Gemma's first turn
+    /// T0Native — runtime probe per ondevice-tool-calling-survey.md §A.
+    /// Gives Gemma a tool-use prompt with NO grammar enforcement and verifies
+    /// it does NOT emit Llama-3.1 native tool-call tokens
+    /// (`&lt;|python_tag|&gt;`, `&lt;|eom_id|&gt;`). Confirms the survey's
+    /// classification: Gemma 4 has no tool-calling SFT → must route through
+    /// GBNF backend. If this assertion ever fires, Gemma's tokenizer or chat
+    /// template has changed under us and the dual-backend selection logic
+    /// needs revisiting.
+    /// </summary>
+    [SkippableFact]
+    public async Task T0Native_Gemma_does_not_emit_native_tool_tokens_must_use_gbnf()
+    {
+        Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
+        var result = await T0Probe.RunAsync(llm, ChatTemplates.Gemma);
+
+        _output.WriteLine($"family={result.ModelFamilyId} native_viable={result.EmittedNativeToolMarkers}");
+        _output.WriteLine($"detected_markers=[{string.Join(", ", result.DetectedMarkers)}]");
+        _output.WriteLine($"recommendation: {result.Recommendation}");
+        _output.WriteLine($"raw[..300]: {Truncate(result.RawOutput, 300)}");
+
+        Assert.False(result.EmittedNativeToolMarkers,
+            $"Expected no Llama-3.1 markers from Gemma. Detected: [{string.Join(", ", result.DetectedMarkers)}]. "
+            + "If this fires, Gemma started emitting native tool tokens — investigate tokenizer.");
+    }
+
+    private static string Truncate(string s, int n)
+        => s.Length <= n ? s.Replace("\n", "\\n") : s[..n].Replace("\n", "\\n") + "…";
+
+    /// <summary>
+    /// T0Sanity — with GBNF + the tool system prompt, Gemma's first turn
     /// produces grammar-valid JSON matching the {tool, args} schema. Predicts
     /// "yes" because GBNF enforces structure at the sampler — the model has
     /// no choice but to emit valid shape. If this fails, GBNF wiring is wrong

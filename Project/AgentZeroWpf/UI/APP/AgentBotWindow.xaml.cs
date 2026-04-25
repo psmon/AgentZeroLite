@@ -23,6 +23,14 @@ public partial class AgentBotWindow : Window
     private readonly Func<string?>? _getActiveDirectory;
     private readonly Func<IReadOnlyList<Module.CliGroupInfo>>? _getGroups;
     private CancellationTokenSource? _aiCts;
+    // AIMODE conversation session. Lifecycle = AIMODE entry → AIMODE exit.
+    // Within one AIMODE period the loop is reused so the InteractiveExecutor's
+    // KV cache retains earlier turns and the system prompt isn't re-tokenised
+    // every send. Cycling out of AIMODE (Ai → Chat / Key) disposes the loop
+    // so the next AIMODE entry starts a fresh conversation. Decoupled from
+    // model load — the same loaded LLM can host many sequential AIMODE
+    // sessions, each with its own KV cache and history.
+    private Agent.Common.Llm.Tools.AgentToolLoop? _aiLoop;
 
     // Akka Actor 연동
     private IActorRef? _botActorRef;
@@ -558,6 +566,97 @@ public partial class AgentBotWindow : Window
         scrollChat.ScrollToEnd();
     }
 
+    /// <summary>
+    /// Renders a real-time AIMODE terminal exchange as a left-side chat card.
+    /// Called from the AgentToolLoop's OnTurnCompleted callback for
+    /// send_to_terminal (outbound, "→") and read_terminal (inbound, "←")
+    /// turns so the user sees the conversation flowing live in the AgentBot
+    /// window instead of having to alt-tab to the terminal.
+    ///
+    /// LLM-loop safety: this method only writes to <c>pnlMessages</c>.
+    /// The LLM's KV cache is not touched. The next agent turn sees only the
+    /// raw tool_result the host returned, never anything rendered here, so
+    /// there is no risk of feedback amplification.
+    ///
+    /// Bypasses <c>chkHideSysMsg</c> — this is conversation data, not
+    /// status noise.
+    /// </summary>
+    internal void AddTerminalExchangeBubble(string direction, string terminalLabel, string text)
+    {
+        // Truncate noisy long terminal dumps so a 5KB read doesn't overrun
+        // the chat panel. Full content remains in the underlying log.
+        const int maxLen = 800;
+        var display = text.Length <= maxLen ? text : text[..maxLen] + "  …(truncated)";
+
+        // Direction colour: outbound (sent to terminal) = mint green;
+        // inbound (read back) = sky cyan. Same left-aligned layout, same
+        // muted card body for visual unity.
+        var arrowColor = direction == "→"
+            ? Color.FromRgb(0x4E, 0xC9, 0xB0)   // outbound: mint
+            : Color.FromRgb(0x9C, 0xDC, 0xFE);  // inbound: cyan
+
+        var stack = new StackPanel();
+        stack.Children.Add(new TextBlock
+        {
+            Text = $"{direction} {terminalLabel}",
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 10,
+            Foreground = new SolidColorBrush(arrowColor),
+            Margin = new Thickness(0, 0, 0, 2),
+        });
+        stack.Children.Add(CreateSelectableText(display, 11,
+            new SolidColorBrush(Color.FromRgb(0xE0, 0xE0, 0xE0))));
+
+        var border = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x2A, 0x32)),  // dark slate
+            CornerRadius = new CornerRadius(8, 8, 8, 2),
+            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(4, 2, 40, 2),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            BorderBrush = new SolidColorBrush(arrowColor) { Opacity = 0.4 },
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = stack,
+        };
+        pnlMessages.Children.Add(border);
+        scrollChat.ScrollToEnd();
+    }
+
+    /// <summary>
+    /// Renders an on-device LLM response as a left-aligned chat bubble (not
+    /// a system message). Crucially this bypasses the
+    /// <c>chkHideSysMsg</c> toggle — even with system messages hidden the
+    /// model's actual answer must always be visible. Visually distinct from
+    /// the user bubble (right-aligned blue) so the conversation reads
+    /// naturally: user → bot → user → bot.
+    /// </summary>
+    internal void AddBotMessage(string text, string label)
+    {
+        var stack = new StackPanel();
+        stack.Children.Add(new TextBlock
+        {
+            Text = $"◂ {label}",
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 10,
+            Foreground = new SolidColorBrush(Color.FromRgb(0xC5, 0x86, 0xC0)),  // violet — same as AI mode badge
+            Margin = new Thickness(0, 0, 0, 2),
+        });
+        stack.Children.Add(CreateSelectableText(text, 12,
+            new SolidColorBrush(Color.FromRgb(0xF3, 0xF3, 0xF3))));
+
+        var border = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x2C, 0x4E)),  // muted violet, distinct from user blue
+            CornerRadius = new CornerRadius(8, 8, 8, 2),
+            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(4, 2, 40, 2),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Child = stack,
+        };
+        pnlMessages.Children.Add(border);
+        scrollChat.ScrollToEnd();
+    }
+
 
     // ------------------------------------------------------------------
     //  + Menu button
@@ -856,6 +955,40 @@ public partial class AgentBotWindow : Window
         // Render the user request as the user-side message bubble first
         AddUserMessage(displayText, "AI");
 
+        // Lazy-load on first AIMODE use: app start does NOT auto-load the
+        // model (per maintainer direction "항상 로드안하게"). If a user has
+        // saved settings (model id persisted), trigger Load now and proceed
+        // once it completes. If no settings exist, fall back to the explicit
+        // "open Settings and click Load" message.
+        if (LlmService.Llm is null)
+        {
+            var savedSettings = LlmSettingsStore.Load();
+            var savedEntry = LlmModelCatalog.FindById(savedSettings.ModelId);
+            var savedModelPath = LlmModelLocator.ResolveExistingOrTarget(savedEntry);
+
+            if (!File.Exists(savedModelPath))
+            {
+                AddSystemMessage($"AI mode needs a loaded LLM, and the saved model ({savedEntry.DisplayName}) is not on disk. Open Settings → AI Mode, download / pick a model, then click Load.");
+                return;
+            }
+
+            AddSystemMessage($"⌛ Loading {savedEntry.DisplayName}  ·  backend={savedSettings.Backend}  ·  one-time per process");
+            var loadSw = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                await LlmService.LoadAsync(savedSettings, savedModelPath);
+                loadSw.Stop();
+                AddSystemMessage($"✓ Loaded {savedEntry.DisplayName}  ·  {loadSw.ElapsedMilliseconds}ms  ·  ready");
+                AppLogger.Log($"[AIMODE] lazy-loaded model id={savedSettings.ModelId} backend={savedSettings.Backend} elapsed={loadSw.ElapsedMilliseconds}ms");
+            }
+            catch (Exception ex)
+            {
+                AddSystemMessage($"✗ Load failed: {ex.Message}. Open Settings → AI Mode for diagnostics.");
+                AppLogger.LogError("[AIMODE] lazy load failed", ex);
+                return;
+            }
+        }
+
         if (LlmService.Llm is not Agent.Common.Llm.LlamaSharpLocalLlm llm)
         {
             AddSystemMessage("AI mode requires a loaded LLM (LlamaSharpLocalLlm). Open Settings → AI Mode and click Load.");
@@ -874,27 +1007,89 @@ public partial class AgentBotWindow : Window
 
         var host = new WorkspaceTerminalToolHost(_getGroups);
 
+        // Pick the chat template per loaded model — Gemma uses
+        // <start_of_turn> markers, Nemotron (Llama-3.1 backbone) uses
+        // <|start_header_id|> + <|eot_id|>. Without this, AgentToolLoop
+        // would default to Gemma and Nemotron would chat against wrong
+        // markers, producing degraded or empty tool calls.
+        var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
+        var template = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+            ? Agent.Common.Llm.Tools.ChatTemplates.Llama31
+            : Agent.Common.Llm.Tools.ChatTemplates.Gemma;
+
+        // Activity indicator so the user sees something is happening even
+        // before the first tool call comes back. RunAsync can take 2–5s on
+        // the first turn (prefill of system prompt) and silence felt like
+        // the app froze.
+        AddSystemMessage($"💭 thinking…  ·  {entry.DisplayName}");
+
+        // Empirical: Vulkan + Llama-3.1 + GBNF on llama.cpp commit 3f7c29d
+        // hits grammar-dead-end stalls (~18s for 3 chars). CPU + Llama-3.1
+        // + GBNF is verified by T1N tests. Surface a heads-up so the user
+        // knows where to look if the loop fails.
+        var settingsBackend = LlmService.CurrentSettings.Backend;
+        if (entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+            && settingsBackend == Agent.Common.Llm.LocalLlmBackend.Vulkan)
+        {
+            AddSystemMessage("ℹ️ Note: Nemotron + Vulkan + GBNF is unstable on the current llama.cpp build. If the loop stalls or returns malformed JSON, switch backend to Cpu in Settings → AI Mode and reload.");
+        }
+
         try
         {
-            await using var loop = new Agent.Common.Llm.Tools.AgentToolLoop(llm, host);
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var session = await loop.RunAsync(userRequest, cts.Token);
-            sw.Stop();
-
-            // Render each tool call inline so the user sees what the agent did
-            foreach (var turn in session.Turns)
+            // First send of this AIMODE session — create a fresh loop. The
+            // loop persists for the duration the user stays in AIMODE so
+            // follow-up sends share KV cache and conversation history.
+            // CycleChatMode disposes it when the user leaves AIMODE.
+            if (_aiLoop is null)
             {
-                var args = turn.Call.Args.ToJsonString();
-                AddSystemMessage($"⚙ {turn.Call.Tool}({args})");
+                var loopOpts = new Agent.Common.Llm.Tools.AgentToolLoopOptions
+                {
+                    OnTurnCompleted = turn => Dispatcher.BeginInvoke(
+                        new Action(() => RenderToolTurnLive(turn))),
+                };
+                _aiLoop = new Agent.Common.Llm.Tools.AgentToolLoop(llm, host, loopOpts, template);
+                AppLogger.Log($"[AIMODE] new session opened (template={template.FamilyId})");
+                AddSystemMessage("✨ New AI session started — conversation history begins here");
             }
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var session = await _aiLoop.RunAsync(userRequest, cts.Token);
+            sw.Stop();
+            // Per-turn rendering already happened live via RenderToolTurnLive
+            // (OnTurnCompleted callback). No post-loop dump needed.
 
             if (session.TerminatedCleanly)
             {
-                AddSystemMessage($"✓ {session.FinalMessage}  ·  {sw.ElapsedMilliseconds}ms · {session.TurnCount} turn(s)");
+                // Render the model's actual answer as a bot chat bubble so
+                // it's always visible (bypasses the "hide system messages"
+                // toggle). Without this the response disappears when the
+                // user has system messages hidden.
+                var label = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+                    ? "Nemotron"
+                    : "Gemma";
+                AddBotMessage(session.FinalMessage, label);
+                AddSystemMessage($"✓ done  ·  {sw.ElapsedMilliseconds}ms · {session.TurnCount} turn(s)");
             }
             else
             {
-                AddSystemMessage($"⚠ {session.FailureReason ?? session.FinalMessage}  ·  {sw.ElapsedMilliseconds}ms");
+                // Show even the failure reason as a bot bubble so the user
+                // sees it regardless of system-message visibility, then a
+                // smaller system note with timing.
+                var label = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+                    ? "Nemotron"
+                    : "Gemma";
+                AddBotMessage($"⚠ {session.FailureReason ?? session.FinalMessage}", label);
+                AddSystemMessage($"failed after {sw.ElapsedMilliseconds}ms · {session.TurnCount} turn(s)");
+
+                // Targeted recovery hint when the failure is the known
+                // Vulkan+GBNF stall pattern (turns=0, fast-failure on first
+                // iteration, Llama-3.1 family).
+                if (session.TurnCount == 0
+                    && entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+                    && LlmService.CurrentSettings.Backend == Agent.Common.Llm.LocalLlmBackend.Vulkan)
+                {
+                    AddSystemMessage("→ Try: Settings → AI Mode → Backend = Cpu → Save Options → Unload → Load. CPU + Nemotron + GBNF is verified stable.");
+                }
             }
 
             AppLogger.Log($"[AIMODE] complete clean={session.TerminatedCleanly} turns={session.TurnCount} elapsed={sw.ElapsedMilliseconds}ms final=\"{session.FinalMessage}\"");
@@ -1652,30 +1847,167 @@ public partial class AgentBotWindow : Window
 
     private void CycleChatMode()
     {
-        var hasLlm = LlmService.Llm is not null;
-        _chatMode = _chatMode switch
-        {
-            ChatMode.Chat => ChatMode.Key,
-            ChatMode.Key  => hasLlm ? ChatMode.Ai : ChatMode.Chat,   // skip Ai when no LLM
-            ChatMode.Ai   => ChatMode.Chat,
-            _             => ChatMode.Chat,
-        };
+        var previous = _chatMode;
+        _chatMode = ChatModeCycle.Next(_chatMode, IsAiModeAvailable());
         s_lastChatMode = _chatMode;
+
+        // AIMODE session boundary: leaving AIMODE disposes the loop so the
+        // next entry starts a fresh conversation (new KV cache, system prompt
+        // re-emitted on first send). This decouples session lifecycle from
+        // model load — same loaded LLM can host many sequential sessions.
+        if (previous == ChatMode.Ai && _chatMode != ChatMode.Ai)
+        {
+            DisposeAiLoopAsync();
+        }
+
         UpdateChatModeBadge();
+    }
+
+    /// <summary>
+    /// Live per-turn renderer. Routes <c>send_to_terminal</c> and
+    /// <c>read_terminal</c> turns into chat-card style bubbles so the user
+    /// can read the conversation as it happens, while administrative tools
+    /// (<c>list_terminals</c>, <c>send_key</c>) stay as compact system
+    /// notes. Pure UI — does not feed anything back into the LLM context.
+    /// </summary>
+    private void RenderToolTurnLive(Agent.Common.Llm.Tools.ToolTurn turn)
+    {
+        var tool = turn.Call.Tool;
+        var args = turn.Call.Args;
+
+        switch (tool)
+        {
+            case "send_to_terminal":
+            {
+                int g = ReadInt(args, "group");
+                int t = ReadInt(args, "tab");
+                string text = ReadString(args, "text") ?? "";
+                AddTerminalExchangeBubble("→", FormatTerminalLabel(g, t), text);
+                break;
+            }
+            case "read_terminal":
+            {
+                int g = ReadInt(args, "group");
+                int t = ReadInt(args, "tab");
+                // tool_result is JSON: { ok, group_index, tab_index, length, text }
+                var (ok, terminalText) = TryExtractReadTerminalText(turn.ToolResult);
+                if (ok)
+                {
+                    AddTerminalExchangeBubble("←", FormatTerminalLabel(g, t), terminalText);
+                }
+                else
+                {
+                    AddSystemMessage($"⚙ read_terminal({{\"group\":{g},\"tab\":{t}}}) → error");
+                }
+                break;
+            }
+            default:
+            {
+                // Administrative / control tools — keep compact system note
+                var argsJson = args.ToJsonString();
+                AddSystemMessage($"⚙ {tool}({argsJson})");
+                break;
+            }
+        }
+    }
+
+    private string FormatTerminalLabel(int g, int t)
+    {
+        try
+        {
+            var groups = _getGroups?.Invoke();
+            if (groups is not null && g >= 0 && g < groups.Count)
+            {
+                var grp = groups[g];
+                if (grp.Tabs is not null && t >= 0 && t < grp.Tabs.Count)
+                    return $"{grp.Tabs[t].Title} (T{g}:{t})";
+            }
+        }
+        catch { /* fall back to bare indices */ }
+        return $"Terminal ({g}:{t})";
+    }
+
+    private static int ReadInt(System.Text.Json.Nodes.JsonObject args, string key)
+        => args.TryGetPropertyValue(key, out var v) && v is System.Text.Json.Nodes.JsonValue jv
+            && jv.TryGetValue<int>(out var i) ? i : 0;
+
+    private static string? ReadString(System.Text.Json.Nodes.JsonObject args, string key)
+        => args.TryGetPropertyValue(key, out var v) && v is System.Text.Json.Nodes.JsonValue jv
+            && jv.TryGetValue<string>(out var s) ? s : null;
+
+    private static (bool ok, string text) TryExtractReadTerminalText(string toolResultJson)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(toolResultJson);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("ok", out var okEl) && okEl.GetBoolean()
+                && root.TryGetProperty("text", out var textEl))
+            {
+                return (true, textEl.GetString() ?? "");
+            }
+        }
+        catch { }
+        return (false, "");
+    }
+
+    private async void DisposeAiLoopAsync()
+    {
+        var loop = _aiLoop;
+        _aiLoop = null;
+        if (loop is null) return;
+        try { _aiCts?.Cancel(); } catch { }
+        try { await loop.DisposeAsync(); } catch { }
+
+        // Tell AgentBotActor to forget all "introduced" terminals so the next
+        // AIMODE session re-introduces AgentBot fresh. State lives in the
+        // actor (per Akka best practice) — fire-and-forget Tell is enough.
+        try
+        {
+            ActorSystemManager.System
+                .ActorSelection("/user/stage/bot")
+                .Tell(new Agent.Common.Actors.ResetIntroductions());
+        }
+        catch { /* actor may already be torn down on app exit */ }
+
+        AppLogger.Log("[AIMODE] session closed (left AIMODE)");
+    }
+
+    /// <summary>
+    /// AI mode is available if EITHER the LLM is already loaded OR a saved
+    /// model file is present on disk (lazy-load on first AIMODE send picks
+    /// it up). Without this we'd refuse to enter AI mode until the user
+    /// manually Loads in Settings, which defeats the lazy-load UX added
+    /// alongside <see cref="SendThroughAiToolLoopAsync"/>.
+    /// </summary>
+    private static bool IsAiModeAvailable()
+    {
+        if (LlmService.Llm is not null) return true;
+        try
+        {
+            var saved = LlmSettingsStore.Load();
+            var entry = LlmModelCatalog.FindById(saved.ModelId);
+            return File.Exists(LlmModelLocator.ResolveExistingOrTarget(entry));
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void UpdateChatModeBadge()
     {
-        // Defensive downgrade: if persisted state had us in Ai but no LLM is
-        // loaded right now (e.g. window reopened before LlmService.LoadAsync
-        // ran), drop back to Chat with a hint. The send-time gate in Mode 7
-        // (TODO) will be the real safety net; this is just to keep the badge
-        // honest at startup.
-        if (_chatMode == ChatMode.Ai && LlmService.Llm is null)
+        // Defensive downgrade only when AI mode is genuinely unreachable —
+        // no loaded LLM AND no settings/model file the lazy loader could
+        // pick up. With those present, the send-time path in
+        // SendThroughAiToolLoopAsync handles the load on first use.
+        var aiAvailable = IsAiModeAvailable();
+        var stabilized = ChatModeCycle.StabilizeForBadge(_chatMode, aiAvailable);
+        if (stabilized != _chatMode)
         {
-            _chatMode = ChatMode.Chat;
+            _chatMode = stabilized;
             s_lastChatMode = _chatMode;
-            ShowModeToast("AI mode needs a loaded LLM — Settings → AI Mode");
+            ShowModeToast("AI mode needs a model — Settings → AI Mode (download or pick one)");
             // fall through to render the Chat badge
         }
 

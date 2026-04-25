@@ -35,7 +35,12 @@ public sealed class AgentToolLoop : IAsyncDisposable
     private readonly InteractiveExecutor _executor;
     private readonly Grammar _grammar;
     private bool _firstTurn = true;
+    private bool _isFirstUserSend = true;  // emit system prompt only on the very first RunAsync; reuse retains KV cache for follow-ups
+    private int _userSendCount;
     private bool _disposed;
+
+    /// <summary>Number of user sends dispatched into this loop.</summary>
+    public int UserSendCount => _userSendCount;
 
     public AgentToolLoop(
         LlamaSharpLocalLlm llm,
@@ -62,6 +67,7 @@ public sealed class AgentToolLoop : IAsyncDisposable
     {
         if (_disposed) throw new ObjectDisposedException(nameof(AgentToolLoop));
 
+        _userSendCount++;
         var turns = new List<ToolTurn>();
         string? failure = null;
 
@@ -69,9 +75,24 @@ public sealed class AgentToolLoop : IAsyncDisposable
         {
             ct.ThrowIfCancellationRequested();
 
-            var turnInput = iter == 0
-                ? FormatFirstTurn(userRequest)
-                : FormatToolResultTurn(turns[^1].ToolResult);
+            // First iteration of the very first send carries the system
+            // prompt + tool catalog. First iteration of any FOLLOW-UP send
+            // carries only the new user request — the system prompt is
+            // already in the KV cache and re-sending it would waste tokens
+            // and confuse the model. Continuation tool-result turns follow
+            // the standard tool-result format.
+            string turnInput;
+            if (iter == 0)
+            {
+                turnInput = _isFirstUserSend
+                    ? FormatFirstTurn(userRequest)
+                    : FormatFollowupUserTurn(userRequest);
+                _isFirstUserSend = false;
+            }
+            else
+            {
+                turnInput = FormatToolResultTurn(turns[^1].ToolResult);
+            }
 
             var rawJson = await GenerateOneTurnAsync(turnInput, ct);
             ToolCall call;
@@ -108,7 +129,13 @@ public sealed class AgentToolLoop : IAsyncDisposable
             {
                 toolResult = $"{{\"error\":\"{EscapeJsonString(ex.Message)}\"}}";
             }
-            turns.Add(new ToolTurn(call, toolResult));
+            var turn = new ToolTurn(call, toolResult);
+            turns.Add(turn);
+
+            // Stream this turn to the UI immediately so the user sees the
+            // agent's progress in real time. Callback runs on the task that
+            // owns this loop — UI implementations marshal to dispatcher.
+            try { _opts.OnTurnCompleted?.Invoke(turn); } catch { /* UI errors must not break the loop */ }
         }
 
         return new AgentToolSession(
@@ -181,6 +208,9 @@ public sealed class AgentToolLoop : IAsyncDisposable
     private static string FormatFirstTurn(string userRequest)
         => $"{AgentToolGrammar.SystemPrompt}\n\n--- USER REQUEST ---\n{userRequest}";
 
+    private static string FormatFollowupUserTurn(string userRequest)
+        => $"--- USER REQUEST ---\n{userRequest}";
+
     private static string FormatToolResultTurn(string toolResultJson)
         => $"--- TOOL RESULT ---\n{toolResultJson}\n\n(Reply with the next single JSON tool call. Call \"done\" when satisfied.)";
 
@@ -239,9 +269,35 @@ public sealed record AgentToolLoopOptions
     /// <summary>Max model turns before the loop gives up without seeing <c>done</c>.</summary>
     public int MaxIterations { get; init; } = 8;
 
-    /// <summary>Max tokens emitted per model turn. Tool-call JSONs are short; cap low.</summary>
-    public int MaxTokensPerTurn { get; init; } = 192;
+    /// <summary>
+    /// Max tokens emitted per model turn. Pretty-printed JSON for tool calls
+    /// (especially with `send_to_terminal` carrying a multi-word `text` arg)
+    /// can run 80–250 tokens; under-sizing this caps the model mid-JSON and
+    /// the parser sees a truncated `{ "tool": "x", "args": {` payload.
+    /// 384 absorbs all 5 tools' typical envelopes with headroom.
+    /// </summary>
+    public int MaxTokensPerTurn { get; init; } = 384;
 
-    /// <summary>Sampling temperature. Low for stable, deterministic-leaning tool calls.</summary>
-    public float Temperature { get; init; } = 0.1f;
+    /// <summary>
+    /// Sampling temperature. 0.0 = greedy (most deterministic). The tool-call
+    /// path values reproducibility over creativity, and a non-zero temperature
+    /// can wander into grammar-dead-end states (especially on Vulkan +
+    /// Llama-3.1 tokenizer where the GBNF and tokenizer interact poorly,
+    /// producing 18s for 3 chars). Greedy avoids that class of stall.
+    /// </summary>
+    public float Temperature { get; init; } = 0.0f;
+
+    /// <summary>
+    /// Optional callback fired after each completed turn (tool call + result)
+    /// so the UI can stream the agent's reasoning chain to the user instead
+    /// of showing a single dump after the whole loop finishes. The callback
+    /// runs on the loop's task — implementations should marshal to UI
+    /// thread themselves (Dispatcher.BeginInvoke etc.).
+    ///
+    /// IMPORTANT: anything the callback does has NO effect on the LLM context
+    /// — the loop's KV cache only sees the tool_result text, not whatever the
+    /// callback renders. Safe to use for UI-side bubbles without risk of
+    /// model-feedback loops.
+    /// </summary>
+    public Action<ToolTurn>? OnTurnCompleted { get; init; }
 }

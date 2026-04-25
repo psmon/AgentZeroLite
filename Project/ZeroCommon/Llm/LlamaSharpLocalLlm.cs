@@ -76,6 +76,15 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm
     public ILocalChatSession CreateSession()
         => new LlamaSharpLocalChatSession(_options, _weights, _modelParams);
 
+    /// <summary>
+    /// Open a session with an explicit chat template (Gemma, Llama-3.1, …).
+    /// The default <see cref="ILocalChatSession.CreateSession"/> path keeps
+    /// Gemma for back-compat; <see cref="LlmService.OpenSession"/> uses this
+    /// overload to pick per-model.
+    /// </summary>
+    public ILocalChatSession CreateSession(Tools.ChatTemplate template)
+        => new LlamaSharpLocalChatSession(_options, _weights, _modelParams, template);
+
     // Same-assembly accessor so the Agent.Common.Llm.Tools layer can build a
     // grammar-constrained InteractiveExecutor against the loaded weights
     // without going through ILocalChatSession (which is the Q&A surface and

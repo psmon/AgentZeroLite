@@ -119,3 +119,14 @@ public sealed record SetBotUiCallback(Action<string, BotResponseType> Callback);
 
 public sealed record RegisterBot;
 public sealed record UnregisterBot;
+
+// AgentBot ↔ Terminal AI 첫 접촉 추적용. AIMODE에서 send_to_terminal이
+// 어떤 (group, tab) 조합으로 처음 발화될 때 한 번만 자기소개를 prepend
+// 하고, 같은 (group, tab)에 대해서는 더 이상 prepend하지 않게 한다.
+// 상태는 AgentBotActor가 보유 — 액터 모델 원칙 (state는 actor 안에).
+//
+// IntroduceTerminalIfFirst: Ask 패턴. Reply = bool (true면 첫 접촉).
+// ResetIntroductions: AIMODE 세션이 새로 시작되면 모두 잊는다.
+public sealed record IntroduceTerminalIfFirst(int GroupIndex, int TabIndex);
+public sealed record IntroduceTerminalReply(bool WasFirstContact);
+public sealed record ResetIntroductions;

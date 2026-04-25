@@ -5,7 +5,8 @@ public sealed record LlmModelCatalogEntry(
     string DisplayName,
     string FileName,
     string DownloadUrl,
-    long ApproxBytes);
+    long ApproxBytes,
+    string ChatFamily = "gemma");  // "gemma" | "llama31" — drives ChatTemplate selection in LlmService.OpenSession
 
 public static class LlmModelCatalog
 {
@@ -28,7 +29,8 @@ public static class LlmModelCatalog
         DisplayName: "Nemotron Nano 8B v1  (UD-Q4_K_XL, 5.0 GB, native tool-calling)",
         FileName: "Llama-3.1-Nemotron-Nano-8B-v1-UD-Q4_K_XL.gguf",
         DownloadUrl: "https://huggingface.co/unsloth/Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/main/Llama-3.1-Nemotron-Nano-8B-v1-UD-Q4_K_XL.gguf",
-        ApproxBytes: 4_994_203_200L);
+        ApproxBytes: 4_994_203_200L,
+        ChatFamily: "llama31");
 
     public static readonly IReadOnlyList<LlmModelCatalogEntry> All = new[]
     {

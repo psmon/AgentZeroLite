@@ -1,16 +1,26 @@
 using System.Runtime.CompilerServices;
 using Agent.Common;
+using Agent.Common.Llm.Tools;
 using LLama;
 using LLama.Common;
 using LLama.Sampling;
 
 namespace Agent.Common.Llm;
 
+/// <summary>
+/// In-process multi-turn chat session bound to a single
+/// <see cref="LLamaContext"/>. Chat-template specifics (markers,
+/// anti-prompts) are externalised into <see cref="ChatTemplate"/> so the
+/// same session class works for Gemma 4 and Llama-3.1 (Nemotron) without
+/// duplicating loop logic. The template is selected by
+/// <see cref="LlmService.OpenSession"/> from the loaded model's catalog
+/// entry; defaults to <see cref="ChatTemplates.Gemma"/> for callers that
+/// pre-date the multi-model rollout.
+/// </summary>
 public sealed class LlamaSharpLocalChatSession : ILocalChatSession
 {
-    private static readonly string[] AntiPrompts = { "<end_of_turn>", "<eos>" };
-
     private readonly LocalLlmOptions _options;
+    private readonly ChatTemplate _template;
     private readonly LLamaContext _context;
     private readonly InteractiveExecutor _executor;
 
@@ -18,11 +28,16 @@ public sealed class LlamaSharpLocalChatSession : ILocalChatSession
     private int _turnCount;
     private bool _disposed;
 
-    internal LlamaSharpLocalChatSession(LocalLlmOptions options, LLamaWeights weights, ModelParams modelParams)
+    internal LlamaSharpLocalChatSession(
+        LocalLlmOptions options,
+        LLamaWeights weights,
+        ModelParams modelParams,
+        ChatTemplate? template = null)
     {
         _options = options;
+        _template = template ?? ChatTemplates.Gemma;
 
-        AppLogger.Log($"[LLM] Session ctor: CreateContext begin (ctx={modelParams.ContextSize}, gpuLayers={modelParams.GpuLayerCount})");
+        AppLogger.Log($"[LLM] Session ctor: CreateContext begin (ctx={modelParams.ContextSize}, gpuLayers={modelParams.GpuLayerCount}, template={_template.FamilyId})");
         _context = weights.CreateContext(modelParams);
         AppLogger.Log("[LLM] Session ctor: CreateContext done");
 
@@ -44,13 +59,13 @@ public sealed class LlamaSharpLocalChatSession : ILocalChatSession
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LlamaSharpLocalChatSession));
 
-        // LLamaSharp's anti-prompt match halts generation but leaves the matched
-        // string in the emitted output. So after turn 1 the KV cache already ends
-        // with "<end_of_turn>"; turn 2 only needs a separator before the next user
-        // turn, not another "<end_of_turn>".
-        var prompt = _firstTurn
-            ? $"<start_of_turn>user\n{userMessage}<end_of_turn>\n<start_of_turn>model\n"
-            : $"\n<start_of_turn>user\n{userMessage}<end_of_turn>\n<start_of_turn>model\n";
+        // ChatTemplate.Format selects the first-turn vs continuation marker
+        // pair. LLamaSharp's anti-prompt match halts generation but leaves
+        // the matched string in the emitted output, so the KV cache tail
+        // already ends with the family's end-of-turn marker — that's why the
+        // continuation format starts cleanly with the next user header
+        // rather than re-emitting an end marker.
+        var prompt = _template.Format(userMessage, _firstTurn);
 
         _firstTurn = false;
         _turnCount++;
@@ -58,7 +73,7 @@ public sealed class LlamaSharpLocalChatSession : ILocalChatSession
         var inferenceParams = new InferenceParams
         {
             MaxTokens = _options.MaxTokens,
-            AntiPrompts = AntiPrompts,
+            AntiPrompts = _template.AntiPrompts,
             SamplingPipeline = new DefaultSamplingPipeline
             {
                 Temperature = _options.Temperature
@@ -72,9 +87,9 @@ public sealed class LlamaSharpLocalChatSession : ILocalChatSession
     // Anti-prompt matches in LLamaSharp can leave the matched text — or a partial
     // prefix of it when detokenization boundaries split the special token — at the
     // end of the emitted stream. Strip any trailing prefix of known anti-prompts.
-    private static string StripTrailingAntiPrompt(string text)
+    private string StripTrailingAntiPrompt(string text)
     {
-        foreach (var anti in AntiPrompts)
+        foreach (var anti in _template.AntiPrompts)
         {
             for (var len = anti.Length; len > 0; len--)
             {

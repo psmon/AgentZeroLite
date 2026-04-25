@@ -41,9 +41,15 @@ public static class ChatTemplates
 
     /// <summary>
     /// Meta Llama-3.1 / Llama-3.2 / NVIDIA Nemotron Nano (Llama-3.1 backbone)
-    /// chat template. Uses the `&lt;|begin_of_text|&gt;` BOS plus
-    /// `&lt;|start_header_id|&gt;…&lt;|end_header_id|&gt;` per-turn role headers
-    /// and `&lt;|eot_id|&gt;` end-of-turn marker.
+    /// chat template. Uses `&lt;|start_header_id|&gt;…&lt;|end_header_id|&gt;`
+    /// per-turn role headers and `&lt;|eot_id|&gt;` end-of-turn marker.
+    ///
+    /// **No leading `&lt;|begin_of_text|&gt;`** — LLamaSharp / llama.cpp
+    /// auto-prepends the model's BOS token when it tokenizes the prompt, so
+    /// embedding `&lt;|begin_of_text|&gt;` here would produce a doubled BOS
+    /// (observed warning: <c>"Added a BOS token... prompt also starts with
+    /// a BOS token. So now the final prompt starts with 2 BOS tokens"</c>),
+    /// degrading first-turn quality and tool-call JSON formation.
     ///
     /// We deliberately omit the system role and inline system+user content
     /// in a single user turn. This keeps the application layer
@@ -53,7 +59,7 @@ public static class ChatTemplates
     /// </summary>
     public static readonly ChatTemplate Llama31 = new(
         FirstTurnFormat:
-            "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n" +
+            "<|start_header_id|>user<|end_header_id|>\n\n" +
             "{0}<|eot_id|>" +
             "<|start_header_id|>assistant<|end_header_id|>\n\n",
         ContinuationFormat:

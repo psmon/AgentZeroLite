@@ -21,6 +21,13 @@ public sealed class AgentBotActor : ReceiveActor
     private BotMode _currentMode = BotMode.Chat;
     private Action<string, BotResponseType>? _uiCallback;
 
+    // AIMODE first-contact tracking. Per the Akka model, state belongs in the
+    // actor that owns the concern — AgentBotActor is the singleton that
+    // represents "the agent talking to terminals", so it tracks who has been
+    // greeted. WorkspaceTerminalToolHost asks via IntroduceTerminalIfFirst
+    // before sending; the reply tells it whether to prepend a self-intro.
+    private readonly HashSet<(int g, int t)> _introducedTerminals = new();
+
     public AgentBotActor(IActorRef stage)
     {
         _stage = stage;
@@ -31,7 +38,7 @@ public sealed class AgentBotActor : ReceiveActor
     private void CommonHandlers()
     {
         Receive<Ping>(_ => Sender.Tell(new Pong("Bot", Self.Path.ToString(),
-            $"Mode={_currentMode}")));
+            $"Mode={_currentMode} introduced={_introducedTerminals.Count}")));
 
         Receive<SetBotUiCallback>(msg =>
         {
@@ -52,6 +59,24 @@ public sealed class AgentBotActor : ReceiveActor
 
         Receive<QueryTerminalStatus>(_ =>
             _stage.Forward(new QueryStageStatus()));
+
+        // AIMODE introduction state — atomic mark-and-tell.
+        Receive<IntroduceTerminalIfFirst>(msg =>
+        {
+            var key = (msg.GroupIndex, msg.TabIndex);
+            var first = _introducedTerminals.Add(key);
+            if (first)
+                _log.Info("AIMODE first contact with terminal [{0}:{1}]",
+                    msg.GroupIndex, msg.TabIndex);
+            Sender.Tell(new IntroduceTerminalReply(WasFirstContact: first));
+        });
+
+        Receive<ResetIntroductions>(_ =>
+        {
+            var n = _introducedTerminals.Count;
+            _introducedTerminals.Clear();
+            _log.Info("AIMODE introductions cleared (was tracking {0})", n);
+        });
     }
 
     private void BecomeChat()

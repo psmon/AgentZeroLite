@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Agent.Common.Llm;
+using Agent.Common.Llm.Tools;
 using LLama;
 using LLama.Common;
 using LLama.Sampling;
@@ -103,5 +104,50 @@ public sealed class NemotronProbeTests
         // Soft semantic check — at temp 0.1 on a "say hello" prompt the
         // model should produce something containing "hello".
         Assert.Contains("hello", reply, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// T0Native — runtime probe per ondevice-tool-calling-survey.md §B.
+    /// Gives Nemotron Nano 8B-v1 a Llama-3.1 tool-use prompt with NO grammar
+    /// enforcement and inspects the raw output for native function-call
+    /// markers (`&lt;|python_tag|&gt;` / `&lt;|eom_id|&gt;`).
+    ///
+    /// Empirical result on our self-built stack (LLamaSharp 0.26 + llama.cpp
+    /// commit 3f7c29d, Nemotron-Nano-8B-v1 UD-Q4_K_XL, CPU): the model
+    /// produces a plain `list_terminals()` call rather than the SFT-trained
+    /// `&lt;|python_tag|&gt;...&lt;|eom_id|&gt;` envelope. The survey's
+    /// "Native primary" prediction does NOT hold for this GGUF/commit.
+    /// Decision: route Nemotron through GBNF too (same as Gemma) — which is
+    /// what the existing AgentToolLoop already does via the Llama31 chat
+    /// template injection. NativeToolBackend implementation deferred until
+    /// either Nano-9B-v2 lands or a future llama.cpp commit changes the
+    /// tokenizer behaviour for these tokens.
+    ///
+    /// Assertion direction: assert NO native markers (the observed reality).
+    /// If a future stack update flips this to YES, the test fires and we
+    /// know to revisit the NativeToolBackend decision.
+    /// </summary>
+    [SkippableFact]
+    public async Task T0Native_Nemotron_does_not_emit_llama31_tool_tokens_on_current_stack()
+    {
+        Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
+        var result = await T0Probe.RunAsync(llm, ChatTemplates.Llama31);
+
+        _output.WriteLine($"family={result.ModelFamilyId} native_viable={result.EmittedNativeToolMarkers}");
+        _output.WriteLine($"detected_markers=[{string.Join(", ", result.DetectedMarkers)}]");
+        _output.WriteLine($"recommendation: {result.Recommendation}");
+        var rawPreview = result.RawOutput.Length <= 400
+            ? result.RawOutput.Replace("\n", "\\n")
+            : result.RawOutput[..400].Replace("\n", "\\n") + "…";
+        _output.WriteLine($"raw[..400]: {rawPreview}");
+
+        Assert.False(result.EmittedNativeToolMarkers,
+            $"Nemotron unexpectedly emitted native Llama-3.1 tool tokens "
+            + $"(detected: [{string.Join(", ", result.DetectedMarkers)}]). "
+            + "The current stack used to produce plain `list_terminals()` text. "
+            + "If this fires, native tool parsing is now viable on our llama.cpp commit — "
+            + "consider implementing NativeToolBackend per ondevice-tool-calling-survey.md §architecture.");
     }
 }

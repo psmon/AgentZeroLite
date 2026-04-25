@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Akka.Actor;
+using Agent.Common.Actors;
 using Agent.Common.Llm.Tools;
 using AgentZeroWpf.Module;
 
@@ -72,24 +74,76 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolHost
         }
     }
 
-    public Task<bool> SendToTerminalAsync(int group, int tab, string text, CancellationToken ct)
+    public async Task<bool> SendToTerminalAsync(int group, int tab, string text, CancellationToken ct)
     {
         if (!TryResolveOrError(group, tab, out var session, out _))
-            return Task.FromResult(false);
+            return false;
+
+        // First-contact protocol — ask the AgentBotActor (which holds the
+        // introduction state per Akka best practice) whether this (group, tab)
+        // has been talked-to in the current AIMODE session. If not, prepend a
+        // one-shot self-introduction so the receiving terminal AI knows what
+        // it's talking to + how the channel works (read responses inline; no
+        // reverse function-call channel exists, just type back into your
+        // terminal and AgentBot will read via read_terminal).
+        try
+        {
+            // AgentBotActor lives at /user/stage/bot as a child of StageActor.
+            // Ask the actor (which holds the per-AIMODE-session introduction
+            // state) whether this is first contact for (group, tab). Reply
+            // is atomic — the actor marks "introduced" before sending the
+            // reply, so a second concurrent Ask correctly gets WasFirstContact=false.
+            // ResolveOne resolves the path to a concrete IActorRef so Ask
+            // (which is defined as an extension on IActorRef, not ActorSelection)
+            // can be used.
+            var bot = await AgentZeroWpf.Actors.ActorSystemManager.System
+                .ActorSelection("/user/stage/bot")
+                .ResolveOne(System.TimeSpan.FromSeconds(1));
+            var reply = await bot.Ask<IntroduceTerminalReply>(
+                new IntroduceTerminalIfFirst(group, tab),
+                System.TimeSpan.FromSeconds(2));
+            if (reply.WasFirstContact)
+            {
+                text = BuildFirstContactHeader() + "\n\n" + text;
+                AppLogger.Log($"[AIMODE] prepended first-contact intro for [{group}:{tab}]");
+            }
+        }
+        catch (System.Exception ex)
+        {
+            // Introduction tracking is a UX nicety, not load-bearing — log
+            // and proceed without an intro if the actor query fails.
+            AppLogger.Log($"[AIMODE] introduction Ask failed (sending without intro): {ex.Message}");
+        }
 
         try
         {
             session!.WriteAndSubmit(text);
             int preview = System.Math.Min(text.Length, 30);
             AppLogger.Log($"[AIMODE] send_to_terminal [{group}:{tab}] len={text.Length} preview=\"{text.Substring(0, preview)}\"");
-            return Task.FromResult(true);
+            return true;
         }
         catch (System.Exception ex)
         {
             AppLogger.Log($"[AIMODE] send_to_terminal FAILED [{group}:{tab}] {ex.GetType().Name}: {ex.Message}");
-            return Task.FromResult(false);
+            return false;
         }
     }
+
+    // English by design — LLM prompts and prompts directed at LLM-backed
+    // terminals (Claude, Codex, etc.) default to English for tokenization
+    // efficiency and stability across model families. See harness/knowledge/
+    // llm-prompt-conventions.md.
+    private static string BuildFirstContactHeader() =>
+        "[AgentBot self-introduction]\n"
+        + "Hi! I'm AgentBot — an on-device AI agent running inside the AgentZero Lite shell. "
+        + "The user asked me to relay a message to this terminal, so I connected here to talk with you.\n"
+        + "How to talk back: just type your reply normally into this terminal. "
+        + "I read your output via a read_terminal function call and use it to decide what to do next.\n"
+        + "If you ever need to message a DIFFERENT terminal tab, you can use: "
+        + "`AgentZeroLite.ps1 terminal-send <group> <tab> \"text\"`. "
+        + "There is no reverse function-call channel back to me — just answer here and I will see it.\n"
+        + "You will only see this introduction once per AIMODE session.\n"
+        + "─── original message follows ───";
 
     public Task<bool> SendKeyAsync(int group, int tab, string key, CancellationToken ct)
     {

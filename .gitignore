@@ -450,3 +450,4 @@ env.json
 .claude/scheduled_tasks.lock
 /.dotnet-cli
 /.dotnet
+.mcp.json

@@ -561,7 +561,15 @@ public partial class SettingsPanel
         tbLlmChatInput.IsEnabled = false;
         btnLlmChatSend.IsEnabled = false;
 
-        tbLlmChatHistory.AppendText((tbLlmChatHistory.Text.Length == 0 ? "" : "\n") + $"▸ You: {userMsg}\n◂ Gemma: ");
+        // Label the assistant turn with whatever model is currently loaded —
+        // the chat session was opened with the matching ChatTemplate, so the
+        // label should reflect the actual responder (Gemma vs Nemotron etc.).
+        var modelLabel = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId).ChatFamily switch
+        {
+            "llama31" => "Nemotron",
+            _ => "Gemma"
+        };
+        tbLlmChatHistory.AppendText((tbLlmChatHistory.Text.Length == 0 ? "" : "\n") + $"▸ You: {userMsg}\n◂ {modelLabel}: ");
         svLlmChat.ScrollToEnd();
 
         _llmChatCts = new CancellationTokenSource();

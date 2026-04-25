@@ -133,7 +133,20 @@ public static class LlmService
     public static ILocalChatSession OpenSession()
     {
         var llm = Llm ?? throw new InvalidOperationException("LLM not loaded.");
-        return llm.CreateSession();
+
+        // Pick the chat template from the loaded model's catalog entry. This
+        // is the official routing for the AIMODE module: Gemma → Gemma
+        // template + GBNF backend; Nemotron → Llama-3.1 template + GBNF
+        // backend (T0 probe confirmed Nemotron does not emit native tool
+        // tokens on our llama.cpp commit, so both families share the GBNF
+        // path with template substitution only).
+        var entry = LlmModelCatalog.FindById(CurrentSettings.ModelId);
+        var template = entry.ChatFamily.ToLowerInvariant() switch
+        {
+            "llama31" => Tools.ChatTemplates.Llama31,
+            _ => Tools.ChatTemplates.Gemma
+        };
+        return llm.CreateSession(template);
     }
 
     private static void TransitionTo(LlmServiceState next)
