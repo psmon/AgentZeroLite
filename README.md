@@ -65,6 +65,14 @@ macros to whichever terminal is in focus — nothing more, nothing less.
   `terminal-read`. No extra broker, no cloud relay — just the two CLIs poking each
   other through AgentZero's IPC. This is the tiki-taka between models that the Lite
   edition exists for.
+- **AIMODE — on-device LocalLLM as your in-shell coordinator** — flip the AgentBot
+  to AI mode (Shift+Tab) and a small on-device LLM (Gemma 4 today; Nemotron
+  staged) becomes a secretary that drives the *other* AI CLIs for you. You ask
+  in Korean or English, it picks the right terminal AI, sends the message,
+  waits, reads the reply, brings back a summary. Two-way channel: peer
+  terminals call back through the existing `bot-chat` CLI so the LocalLLM
+  doesn't have to keep polling. Nothing leaves the machine. See
+  [AIMODE section](#-aimode--locallm-as-your-in-shell-coordinator) below.
 - **AgentBot `[+]` menu — 3 ways to arm a terminal AI** —
   - **`AgentZeroCLI Helper`** — drops a ready-made briefing into the chat input that
     teaches any terminal AI (Claude, Codex, shell-hosted model) how to call
@@ -275,6 +283,181 @@ What makes this work:
 
 This is the "tiki-taka between models" the Lite edition was built for. Terminal
 multiplexers let you *watch* many prompts; AgentZero Lite lets them **talk**.
+
+---
+
+## 🧠 AIMODE — LocalLLM as your in-shell coordinator
+
+The next step up from "teach two CLIs to talk to each other" is "have a small
+on-device LLM coordinate the conversation for you." That is **AIMODE** —
+flip the AgentBot pane with **Shift+Tab** and a Gemma 4 (Nemotron staged)
+running on your GPU/CPU becomes a tiny in-app secretary that drives the
+real AI CLIs on your behalf.
+
+> **Philosophy.** The LocalLLM here is **not trying to out-think Claude or
+> Codex**. The goal is the *small secretary* role: take the fuzzy ask,
+> route it to the right terminal AI, organise the result. Less than a PM,
+> more than a bash alias. The heavy reasoning lives in those bigger CLIs;
+> the LocalLLM is the receptionist who knows everyone's extension number
+> and the protocol for transferring calls.
+
+### What it looks like
+
+```
+                  +----------------------+
+                  |      You (user)      |
+                  +----------+-----------+
+                             | chat: "claude한테 토론해줘", "hi", ...
+                             v
++----------------------------+----------------------------+
+|                AgentBot AIMODE  (chat pane)             |
+|                                                         |
+|   +----------------------+      Tool catalog            |
+|   | LocalLLM             |      list_terminals          |
+|   | Gemma 4 / Nemotron   | ---  read_terminal           |
+|   | on-device            |      send_to_terminal        |
+|   | GBNF-constrained     |      send_key  wait  done    |
+|   | one JSON call/turn   |                              |
+|   +----------+-----------+                              |
+|              | Tell                                     |
+|              v                                          |
+|   +-------------------------------------------------+   |
+|   |  AgentReactorActor   (Akka FSM)                 |   |
+|   |  Idle -> Thinking -> Generating -> Acting -> Done   |
+|   |  owns KV cache; ONE cycle per StartReactor      |   |
+|   +-------------------------------------------------+   |
++----------------------------+----------------------------+
+                             | ConPTY (write text + Enter)
+                             v
+            +-----------------+   +-----------------+
+            | Claude (tab)    |<->| Codex  (tab)    |   ...
+            | the smart one   |   | the other one   |
+            +--------+--------+   +--------+--------+
+                     | replies via the existing CLI
+                     v
+   AgentZeroLite.exe -cli bot-chat "DONE(text)" --from <peerName>
+                     |
+                     | WM_COPYDATA  (existing CLI/IPC channel)
+                     v
+   MainWindow.HandleBotChat
+       -> /user/stage/bot.Tell(TerminalSentToBot)
+       -> Reactor wakes for a continuation cycle
+```
+
+### How an LLM becomes an Agent — the function-call tool chain
+
+A bare LLM is a text-completion engine. **It is not an agent.** To make it
+act on the world you have to do four things:
+
+1. **Constrain its output** to a tool surface. Here, a GBNF grammar forces
+   every emission to be `{"tool": "<name>", "args": { ... }}` and nothing
+   else. The sampler literally cannot produce free-form prose.
+2. **Run the tool** and capture the result.
+3. **Feed the result back** into the LLM's context as the next user turn.
+4. **Repeat** until the LLM emits `done`.
+
+That generate → tool → result → generate-again loop is what turns
+text completion into agency. AgentZero's recipe lives in
+`Project/ZeroCommon/Llm/Tools/`:
+
+| Layer | Role |
+|-------|------|
+| `AgentToolGrammar.Gbnf` | GBNF grammar — sampler can only emit valid tool-call JSON |
+| Tool surface (6 tools) | `list_terminals`, `read_terminal`, `send_to_terminal`, `send_key`, `wait`, `done` |
+| `AgentToolLoop` | The generate → run → feed-back loop |
+| `AgentReactorActor` | Akka wrapper — live progress, cancellation, KV cache, peer-signal continuation |
+| System prompt (Mode 1 / Mode 2) | Teaches the model when to chat directly vs relay to a terminal AI |
+| Handshake protocol | Verifies the reverse channel works before substantive relay |
+
+**One cycle per run** is the central rule: each `StartReactor` does ONE
+short round-trip with a peer (send → wait → read → react → done) and then
+stops. Subsequent cycles are triggered by the user OR an arriving peer
+signal — never by the LLM trying to script a 5-turn discussion in one
+giant tool chain. KV cache preserves history across cycles.
+
+### Two-way channel — peer terminal AI talks back via CLI
+
+The novel piece: the terminal AI (Claude in a tab, Codex in a tab) can
+**push messages back to AgentBot** via the existing `bot-chat` CLI. When
+AgentBot first contacts a terminal it sends a handshake header explaining:
+
+> You are **Claude** and I am AgentBot.
+> Step 1 — verify the channel: `AgentZeroLite.exe -cli help`
+> Step 2 — acknowledge: `AgentZeroLite.exe -cli bot-chat "DONE(handshake-ok)" --from Claude`
+
+When that command runs, the message routes through `WM_COPYDATA` →
+`MainWindow.HandleBotChat` → `Tell(TerminalSentToBot)` to the bot actor.
+If the peer is in an active conversation, the Reactor wakes for a fresh
+continuation cycle. **Polling the visible terminal output (`read_terminal`)
+is the *fallback*** for peers that don't or can't emit the signal.
+
+This makes the terminal AI an active participant — it can *delay* its
+reply (long compile, big refactor) and call back when ready, instead of
+forcing AgentBot to repeatedly poll a `Crafting…` indicator.
+
+### Tested scenarios (live, Gemma 4)
+
+- **T5G** — greetings stay direct: `"안녕"` → bot replies in chat,
+  never routes to a terminal.
+- **T6G** — five sequential continuation cycles, each ≤ 6 tool
+  iterations (one cycle per run, not one giant run for the whole
+  conversation).
+- **T7G** — vague Mode 2 asks (`"Claude한테 토론 시작해"`) still
+  trigger `send_to_terminal` with a reasonable opener instead of
+  bouncing the request back at the user.
+
+42/42 headless tests + the live suite above gate every change to the
+loop / actor / prompt.
+
+---
+
+## 🧪 Harness — making the function-call chain self-improve
+
+Wiring an LLM into a useful tool chain is **hard**, and it is honestly
+not (yet) my strongest area. The harness — under
+[`harness/`](harness/) — is how this repo iterates without me having
+to re-reason from scratch every time:
+
+```
+harness/
+├── agents/        — specialist evaluators (security-guard, build-doctor,
+│                    test-sentinel, code-coach, tamer)
+├── engine/        — workflows (release-build-pipeline, pre-commit-review)
+├── knowledge/     — domain notes (LLM prompt conventions, tool-calling survey)
+└── logs/          — every Mode 3 review, RCA, evaluation pinned here
+```
+
+The feedback loop that improved the AIMODE function-call chain across
+this iteration:
+
+1. **Unit-test feedback** — `T1G..T7G` live tests + headless TestKit
+   suites (42/42 currently) verify the protocol & state machine against
+   regressions.
+2. **Real-execution feedback** — actual app logs at
+   `%LOCALAPPDATA%\AgentZeroWpf\logs\app-log.txt` capture every Reactor
+   turn, peer signal, JSON parse failure.
+3. **Mode 3 RCA logs** — under
+   [`harness/logs/code-coach/`](harness/logs/code-coach/). Each
+   regression gets a dated post-mortem with: symptom, root cause, patch,
+   evaluation, deferred follow-ups.
+4. **The user as reviewer** — I'm not driving the prompt design alone.
+   The harness produces the suggestions; I review them, accept or
+   course-correct, and the next loop incorporates that feedback. Closer
+   to **pair programming with an iterating improver** than to "AI does
+   it all" — and the artefact of that pairing (logs / evaluations /
+   final prompt) is the actual material I'm learning from.
+
+Concrete example from this iteration: the AIMODE prompt went through
+**6 revisions** in one sitting — one-cycle rule, vague-relay
+anti-passivity, anti-denial, handshake split, peer-signal trigger,
+ID-scheme switch to strings — each one captured in the same Mode 3 doc
+with what failed and why the next attempt addressed it. The harness is
+the **memory of those attempts** so the same mistake doesn't recur.
+
+> If you want to study how this kind of harness is structured, the
+> sister repo
+> **[harness-kakashi](https://github.com/psmon/harness-kakashi)** is a
+> standalone training ground built around the same patterns.
 
 ---
 
