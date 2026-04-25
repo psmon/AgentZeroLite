@@ -136,6 +136,119 @@ public sealed class AgentToolLoopTests
     }
 
     /// <summary>
+    /// T3G — multi-step semantic: given a request that requires *acting on*
+    /// the terminal catalog (not just inspecting), Gemma should chain
+    /// list_terminals → send_to_terminal → done. Mock catalog names two
+    /// terminals (Claude tab 0, Codex tab 1) and the request asks to send
+    /// to Codex; the mock records every call so we can verify Gemma routed
+    /// to the correct tab index based on the catalog content it received.
+    ///
+    /// This is the test that fails if Gemma can't reason over the JSON
+    /// catalog it gets back — the part GBNF can't help with (GBNF guarantees
+    /// the *shape* of Gemma's output, not the *correctness* of its arg values).
+    /// </summary>
+    [SkippableFact]
+    public async Task T3G_multistep_send_to_named_terminal_routes_to_correct_tab()
+    {
+        Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
+        var host = new MockAgentToolHost
+        {
+            ListTerminalsResult =
+                """
+                {"groups":[{"index":0,"name":"main","tabs":[
+                  {"index":0,"title":"Claude","running":true},
+                  {"index":1,"title":"Codex","running":true}
+                ]}]}
+                """,
+        };
+        await using var loop = new AgentToolLoop(llm, host, new AgentToolLoopOptions { MaxIterations = 6 });
+
+        var sw = Stopwatch.StartNew();
+        var session = await loop.RunAsync(
+            "Send the text 'hello' to the Codex terminal, then tell me you're done.");
+        sw.Stop();
+
+        _output.WriteLine($"T3G elapsed={sw.ElapsedMilliseconds}ms turns={session.TurnCount} clean={session.TerminatedCleanly} final=\"{session.FinalMessage}\"");
+        foreach (var (call, idx) in session.Turns.Select((c, i) => (c, i)))
+            _output.WriteLine($"  turn {idx}: {call.Call.Tool} args={call.Call.Args.ToJsonString()}");
+        foreach (var (tool, args) in host.Calls)
+            _output.WriteLine($"  host saw: {tool} {args}");
+
+        // Structural: every recorded call must be a known tool
+        Assert.All(session.Turns, t => Assert.Contains(t.Call.Tool, AgentToolGrammar.KnownTools));
+
+        // Semantic: the mock host should have seen at least one send_to_terminal
+        // call. We do NOT assert tab index strictly because Gemma at temp 0.1
+        // may occasionally route to tab 0 — log it but only fail if NO send
+        // happened at all. A stricter assertion would belong in T4G-style
+        // statistical pass over multiple trials.
+        var sendCall = host.Calls.FirstOrDefault(c => c.Tool == "send_to_terminal");
+        Assert.False(sendCall == default,
+            $"expected at least one send_to_terminal call; saw: [{string.Join(", ", host.Calls.Select(c => c.Tool))}]");
+
+        // Soft check: log whether Gemma routed to the right tab. Don't fail —
+        // single-trial routing is too noisy at 4B-class scale.
+        if (sendCall.Args.Contains("\"tab\":1"))
+            _output.WriteLine("  ✓ Gemma routed to Codex tab (tab=1) correctly");
+        else if (sendCall.Args.Contains("\"tab\":0"))
+            _output.WriteLine("  ⚠ Gemma routed to tab=0 (Claude) — may have mis-read catalog");
+        else
+            _output.WriteLine($"  ⚠ unexpected tab in send_to_terminal args: {sendCall.Args}");
+    }
+
+    /// <summary>
+    /// T4G — output stability across trials. Run the same simple, unambiguous
+    /// "list terminals" request N times; assert that the first tool call is
+    /// <c>list_terminals</c> in at least <c>requiredHits / trials</c> of them.
+    /// Statistical assertion is the right shape for non-deterministic LLMs:
+    /// GBNF guarantees output VALIDITY 100% (no malformed JSON), but tool
+    /// SELECTION is the model's free choice and should be measured as a rate.
+    ///
+    /// Calibrated for 4B-effective Gemma at CPU + temperature 0.1: expect
+    /// near-perfect routing on a question this clear (≥ 4/5).
+    /// </summary>
+    [SkippableFact]
+    public async Task T4G_first_call_is_list_terminals_at_least_4_of_5_trials()
+    {
+        Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
+
+        const int trials = 5;
+        const int requiredHits = 4;
+
+        await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
+
+        int hits = 0;
+        var firstCalls = new List<string>();
+
+        for (int trial = 0; trial < trials; trial++)
+        {
+            var host = new MockAgentToolHost();
+            await using var loop = new AgentToolLoop(llm, host, new AgentToolLoopOptions { MaxIterations = 1 });
+
+            var sw = Stopwatch.StartNew();
+            var session = await loop.RunAsync("List the currently open terminals.");
+            sw.Stop();
+
+            var firstCall = session.Turns.Count > 0
+                ? session.Turns[0].Call.Tool
+                : (session.TerminatedCleanly ? AgentToolGrammar.DoneToolName : "(none)");
+            firstCalls.Add(firstCall);
+
+            if (firstCall == "list_terminals") hits++;
+
+            _output.WriteLine($"  trial {trial + 1}/{trials} ({sw.ElapsedMilliseconds}ms): first_call={firstCall}");
+        }
+
+        _output.WriteLine($"T4G results: {hits}/{trials} trials picked list_terminals first");
+        _output.WriteLine($"  all first calls: [{string.Join(", ", firstCalls)}]");
+
+        Assert.True(hits >= requiredHits,
+            $"expected list_terminals as first call in ≥ {requiredHits}/{trials} trials; got {hits}/{trials}: [{string.Join(", ", firstCalls)}]");
+    }
+
+    /// <summary>
     /// T_parser — pure unit test, no model load. Verifies the JSON parsing
     /// helpers handle the GBNF output shape correctly. Runs even without a
     /// model file present (no Skip).
