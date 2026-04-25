@@ -21,6 +21,8 @@ public partial class AgentBotWindow : Window
     private readonly Func<string>? _getSessionName;
     private readonly Func<ITerminalSession?>? _getActiveSession;
     private readonly Func<string?>? _getActiveDirectory;
+    private readonly Func<IReadOnlyList<Module.CliGroupInfo>>? _getGroups;
+    private CancellationTokenSource? _aiCts;
 
     // Akka Actor 연동
     private IActorRef? _botActorRef;
@@ -114,6 +116,7 @@ public partial class AgentBotWindow : Window
         _getSessionName = getSessionName;
         _getActiveSession = getActiveSession;
         _getActiveDirectory = getActiveDirectory;
+        _getGroups = getGroups;
 
         System.Windows.DataObject.AddPastingHandler(txtInput, OnInputPasting);
         txtInput.PreviewTextInput += OnInputTextComposition;
@@ -783,6 +786,21 @@ public partial class AgentBotWindow : Window
 
         if (string.IsNullOrEmpty(textToSend) || textToSend == "/") return;
 
+        // ── AI MODE ────────────────────────────────────────────────────────
+        // Route the input through the on-device tool loop instead of the
+        // terminal. The loop will use list_terminals / read_terminal /
+        // send_to_terminal / send_key / done to act on the workspace.
+        if (_chatMode == ChatMode.Ai)
+        {
+            var aiInput = textToSend;
+            txtInput.Clear();
+            _ = SendThroughAiToolLoopAsync(aiInput, displayText);
+            _clipboardAttachment = null;
+            pnlClipboardTag.Visibility = Visibility.Collapsed;
+            return;
+        }
+        // ───────────────────────────────────────────────────────────────────
+
         var session = _getActiveSession?.Invoke();
         if (session is null)
         {
@@ -826,6 +844,75 @@ public partial class AgentBotWindow : Window
 
         _clipboardAttachment = null;
         pnlClipboardTag.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// AI mode entry — runs the on-device tool loop for a user request and
+    /// renders trace + final result into chat. Cancellable by another input
+    /// (replaces _aiCts) or by Esc on the input box (handled in OnInputKeyDown).
+    /// </summary>
+    private async Task SendThroughAiToolLoopAsync(string userRequest, string displayText)
+    {
+        // Render the user request as the user-side message bubble first
+        AddUserMessage(displayText, "AI");
+
+        if (LlmService.Llm is not Agent.Common.Llm.LlamaSharpLocalLlm llm)
+        {
+            AddSystemMessage("AI mode requires a loaded LLM (LlamaSharpLocalLlm). Open Settings → AI Mode and click Load.");
+            return;
+        }
+        if (_getGroups is null)
+        {
+            AddSystemMessage("AI mode is not wired (host did not provide a groups callback).");
+            return;
+        }
+
+        // Cancel any in-flight AI loop before starting a new one
+        try { _aiCts?.Cancel(); } catch { }
+        var cts = new CancellationTokenSource();
+        _aiCts = cts;
+
+        var host = new WorkspaceTerminalToolHost(_getGroups);
+
+        try
+        {
+            await using var loop = new Agent.Common.Llm.Tools.AgentToolLoop(llm, host);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var session = await loop.RunAsync(userRequest, cts.Token);
+            sw.Stop();
+
+            // Render each tool call inline so the user sees what the agent did
+            foreach (var turn in session.Turns)
+            {
+                var args = turn.Call.Args.ToJsonString();
+                AddSystemMessage($"⚙ {turn.Call.Tool}({args})");
+            }
+
+            if (session.TerminatedCleanly)
+            {
+                AddSystemMessage($"✓ {session.FinalMessage}  ·  {sw.ElapsedMilliseconds}ms · {session.TurnCount} turn(s)");
+            }
+            else
+            {
+                AddSystemMessage($"⚠ {session.FailureReason ?? session.FinalMessage}  ·  {sw.ElapsedMilliseconds}ms");
+            }
+
+            AppLogger.Log($"[AIMODE] complete clean={session.TerminatedCleanly} turns={session.TurnCount} elapsed={sw.ElapsedMilliseconds}ms final=\"{session.FinalMessage}\"");
+        }
+        catch (OperationCanceledException)
+        {
+            AddSystemMessage("AI loop canceled.");
+        }
+        catch (Exception ex)
+        {
+            AddSystemMessage($"AI loop error: {ex.Message}");
+            AppLogger.LogError("[AIMODE] loop crashed", ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_aiCts, cts))
+                _aiCts = null;
+        }
     }
 
     private static async Task SendLargeTextAsync(ITerminalSession session, string text, bool isMultiLine)
@@ -1651,6 +1738,17 @@ public partial class AgentBotWindow : Window
         if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
         {
             CycleChatMode();
+            e.Handled = true;
+            return;
+        }
+
+        // Esc while an AI loop is running cancels it (the loop's
+        // CancellationToken hand-off is the existing pattern; no other
+        // mode currently uses _aiCts). Falls through to the rest of the
+        // handler if nothing was running.
+        if (e.Key == Key.Escape && _aiCts is not null)
+        {
+            try { _aiCts.Cancel(); } catch { }
             e.Handled = true;
             return;
         }
