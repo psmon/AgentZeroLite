@@ -1,5 +1,11 @@
 # LLM Docs Index / LLM 문서 색인
 
+> ⚠️ **Disclaimer / 주의** — The Gemma 4 path documented here uses **self-built `llama.dll` / `ggml-*.dll` binaries** because the official LLamaSharp NuGet doesn't support Gemma 4 yet. **Safety of the prebuilt DLLs is not vouched for** — if you need this path, **build them yourself** from the pinned llama.cpp commit. This is a temporary workaround that will be removed the moment NuGet support lands. The recipe stays documented because it's the fastest loop for experimenting with brand-new on-device models *before* official binding support exists. Better approaches are very welcome — please share via issue / PR.
+>
+> 여기 정리된 Gemma 4 경로는 LLamaSharp NuGet이 아직 Gemma 4를 지원하지 않아 **`llama.dll` / `ggml-*.dll`을 직접 빌드해서 쓰는 우회**입니다. **prebuilt DLL의 안전성은 보장하지 못하므로** 이 방법이 필요하면 고정 커밋에서 **직접 빌드**해서 사용하세요. NuGet 공식 지원이 나오면 즉시 걷어낼 한시적 우회이며, 이 레시피를 남겨두는 이유는 *공식 바인딩 지원 전* 새 온디바이스 모델을 가장 빠르게 실험하기 위한 루프이기 때문입니다. 더 좋은 방법을 알고 계시다면 이슈 / PR로 공유 부탁드립니다.
+
+---
+
 > Tutorials and deep-dives for embedding LLMs in AgentZero Lite (and .NET apps in general).
 > AgentZero Lite 및 .NET 앱 일반에 LLM을 내장하는 튜토리얼·심화 자료 모음.
 

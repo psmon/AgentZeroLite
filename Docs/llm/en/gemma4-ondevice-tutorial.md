@@ -1,5 +1,18 @@
 # Embedding Gemma 4 On-Device in .NET — A Story of Failure and Success
 
+> ⚠️ **Read this first — safety & intent disclaimer**
+>
+> The `llama.dll` / `ggml-*.dll` binaries described here were **self-built solely because I urgently needed Gemma 4 in this project right now**, before the official LLamaSharp NuGet caught up. They are checked in for reproducibility of *my* journey, not as a vetted distribution.
+>
+> - **I cannot vouch for the safety of the prebuilt DLLs.** Do not use the binaries from this repo as-is. If you need this approach, **build the DLLs yourself from the pinned llama.cpp commit** (or a commit you've audited) and verify the artifacts.
+> - **If you know a cleaner path, please share it** — issues / PRs welcome. The whole point of this writeup is to invite better answers.
+> - **This is a temporary lifecycle.** The moment LLamaSharp ships Gemma 4 support on NuGet, this entire workaround gets ripped out. The doc exists mostly so (a) future-me / Claude doesn't re-trip the same wires, and (b) the migration back to NuGet is mechanical.
+> - **Why we still keep the recipe:** when a new on-device model lands and needs to be experimented with *before* official binding support exists, this self-build path is the fastest experimentation loop. So the technique stays documented even after this specific Gemma 4 instance retires.
+>
+> TL;DR — treat this as a research log, not a deployment guide.
+
+---
+
 > This tutorial walks through the real-world process of **embedding Google's Gemma 4 directly into a .NET 10 WPF app (AgentZero Lite) without any HTTP server** — from first attempts to final working solution. Written for .NET developers who are new to LLM integration. Every term is explained as it appears. Actual measurements, dead ends, and fixes are all included.
 
 ---
