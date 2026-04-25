@@ -23,10 +23,18 @@ public static class LlmModelCatalog
         DownloadUrl: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q4_K_XL.gguf",
         ApproxBytes: 3_174_043_296L);
 
+    public static readonly LlmModelCatalogEntry NemotronNano8Bv1_UD_Q4_K_XL = new(
+        Id: "nemotron-nano-8B-v1-UD-Q4_K_XL",
+        DisplayName: "Nemotron Nano 8B v1  (UD-Q4_K_XL, 5.0 GB, native tool-calling)",
+        FileName: "Llama-3.1-Nemotron-Nano-8B-v1-UD-Q4_K_XL.gguf",
+        DownloadUrl: "https://huggingface.co/unsloth/Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/main/Llama-3.1-Nemotron-Nano-8B-v1-UD-Q4_K_XL.gguf",
+        ApproxBytes: 4_994_203_200L);
+
     public static readonly IReadOnlyList<LlmModelCatalogEntry> All = new[]
     {
         E4B_UD_Q4_K_XL,
-        E2B_UD_Q4_K_XL
+        E2B_UD_Q4_K_XL,
+        NemotronNano8Bv1_UD_Q4_K_XL
     };
 
     public static LlmModelCatalogEntry Default => E4B_UD_Q4_K_XL;
