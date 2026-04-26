@@ -271,31 +271,67 @@
                 </Grid>
             </TabItem>
 
-            <!-- LLM (Gemma) Tab -->
-            <TabItem Header="&#x1F916; LLM (Gemma)" Style="{StaticResource SettingsTabItem}">
+            <!-- LLM Tab — Local (Gemma) + External (Webnori/OpenAI/LMStudio/Ollama) -->
+            <TabItem Header="&#x1F916; LLM" Style="{StaticResource SettingsTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,8,0,0">
 
-                        <!-- Experimental Banner -->
-                        <Border Background="#2A0E1F" BorderBrush="#FF2D95" BorderThickness="1"
+                        <!-- ACTIVE BACKEND SELECTOR (shared) — decides which backend
+                             TestBot, AgentBot, and AIMODE all flow through. -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
                                 CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <TextBlock Text="&#x26A0;" FontSize="14" Foreground="#FF2D95"
+                                    <Rectangle Width="3" Height="10" Fill="#FFB800" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="ACTIVE BACKEND" FontSize="11" FontWeight="Bold"
+                                               Foreground="#FFB800" FontFamily="Consolas"/>
+                                    <TextBlock x:Name="tbActiveBackendStatus" FontFamily="Consolas" FontSize="10"
+                                               Foreground="#7C7C8C" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="rbBackendLocal" GroupName="LlmBackend"
+                                                 Content="Local (on-device Gemma 4 / Nemotron)"
+                                                 Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                 VerticalAlignment="Center" Margin="0,0,16,0"
+                                                 Checked="OnActiveBackendChanged"/>
+                                    <RadioButton x:Name="rbBackendExternal" GroupName="LlmBackend"
+                                                 Content="External (Webnori / OpenAI / LMStudio / Ollama)"
+                                                 Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                 VerticalAlignment="Center"
+                                                 Checked="OnActiveBackendChanged"/>
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="9"
+                                           Foreground="#556677" Margin="0,6,0,0"
+                                           Text="Local needs a downloaded GGUF + Load. External just needs a provider/model (Webnori is preconfigured for contributors). AIMODE toolchain is Gemma-4-shaped — non-Gemma external models will likely fail JSON envelope parsing."/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Per-backend config sub-tabs -->
+                        <TabControl x:Name="tcLlmBackend" Background="Transparent" BorderThickness="0"
+                                    Margin="0,0,0,8" SelectionChanged="OnLlmBackendSubTabChanged">
+                            <TabItem Header="Local (Gemma)" Style="{StaticResource SettingsTabItem}">
+                                <ScrollViewer VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Margin="0,8,0,0">
+
+                        <!-- Local backend status — base LLM tests passed for both,
+                             but AIMODE toolchain (GBNF + 5-tool envelope) is Gemma-only. -->
+                        <Border Background="#0E1F2A" BorderBrush="#00E5FF" BorderThickness="1"
+                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="&#x2139;" FontSize="14" Foreground="#00E5FF"
                                                VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="온디바이스 실험중" FontSize="13" FontWeight="Bold"
-                                               Foreground="#FF2D95" FontFamily="Consolas"
+                                    <TextBlock Text="온디바이스 LLM 상태" FontSize="13" FontWeight="Bold"
+                                               Foreground="#00E5FF" FontFamily="Consolas"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
-                                           Foreground="#E0C8D8" LineHeight="16">
-                                    <Run>AgentBot AI Mode의 온디바이스 탑재를 위해 시도되고 있는 기능입니다.</Run>
+                                           Foreground="#C8D8E0" LineHeight="16">
+                                    <Run FontWeight="Bold" Foreground="#00FFAA">기본 LLM 테스트 완료</Run><Run> — Gemma 4 / Nemotron Nano 둘 다 Load + 멀티턴 채팅 + 함수콜 단위로는 정상 동작.</Run>
                                     <LineBreak/>
-                                    <Run FontWeight="Bold" Foreground="#00FFAA">CPU 백엔드는 테스트 통과</Run><Run> — Load / 멀티턴 채팅 / 함수콜 모두 안정.</Run>
+                                    <Run FontWeight="Bold" Foreground="#00FFAA">AIMODE 툴체인은 Gemma 전용</Run><Run> — 5-tool JSON envelope + GBNF 그래마가 Gemma 4 기준으로 표준화됨. </Run><Run FontWeight="Bold" Foreground="#FFB800">Nemotron 등 Llama-3.x 계열은 AIMODE 비호환</Run><Run> (TestBot 일반 채팅은 OK).</Run>
                                     <LineBreak/>
-                                    <Run FontWeight="Bold" Foreground="#FF2D95">GPU(Vulkan) 백엔드는 아직 불안정</Run><Run> — Gemma 4 + Vulkan 조합의 네이티브 크래시 원인들을 추적 중.</Run>
-                                    <LineBreak/>
-                                    <Run Foreground="#888899">세부 실패 사례: Docs/gemma4-gpu-load-failures.md</Run>
+                                    <Run Foreground="#888899">CPU 백엔드 안정. Vulkan 백엔드는 일부 GPU/드라이버 조합에서 native crash가 보고됨 — Docs/gemma4-gpu-load-failures.md 참고.</Run>
                                 </TextBlock>
                             </StackPanel>
                         </Border>
@@ -507,6 +543,142 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <TabItem Header="External" Style="{StaticResource SettingsTabItem}">
+                                <ScrollViewer VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Margin="0,8,0,0">
+
+                                        <!-- Provider selection -->
+                                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                    <Rectangle Width="3" Height="10" Fill="#00E5FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="PROVIDER" FontSize="11" FontWeight="Bold"
+                                                               Foreground="#00E5FF" FontFamily="Consolas"/>
+                                                </StackPanel>
+                                                <ComboBox x:Name="cbExtProvider" Style="{StaticResource DarkComboBox}"
+                                                          Margin="0,0,0,6"
+                                                          SelectionChanged="OnExtProviderChanged">
+                                                    <ComboBoxItem Content="Webnori (free contributor tier — best-effort uptime)"/>
+                                                    <ComboBoxItem Content="OpenAI (api.openai.com — requires key)"/>
+                                                    <ComboBoxItem Content="LMStudio (your own LM Studio server)"/>
+                                                    <ComboBoxItem Content="Ollama (localhost:11434)"/>
+                                                </ComboBox>
+                                                <TextBlock x:Name="tbExtProviderHint" TextWrapping="Wrap"
+                                                           FontFamily="Consolas" FontSize="9"
+                                                           Foreground="#7C7C8C" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Endpoint config (per-provider; Webnori is read-only) -->
+                                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                    <Rectangle Width="3" Height="10" Fill="#8B00FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="ENDPOINT" FontSize="11" FontWeight="Bold"
+                                                               Foreground="#8B00FF" FontFamily="Consolas"/>
+                                                </StackPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <TextBlock Text="Base URL" Grid.Row="0" Grid.Column="0"
+                                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                                    <TextBox x:Name="tbExtBaseUrl" Grid.Row="0" Grid.Column="1"
+                                                             Style="{StaticResource DarkTextBox}" Margin="0,3,0,3"/>
+
+                                                    <TextBlock Text="API Key" Grid.Row="1" Grid.Column="0"
+                                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                               VerticalAlignment="Center" Margin="0,3,6,3"/>
+                                                    <TextBox x:Name="tbExtApiKey" Grid.Row="1" Grid.Column="1"
+                                                             Style="{StaticResource DarkTextBox}" Margin="0,3,0,3"/>
+                                                </Grid>
+                                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="9"
+                                                           Foreground="#556677" Margin="0,6,0,0"
+                                                           Text="OpenAI: leave Base URL empty to use api.openai.com. LMStudio: typical http://localhost:1234. Ollama: empty defaults to localhost:11434. Webnori: read-only."/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Model + token cap -->
+                                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                                CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                    <Rectangle Width="3" Height="10" Fill="#00FFAA" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="MODEL" FontSize="11" FontWeight="Bold"
+                                                               Foreground="#00FFAA" FontFamily="Consolas"/>
+                                                </StackPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <!-- IsEditable lets users type a model id that's not in the
+                                                         provider's /v1/models list (common for niche LM Studio
+                                                         loads). The DarkComboBox template renders only
+                                                         SelectionBoxItem so it can't show the typed Text — fall
+                                                         back to the default ComboBox visuals here. -->
+                                                    <ComboBox x:Name="cbExtModel" Grid.Column="0"
+                                                              IsEditable="True"
+                                                              FontFamily="Consolas" FontSize="10"
+                                                              SelectionChanged="OnExtModelChanged"/>
+                                                    <Button x:Name="btnExtRefreshModels" Grid.Column="1"
+                                                            Content="Refresh" Padding="12,5" Margin="8,0,0,0"
+                                                            Style="{StaticResource DarkButton}"
+                                                            Click="OnExtRefreshModelsClick"/>
+                                                </Grid>
+                                                <Grid Margin="0,8,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="120"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="MaxTokens" Grid.Column="0"
+                                                               Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
+                                                               VerticalAlignment="Center" Margin="0,0,6,0"
+                                                               ToolTip="Per-request token cap. The only knob — every other tuning happens server-side."/>
+                                                    <TextBox x:Name="tbExtMaxTokens" Grid.Column="1"
+                                                             Style="{StaticResource DarkTextBox}"/>
+                                                    <TextBlock Text="(per request)" Grid.Column="2"
+                                                               Foreground="#7C7C8C" FontFamily="Consolas" FontSize="9"
+                                                               VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Save / Test -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <Button x:Name="btnExtSave" Content="Save Options"
+                                                    Padding="12,5" Margin="0,0,6,0"
+                                                    Style="{StaticResource DarkButton}"
+                                                    Click="OnExtSaveClick"/>
+                                            <Button x:Name="btnExtTest" Content="Test Connection"
+                                                    Padding="12,5" Margin="0,0,6,0"
+                                                    Style="{StaticResource DarkButton}"
+                                                    Click="OnExtTestClick"/>
+                                            <TextBlock x:Name="tbExtStatus" Text="—"
+                                                       FontFamily="Consolas" FontSize="10"
+                                                       Foreground="#556677" VerticalAlignment="Center"
+                                                       Margin="10,0,0,0"/>
+                                        </StackPanel>
+
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
 
                         <!-- Chat Test -->
                         <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"

@@ -25,7 +25,7 @@ namespace Agent.Common.Llm.Tools;
 /// <c>GemmaAgentToolLoop</c> + <c>NemotronAgentToolLoop</c> — the divergence
 /// is small (markers + anti-prompts only).
 /// </summary>
-public sealed class AgentToolLoop : IAsyncDisposable
+public sealed class AgentToolLoop : IAgentToolLoop
 {
     private readonly LlamaSharpLocalLlm _llm;
     private readonly IAgentToolHost _host;

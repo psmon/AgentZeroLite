@@ -5,9 +5,9 @@
 //        NOT covering the inner LLM tool loop (those live tests gate on a
 //        model file and are kept in AgentToolLoopTests / NemotronProbeTests).
 //
-// Trick: ReactorBindings.LlmAccessor returns null in these tests so the
+// Trick: ReactorBindings.ToolLoopFactory returns null in these tests so the
 //        actor hits the early-exit path that emits a ReactorResult with
-//        FailureReason="LLM not loaded". That exercises message routing
+//        FailureReason="Backend not ready". That exercises message routing
 //        without needing LLamaSharp + a 4 GB model file in CI.
 // ───────────────────────────────────────────────────────────
 
@@ -21,12 +21,11 @@ public sealed class AgentReactorActorTests : TestKit
 {
     private static ReactorBindings BindingsWithNoLlm() => new(
         HostFactory: () => new StubHost(),
-        TemplateFactory: () => ChatTemplates.Gemma,
         OptionsFactory: () => new AgentToolLoopOptions(),
-        LlmAccessor: () => null);
+        ToolLoopFactory: (_, _) => null);
 
     [Fact]
-    public void StartReactor_with_no_llm_emits_ReactorResult_failure_to_parent()
+    public void StartReactor_with_no_backend_emits_ReactorResult_failure_to_parent()
     {
         var probe = CreateTestProbe("parent-probe");
         // Use the probe as parent so we can assert on what TellParent sends.
@@ -40,7 +39,7 @@ public sealed class AgentReactorActorTests : TestKit
         var result = probe.ExpectMsg<ReactorResult>(TimeSpan.FromSeconds(2));
         Assert.False(result.Success);
         Assert.Equal(0, result.TurnCount);
-        Assert.Equal("LLM not loaded", result.FailureReason);
+        Assert.Equal("Backend not ready", result.FailureReason);
         Assert.Contains("AI Mode", result.FinalMessage);
     }
 
@@ -100,9 +99,8 @@ public sealed class AgentBotActorReactorWiringTests : TestKit
 {
     private static ReactorBindings BindingsNoLlm() => new(
         HostFactory: () => new StubHost(),
-        TemplateFactory: () => ChatTemplates.Gemma,
         OptionsFactory: () => new AgentToolLoopOptions(),
-        LlmAccessor: () => null);
+        ToolLoopFactory: (_, _) => null);
 
     private (IActorRef bot, IActorRef stage) NewBot()
     {
@@ -140,11 +138,11 @@ public sealed class AgentBotActorReactorWiringTests : TestKit
 
         bot.Tell(new StartReactor("anything"));
 
-        // The child reactor short-circuits on null LLM and bubbles the
-        // failure result back through the bot → our probe.
+        // The child reactor short-circuits when the factory returns null and
+        // bubbles the failure result back through the bot → our probe.
         var result = resultProbe.ExpectMsg<ReactorResult>(TimeSpan.FromSeconds(2));
         Assert.False(result.Success);
-        Assert.Equal("LLM not loaded", result.FailureReason);
+        Assert.Equal("Backend not ready", result.FailureReason);
     }
 
     [Fact]
@@ -240,10 +238,10 @@ public sealed class AgentBotActorReactorWiringTests : TestKit
         bot.Tell(new MarkConversationActive("Claude"));
         bot.Tell(new TerminalSentToBot("Claude", "Claude responded with hi"));
 
-        // Reactor wakes (no LLM → friendly failure result), proving routing reached it.
+        // Reactor wakes (factory returns null → friendly failure result), proving routing reached it.
         var result = resultProbe.ExpectMsg<ReactorResult>(TimeSpan.FromSeconds(2));
         Assert.False(result.Success);
-        Assert.Equal("LLM not loaded", result.FailureReason);
+        Assert.Equal("Backend not ready", result.FailureReason);
     }
 
     [Fact]

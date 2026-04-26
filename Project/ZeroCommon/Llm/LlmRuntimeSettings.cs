@@ -1,9 +1,27 @@
+using Agent.Common.Llm.Providers;
 using LLama.Native;
 
 namespace Agent.Common.Llm;
 
+/// <summary>
+/// Which engine answers TestBot/AgentBot/AIMODE prompts.
+/// Local = on-device GGUF via LLamaSharp (everything below ContextSize/Backend etc).
+/// External = OpenAI-compatible REST (Webnori/OpenAI/LMStudio/Ollama). Externally
+/// served models tune themselves server-side, so the only knob exposed here is
+/// MaxTokens.
+/// </summary>
+public enum LlmActiveBackend { Local, External }
+
 public sealed class LlmRuntimeSettings
 {
+    // ── Active backend selector ──
+    // Default = External + Webnori + gemma-4-e4b. New AgentZeroLite installs
+    // get a working AIMODE without downloading multi-GB GGUFs first; user can
+    // switch to Local from the LLM tab.
+    public LlmActiveBackend ActiveBackend { get; set; } = LlmActiveBackend.External;
+
+    public ExternalLlmSettings External { get; set; } = new();
+
     // Which entry from LlmModelCatalog to load. Persisted as a string id so
     // the JSON file is stable across catalog additions/reorders.
     public string ModelId { get; set; } = LlmModelCatalog.Default.Id;
@@ -52,6 +70,34 @@ public sealed class LlmRuntimeSettings
     // keeps pages resident). false = regular read; releases RAM after GPU upload.
     // Turn off when system RAM is tight.
     public bool UseMemoryMap { get; set; } = true;
+
+    /// <summary>
+    /// Builds the external <see cref="ILlmProvider"/> from the persisted
+    /// settings (Webnori/OpenAI/LMStudio/Ollama). Returns null when
+    /// <c>External.Provider</c> is unrecognised — caller should surface that
+    /// to the user.
+    /// </summary>
+    public ILlmProvider? CreateExternalProvider()
+    {
+        return External.Provider switch
+        {
+            ExternalProviderNames.Webnori => LlmProviderFactory.CreateWebnori(),
+            ExternalProviderNames.OpenAI => LlmProviderFactory.CreateOpenAI(External.OpenAIApiKey, External.OpenAIBaseUrl),
+            ExternalProviderNames.LMStudio => LlmProviderFactory.CreateLmStudio(External.LMStudioBaseUrl, External.LMStudioApiKey),
+            ExternalProviderNames.Ollama => LlmProviderFactory.CreateOllama(External.OllamaBaseUrl),
+            _ => null,
+        };
+    }
+
+    /// <summary>Resolves the model id to send to the active external provider.</summary>
+    public string ResolveExternalModel()
+    {
+        if (!string.IsNullOrEmpty(External.SelectedModel))
+            return External.SelectedModel;
+        return External.Provider == ExternalProviderNames.Webnori
+            ? WebnoriDefaults.DefaultModel
+            : "";
+    }
 
     public LocalLlmOptions ToOptions(string modelPath) => new()
     {

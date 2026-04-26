@@ -1019,41 +1019,58 @@ public partial class AgentBotWindow : Window
             return;
         }
 
-        // Lazy-load on first AIMODE use (same as before). The actor cannot
-        // self-load — LlmService is a process-wide singleton owned by the UI.
-        if (LlmService.Llm is null)
+        // Backend-aware readiness gate.
+        //   Local: lazy-load the GGUF if it's on disk (one-time per process);
+        //   External: REST has no "load" — just verify settings + model id.
+        var savedSettings = LlmSettingsStore.Load();
+        if (savedSettings.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
         {
-            var savedSettings = LlmSettingsStore.Load();
-            var savedEntry = LlmModelCatalog.FindById(savedSettings.ModelId);
-            var savedModelPath = LlmModelLocator.ResolveExistingOrTarget(savedEntry);
-
-            if (!File.Exists(savedModelPath))
+            if (LlmService.Llm is null)
             {
-                AddSystemMessage($"AI mode needs a loaded LLM, and the saved model ({savedEntry.DisplayName}) is not on disk. Open Settings → AI Mode, download / pick a model, then click Load.");
-                return;
+                var savedEntry = LlmModelCatalog.FindById(savedSettings.ModelId);
+                var savedModelPath = LlmModelLocator.ResolveExistingOrTarget(savedEntry);
+
+                if (!File.Exists(savedModelPath))
+                {
+                    AddSystemMessage($"AI mode needs a loaded LLM, and the saved model ({savedEntry.DisplayName}) is not on disk. Open Settings → LLM, download / pick a model, then click Load.");
+                    return;
+                }
+
+                AddSystemMessage($"⌛ Loading {savedEntry.DisplayName}  ·  backend={savedSettings.Backend}  ·  one-time per process");
+                var loadSw = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    await LlmService.LoadAsync(savedSettings, savedModelPath);
+                    loadSw.Stop();
+                    AddSystemMessage($"✓ Loaded {savedEntry.DisplayName}  ·  {loadSw.ElapsedMilliseconds}ms  ·  ready");
+                    AppLogger.Log($"[AIMODE] lazy-loaded model id={savedSettings.ModelId} backend={savedSettings.Backend} elapsed={loadSw.ElapsedMilliseconds}ms");
+                }
+                catch (Exception ex)
+                {
+                    AddSystemMessage($"✗ Load failed: {ex.Message}. Open Settings → LLM for diagnostics.");
+                    AppLogger.LogError("[AIMODE] lazy load failed", ex);
+                    return;
+                }
             }
 
-            AddSystemMessage($"⌛ Loading {savedEntry.DisplayName}  ·  backend={savedSettings.Backend}  ·  one-time per process");
-            var loadSw = System.Diagnostics.Stopwatch.StartNew();
-            try
+            if (LlmService.Llm is null)
             {
-                await LlmService.LoadAsync(savedSettings, savedModelPath);
-                loadSw.Stop();
-                AddSystemMessage($"✓ Loaded {savedEntry.DisplayName}  ·  {loadSw.ElapsedMilliseconds}ms  ·  ready");
-                AppLogger.Log($"[AIMODE] lazy-loaded model id={savedSettings.ModelId} backend={savedSettings.Backend} elapsed={loadSw.ElapsedMilliseconds}ms");
-            }
-            catch (Exception ex)
-            {
-                AddSystemMessage($"✗ Load failed: {ex.Message}. Open Settings → AI Mode for diagnostics.");
-                AppLogger.LogError("[AIMODE] lazy load failed", ex);
+                AddSystemMessage("AI mode requires a loaded LLM. Open Settings → LLM and click Load.");
                 return;
             }
         }
-
-        if (LlmService.Llm is null)
+        else
         {
-            AddSystemMessage("AI mode requires a loaded LLM. Open Settings → AI Mode and click Load.");
-            return;
+            // External: validate provider+model are configured before kicking
+            // the reactor. The reactor itself returns a typed failure if the
+            // factory still returns null, but failing fast here gives a better
+            // user message.
+            if (savedSettings.CreateExternalProvider() is null
+                || string.IsNullOrEmpty(savedSettings.ResolveExternalModel()))
+            {
+                AddSystemMessage($"AI mode (External / {savedSettings.External.Provider}) is not configured. Open Settings → LLM → External and pick a provider, model, and (for OpenAI) API key.");
+                return;
+            }
         }
         if (_getGroups is null)
         {
@@ -1068,23 +1085,40 @@ public partial class AgentBotWindow : Window
 
         EnsureReactorWiring();
 
-        var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
-        _aiActiveChatFamily = entry.ChatFamily;
-
-        // Vulkan + Llama-3.1 + GBNF heads-up (same as before, in case the user
-        // hasn't seen it this session). Bot also gets the Vulkan-temp clamp
-        // notice via the reactor's first ReactorProgress if it kicked in.
-        if (entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
-            && LlmService.CurrentSettings.Backend == Agent.Common.Llm.LocalLlmBackend.Vulkan)
+        string displayName;
+        if (savedSettings.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
         {
-            AddSystemMessage("ℹ️ Note: Nemotron + Vulkan + GBNF is unstable on the current llama.cpp build. If the loop stalls or returns malformed JSON, switch backend to Cpu in Settings → AI Mode and reload.");
+            var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
+            _aiActiveChatFamily = entry.ChatFamily;
+            displayName = entry.DisplayName;
+
+            if (entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+                && LlmService.CurrentSettings.Backend == Agent.Common.Llm.LocalLlmBackend.Vulkan)
+            {
+                AddSystemMessage("ℹ️ Note: Nemotron + Vulkan + GBNF is unstable on the current llama.cpp build. If the loop stalls or returns malformed JSON, switch backend to Cpu in Settings → LLM and reload.");
+            }
+            AppLogger.Log($"[AIMODE] StartReactor sent (backend=Local, model={entry.Id}, family={entry.ChatFamily})");
+        }
+        else
+        {
+            _aiActiveChatFamily = "external";
+            var modelId = savedSettings.ResolveExternalModel();
+            displayName = $"{savedSettings.External.Provider} · {modelId}";
+
+            // Heads-up: the AIMODE toolchain is Gemma-4-shaped. Non-Gemma
+            // external models won't emit the JSON envelopes the reactor expects;
+            // user gets fail-fast messages from ExternalAgentToolLoop.
+            if (!modelId.Contains("gemma", StringComparison.OrdinalIgnoreCase))
+            {
+                AddSystemMessage($"⚠️ AIMODE toolchain is standardised on Gemma 4. Model '{modelId}' is non-Gemma — expect malformed JSON envelopes. Switch to Webnori / google/gemma-4-e4b for reliable AIMODE.");
+            }
+            AppLogger.Log($"[AIMODE] StartReactor sent (backend=External, provider={savedSettings.External.Provider}, model={modelId})");
         }
 
-        SetAiGenerationStatus($"💭 thinking…  ·  {entry.DisplayName}");
+        SetAiGenerationStatus($"💭 thinking…  ·  {displayName}");
         _aiSendStopwatch = System.Diagnostics.Stopwatch.StartNew();
         _aiSendInFlight = true;
 
-        AppLogger.Log($"[AIMODE] StartReactor sent (model={entry.Id}, family={entry.ChatFamily})");
         _botActorRef.Tell(new Agent.Common.Actors.StartReactor(userRequest));
     }
 
@@ -1108,35 +1142,61 @@ public partial class AgentBotWindow : Window
         var getGroups = _getGroups;
         _botActorRef.Tell(new Agent.Common.Actors.ReactorBindings(
             HostFactory: () => new WorkspaceTerminalToolHost(getGroups),
-            TemplateFactory: () =>
-            {
-                var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
-                return entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
-                    ? Agent.Common.Llm.Tools.ChatTemplates.Llama31
-                    : Agent.Common.Llm.Tools.ChatTemplates.Gemma;
-            },
             OptionsFactory: () =>
             {
-                var s = LlmService.CurrentSettings;
-                var entry = LlmModelCatalog.FindById(s.ModelId);
-                var isLlama31 = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase);
-                var isVulkan = s.Backend == Agent.Common.Llm.LocalLlmBackend.Vulkan;
-                var effectiveTemp = (isLlama31 && isVulkan) ? 0.0f : s.Temperature;
-                // AIMODE per-turn cap is now its OWN setting (panel "AIMODE
-                // MaxTok"), distinct from "Chat MaxTok" (TestBot). The two
-                // had wildly different needs: TestBot ships a single
-                // free-form answer, AIMODE ships a tool envelope per turn.
-                // We still apply a small safety floor (256) because the
-                // smallest valid `done` envelope already needs ~80 tokens.
-                var perTurnCap = Math.Max(256, s.AgentToolLoopMaxTokens);
-                AppLogger.Log($"[AIMODE] options: maxTokens={perTurnCap} (panel.AgentLoop={s.AgentToolLoopMaxTokens}), temp={effectiveTemp:0.00} (panel={s.Temperature:0.00}), backend={s.Backend}, family={entry.ChatFamily}");
-                return new Agent.Common.Llm.Tools.AgentToolLoopOptions
+                // Options are read from whichever backend is the source of
+                // truth right now: Local pulls from LlmService.CurrentSettings
+                // (which mirrors the loaded model's runtime), External pulls
+                // from the persisted JSON because there's no "loaded" config.
+                var settings = Agent.Common.Llm.LlmSettingsStore.Load();
+                if (settings.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
                 {
-                    MaxTokensPerTurn = perTurnCap,
-                    Temperature = effectiveTemp,
-                };
+                    var s = LlmService.CurrentSettings;
+                    var entry = LlmModelCatalog.FindById(s.ModelId);
+                    var isLlama31 = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase);
+                    var isVulkan = s.Backend == Agent.Common.Llm.LocalLlmBackend.Vulkan;
+                    var effectiveTemp = (isLlama31 && isVulkan) ? 0.0f : s.Temperature;
+                    var perTurnCap = Math.Max(256, s.AgentToolLoopMaxTokens);
+                    AppLogger.Log($"[AIMODE] options: backend=Local maxTokens={perTurnCap} temp={effectiveTemp:0.00} family={entry.ChatFamily}");
+                    return new Agent.Common.Llm.Tools.AgentToolLoopOptions
+                    {
+                        MaxTokensPerTurn = perTurnCap,
+                        Temperature = effectiveTemp,
+                    };
+                }
+                else
+                {
+                    var perTurnCap = Math.Max(256, settings.External.MaxTokens);
+                    var effectiveTemp = settings.Temperature;
+                    AppLogger.Log($"[AIMODE] options: backend=External provider={settings.External.Provider} model={settings.ResolveExternalModel()} maxTokens={perTurnCap} temp={effectiveTemp:0.00}");
+                    return new Agent.Common.Llm.Tools.AgentToolLoopOptions
+                    {
+                        MaxTokensPerTurn = perTurnCap,
+                        Temperature = effectiveTemp,
+                    };
+                }
             },
-            LlmAccessor: () => LlmService.Llm as Agent.Common.Llm.LlamaSharpLocalLlm));
+            ToolLoopFactory: (opts, host) =>
+            {
+                var settings = Agent.Common.Llm.LlmSettingsStore.Load();
+                if (settings.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
+                {
+                    var llm = LlmService.Llm as Agent.Common.Llm.LlamaSharpLocalLlm;
+                    if (llm is null) return null;
+                    var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
+                    var template = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+                        ? Agent.Common.Llm.Tools.ChatTemplates.Llama31
+                        : Agent.Common.Llm.Tools.ChatTemplates.Gemma;
+                    return new Agent.Common.Llm.Tools.AgentToolLoop(llm, host, opts, template);
+                }
+                else
+                {
+                    var provider = settings.CreateExternalProvider();
+                    var model = settings.ResolveExternalModel();
+                    if (provider is null || string.IsNullOrEmpty(model)) return null;
+                    return new Agent.Common.Llm.Tools.ExternalAgentToolLoop(provider, model, host, opts);
+                }
+            }));
 
         _aiReactorRegistered = true;
         AppLogger.Log("[AIMODE] Reactor wiring registered");
@@ -1155,11 +1215,14 @@ public partial class AgentBotWindow : Window
 
             case Agent.Common.Actors.ReactorPhase.Generating:
                 {
-                    var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
+                    var saved = LlmSettingsStore.Load();
+                    var displayName = saved.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local
+                        ? LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId).DisplayName
+                        : $"{saved.External.Provider} · {saved.ResolveExternalModel()}";
                     SetAiGenerationStatus(
                         p.Tokens == 0
-                            ? $"💭 generating…  ·  {entry.DisplayName}"
-                            : $"💭 generating…  ·  {entry.DisplayName}  ·  {p.Tokens} tok");
+                            ? $"💭 generating…  ·  {displayName}"
+                            : $"💭 generating…  ·  {displayName}  ·  {p.Tokens} tok");
                 }
                 break;
 
@@ -2121,12 +2184,19 @@ public partial class AgentBotWindow : Window
     /// </summary>
     private static bool IsAiModeAvailable()
     {
-        if (LlmService.Llm is not null) return true;
         try
         {
             var saved = LlmSettingsStore.Load();
-            var entry = LlmModelCatalog.FindById(saved.ModelId);
-            return File.Exists(LlmModelLocator.ResolveExistingOrTarget(entry));
+            if (saved.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
+            {
+                if (LlmService.Llm is not null) return true;
+                var entry = LlmModelCatalog.FindById(saved.ModelId);
+                return File.Exists(LlmModelLocator.ResolveExistingOrTarget(entry));
+            }
+            // External: a configured provider + model id is enough — no
+            // local artefacts on disk to check.
+            return saved.CreateExternalProvider() is not null
+                && !string.IsNullOrEmpty(saved.ResolveExternalModel());
         }
         catch
         {

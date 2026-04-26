@@ -431,6 +431,8 @@ src/MemorizerProxy/.env
 *_out.txt
 *.stackdump
 .claude/settings.local.json
+.claude/skills/psmon-doc-writer/
+tmp/
 /Docs/claude-logs
 
 # Signing certificates (local only)

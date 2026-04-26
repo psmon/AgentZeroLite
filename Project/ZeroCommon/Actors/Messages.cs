@@ -209,14 +209,22 @@ public sealed record ResetReactorSession;
 
 /// <summary>
 /// Reactor 자식 생성에 필요한 호스트 의존성. UI가 첫 SetReactorCallbacks
-/// 시점에 함께 전달 — 액터는 IAgentToolHost를 직접 참조하지 않고
-/// 호출 시점의 LLM(LlmService.Llm)과 결합한다.
+/// 시점에 함께 전달.
+///
+/// <para><b>Backend-agnostic</b>: <see cref="ToolLoopFactory"/>는 활성 백엔드
+/// (Local: LLamaSharp+GBNF / External: REST)를 보고 적절한 <see cref="Agent.Common.Llm.Tools.IAgentToolLoop"/>
+/// 구현을 만들어 돌려준다. 액터는 어느 쪽인지 알 필요 없이 인터페이스만 호출.</para>
+///
+/// <para>팩토리는 (a) 액터가 OnTurnCompleted/OnGenerationProgress 콜백을
+/// 주입한 옵션과 (b) 액터가 만든 호스트 인스턴스를 인자로 받아, 둘 다
+/// 결합한 루프를 반환한다. 백엔드가 준비 안됐으면 (Local 미로드, External
+/// 키 미설정 등) null 반환 — 액터는 실패 메시지를 부모에게 푸시하고 종료.</para>
 /// </summary>
 public sealed record ReactorBindings(
     Func<Agent.Common.Llm.Tools.IAgentToolHost> HostFactory,
-    Func<Agent.Common.Llm.Tools.ChatTemplate> TemplateFactory,
     Func<Agent.Common.Llm.Tools.AgentToolLoopOptions> OptionsFactory,
-    Func<Agent.Common.Llm.LlamaSharpLocalLlm?> LlmAccessor);
+    Func<Agent.Common.Llm.Tools.AgentToolLoopOptions, Agent.Common.Llm.Tools.IAgentToolHost,
+         Agent.Common.Llm.Tools.IAgentToolLoop?> ToolLoopFactory);
 
 // ─── Peer-signal protocol (terminal → bot push, primary path) ───
 //

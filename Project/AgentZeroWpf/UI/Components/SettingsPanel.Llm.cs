@@ -61,6 +61,9 @@ public partial class SettingsPanel
         var settings = LlmSettingsStore.Load();
         ApplySettingsToUi(settings);
 
+        // External sub-tab + active-backend toggle
+        InitializeExternalTab();
+
         // Model path + download state
         RefreshLlmModelStatus();
 
@@ -487,9 +490,13 @@ public partial class SettingsPanel
         btnLlmLoad.IsEnabled = s == LlmServiceState.Unloaded;
         btnLlmUnload.IsEnabled = loaded;
         btnLlmSaveOptions.IsEnabled = s is LlmServiceState.Unloaded or LlmServiceState.Loaded;
-        btnLlmNewSession.IsEnabled = loaded;
-        btnLlmChatSend.IsEnabled = loaded && _llmChatCts is null;
-        tbLlmChatInput.IsEnabled = loaded;
+
+        // TestBot's Send/Input are gated by *whichever backend is active* now,
+        // not just LlmService state — External works without LlmService.Loaded.
+        var chatReady = LlmGateway.IsActiveAvailable();
+        btnLlmNewSession.IsEnabled = chatReady;
+        btnLlmChatSend.IsEnabled = chatReady && _llmChatCts is null;
+        tbLlmChatInput.IsEnabled = chatReady;
         cbLlmBackend.IsEnabled = s == LlmServiceState.Unloaded;
 
         // Session creation is intentionally NOT auto-triggered here.
@@ -506,15 +513,16 @@ public partial class SettingsPanel
     private async Task<bool> EnsureSessionAsync()
     {
         if (_llmSession is not null) return true;
-        if (LlmService.State != LlmServiceState.Loaded) return false;
+        if (!LlmGateway.IsActiveAvailable()) return false;
 
-        AppLogger.Log("[LLM] Opening chat session (creating LLamaContext)");
+        AppLogger.Log("[LLM] Opening chat session via LlmGateway");
         try
         {
-            // Session creation (KV-cache alloc) can be expensive on GPU — run
-            // off the UI thread so Vulkan allocations don't run inline with
-            // dispatcher work.
-            _llmSession = await Task.Run(LlmService.OpenSession);
+            // Session creation (KV-cache alloc for Local) can be expensive on
+            // GPU — run off the UI thread so Vulkan allocations don't race
+            // with dispatcher work. External just spins up an HttpClient and
+            // is essentially instant; the Task.Run pays a negligible cost.
+            _llmSession = await Task.Run(LlmGateway.OpenSession);
             tbLlmChatHistory.Text = "";
             tbLlmTurnCount.Text = "turns: 0";
             AppLogger.Log("[LLM] Chat session opened");
@@ -564,14 +572,24 @@ public partial class SettingsPanel
         tbLlmChatInput.IsEnabled = false;
         btnLlmChatSend.IsEnabled = false;
 
-        // Label the assistant turn with whatever model is currently loaded —
-        // the chat session was opened with the matching ChatTemplate, so the
-        // label should reflect the actual responder (Gemma vs Nemotron etc.).
-        var modelLabel = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId).ChatFamily switch
+        // Label the assistant turn with whatever backend is currently active.
+        // Local: name from the loaded model's catalog entry. External: short
+        // provider tag — the actual responder is whatever model the provider
+        // serves (Webnori/Gemma in the default case).
+        var savedSettings = LlmSettingsStore.Load();
+        string modelLabel;
+        if (savedSettings.ActiveBackend == LlmActiveBackend.Local)
         {
-            "llama31" => "Nemotron",
-            _ => "Gemma"
-        };
+            modelLabel = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId).ChatFamily switch
+            {
+                "llama31" => "Nemotron",
+                _ => "Gemma"
+            };
+        }
+        else
+        {
+            modelLabel = savedSettings.External.Provider;
+        }
         tbLlmChatHistory.AppendText((tbLlmChatHistory.Text.Length == 0 ? "" : "\n") + $"▸ You: {userMsg}\n◂ {modelLabel}: ");
         svLlmChat.ScrollToEnd();
 
@@ -601,8 +619,9 @@ public partial class SettingsPanel
             tbLlmTps.Text = $"{_llmLastTps:0.0} t/s";
             _llmChatCts?.Dispose();
             _llmChatCts = null;
-            tbLlmChatInput.IsEnabled = LlmService.State == LlmServiceState.Loaded;
-            btnLlmChatSend.IsEnabled = LlmService.State == LlmServiceState.Loaded;
+            var ready = LlmGateway.IsActiveAvailable();
+            tbLlmChatInput.IsEnabled = ready;
+            btnLlmChatSend.IsEnabled = ready;
             tbLlmChatInput.Focus();
         }
     }

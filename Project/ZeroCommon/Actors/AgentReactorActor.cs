@@ -29,7 +29,7 @@ public sealed class AgentReactorActor : ReceiveActor
     private readonly ILoggingAdapter _log = Context.GetLogger();
     private readonly ReactorBindings _bindings;
 
-    private AgentToolLoop? _loop;
+    private IAgentToolLoop? _loop;
     private CancellationTokenSource? _cts;
     private int _round;
     private long _runStartedAtTicks;
@@ -58,38 +58,36 @@ public sealed class AgentReactorActor : ReceiveActor
                 _cts = new CancellationTokenSource();
 
                 // Lazy-create the loop on first turn or after ResetReactorSession.
-                // The loop holds a fresh LLamaContext + InteractiveExecutor and
-                // outlives one StartReactor — re-used across follow-up sends so
-                // KV cache + system prompt stay primed.
+                // The loop is reused across follow-up sends — Local backend
+                // keeps KV cache + system prompt primed; External backend keeps
+                // the messages[] history primed (same effect, different impl).
                 if (_loop is null)
                 {
-                    var llm = _bindings.LlmAccessor();
-                    if (llm is null)
-                    {
-                        TellParent(new ReactorResult(
-                            Success: false,
-                            FinalMessage: "AI Mode requires a loaded LLM (LlamaSharpLocalLlm). Open Settings → AI Mode and click Load.",
-                            TurnCount: 0,
-                            ElapsedMs: 0,
-                            FailureReason: "LLM not loaded"));
-                        return;
-                    }
-
                     var host = _bindings.HostFactory();
-                    var template = _bindings.TemplateFactory();
                     var baseOpts = _bindings.OptionsFactory();
-                    // We override the loop's two streaming callbacks so we can
-                    // pump them through Self.Tell — that keeps every state
-                    // mutation single-threaded under the actor's mailbox even
-                    // though the loop's task runs on the thread pool.
+                    // Inject actor-mailbox callbacks so the loop's thread-pool
+                    // task can post progress events back through Self.Tell —
+                    // every state mutation stays single-threaded.
                     var wired = baseOpts with
                     {
                         OnTurnCompleted = turn => Self.Tell(new TurnCompletedInternal(turn)),
                         OnGenerationProgress = (phase, tokens) =>
                             Self.Tell(new GenerationProgressInternal(phase, tokens)),
                     };
-                    _loop = new AgentToolLoop(llm, host, wired, template);
-                    _log.Info("[Reactor] Loop created (template={0})", template.FamilyId);
+
+                    var loop = _bindings.ToolLoopFactory(wired, host);
+                    if (loop is null)
+                    {
+                        TellParent(new ReactorResult(
+                            Success: false,
+                            FinalMessage: "AI Mode backend not ready. Open Settings → LLM and configure (Local: Load model, External: pick provider/model/key).",
+                            TurnCount: 0,
+                            ElapsedMs: 0,
+                            FailureReason: "Backend not ready"));
+                        return;
+                    }
+                    _loop = loop;
+                    _log.Info("[Reactor] Loop created (impl={0})", loop.GetType().Name);
                 }
 
                 TellParent(new ReactorProgress(ReactorPhase.Thinking,
