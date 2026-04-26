@@ -535,3 +535,5 @@ whole product.
 ---
 
 🚧 **In preparation** · <https://blumn.ai/>
+
+<sub>design coaching: bk-mon · dev: psmon</sub>

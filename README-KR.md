@@ -511,3 +511,5 @@ EF Core가 자동 마이그레이션).
 ---
 
 🚧 **준비 중** · <https://blumn.ai/>
+
+<sub>디자인 코칭: bk-mon · 개발: psmon</sub>
