@@ -32,26 +32,86 @@
 - 적용: `Project/ZeroCommon/Llm/Tools/AgentToolLoop.cs`, `ExternalAgentToolLoop.cs`, `Project/ZeroCommon/Actors/AgentReactorActor.cs`
 
 **이식 항목**:
+> **2026-04-27 정밀 분석 갱신**: 오리진 가드 11개를 모두 이식하지 않고 **3종 세트만** 발췌. 액터 5상태 머신·적응형 대기·`CompletionSignal`은 Lite의 `Task.await` 시간 모델과 충돌하므로 **거부**. 분석: [`harness/logs/tamer/2026-04-27-15-00-react-actor-guard-analysis.md`](../../harness/logs/tamer/2026-04-27-15-00-react-actor-guard-analysis.md)
+
+### 이식 대상 (3종 세트만)
+
 ```csharp
-// 다음 상수와 검사 로직만 발췌하여 Lite의 tool loop에 추가
-public const int DefaultMaxRounds       = 10;
-public const int MaxSameCallRepeats     = 3;   // 동일 함수+인자 반복 차단
-public const int MaxConsecutiveBlocks   = 3;   // 같은 도구 연속 차단
-public const int MaxLlmRetries          = 1;   // transient 에러 재시도
-public const int MaxCallsPerRound       = 30;
-public const int MaxAiWaitSeconds       = 25;  // 비동기 도구 적응형 cap
-public const int MaxAsyncTimeoutRetries = 1;
+// Project/ZeroCommon/Llm/Tools/AgentToolLoopOptions.cs 에 추가
+public sealed record AgentToolLoopOptions
+{
+    public int MaxIterations { get; init; } = 12;          // 기존
+    public int MaxSameCallRepeats { get; init; } = 3;      // ★ 신규
+    public int MaxConsecutiveBlocks { get; init; } = 3;    // ★ 신규
+    public int MaxLlmRetries { get; init; } = 1;           // ★ 신규 (External만 의미)
+}
 ```
 
-**수행 절차**:
-1. `AgentToolLoop`에 위 상수와 `(functionName, argumentsHash)` 쌍 카운터 도입
-2. 같은 호출이 `MaxSameCallRepeats`회 이상 → 강제 종료, "loop detected" 반환
-3. 라운드 cap 초과 시 명시적 에러 메시지로 LLM에 반환 (조용한 실패 금지)
-4. `ZeroCommon.Tests`에 가드 단위 테스트 추가 (mock LLM이 같은 호출 반복)
+### 거부 항목 (이식하지 말 것)
 
-**Trade-off**: 없음. 안정성 향상.
+| 오리진 가드 | 거부 사유 |
+|---|---|
+| `MaxAiWaitSeconds` / `MinAiWaitSeconds` / `AdaptiveReductionSeconds` / `TimeoutGraceSeconds` | Lite는 LLM이 자발적으로 `wait(seconds=N)` 도구를 호출하는 패턴. 적응형 대기 도입하려면 ITerminalSession 시맨틱 변경 필요 → 별개 설계 |
+| `AsyncAiTools` / `AsyncShellTools` 분류 HashSet | Lite의 모든 도구가 `Task<string>` 반환 — 분류 무의미 |
+| `MaxCallsPerRound = 30` | Lite의 for-loop가 라운드당 1도구 강제 — 의미 자체가 다름 |
+| 5상태 머신 (`Idle/Thinking/Acting/Waiting/Complete/Error`) | Lite의 thin actor + for-loop는 더 깨끗. 통째 이식은 architectural backslide |
+| `CompletionSignal` / `TerminalDoneSignal` | Lite는 Task await로 충분 — 외부 메시지 도입은 의존성만 늘림 |
+| 오리진 transient 분류 (문자열 contains) | 깨지기 쉬움. 이식 시 **개선**해서 — `HttpRequestException.StatusCode`로 분류 권장 |
+| 즉시 재시도 (backoff 없음) | 오리진 약점. Lite 이식 시 exponential backoff(1s→3s) **추가** |
 
-**채택 사유**: Lite의 tool loop은 LLM의 stop 토큰에 안정성을 위임. 잘못 학습된 모델/프롬프트가 무한 호출 시 보호 없음. Origin 가드는 실전 이슈에서 도출된 값.
+### 수행 절차
+
+1. **`AgentToolLoopOptions`** 에 필드 3개 추가 (위 코드)
+2. **`AgentToolLoop.cs`** for 루프 라인 113 직후 (KnownTools 검증 다음)에 가드 삽입:
+   ```csharp
+   var callKey = $"{call.Tool}:{NormalizeArgsJson(call.Args)}"; // ⚠️ JSON 정규화 필수
+   _callCounts.TryGetValue(callKey, out var count);
+   _callCounts[callKey] = count + 1;
+   if (count + 1 > _opts.MaxSameCallRepeats)
+   {
+       turns.Add(new ToolTurn(call, $"Error: tool '{call.Tool}' with these exact args " +
+           $"was already called {count + 1} times. Try a different approach."));
+       _consecutiveBlockedCalls++;
+       if (_consecutiveBlockedCalls >= _opts.MaxConsecutiveBlocks)
+       { failure = $"aborted after {_consecutiveBlockedCalls} consecutive blocked repeats"; break; }
+       continue;  // 2단 방어: LLM 자가교정 기회
+   }
+   _consecutiveBlockedCalls = 0;
+   ```
+3. **`ExternalAgentToolLoop.cs`** 동일 위치에 동일 가드 + catch 블록(라인 76-85)에 transient 재시도 (HTTP 5xx/timeout, **backoff 추가**):
+   ```csharp
+   catch (Exception ex) when (ex is not OperationCanceledException) {
+       if (IsTransientHttpError(ex) && _llmRetryCount < _opts.MaxLlmRetries) {
+           _llmRetryCount++;
+           await Task.Delay(TimeSpan.FromSeconds(_llmRetryCount * 2), ct);  // 1s, 3s
+           continue;
+       }
+       failure = $"provider call failed at iteration {iter}: {ex.Message}"; break;
+   }
+   ```
+4. **JSON 인자 정규화 헬퍼** (`NormalizeArgsJson`) — `JsonSerializer.Deserialize<JsonElement>` → `Serialize` 라운드트립으로 인자 순서/공백 통일 (오리진 약점 보강)
+5. **`ZeroCommon.Tests`에 단위 테스트 2개**:
+   - `MockAgentToolHost`로 같은 도구 강제 반복 → `FailureReason`에 `"blocked"` 포함 검증
+   - `MaxConsecutiveBlocks` 도달 → `TerminatedCleanly=false` + 도구 호출 횟수 = `MaxSameCallRepeats + 1` 검증
+
+### 정량 평가
+
+| 항목 | 값 |
+|---|---|
+| 추가 LOC | ~120 (Options +6, AgentToolLoop +30, ExternalAgentToolLoop +30, helper +20, tests +50) |
+| 영향 파일 | 4개 (Options, 두 loop, 테스트) |
+| 위험도 | 낮음 — failure 경로만 추가, 정상 경로 무영향, 백워드 호환 100% |
+| 작업 시간 | 2~3일 |
+
+### Trade-off (정밀 분석 결과 추가)
+
+- **False positive 위험**: 정상적으로 같은 도구를 여러 라운드 호출해야 하는 시나리오(예: 5개 터미널 순회 list_terminals)에서 막힐 수 있음. JSON 인자 정규화로 완화 — 인자가 다르면 다른 키로 카운트.
+- **세션 단위 카운터 누적** (오리진 동일): 라운드별 reset 안 함. 긴 세션 후반 false positive 가능. 운영 후 **라운드별 reset 옵션 검토** 가치.
+- **튜닝 비용**: `MaxSameCallRepeats=3`이 Lite 도구 카탈로그에도 최적인지는 운영 1~2주 모니터링 필요.
+
+### 채택 사유
+
+Lite의 tool loop은 현재 `MaxIterations=12` 안에서 같은 도구 12회 반복이 자유롭다. GBNF가 JSON 구조는 강제하지만 의미적 반복은 못 막는다. 오리진의 *2단 방어*(LLM에 피드백 → 그래도 안 되면 차단) 패턴은 모델이 *왜 막혔는지 알고* 다른 시도를 하게 만들어 단순 break보다 똑똑함.
 
 ---
 

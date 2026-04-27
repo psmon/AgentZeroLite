@@ -46,20 +46,44 @@
 ```
 
 **특징** (`/d/Code/AI/AgentWin/Project/ZeroCommon/Actors/ReActActor.cs`):
-- 5단계 명시적 상태 머신 (`Become()`)
-- 안정성 가드 다수:
-  - `DefaultMaxRounds = 10`
-  - `MaxSameCallRepeats = 3` — 동일 함수+인자 반복 차단
-  - `MaxConsecutiveBlocks = 3` — 같은 도구 연속 차단
-  - `MaxLlmRetries = 1` — transient LLM 에러 재시도
-  - `MaxCallsPerRound = 30` — 라운드당 호출 cap
-  - `MaxAiWaitSeconds = 25` — 비동기 도구 적응형 대기
-  - `MaxAsyncTimeoutRetries = 1`
-- 비동기 도구는 `CompletionSignal` 메시지로 외부에서 완료 신호 주입 가능
-- 동기 도구와 비동기 도구를 명시적으로 분리:
-  - **AsyncAiTools** (적응형 대기): `term_send`, `stage_send`, `meeting_say`
+- 5단계 명시적 상태 머신 (`Become()`) + Error 조기종료 경로
+- 가드 상수 **11개** 전수 (정의 라인 28-39):
+
+| # | 상수 | 값 | 위반 시 동작 |
+|---|---|---:|---|
+| 1 | `DefaultMaxRounds` | 10 | 즉시 종료 (Error) |
+| 2 | `MaxSameCallRepeats` | 3 | LLM에 *"This exact call ..."* 에러 toolResult 피드백 + `_consecutiveBlockedCalls++` (액터 안 죽음) |
+| 3 | `MaxConsecutiveBlocks` | 3 | 즉시 종료 — 위 피드백이 N회 무시되면 차단 (2단 방어) |
+| 4 | `MaxLlmRetries` | 1 | transient (502/503/504/timeout/connection reset 문자열 contains) → 재시도, 그 외 즉시 종료. **backoff 없음** (오리진 약점) |
+| 5 | `MaxCallsPerRound` | 30 | 라운드당 도구 호출 cap |
+| 6 | `MaxAiWaitSeconds` | 25 | AsyncAiTools 초기 대기 (시작값) |
+| 7 | `MinAiWaitSeconds` | 5 | 적응형 대기의 **하한** |
+| 8 | `AdaptiveReductionSeconds` | 3 | DONE 도착 시 차감량 |
+| 9 | `ShellWaitSeconds` | 3 | AsyncShellTools(`term_send_key`) **고정** 대기 |
+| 10 | `TimeoutGraceSeconds` | 12 | DONE 미수신 시 1회 추가 대기량 |
+| 11 | `MaxAsyncTimeoutRetries` | 1 | 위 grace 발동 횟수 cap |
+
+- **카운터 키**: `funcName + ":" + argsJson` 그대로 (정규화 없음 — 인자 순서/공백 다르면 다른 키, **가드 우회 가능**한 약점)
+- **카운터 reset**: 세션 시작 시 1회 (라운드별 reset 없음 — 긴 세션에서 누적 false positive 가능)
+- 비동기 도구는 `CompletionSignal` 또는 `TerminalDoneSignal` 메시지로 외부에서 완료 신호 주입
+- 동기/비동기 도구는 코드 내 하드코딩 HashSet으로 분류:
+  - **AsyncAiTools** (적응형 대기 25→5초): `term_send`, `stage_send`, `meeting_say`
   - **AsyncShellTools** (고정 3초): `term_send_key`
-  - **동기**: `term_read`, `window_list`, `window_focus` 등
+  - **동기**: `term_read`, `window_list`, `window_focus` 등 (대기 0초)
+- `stage_send` 라운드당 1회 제한 별도 (메시지 폭주 방지)
+
+**적응형 대기 — 일방향 감소**
+
+```
+시작:    _currentAiWaitSeconds = 25
+DONE 1회: 25 → 22  (-AdaptiveReductionSeconds=3)
+DONE 2회: 22 → 19
+...
+DONE 7회: 8 → 5
+DONE 8회+: 5 (MinAiWaitSeconds 도달, 고정)
+```
+
+증가 신호 없음 — 빠른 응답에 점점 적응만 함. 느려지는 터미널엔 회복 안 되는 *알려진 한계*.
 
 #### Lite: `AgentReactorActor` (단순 루프)
 
@@ -77,10 +101,18 @@
          Done
 ```
 
-**특징** (`/d/Code/AI/AgentZeroLite/Project/ZeroCommon/Actors/AgentReactorActor.cs`):
-- AIMODE의 추론 루프를 하나의 액터로 호스팅
-- `AgentToolLoop` (Gemma 4 GBNF) 또는 `ExternalAgentToolLoop` (REST) 위임
-- `MaxTokens cap` (기본 2048) 외 명시적 가드는 코드 레벨에서 처리
+**특징** (`/d/Code/AI/AgentZeroLite/Project/ZeroCommon/Actors/AgentReactorActor.cs`, `Llm/Tools/AgentToolLoop.cs`, `Llm/Tools/ExternalAgentToolLoop.cs`):
+- 액터는 thin (Idle/Running 2단계만 `Become`). 루프는 `for (iter = 0; iter < MaxIterations; iter++)` (`AgentToolLoop.cs` 라인 74-139)
+- 액터 → `Task.Run` + `PipeTo`로 `RunAsync` 비동기 실행, 콜백을 `Self.Tell`로 메일박스에 푸시
+- **현재 가드 (3개)**:
+  - `MaxIterations = 12` (`AgentToolLoopOptions` 라인 300) — 라운드 cap
+  - `CancellationToken` (사용자 취소)
+  - `KnownTools` 화이트리스트 검증 (라인 109-113) — 알려지지 않은 도구 즉시 break
+- **가드 부재** (오리진 대비 무방비):
+  - 같은 도구 반복 감지 ❌
+  - LLM transient 재시도 ❌ (JSON 파싱 실패 시 즉시 break)
+  - 라운드당 도구 호출 cap (for-loop가 라운드당 1도구 강제하므로 의미 자체가 다름)
+- **시간 모델 자체가 다름**: 비동기 도구는 모두 `Task<string>` 반환, 루프가 직접 `await`. 외부 완료 신호 없음. LLM이 자발적으로 `wait(seconds=N)` 도구를 호출 (시스템 프롬프트에 가이드)
 
 ### 1.3 분기 분석
 
@@ -92,10 +124,12 @@
 | 외부 LLM 호환성 | (Origin은 외부 only) | Local + External 양쪽 지원 | Lite 우위 |
 | 코드 복잡도 | 높음 (~수백 줄 상태 머신) | 낮음 (~수백 줄 루프) | Lite 우위 (유지보수) |
 
-**채택 권고**:
-> **Origin의 ReActActor 가드 패턴을 Lite의 `AgentToolLoop`/`ExternalAgentToolLoop`에 이식.**
-> 액터 자체를 통째 바꾸지 말고, 가드 상수와 *동일 함수 반복 감지 로직*만 발췌.
-> → P0 (안정성 직결)
+**채택 권고** (2026-04-27 정밀 분석 반영):
+> **가드 *3종 세트*만 발췌 이식**: `MaxSameCallRepeats` + `MaxConsecutiveBlocks` + `MaxLlmRetries`(External만, backoff 추가).
+> 액터 5상태 머신·적응형 대기·`CompletionSignal` 외부 메시지·도구 분류 HashSet은 **이식 거부** — Lite의 `Task.await` 시간 모델과 충돌, 통째 이식은 architectural backslide.
+> 카운터 키는 오리진 약점 보강을 위해 **JSON 인자 정규화** 후 비교.
+> 상세 분석 + 패치 스케치: [`harness/logs/tamer/2026-04-27-15-00-react-actor-guard-analysis.md`](../../harness/logs/tamer/2026-04-27-15-00-react-actor-guard-analysis.md)
+> → P0 (안정성 직결, ~120 LOC, 2~3일)
 
 ---
 

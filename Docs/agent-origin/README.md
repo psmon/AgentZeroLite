@@ -57,7 +57,7 @@
 | 우선순위 | 채택 대상 | 사유 | 비용 |
 |:---:|---|---|:---:|
 | **P0** | `AppLogger` 파일 로깅 (디버그/콘솔/IDE 분기) | Lite 로깅은 단순. Origin은 IDE 디버거 감지·콘솔 강제 분기 보유 | S |
-| **P0** | `ReActActor` 5단계 상태 머신 (Idle/Thinking/Acting/Waiting/Complete) + 적응형 대기(`MaxAiWaitSeconds=25`) + `MaxSameCallRepeats=3` 가드 | Lite의 `AgentReactorActor`는 단순 루프. tool-calling 안정성에 직결 | M |
+| **P0** | `ReActActor` 가드 *3종 세트* (`MaxSameCallRepeats=3` + `MaxConsecutiveBlocks=3` + `MaxLlmRetries=1`) | Lite tool-loop은 같은 도구 12회 반복 자유 — 2단 방어(LLM 피드백→차단) 패턴이 무한 호출 보호 | S~M |
 | **P1** | `Whisper.net` STT + `NAudio` VAD (선택적 Speech 모듈) | 로컬 음성 입력은 Lite 스코프 결정 필요 | M |
 | **P1** | `IVirtualDesktopService` (Windows Virtual Desktop API COM 래핑) | 멀티 데스크톱 워크스페이스에 직결 | S |
 | **P1** | CLI 자동화 표면 (`capture`, `text-capture`, `scroll-capture`, `mouseclick`, `keypress`, `screenshot`, `element-tree`) | Lite는 IPC/터미널만, Origin은 UI Automation 풀세트 | L |
@@ -84,3 +84,7 @@
 
 > 📌 본 문서는 정원지기 카카시(tamer)가 1회성 분석으로 작성한 스냅샷이다.
 > Origin과 Lite는 살아 있는 코드베이스이므로, 6개월 이상 경과 시 재조사 권장.
+>
+> **Snapshot timeline**:
+> - **2026-04-27 (initial)** — 4-doc 비교 세트 초안 작성 (`harness/logs/tamer/2026-04-27-14-04-...md`)
+> - **2026-04-27 (P0-1 deep-dive)** — `02-...#1.2` 가드 11개 + 적응형 일방향 도식 보강, `03-...#P0-1` 3종 세트 발췌 + 거부 항목 명시 (`harness/logs/tamer/2026-04-27-15-00-...md`)
