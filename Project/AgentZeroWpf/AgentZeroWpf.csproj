@@ -34,6 +34,14 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
+
+    <!-- Voice (phase 2) — mic capture + playback (NAudio), offline STT (Whisper.net,
+         CPU only — Cuda runtime intentionally omitted to keep the installer slim;
+         CUDA acceleration arrives in a future phase), Windows SAPI TTS. -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Whisper.net" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
+    <PackageReference Include="System.Speech" Version="10.0.0-preview.3.25171.5" />
   </ItemGroup>
 
   <ItemGroup>

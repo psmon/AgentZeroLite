@@ -20,6 +20,7 @@ public partial class SettingsPanel : UserControl
             RefreshList();
             RefreshPathStatus();
             InitializeLlmTab();
+            InitializeVoiceTab();
         };
     }
 
