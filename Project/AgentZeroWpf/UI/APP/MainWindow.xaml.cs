@@ -1635,13 +1635,30 @@ public partial class MainWindow : Window
 
         terminal.Loaded += (_, _) =>
         {
+            // PTY-FREEZE-DIAG: WPF fires Loaded again whenever the control is
+            // reparented (tab activation, dock layout restore, etc). The
+            // existing `IsTerminalStarted` guard prevents double-RestartTerm,
+            // but the *frequency* of Loaded was previously invisible. If a
+            // freeze coincides with an unexpected re-fire, this log is the
+            // first signal.
+            var ptyHashOnLoad = terminal.ConPTYTerm is null
+                ? 0
+                : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
+            AppLogger.Log($"[CLI] Loaded fired | label={groupName}/{tab.Title} hasConPTY={terminal.ConPTYTerm is not null} ptyHash=0x{ptyHashOnLoad:X8} isStarted={tab.IsTerminalStarted}");
+
             if (terminal.ConPTYTerm is null) return;
 
             if (!tab.IsTerminalStarted)
             {
                 terminal.RestartTerm();
                 tab.IsTerminalStarted = true;
-                AppLogger.Log($"[CLI] RestartTerm(): {cmdLine}");
+                // PTY-FREEZE-DIAG: capture the post-RestartTerm state so we
+                // can correlate the cmdLine with the actual ConPTYTerm object
+                // reference. Two tabs that share a ptyHash here is the strong
+                // smoking gun for cross-tab pipe collision.
+                var ptyHashAfter = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
+                var outLen = terminal.ConPTYTerm.ConsoleOutputLog?.Length ?? -1;
+                AppLogger.Log($"[CLI] RestartTerm(): {cmdLine} | label={groupName}/{tab.Title} ptyHash=0x{ptyHashAfter:X8} outputLog={(outLen >= 0 ? outLen.ToString() : "null")}");
             }
 
             // Create session if missing (covers both first start and reparent/restore)

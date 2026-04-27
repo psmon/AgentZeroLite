@@ -96,23 +96,29 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
     {
         if (_disposed)
         {
-            AppLogger.Log($"[Session] Write rejected: session disposed | id={_internalId} label={_sessionId}");
+            AppLogger.Log($"[Session] Write rejected: session disposed | id={_internalId} label={_sessionId} bytes={text.Length}");
             return;
         }
 
         if (_pty.ConsoleOutputLog is null)
         {
-            AppLogger.Log($"[Session] Write rejected: PTY output log null (dead pipe) | id={_internalId} label={_sessionId}");
+            AppLogger.Log($"[Session] Write rejected: PTY output log null (dead pipe) | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length}");
             return;
         }
 
         try
         {
             _pty.WriteToTerm(text);
+            // PTY-FREEZE-DIAG: success line proves the write reached WriteToTerm.
+            // If a freeze leaves no [Session] write ok line for a tab while the
+            // sibling tab logs them, the failure is upstream of WriteToTerm
+            // (route never reaches this method). If lines exist but the PTY
+            // doesn't echo, the failure is inside WriteToTerm / the pipe.
+            AppLogger.Log($"[Session] write ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length} outLen={_pty.ConsoleOutputLog?.Length ?? -1}");
         }
         catch (Exception ex)
         {
-            AppLogger.Log($"[Session] WriteToTerm failed | id={_internalId} label={_sessionId} error={ex.GetType().Name}: {ex.Message}");
+            AppLogger.Log($"[Session] WriteToTerm failed | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length} error={ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -130,18 +136,58 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
 
     public async Task WriteAsync(ReadOnlyMemory<char> text, CancellationToken ct = default)
     {
-        if (text.Length <= SmallThreshold)
+        // PTY-FREEZE-DIAG: WriteAsync had no rejection paths before, so a
+        // disposed session or dead pipe would either throw inside WriteToTerm
+        // or silently land in the Channel queue with no record. These checks
+        // mirror Write() for symmetry and visibility.
+        if (_disposed)
         {
-            // Small writes go directly — no queuing overhead
-            _pty.WriteToTerm(text.Span);
+            AppLogger.Log($"[Session] WriteAsync rejected: disposed | id={_internalId} label={_sessionId} bytes={text.Length}");
+            return;
+        }
+        if (_pty.ConsoleOutputLog is null)
+        {
+            AppLogger.Log($"[Session] WriteAsync rejected: PTY output log null | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length}");
             return;
         }
 
+        if (text.Length <= SmallThreshold)
+        {
+            // Small writes go directly — no queuing overhead
+            try
+            {
+                _pty.WriteToTerm(text.Span);
+                AppLogger.Log($"[Session] writeAsync small ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Log($"[Session] writeAsync small failed | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length} error={ex.GetType().Name}: {ex.Message}");
+            }
+            return;
+        }
+
+        AppLogger.Log($"[Session] writeAsync queued | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length}");
         await _writeChannel.Writer.WriteAsync(new WriteRequest(text), ct);
     }
 
     public void SendControl(TerminalControl control)
     {
+        // PTY-FREEZE-DIAG: SendControl had no rejection paths or success log
+        // before. send_to_terminal + send_key are the two paths the AIMODE bot
+        // uses, and the bot's freeze symptom was "neither lands". Logging both
+        // outcomes makes it possible to distinguish "Write rejected (rare)"
+        // from "WriteToTerm threw" from "WriteToTerm silently no-oped".
+        if (_disposed)
+        {
+            AppLogger.Log($"[Session] SendControl rejected: disposed | id={_internalId} label={_sessionId} control={control}");
+            return;
+        }
+        if (_pty.ConsoleOutputLog is null)
+        {
+            AppLogger.Log($"[Session] SendControl rejected: PTY output log null | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} control={control}");
+            return;
+        }
+
         ReadOnlySpan<char> seq = control switch
         {
             TerminalControl.Interrupt => "\x03",
@@ -162,8 +208,17 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
             TerminalControl.ClearScreen => "\x1b[2J\x1b[H",
             _ => "",
         };
-        if (seq.Length > 0)
+        if (seq.Length == 0) return;
+
+        try
+        {
             _pty.WriteToTerm(seq);
+            AppLogger.Log($"[Session] control ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} control={control}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Session] control failed | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} control={control} error={ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     // --- Output change detection (bridges PTY log to events) ---
@@ -214,23 +269,55 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
             await foreach (var req in _writeChannel.Reader.ReadAllAsync(ct))
             {
                 var text = req.Text;
+                AppLogger.Log($"[Session] writeLoop start | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} totalBytes={text.Length}");
+                var chunkOk = true;
                 for (var i = 0; i < text.Length; i += ChunkSize)
                 {
                     if (ct.IsCancellationRequested) return;
 
                     var len = Math.Min(ChunkSize, text.Length - i);
-                    _pty.WriteToTerm(text.Span.Slice(i, len));
+                    try
+                    {
+                        _pty.WriteToTerm(text.Span.Slice(i, len));
+                    }
+                    catch (Exception ex)
+                    {
+                        // PTY-FREEZE-DIAG: a chunk failure aborts the rest of
+                        // the queued write — the bot's handshake (1420 bytes)
+                        // would partially land then stop. Logging the exact
+                        // offset narrows down whether the pipe broke mid-write
+                        // or refused the very first chunk.
+                        AppLogger.Log($"[Session] writeLoop chunk failed | id={_internalId} ptyHash=0x{PtyRefHash:X8} offset={i} chunkLen={len} error={ex.GetType().Name}: {ex.Message}");
+                        chunkOk = false;
+                        break;
+                    }
 
                     if (i + len < text.Length)
                         await Task.Delay(ChunkDelayMs, ct);
                 }
 
+                if (!chunkOk) continue;
+
                 // Final delay after large write before sending Enter
                 await Task.Delay(FinalDelayMs, ct);
-                _pty.WriteToTerm("\r".AsSpan());
+                try
+                {
+                    _pty.WriteToTerm("\r".AsSpan());
+                    AppLogger.Log($"[Session] writeLoop end ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} totalBytes={text.Length}");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Log($"[Session] writeLoop final \\r failed | id={_internalId} ptyHash=0x{PtyRefHash:X8} error={ex.GetType().Name}: {ex.Message}");
+                }
             }
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            // PTY-FREEZE-DIAG: catch-all so a write-loop crash doesn't vanish
+            // the entire input channel for the rest of the session lifetime.
+            AppLogger.Log($"[Session] writeLoop exited unexpectedly | id={_internalId} ptyHash=0x{PtyRefHash:X8} error={ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     public void Dispose()

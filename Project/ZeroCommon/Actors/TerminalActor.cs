@@ -42,14 +42,31 @@ public sealed class TerminalActor : ReceiveActor
         Receive<BindSession>(msg =>
         {
             if (ReferenceEquals(_session, msg.Session))
+            {
+                // PTY-FREEZE-DIAG: same-ref rebind is normal (Loaded fires
+                // twice on tab reparenting). Logged for completeness so a
+                // log full of these doesn't look like a missing handoff.
+                _log.Info("BindSession no-op (same ref) | terminal={0} session={1}/{2}",
+                    _terminalId, msg.Session.SessionId, msg.Session.InternalId);
                 return;
+            }
 
+            // PTY-FREEZE-DIAG: when a tab is restarted, a *new* ConPtyTerminalSession
+            // gets bound here while the previous one still exists in MainWindow's
+            // `tab.Session` history. If write traffic is racing in flight when this
+            // swap happens, it can land on either object. The log emits both
+            // identifiers so a freeze trace can match write-side `id=...` lines
+            // against the actor's view of which session is active.
+            var prevSessionId = _session?.SessionId ?? "(none)";
+            var prevInternalId = _session?.InternalId ?? "(none)";
             if (_session is not null)
                 _session.OutputReceived -= OnSessionOutput;
 
             _session = msg.Session;
             _session.OutputReceived += OnSessionOutput;
-            _log.Info("Session bound: {0} (terminal: {1})", _session.SessionId, _terminalId);
+            _log.Info("BindSession swap | terminal={0} prev={1}/{2} new={3}/{4}",
+                _terminalId, prevSessionId, prevInternalId,
+                _session.SessionId, _session.InternalId);
         });
 
         Receive<UnbindSession>(_ =>
