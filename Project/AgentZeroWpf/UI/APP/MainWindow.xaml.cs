@@ -1544,9 +1544,22 @@ public partial class MainWindow : Window
 
     // CLI 메뉴는 DB에서 동적으로 구성됨 (RebuildCliContextMenu)
 
-    private void AddConsoleTab(string title, string exe, string? arguments = null, int cliDefinitionId = 0, bool activate = true)
+    private void AddConsoleTab(string title, string exe, string? arguments = null, int cliDefinitionId = 0, bool activate = true,
+        [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+        [System.Runtime.CompilerServices.CallerLineNumber] int callerLine = 0)
     {
-        if (_activeGroupIndex < 0) return;
+        // PTY-FREEZE-DIAG: track every new-ConsoleTabInfo creation. The
+        // upstream symptom (claudeA accumulating 5 RestartTerm calls
+        // without the user re-adding the shell) means *something* is
+        // re-creating the ConsoleTabInfo behind the user's back. The
+        // caller / line tells us which code path.
+        AppLogger.Log($"[CLI-Init-DIAG] AddConsoleTab CALLED | title=\"{title}\" group={_activeGroupIndex} totalSoFar={_consoleTabs.Count} caller={caller}:{callerLine} activate={activate}");
+
+        if (_activeGroupIndex < 0)
+        {
+            AppLogger.Log($"[CLI-Init-DIAG] AddConsoleTab ABORTED (no active group) | title=\"{title}\"");
+            return;
+        }
 
         int idx = _consoleTabs.Count;
         var termHost = new Grid { Background = System.Windows.Media.Brushes.Transparent };
@@ -1562,13 +1575,15 @@ public partial class MainWindow : Window
             CanClose = true,
         };
 
-        _consoleTabs.Add(new ConsoleTabInfo
+        var newTab = new ConsoleTabInfo
         {
             Title = title, Document = doc, TerminalHost = termHost,
             CliDefinitionId = cliDefinitionId,
             ExePath = exe, Arguments = arguments,
             Terminal = null, IsInitialized = false,
-        });
+        };
+        _consoleTabs.Add(newTab);
+        AppLogger.Log($"[CLI-Init-DIAG] ConsoleTabInfo created | title=\"{title}\" tabHash=#{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(newTab):X8} idx={idx}");
 
         // Add to the active document pane (may differ from terminalDocPane after splits)
         GetActiveDocumentPane().Children.Add(doc);
@@ -1625,10 +1640,13 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Creates and starts the ConPTY terminal for a tab that hasn't been initialized yet.</summary>
-    private void InitializeTerminal(ConsoleTabInfo tab)
+    private void InitializeTerminal(ConsoleTabInfo tab,
+        [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+        [System.Runtime.CompilerServices.CallerLineNumber] int callerLine = 0)
     {
         // ⚠ CLI diagnostic log — DO NOT REMOVE (핵심 진단 자산, 삭제 금지)
-        AppLogger.Log($"[CLI] InitializeTerminal | title={tab.Title} isInit={tab.IsInitialized} isStarted={tab.IsTerminalStarted}");
+        var tabHash = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(tab);
+        AppLogger.Log($"[CLI] InitializeTerminal | title={tab.Title} tabHash=#{tabHash:X8} isInit={tab.IsInitialized} isStarted={tab.IsTerminalStarted} caller={caller}:{callerLine}");
         if (tab.IsInitialized) return;
         tab.IsInitialized = true;  // Set immediately to prevent re-entrant calls from OnDockActiveContentChanged
 
@@ -1730,7 +1748,9 @@ public partial class MainWindow : Window
             var ptyHashOnLoad = terminal.ConPTYTerm is null
                 ? 0
                 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
-            AppLogger.Log($"[CLI] Loaded fired | label={groupName}/{tab.Title} hasConPTY={terminal.ConPTYTerm is not null} ptyHash=0x{ptyHashOnLoad:X8} isStarted={tab.IsTerminalStarted}");
+            var tabHashOnLoad = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(tab);
+            var termHash = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal);
+            AppLogger.Log($"[CLI] Loaded fired | label={groupName}/{tab.Title} tabHash=#{tabHashOnLoad:X8} termHash=#{termHash:X8} hasConPTY={terminal.ConPTYTerm is not null} ptyHash=0x{ptyHashOnLoad:X8} isStarted={tab.IsTerminalStarted}");
 
             if (terminal.ConPTYTerm is null) return;
 
