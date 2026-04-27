@@ -55,6 +55,10 @@ User says "방금 작성한 거 리뷰해줘" or "code review" with no commit pe
 4. Output: per-file comments with file:line, severity (Suggestion / Should-fix / Must-fix),
    and concrete rewrite snippets.
 5. **[Required]** Write log to `harness/logs/code-coach/{yyyy-MM-dd-HH-mm-title}.md`.
+6. **[Required when any finding ≥ Suggestion]** File a GitHub issue tracking the
+   findings — see "GitHub issue handoff" below. This applies even when the
+   commit is allowed to proceed; advisory items are not lost just because they
+   didn't block the merge.
 
 ## Mode 2 — Auto pre-commit review
 
@@ -68,6 +72,9 @@ includes development code (`*.cs`, `*.xaml`, `*.xaml.cs`, `*.csproj`, `*.props`,
 4. **Advisory, not blocking** — surface findings inline before the commit. User may say
    "ignore and commit" to proceed; otherwise apply suggested fixes, restage, then commit.
 5. **[Required]** Write log under `harness/logs/code-coach/`.
+6. **[Required when any finding ≥ Suggestion]** File a GitHub issue (see
+   "GitHub issue handoff" below). The commit may proceed without applying
+   the findings, but the issue must exist before the commit lands.
 
 This auto-trigger is also pinned in project memory
 (`memory/project_pre_commit_code_coach.md`) so it survives across sessions.
@@ -95,6 +102,64 @@ User says something like "X 해결하기 어려워요" or "이거 어떻게 하�
 - Does not run the build or judge build infrastructure (that's `build-doctor`).
 - Does not assess test coverage holistically (that's `test-sentinel`) — but *will* point
   out missing tests for the specific code under review.
+
+## GitHub issue handoff
+
+Whenever a Mode 1 or Mode 2 review yields **any finding at Suggestion severity
+or higher** (Suggestion / Should-fix / Must-fix), the Coach files a tracking
+issue in the project's GitHub repository before considering the review
+complete. Pure-pass reviews (zero findings) do not get an issue.
+
+The rationale: advisory items that don't block a merge get forgotten
+otherwise. Recording them as issues keeps the cleanup backlog visible
+without forcing every cycle to be a "fix everything before commit" gate.
+
+### Procedure
+
+1. Resolve the repository slug:
+   ```bash
+   gh repo view --json nameWithOwner
+   ```
+2. Pick a label set:
+   - `enhancement` — default for code-quality suggestions
+   - `bug` — only when a Should-fix or Must-fix is filed
+   - `documentation` — when the only findings are doc/comment ones
+3. Create the issue via `gh issue create`. Title format:
+   ```
+   code-coach review: <one-line subject> — N <severity-aggregate>
+   ```
+   Example: `code-coach review: ReActActor guard rollout (P0-1) — 5 advisory suggestions`
+4. Body must include:
+   - **Source** — link to the review log under `harness/logs/code-coach/` and
+     the relevant adoption/spec doc when applicable
+   - **Verdict** — must-fix / should-fix / suggestion counts; whether the commit
+     was approved
+   - **Findings** — one section per item, with `**File**: path:line`,
+     fenced-code rewrite snippet, and a one-line rationale
+   - **Recommendation** — propose a sequencing (which to apply now, which to
+     defer, which to split into a separate task)
+   - **Closes-when** — bulleted acceptance criteria so the issue has a clear
+     exit condition
+
+### Severity → action mapping
+
+| Severity in review | Issue filed? | Commit blocked? |
+|---|:---:|:---:|
+| Must-fix | yes | yes (until applied or explicitly waived) |
+| Should-fix | yes | no, but commit message must reference the issue |
+| Suggestion | yes | no |
+| (no findings) | no | no |
+
+### Examples
+
+A pure-pass review on a typo fix → no issue.
+
+A review with 1 Should-fix + 2 Suggestions → one issue containing all three,
+labeled `bug` (because of the Should-fix), and the commit message references it
+(`Refs #N`).
+
+A review with 5 Suggestions only → one issue labeled `enhancement`, commit
+proceeds without referencing it.
 
 ## Owned convention sets
 
@@ -125,3 +190,4 @@ Treat them as binding for the file types they cover:
 | Actionability | Each comment names file:line + concrete rewrite/proposal | A/B/C/D |
 | Research depth (Mode 3) | Does the proposal cite alternatives + tradeoffs, not one option? | A/B/C/D |
 | Knowledge capture | Did long-shelf-life findings land in `harness/knowledge/`? | Pass/Fail |
+| Issue handoff | If any finding ≥ Suggestion, was a tracking issue filed? | Pass/Fail |

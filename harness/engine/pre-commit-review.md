@@ -57,7 +57,14 @@ When Claude is about to call `git commit` (any variant — `git commit -m`, `git
   (one per commit run, even if no findings).
 - **Engine log** — `harness/logs/pre-commit-review/{yyyy-MM-dd-HH-mm-title}.md`
   recording: trigger phrase that initiated the commit, files staged, decision (skip /
-  reviewed-clean / reviewed-with-findings / waived).
+  reviewed-clean / reviewed-with-findings / waived), and **issue URL** when one
+  is filed (per the rule below).
+- **GitHub issue** — when the review yields any finding ≥ Suggestion (i.e. the
+  `reviewed-with-findings` or `waived` decision), the engine files one issue
+  via `gh issue create`. Procedure and body template live in
+  `harness/agents/code-coach.md` "GitHub issue handoff". The commit itself
+  does **not** wait on issue creation succeeding — if `gh` fails, log the
+  failure and surface it to the user, but commit proceeds.
 
 ## Not a hook
 
