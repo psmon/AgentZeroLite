@@ -1163,21 +1163,62 @@ public partial class MainWindow : Window
         // Hide CliPanel with Visibility.Hidden (not Collapsed). Collapsed
         // removes the panel from the layout pass, so the AvalonDock
         // DockingManager's measurements stop running while settings is up;
-        // when CliPanel re-measures on return, AvalonDock loses its grip on
-        // each Document's parent LayoutDocumentPane and snaps every
-        // Document into the first pane (the user's right-pane terminal
-        // appears in the left pane). Hidden keeps measurement alive so the
-        // Document → Pane mapping survives the round-trip; SettingsPanel
-        // already sits at a higher Z-order in the same grid cell, so it
-        // overlays opaquely.
+        // Hidden keeps the layout pass alive while making the panel
+        // invisible. SettingsPanel sits at a higher Z-order in the same
+        // grid cell with an opaque background, so it overlays cleanly.
         if (SettingsPanel.Visibility == Visibility.Visible)
         {
+            DumpDockLayout("settings-close-before");
             SwitchToCliPanel();
+            DumpDockLayout("settings-close-after");
             return;
         }
 
+        DumpDockLayout("settings-open-before");
         CliPanel.Visibility = Visibility.Hidden;
         SettingsPanel.Visibility = Visibility.Visible;
+        DumpDockLayout("settings-open-after");
+    }
+
+    /// <summary>
+    /// SETTINGS-LAYOUT-DIAG — temporary instrumentation for the
+    /// "right-pane Document jumps to left pane after settings round-trip"
+    /// bug. Dumps each tab's Document → parent LayoutDocumentPane mapping
+    /// at four phases of the round-trip so the exact moment the mapping
+    /// changes is visible in app-log.txt.
+    /// Remove once issue #4 (or whichever closes this bug) lands.
+    /// </summary>
+    private void DumpDockLayout(string phase)
+    {
+        try
+        {
+            var groups = _cliGroups;
+            if (groups.Count == 0) return;
+            var activeContent = dockManager?.ActiveContent;
+            var activeTitle = activeContent is AvalonDock.Layout.LayoutDocument adoc
+                ? adoc.Title
+                : (activeContent?.GetType().Name ?? "(none)");
+            AppLogger.Log($"[Settings-Layout-DIAG] phase={phase} | activeContent={activeTitle} cliPanelVis={CliPanel.Visibility} settingsVis={SettingsPanel.Visibility}");
+            for (int gi = 0; gi < groups.Count; gi++)
+            {
+                var grp = groups[gi];
+                for (int ti = 0; ti < grp.Tabs.Count; ti++)
+                {
+                    var tab = grp.Tabs[ti];
+                    if (tab.Document is null) continue;
+                    var doc = tab.Document;
+                    var parent = doc.Parent;
+                    var parentName = parent is AvalonDock.Layout.LayoutDocumentPane pane
+                        ? $"pane#0x{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(pane):X8}"
+                        : (parent?.GetType().Name ?? "(null)");
+                    AppLogger.Log($"[Settings-Layout-DIAG] phase={phase} | g={gi} t={ti} title=\"{tab.Title}\" docHash=0x{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(doc):X8} parent={parentName} isActive={doc.IsActive} isSelected={doc.IsSelected}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Settings-Layout-DIAG] phase={phase} dump failed: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     // =========================================================================
