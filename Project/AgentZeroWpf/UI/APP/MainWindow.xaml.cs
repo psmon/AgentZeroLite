@@ -1698,20 +1698,19 @@ public partial class MainWindow : Window
             }
         };
 
-        // Activate the document when the terminal area receives focus.
-        // EasyTerminalControl is HwndHost-based, so mouse-down on the console
-        // body is consumed by the native control and never reaches WPF as a
-        // PreviewMouseLeftButtonDown — the only consistent signal we get is
-        // the routed focus event that bubbles up from the win32 child. Without
-        // this hook the user has to click the *tab strip* at the top to make
-        // a split-pane Document active; click on the console body itself
-        // doesn't switch active state.
-        terminal.GotFocus += (_, _) =>
-        {
-            if (tab.Document is not null && !tab.Document.IsActive)
-                tab.Document.IsActive = true;
-        };
-
+        // [REVERTED — was: GotFocus → tab.Document.IsActive = true]
+        // Setting IsActive from inside a GotFocus handler put the AvalonDock
+        // active-document state into a feedback loop: setting IsActive caused
+        // the DockingManager to push focus around to enforce the new active
+        // pane, which fired GotFocus on the *other* terminal, which set its
+        // own Document.IsActive, which fired GotFocus back on this one — at
+        // win32 input speeds, the user perceived it as the active highlight
+        // ricocheting between panes and no input land anywhere.
+        //
+        // Click-to-activate stays as a wishlist item until we find a signal
+        // that doesn't enter this loop (candidates: a one-shot Win32
+        // WM_LBUTTONDOWN hook, AvalonDock's own ActivateDocument call, or
+        // a Dispatcher.BeginInvoke debounce). Tracked in the issue handoff.
         tab.TerminalHost.Children.Add(terminal);
 
         // Capture group name now (before async Loaded) for session ID
