@@ -1691,6 +1691,13 @@ public partial class MainWindow : Window
         // composition directly — no ImeProcessed blocking needed.
         terminal.PreviewKeyDown += (_, e) =>
         {
+            // PTY-FREEZE-DIAG: if the user reports "keyboard does nothing",
+            // the first question is whether WPF saw the key at all. A line
+            // here per keystroke proves the key reached the WPF tree; absence
+            // of these lines while the user types means focus is parked
+            // somewhere the terminal doesn't own.
+            AppLogger.Log($"[CLI-Input-DIAG] PreviewKeyDown | tab={tab.Title} key={e.Key} handled={e.Handled}");
+
             if (e.Key == System.Windows.Input.Key.Tab)
             {
                 terminal.ConPTYTerm?.WriteToTerm("\t".AsSpan());
@@ -1698,19 +1705,15 @@ public partial class MainWindow : Window
             }
         };
 
-        // [REVERTED — was: GotFocus → tab.Document.IsActive = true]
-        // Setting IsActive from inside a GotFocus handler put the AvalonDock
-        // active-document state into a feedback loop: setting IsActive caused
-        // the DockingManager to push focus around to enforce the new active
-        // pane, which fired GotFocus on the *other* terminal, which set its
-        // own Document.IsActive, which fired GotFocus back on this one — at
-        // win32 input speeds, the user perceived it as the active highlight
-        // ricocheting between panes and no input land anywhere.
-        //
-        // Click-to-activate stays as a wishlist item until we find a signal
-        // that doesn't enter this loop (candidates: a one-shot Win32
-        // WM_LBUTTONDOWN hook, AvalonDock's own ActivateDocument call, or
-        // a Dispatcher.BeginInvoke debounce). Tracked in the issue handoff.
+        // PTY-FREEZE-DIAG: focus trace — pure logging, no IsActive write.
+        // Earlier IsActive-from-GotFocus attempt (commit 6143c60, reverted in
+        // f679a7a) caused an active-document ricochet loop. These logs only
+        // observe; nothing changes the dock state.
+        terminal.GotFocus += (_, _) =>
+            AppLogger.Log($"[CLI-Input-DIAG] GotFocus  | tab={tab.Title} active={tab.Document?.IsActive == true}");
+        terminal.LostFocus += (_, _) =>
+            AppLogger.Log($"[CLI-Input-DIAG] LostFocus | tab={tab.Title} active={tab.Document?.IsActive == true}");
+
         tab.TerminalHost.Children.Add(terminal);
 
         // Capture group name now (before async Loaded) for session ID
