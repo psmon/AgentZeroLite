@@ -89,10 +89,29 @@ public partial class SettingsPanel : UserControl
         // Exact match — already registered
         if (string.Equals(trimmed, currentAppDir, StringComparison.OrdinalIgnoreCase))
             return true;
-        // Previous version paths: contains AgentZeroLite.exe in that directory
-        string exe = Path.Combine(trimmed, "AgentZeroLite.exe");
-        if (File.Exists(exe))
+
+        // This cleanup recognizes ONLY this project's own binaries
+        // (AgentZeroLite.exe). Sibling projects manage their own PATH:
+        //   - AgentWin (upstream) ships AgentZeroWpf.exe
+        //   - Any third-party "AgentZero" tool is also out of scope
+        // Refusing to recognize them prevents this Register-PATH button
+        // from silently deleting a co-installed sibling project's entry.
+        if (File.Exists(Path.Combine(trimmed, "AgentZeroLite.exe")))
             return true;
+
+        // Stale registration whose directory has been deleted on disk.
+        // Matches only when the leaf name still looks like an AgentZero*
+        // build/release folder AND doesn't carry the Wpf/Win markers that
+        // signal the sibling project (AgentWin / AgentZeroWpf.*).
+        if (!Directory.Exists(trimmed))
+        {
+            var leaf = Path.GetFileName(trimmed);
+            if (leaf.StartsWith("AgentZero", StringComparison.OrdinalIgnoreCase)
+                && !leaf.Contains("Wpf", StringComparison.OrdinalIgnoreCase)
+                && !leaf.Contains("Win", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
         return false;
     }
 

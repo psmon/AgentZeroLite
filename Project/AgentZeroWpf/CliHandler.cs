@@ -5,6 +5,7 @@ using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using Agent.Common.Module;
 using AgentZeroWpf.Module;
 using Microsoft.Win32.SafeHandles;
 
@@ -64,6 +65,7 @@ internal static class CliHandler
         return command switch
         {
             "help" or "--help" or "-h" or "/?" => PrintHelp(),
+            "version" or "--version" or "-v" => PrintVersion(),
             "status" => GetStatus(),
             "copy" => CopyToClipboard(),
             "open-win" => OpenWin(),
@@ -225,8 +227,7 @@ internal static class CliHandler
             return 0;
         }
 
-        string exePath = Process.GetCurrentProcess().MainModule?.FileName
-                         ?? Path.Combine(AppContext.BaseDirectory, "AgentZeroLite.exe");
+        string exePath = GetSelfExePath();
 
         Process.Start(new ProcessStartInfo
         {
@@ -745,6 +746,23 @@ internal static class CliHandler
     //      : send structured peer signal to AgentBot broker
     // =========================================================================
 
+    /// <summary>
+    /// One-line build identity, useful for a quick "is this the build I think
+    /// it is?" sanity check from any shell. Doesn't require the GUI to be up
+    /// (no IPC) — pure local introspection of the running CLI binary.
+    /// </summary>
+    private static int PrintVersion()
+    {
+        Console.WriteLine($"AgentZero Lite CLI {AppVersionProvider.GetDisplayVersion()}");
+        Console.WriteLine($"  exe : {GetSelfExePath()}");
+        Console.WriteLine($"  base: {AppContext.BaseDirectory}");
+        return 0;
+    }
+
+    private static string GetSelfExePath()
+        => Process.GetCurrentProcess().MainModule?.FileName
+           ?? Path.Combine(AppContext.BaseDirectory, "AgentZeroLite.exe");
+
     private static int PrintHelp()
     {
         PrintUsage();
@@ -765,7 +783,12 @@ internal static class CliHandler
 
     private static void PrintUsage()
     {
-        Console.WriteLine("AgentZero Lite CLI");
+        // Header advertises which build of the CLI is responding so a stale
+        // PATH entry vs the live one is obvious from the very first line of
+        // any --help / unknown-command / no-args invocation. Same identity
+        // is queryable directly via `version`.
+        Console.WriteLine($"AgentZero Lite CLI {AppVersionProvider.GetDisplayVersion()}");
+        Console.WriteLine($"  build: {GetSelfExePath()}");
         Console.WriteLine();
         Console.WriteLine("Usage: AgentZeroLite.exe -cli <command> [--no-wait] [--timeout N]");
         Console.WriteLine("   or: AgentZeroLite.ps1 <command> [--no-wait] [--timeout N]");
@@ -787,6 +810,7 @@ internal static class CliHandler
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
         Console.WriteLine("  bot-chat <message> [--from name]        Display external chat in AgentBot");
         Console.WriteLine("  help                                    Show detailed help");
+        Console.WriteLine("  version, --version, -v                  Print CLI build identity (no GUI needed)");
     }
 
     private static int PrintUnknownCommand(string command)

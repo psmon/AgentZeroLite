@@ -66,6 +66,16 @@
     </Content>
   </ItemGroup>
 
+  <!-- Ship version.txt next to the exe so the CLI can report the *exact*
+       file the installer/build pipeline used as the source of truth. The
+       same file feeds AssemblyVersion below; copying it to the output
+       directory means CLI output and installer label always match. -->
+  <ItemGroup>
+    <Content Include="version.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- Auto-version: read from version.txt, embed as assembly version -->
   <PropertyGroup>
     <VersionFile>$(MSBuildProjectDirectory)\version.txt</VersionFile>

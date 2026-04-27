@@ -1564,9 +1564,23 @@ public partial class MainWindow : Window
 
         string workDir = _cliGroups[_activeGroupIndex].DirectoryPath;
         string rawCmd = string.IsNullOrEmpty(tab.Arguments) ? tab.ExePath : $"{tab.ExePath} {tab.Arguments}";
+
+        // Prepend our exe directory to PATH for *this PTY only*. Why:
+        //   - The skills-starter-pack scripts call `& AgentZeroLite.ps1`,
+        //     which resolves via PATH. If User PATH is missing or stale
+        //     (or points at a sibling project's build), the call fails.
+        //   - We *own* this child cmd.exe — it inherits whatever environment
+        //     we set here, and pwsh/cmd/claude inherit from cmd.exe in turn.
+        //   - The injection lives only inside this PTY; User PATH is untouched.
+        // cmd parses `set "PATH=value"` as one token even when value contains
+        // semicolons or `%PATH%`, so the quoted form is robust. The outer
+        // /c double-quote pair survives because cmd treats the *first* quote
+        // and the *last* quote as the /c boundary.
+        string appDir = AppContext.BaseDirectory.TrimEnd('\\', '/');
+        string injectPath = $"set \"PATH={appDir};%PATH%\"";
         string cmdLine = !string.IsNullOrEmpty(workDir) && System.IO.Directory.Exists(workDir)
-            ? $"cmd /c \"pushd {workDir} && {rawCmd}\""
-            : rawCmd;
+            ? $"cmd /c \"{injectPath}&&pushd \"{workDir}\"&&{rawCmd}\""
+            : $"cmd /c \"{injectPath}&&{rawCmd}\"";
 
         var terminal = new EasyWindowsTerminalControl.EasyTerminalControl();
         terminal.StartupCommandLine = cmdLine;
