@@ -78,3 +78,14 @@ EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, crea
 
 ### Mermaid/Pencil rendering
 `Assets/mermaid.min.js` is embedded as a logical resource (`LogicalName="mermaid.min.js"`) for offline Markdown preview; `MarkdownViewer` + `MermaidRenderer` + WebView2 handle the render. Pencil (`.pen`) files go through the `pencil` MCP server — those files are encrypted, never read them with `Read`/`Grep`.
+
+## Ancestor reference — AgentWin (Origin)
+
+AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). When the user mentions *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"the ancestor"*, or asks to *"compare with origin"* / *"오리진이랑 비교"* / *"오리진 참고"*, **read `Docs/agent-origin/` first** instead of crawling the Origin codebase from scratch:
+
+- `Docs/agent-origin/README.md` — Executive summary + adoption priority table (P0~P3)
+- `Docs/agent-origin/01-stack-comparison.md` — Per-item spec table (NuGet, csproj, DB, CLI/IPC, build)
+- `Docs/agent-origin/02-architecture-comparison.md` — Diagrams + branching rationale (actors, LLM gateway, terminal, harness)
+- `Docs/agent-origin/03-adoption-recommendations.md` — Adoption roadmap with cost & trade-offs
+
+These docs are a 2026-04-27 snapshot. If they look stale (e.g. > 6 months) or the user asks about a topic not covered, re-survey `D:\Code\AI\AgentWin` directly and **update the relevant `Docs/agent-origin/*.md` file** so the snapshot stays useful for future sessions.

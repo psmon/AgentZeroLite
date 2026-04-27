@@ -109,6 +109,14 @@ Treat them as binding for the file types they cover:
   `*Header*`, `*Instructions*` constants and `WorkspaceTerminalToolHost`'s
   prepended messages. New prompt added in non-English? Flag for rewrite.
 
+- **`harness/knowledge/agent-origin-reference.md`** — When the user mentions
+  *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"compare with origin"*, or
+  asks "did we have this before" / "is there a better pattern" — consult
+  `Docs/agent-origin/` (snapshot) **before** crawling
+  `D:\Code\AI\AgentWin` directly. In Mode 3 (Research consult), if a similar
+  problem already has an Origin solution, cite the relevant
+  `Docs/agent-origin/0[1-3]-*.md` section in the proposal options.
+
 ## Evaluation rubric
 
 | Axis | Measure | Scale |

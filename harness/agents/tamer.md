@@ -6,6 +6,12 @@ triggers:
   - "하네스를 개선해"
   - "하네스를 설명해"
   - "평가로그를 점검해"
+  - "오리진 비교해"
+  - "오리진 참고해"
+  - "오리진이랑 비교"
+  - "조상 프로젝트 비교"
+  - "AgentWin 비교"
+  - "오리진 스냅샷 갱신"
 description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)을 심고, 토양(지식)을 가꾸고, 물길(엔진)을 내는 메타 에이전트.
 ---
 
@@ -70,6 +76,13 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 2. 시계열 트렌드 분석
 3. 반복 이슈 패턴 식별
 4. 요약 보고서 생성
+
+### 오리진 비교 (오리진 비교해 / 오리진 참고해 / AgentWin 비교)
+1. **`harness/knowledge/agent-origin-reference.md`** 의 lookup 순서를 따른다.
+2. `Docs/agent-origin/README.md` → 해당 토픽이 커버되면 그 문서를 인용해 답한다.
+3. 스냅샷에 없는 토픽이거나 6개월 경과 시 → `D:\Code\AI\AgentWin` 직접 조사 후 해당 `Docs/agent-origin/*.md` 갱신.
+4. 채택 결정 시 `Docs/agent-origin/03-adoption-recommendations.md`의 P0~P3 + REJECT 섹션을 참고한다.
+5. 스냅샷 갱신 시 로그를 `harness/logs/tamer/` 에 기록한다.
 
 ## 평가 기준
 
