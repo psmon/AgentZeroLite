@@ -1155,10 +1155,14 @@ public partial class MainWindow : Window
     private void OnSidebarSettingsClick(object sender, RoutedEventArgs e)
     {
         // Toggle: re-clicking the settings icon returns to the CLI panel.
+        // We deliberately *do not* call ActivateGroup() on return — settings
+        // never changed the active group, and ActivateGroup → RebuildDocumentPane
+        // calls terminalDocPane.Children.Clear() which destroys whatever
+        // split / multi-pane layout the user had built via drag-drop. A pure
+        // Visibility flip on CliPanel preserves the AvalonDock state intact.
         if (SettingsPanel.Visibility == Visibility.Visible)
         {
             SwitchToCliPanel();
-            if (_activeGroupIndex >= 0) ActivateGroup(_activeGroupIndex);
             return;
         }
 
