@@ -31,6 +31,9 @@ mechanical instead of vibes.
 
 2. **Build (build-doctor)** — only if Step 1 produced no Critical/High.
    - Validates version pipeline, native DLL pinning, csproj configurations.
+   - Runs `dotnet test` per `harness/knowledge/dotnet-test-execution.md` (single
+     foreground call, no parallel backgrounds, verify no orphan testhost before
+     handing off to the tag step).
    - Writes log under `harness/logs/build-doctor/`.
    - On success → hand off to the `agent-zero-build` skill (or whatever release path
      the user invoked) for tag + push + GitHub Actions.

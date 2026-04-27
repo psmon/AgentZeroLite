@@ -50,14 +50,26 @@ Domain expertise:
 
 ## Procedure
 
+> **Test execution canon** — every `dotnet test` invocation in this procedure must
+> obey `harness/knowledge/dotnet-test-execution.md` (single foreground call, no parallel
+> backgrounds against the same project, verify testhost cleanup before reporting).
+> The Sentinel is the canonical owner of that rule — if any other agent violates it,
+> flag it as a procedural finding in the report.
+
 1. `dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj` — must pass headless.
-2. (If desktop session available) `dotnet test Project/AgentTest/AgentTest.csproj`.
+   Single foreground call only (canon R1). If output looks empty, check `tasklist | grep
+   testhost` before re-running (canon R2). For repeated diagnostic cycles, narrow with
+   `--filter "FullyQualifiedName~SpecificClass"` (canon R4).
+2. (If desktop session available) `dotnet test Project/AgentTest/AgentTest.csproj`. Refuse
+   in headless / CI environments — this suite needs ConPTY + WPF (canon R5).
 3. Grep `ZeroCommon` for forbidden-namespace usage (boundary violation check).
 4. For each "coverage hot spot" above, confirm at least one test exists and asserts
    the documented invariant.
 5. Produce report: gaps, boundary violations, flaky tests, missing scenarios.
-6. **[Required]** Write log to `harness/logs/test-sentinel/{yyyy-MM-dd-HH-mm-title}.md`.
-7. **[Required]** Self-evaluate against the rubric below.
+6. **[Required]** Before reporting, run `tasklist | grep -iE "testhost|vstest"` and
+   include the result (cleared / orphans-killed / orphans-left) in the log (canon R6).
+7. **[Required]** Write log to `harness/logs/test-sentinel/{yyyy-MM-dd-HH-mm-title}.md`.
+8. **[Required]** Self-evaluate against the rubric below.
 
 ## Evaluation rubric
 
@@ -67,3 +79,4 @@ Domain expertise:
 | Hot-spot coverage | All 5 hot spots have at least one assertion | 0–5 |
 | Suite health | Headless suite green; WPF suite green when session available | A/B/C/D |
 | Regression hooks | Tests added for past incidents (Akka shutdown, ConPTY garble) | A/B/C/D |
+| Test-execution hygiene | Followed `dotnet-test-execution.md` canon; no orphan testhost left | Pass/Fail |

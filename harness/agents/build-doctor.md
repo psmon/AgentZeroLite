@@ -56,13 +56,24 @@ because:
 
 ## Procedure
 
+> **Test execution canon** — Steps 2 and 3 must obey
+> `harness/knowledge/dotnet-test-execution.md`: single foreground call, no parallel
+> backgrounds, narrow with `--filter` for diagnostic cycles, and confirm no orphan
+> testhost before handing off to the next phase. The Sentinel owns the rule;
+> the Doctor inherits it.
+
 1. `dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Debug` — must succeed cleanly.
-2. `dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj` — headless suite must pass.
+2. `dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj` — headless suite must
+   pass. Single foreground call (canon R1). If invoking from a release-build pipeline,
+   verify no testhost from a previous step is still alive (canon R3) before starting.
 3. (Optional, if WPF session available) `dotnet test Project/AgentTest/AgentTest.csproj`.
+   Skip entirely in headless / CI environments (canon R5).
 4. Inspect csproj for native DLL `<Content Include>` paths; `ls` each path on disk.
 5. Inspect `version.txt`, last commit's effect on it, and Release post-build target.
-6. **[Required]** Write log to `harness/logs/build-doctor/{yyyy-MM-dd-HH-mm-title}.md`.
-7. **[Required]** Self-evaluate against the rubric below.
+6. **[Required]** Before reporting, `tasklist | grep -iE "testhost|vstest"` must be
+   empty. Kill any orphan, note it in the log (canon R3 + R6).
+7. **[Required]** Write log to `harness/logs/build-doctor/{yyyy-MM-dd-HH-mm-title}.md`.
+8. **[Required]** Self-evaluate against the rubric below.
 
 ## Release-build gate (hard requirement)
 
@@ -85,3 +96,4 @@ This is not advisory. The Doctor refuses; the gardener does not let it start.
 | Native DLL pinning | All `<Content Include>` paths resolve on disk | Pass/Fail |
 | Version pipeline integrity | `version.txt`, post-build, tag, workflow consistent | A/B/C/D |
 | Security-gate compliance (release only) | Did the gate hold? | Pass/Fail |
+| Test-execution hygiene | `dotnet-test-execution.md` canon obeyed; no orphan testhost on handoff | Pass/Fail |
