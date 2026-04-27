@@ -1158,15 +1158,25 @@ public partial class MainWindow : Window
         // We deliberately *do not* call ActivateGroup() on return — settings
         // never changed the active group, and ActivateGroup → RebuildDocumentPane
         // calls terminalDocPane.Children.Clear() which destroys whatever
-        // split / multi-pane layout the user had built via drag-drop. A pure
-        // Visibility flip on CliPanel preserves the AvalonDock state intact.
+        // split / multi-pane layout the user had built via drag-drop.
+        //
+        // Hide CliPanel with Visibility.Hidden (not Collapsed). Collapsed
+        // removes the panel from the layout pass, so the AvalonDock
+        // DockingManager's measurements stop running while settings is up;
+        // when CliPanel re-measures on return, AvalonDock loses its grip on
+        // each Document's parent LayoutDocumentPane and snaps every
+        // Document into the first pane (the user's right-pane terminal
+        // appears in the left pane). Hidden keeps measurement alive so the
+        // Document → Pane mapping survives the round-trip; SettingsPanel
+        // already sits at a higher Z-order in the same grid cell, so it
+        // overlays opaquely.
         if (SettingsPanel.Visibility == Visibility.Visible)
         {
             SwitchToCliPanel();
             return;
         }
 
-        CliPanel.Visibility = Visibility.Collapsed;
+        CliPanel.Visibility = Visibility.Hidden;
         SettingsPanel.Visibility = Visibility.Visible;
     }
 
