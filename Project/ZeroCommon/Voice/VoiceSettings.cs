@@ -108,4 +108,18 @@ public sealed class VoiceSettings
 
     /// <summary>true = VAD auto-segment by silence, false = manual START/STOP.</summary>
     public bool VoiceTestAutoMode { get; set; } = true;
+
+    /// <summary>
+    /// Cap on the LLM response length when the Voice Test pipeline is the caller.
+    /// Voice replies need to be short — TTS playback time scales linearly with
+    /// token count, so a 1024-token answer is 30~60 s of speech the user must
+    /// sit through (and wait for) before they can interrupt naturally.
+    /// 128 tokens ≈ 5~10 s TTS, the sweet spot for QA cycles.
+    ///
+    /// Applies to <c>External</c> LLM only — for <c>Local</c>, <c>LlmService</c>
+    /// is loaded with a global <c>MaxTokens</c> at model-load time and there's
+    /// no per-call override path, so this knob is silently ignored. The Voice
+    /// tab surfaces that asymmetry in the field's tooltip.
+    /// </summary>
+    public int LlmMaxTokens { get; set; } = 128;
 }

@@ -70,6 +70,8 @@ public partial class SettingsPanel
             rbVoiceModeAuto.IsChecked = v.VoiceTestAutoMode;
             rbVoiceModeManual.IsChecked = !v.VoiceTestAutoMode;
 
+            tbVoiceLlmMaxTokens.Text = v.LlmMaxTokens.ToString();
+
             RefreshVoiceInputDevices(v.InputDeviceId);
             UpdateVoiceTestActiveLlmLabel();
 
@@ -239,7 +241,39 @@ public partial class SettingsPanel
         v.InputDeviceId = (cbVoiceInputDevice.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
         v.VadThreshold = 100 - (int)slVoiceSensitivity.Value;
         v.VoiceTestAutoMode = rbVoiceModeAuto.IsChecked == true;
+        if (int.TryParse(tbVoiceLlmMaxTokens.Text, out var maxTok) && maxTok > 0)
+            v.LlmMaxTokens = maxTok;
         return v;
+    }
+
+    /// <summary>
+    /// Build the chat session for the Voice Test pipeline. For External LLM
+    /// providers we override <c>MaxTokens</c> with <see cref="VoiceSettings.LlmMaxTokens"/>
+    /// so TTS playback stays short. Local backend has no per-call override
+    /// path (<see cref="LlmService.OpenSession"/> is parameterless and reads
+    /// MaxTokens from load-time options) — we fall back to the standard
+    /// gateway and log the asymmetry once per call so the user knows.
+    /// </summary>
+    private static ILocalChatSession OpenVoiceLlmSession(VoiceSettings v)
+    {
+        var s = LlmSettingsStore.Load();
+        if (s.ActiveBackend == LlmActiveBackend.External)
+        {
+            var provider = s.CreateExternalProvider()
+                ?? throw new InvalidOperationException($"Unknown external provider '{s.External.Provider}'.");
+            var model = s.ResolveExternalModel();
+            if (string.IsNullOrEmpty(model))
+            {
+                (provider as IDisposable)?.Dispose();
+                throw new InvalidOperationException(
+                    $"No model selected for {s.External.Provider}. Open Settings → LLM → External and pick one.");
+            }
+            AppLogger.Log($"[Voice-LLM] External session | provider={s.External.Provider} model={model} maxTok={v.LlmMaxTokens} (voice override)");
+            return new ExternalChatSession(provider, model, v.LlmMaxTokens, s.Temperature);
+        }
+
+        AppLogger.Log($"[Voice-LLM] Local session | LlmMaxTokens override ignored (LlmService loads MaxTokens at model-load); LLM-tab cap applies.");
+        return LlmGateway.OpenSession();
     }
 
     private static int ParseDeviceNumber(string id) => int.TryParse(id, out var n) ? n : 0;
@@ -275,6 +309,55 @@ public partial class SettingsPanel
             tbVoiceTestStatus.Text = text;
             tbVoiceTestStatus.Foreground = brush;
         }));
+    }
+
+    /// <summary>
+    /// Aggressive stop — capture, in-flight pipeline (via cts), and any
+    /// running TTS playback all halted. Defensively unmutes the mic so a
+    /// crash mid-playback can't leave it permanently silenced. Idempotent;
+    /// safe to call multiple times.
+    /// </summary>
+    private void StopAllVoiceActivity(string reason)
+    {
+        AppLogger.Log($"[Voice] Stop all activity ({reason})");
+        try { _voiceCapture?.Stop(); } catch { }
+        try { _pipelineCts?.Cancel(); } catch { }
+        try { _voicePlayback?.Stop(); } catch { }
+        if (_voiceCapture is not null) _voiceCapture.Muted = false;
+        btnVoiceTestStart.Content = "START";
+        btnVoiceInterrupt.IsEnabled = false;
+        SetVoiceTestStatus("Stopped.", System.Windows.Media.Brushes.SkyBlue);
+    }
+
+    /// <summary>
+    /// Soft stop — silences the AI's current speech and cancels the in-flight
+    /// pipeline, but leaves capture running so the user can keep talking.
+    /// Replaces <see cref="_pipelineCts"/> with a fresh source so the next
+    /// utterance triggers a new pipeline cleanly. Mute auto-clears via the
+    /// PlaybackStopped → unmute callback chain.
+    /// </summary>
+    private void InterruptVoicePipeline(string reason)
+    {
+        AppLogger.Log($"[Voice] Interrupt ({reason})");
+        try { _voicePlayback?.Stop(); } catch { }
+        try { _pipelineCts?.Cancel(); } catch { }
+        _pipelineCts = new CancellationTokenSource();
+        if (_voiceCapture is not null) _voiceCapture.Muted = false;
+        SetVoiceTestStatus("Interrupted — keep speaking.", System.Windows.Media.Brushes.Goldenrod);
+    }
+
+    /// <summary>
+    /// Cancellation gate between pipeline phases. Returns true if the pipeline
+    /// should bail out — caller must `return` immediately after. Logs the phase
+    /// and surfaces it to the user. Always restores the mic Muted flag.
+    /// </summary>
+    private bool ShouldBailOut(CancellationToken ct, string phase)
+    {
+        if (!ct.IsCancellationRequested) return false;
+        AppLogger.Log($"[Voice] Pipeline cancelled at phase={phase}");
+        if (_voiceCapture is not null) _voiceCapture.Muted = false;
+        SetVoiceTestStatus($"Cancelled at {phase}.", System.Windows.Media.Brushes.Goldenrod);
+        return true;
     }
 
     /// <summary>Build the active <see cref="ISpeechToText"/> from the saved settings.</summary>
@@ -473,24 +556,31 @@ public partial class SettingsPanel
     {
         UpdateVoiceTestActiveLlmLabel();
 
-        if (_voiceCapture is { IsCapturing: true })
+        // Treat the button label as the source of truth for state. This makes
+        // STOP work even after capture already auto-stopped — e.g. when the
+        // pipeline is mid-playback and the user wants to abort the AI's reply.
+        var isStopping = (btnVoiceTestStart.Content as string) == "STOP";
+        if (isStopping)
         {
-            // STOP path. Manual mode: drain any buffered PCM and run the pipeline
-            // once before tearing down. Auto mode: just stop — pipeline already
-            // ran on UtteranceEnded.
+            // Manual mode: drain any buffered PCM and run the pipeline once
+            // BEFORE tearing capture down. Auto mode never reaches this path
+            // with pending audio because UtteranceEnded already kicked the
+            // pipeline. If capture is already stopped (pipeline-only stop),
+            // there's nothing to drain.
             var manual = rbVoiceModeManual.IsChecked == true;
             byte[]? pendingPcm = null;
-            if (manual && _voiceCapture is not null)
+            if (manual && _voiceCapture is { IsCapturing: true })
                 pendingPcm = _voiceCapture.ConsumePcmBuffer();
 
-            try { _voiceCapture?.Stop(); } catch { }
-            _pipelineCts?.Cancel();
-            btnVoiceTestStart.Content = "START";
-            SetVoiceTestStatus("Stopped.", System.Windows.Media.Brushes.SkyBlue);
+            StopAllVoiceActivity("user pressed STOP");
 
             if (manual && pendingPcm is { Length: > 0 } && !_pipelineBusy)
             {
                 var pcmRef = pendingPcm;
+                // Manual STOP needs a fresh cts because StopAllVoiceActivity
+                // just cancelled the previous one — otherwise the pipeline
+                // would bail at the very first ct check.
+                _pipelineCts = new CancellationTokenSource();
                 _ = Task.Run(async () =>
                 {
                     AppLogger.Log($"[Voice] Task.Run transcribe start (manual) | thread=#{Environment.CurrentManagedThreadId} pcm={pcmRef.Length}");
@@ -529,18 +619,25 @@ public partial class SettingsPanel
             var deviceNumber = ParseDeviceNumber(v.InputDeviceId);
             _voiceCapture.Start(deviceNumber);
             btnVoiceTestStart.Content = "STOP";
+            btnVoiceInterrupt.IsEnabled = true;
             SetVoiceTestStatus(
                 rbVoiceModeAuto.IsChecked == true
-                    ? "Listening (Auto VAD) — speak; press STOP to end."
+                    ? "Listening (Auto VAD) — speak; press STOP to end, INTERRUPT to cut off the AI."
                     : "Recording (Manual) — press STOP to transcribe.",
                 System.Windows.Media.Brushes.LightGreen);
         }
         catch (Exception ex)
         {
             btnVoiceTestStart.Content = "START";
+            btnVoiceInterrupt.IsEnabled = false;
             SetVoiceTestStatus($"✗ Capture start failed: {ex.Message}", System.Windows.Media.Brushes.OrangeRed);
             AppLogger.LogError("[Voice] Capture start failed", ex);
         }
+    }
+
+    private void OnVoiceInterrupt(object sender, RoutedEventArgs e)
+    {
+        InterruptVoicePipeline("user pressed INTERRUPT");
     }
 
     private void OnAmplitudeChanged(float rms)
@@ -603,12 +700,14 @@ public partial class SettingsPanel
                 AppendTranscript("[STT] Provider reported not-ready (see status above).");
                 return;
             }
+            if (ShouldBailOut(ct, "after STT-ready")) return;
 
             string transcript;
             try
             {
                 transcript = await stt.TranscribeAsync(pcm, v.SttLanguage, ct);
             }
+            catch (OperationCanceledException) { _ = ShouldBailOut(ct, "STT cancel"); return; }
             catch (Exception ex)
             {
                 AppendTranscript($"[STT-error] {ex.Message}");
@@ -621,6 +720,7 @@ public partial class SettingsPanel
                 return;
             }
             AppendTranscript($"You: {transcript}");
+            if (ShouldBailOut(ct, "after STT")) return;
 
             // ─── LLM (whatever's selected on the LLM tab) ──────────
             if (!LlmGateway.IsActiveAvailable())
@@ -629,13 +729,14 @@ public partial class SettingsPanel
                 return;
             }
 
-            SetVoiceTestStatus("LLM…", System.Windows.Media.Brushes.SkyBlue);
+            SetVoiceTestStatus($"LLM (max {v.LlmMaxTokens} tok)…", System.Windows.Media.Brushes.SkyBlue);
             string answer;
             try
             {
-                await using var session = LlmGateway.OpenSession();
+                await using var session = OpenVoiceLlmSession(v);
                 answer = await session.SendAsync(transcript, ct);
             }
+            catch (OperationCanceledException) { _ = ShouldBailOut(ct, "LLM cancel"); return; }
             catch (Exception ex)
             {
                 AppendTranscript($"[LLM-error] {ex.Message}");
@@ -648,6 +749,7 @@ public partial class SettingsPanel
                 return;
             }
             AppendTranscript($"AI: {answer}");
+            if (ShouldBailOut(ct, "after LLM")) return;
 
             // ─── TTS ───────────────────────────────────────────────
             var tts = CreateTtsProvider(v);
@@ -664,6 +766,7 @@ public partial class SettingsPanel
                 var clean = TtsTextCleaner.StripMarkdown(answer);
                 audio = await tts.SynthesizeAsync(clean, v.TtsVoice, ct);
             }
+            catch (OperationCanceledException) { _ = ShouldBailOut(ct, "TTS cancel"); return; }
             catch (Exception ex)
             {
                 AppendTranscript($"[TTS-error] {ex.Message}");
@@ -675,12 +778,16 @@ public partial class SettingsPanel
                 SetVoiceTestStatus("TTS returned empty audio.", System.Windows.Media.Brushes.Goldenrod);
                 return;
             }
+            if (ShouldBailOut(ct, "before playback")) return;
 
             // Mute the mic during playback so the AI's own voice isn't fed
-            // back into the next utterance. Unmute when playback completes.
-            if (_voiceCapture is not null) _voiceCapture.Muted = true;
+            // back into the next utterance. The cleanup runs in `finally`
+            // and on PlaybackStopped, so a STOP press or a crash mid-playback
+            // never leaves the mic permanently muted.
+            bool muteSet = false;
             try
             {
+                if (_voiceCapture is not null) { _voiceCapture.Muted = true; muteSet = true; }
                 _voicePlayback ??= new VoicePlaybackService();
                 Action? unmute = null;
                 unmute = () =>
@@ -694,7 +801,7 @@ public partial class SettingsPanel
             }
             catch (Exception ex)
             {
-                if (_voiceCapture is not null) _voiceCapture.Muted = false;
+                if (muteSet && _voiceCapture is not null) _voiceCapture.Muted = false;
                 AppendTranscript($"[Playback-error] {ex.Message}");
                 AppLogger.LogError("[Voice-Playback] Play failed", ex);
             }

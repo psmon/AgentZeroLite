@@ -1041,6 +1041,19 @@
                                     <ColumnDefinition Width="120"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
+                                <TextBlock Text="Max Tokens" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center"
+                                           ToolTip="Cap on the AI reply length so TTS playback stays short. 128 ≈ 5–10 s. Applies to External LLM (Webnori/OpenAI/LMStudio/Ollama); Local uses the LLM-tab cap because LlmService loads MaxTokens at model-load time."/>
+                                <TextBox x:Name="tbVoiceLlmMaxTokens" Grid.Column="1"
+                                         Style="{StaticResource DarkTextBox}" Width="100"
+                                         HorizontalAlignment="Left"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
                                 <TextBlock Text="Level" FontFamily="Consolas" FontSize="10"
                                            Foreground="#888899" VerticalAlignment="Center"/>
                                 <Border Grid.Column="1" Background="#0A0A14" BorderBrush="#2A2A5E"
@@ -1055,11 +1068,19 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="tbVoiceTestStatus" Grid.Column="0"
                                            Text="Idle" FontFamily="Consolas" FontSize="10"
                                            Foreground="#556677" VerticalAlignment="Center"/>
-                                <Button x:Name="btnVoiceTestStart" Grid.Column="1"
+                                <!-- Cuts off the AI's current speech + cancels the in-flight
+                                     pipeline, but keeps the session alive (mic stays hot).
+                                     Disabled while idle. -->
+                                <Button x:Name="btnVoiceInterrupt" Grid.Column="1"
+                                        Content="INTERRUPT" Padding="14,5" Margin="0,0,8,0"
+                                        Style="{StaticResource DarkButton}"
+                                        Click="OnVoiceInterrupt" IsEnabled="False"/>
+                                <Button x:Name="btnVoiceTestStart" Grid.Column="2"
                                         Content="START" Padding="14,5"
                                         Style="{StaticResource DarkButton}"
                                         Click="OnVoiceTestStartStop"/>
