@@ -53,6 +53,7 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
         _userSendCount++;
         var turns = new List<ToolTurn>();
         string? failure = null;
+        var guards = new ToolLoopGuards();
 
         // First send seeds the system prompt + tool catalog. Follow-up sends
         // append only the new user request — the system message is already in
@@ -73,23 +74,19 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
         {
             ct.ThrowIfCancellationRequested();
 
-            string assistantText;
-            try
+            var (assistantText, callError) = await CallProviderWithRetryAsync(iter, guards, ct);
+            if (callError is not null)
             {
-                assistantText = await GenerateOneTurnAsync(ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                failure = $"provider call failed at iteration {iter}: {ex.Message}";
+                failure = callError;
                 break;
             }
 
-            _messages.Add(LlmMessage.Assistant(assistantText));
+            _messages.Add(LlmMessage.Assistant(assistantText!));
 
-            var rawJson = ExtractFirstJsonObject(assistantText);
+            var rawJson = ExtractFirstJsonObject(assistantText!);
             if (rawJson is null)
             {
-                failure = $"model emitted no JSON envelope at iteration {iter} (non-Gemma toolchain mismatch?): \"{Truncate(assistantText, 200)}\"";
+                failure = $"model emitted no JSON envelope at iteration {iter} (non-Gemma toolchain mismatch?): \"{Truncate(assistantText!, 200)}\"";
                 break;
             }
 
@@ -115,7 +112,27 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
                 var doneMsg = call.Args.TryGetPropertyValue("message", out var m) && m is JsonValue v
                     ? v.GetValue<string>()
                     : "(no message)";
-                return new AgentToolSession(turns, doneMsg, TerminatedCleanly: true, FailureReason: null);
+                return new AgentToolSession(turns, doneMsg, TerminatedCleanly: true, FailureReason: null)
+                    { GuardStats = guards.Snapshot() };
+            }
+
+            // Same 2-stage repeat defense as AgentToolLoop. The block message
+            // is also fed back through the REST history so the model sees it
+            // on the next turn just like any other tool result.
+            var blockMsg = guards.CheckRepeat(call, _opts.MaxSameCallRepeats);
+            if (blockMsg is not null)
+            {
+                if (guards.ShouldHardStop(_opts.MaxConsecutiveBlocks))
+                {
+                    failure = $"aborted after {guards.ConsecutiveBlocks} consecutive blocked repeats";
+                    break;
+                }
+                var blockTurn = new ToolTurn(call, blockMsg);
+                turns.Add(blockTurn);
+                try { _opts.OnTurnCompleted?.Invoke(blockTurn); } catch { /* UI errors must not break the loop */ }
+                _messages.Add(LlmMessage.User(
+                    $"--- TOOL RESULT ---\n{blockMsg}\n\n(Reply with the next single JSON tool call. Call \"done\" when satisfied.)"));
+                continue;
             }
 
             string toolResult;
@@ -129,6 +146,7 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
             }
             var turn = new ToolTurn(call, toolResult);
             turns.Add(turn);
+            guards.RecordResult(call, toolResult);
 
             try { _opts.OnTurnCompleted?.Invoke(turn); } catch { /* UI errors must not break the loop */ }
 
@@ -140,7 +158,40 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
             turns,
             FinalMessage: failure ?? $"max iterations ({_opts.MaxIterations}) reached without 'done'",
             TerminatedCleanly: false,
-            FailureReason: failure);
+            FailureReason: failure)
+            { GuardStats = guards.Snapshot() };
+    }
+
+    /// <summary>
+    /// Generates one turn with transient-HTTP retry. Exhausting
+    /// <see cref="AgentToolLoopOptions.MaxLlmRetries"/> turns the next failure
+    /// into the loop's overall <c>failure</c>; non-transient exceptions bubble
+    /// out immediately so we don't burn the budget on permanent errors
+    /// (auth, model-not-found, etc.). OperationCanceledException always
+    /// propagates.
+    /// </summary>
+    private async Task<(string? Text, string? Error)> CallProviderWithRetryAsync(
+        int iter, ToolLoopGuards guards, CancellationToken ct)
+    {
+        while (true)
+        {
+            try
+            {
+                return (await GenerateOneTurnAsync(ct), null);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                if (ToolLoopGuards.IsTransientHttpError(ex)
+                    && guards.TryConsumeLlmRetry(_opts.MaxLlmRetries))
+                {
+                    var backoff = guards.CurrentBackoff();
+                    if (backoff > TimeSpan.Zero)
+                        await Task.Delay(backoff, ct);
+                    continue;
+                }
+                return (null, $"provider call failed at iteration {iter}: {ex.Message}");
+            }
+        }
     }
 
     private async Task<string> GenerateOneTurnAsync(CancellationToken ct)

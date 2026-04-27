@@ -70,6 +70,7 @@ public sealed class AgentToolLoop : IAgentToolLoop
         _userSendCount++;
         var turns = new List<ToolTurn>();
         string? failure = null;
+        var guards = new ToolLoopGuards();
 
         for (var iter = 0; iter < _opts.MaxIterations; iter++)
         {
@@ -117,7 +118,26 @@ public sealed class AgentToolLoop : IAgentToolLoop
                 var doneMsg = call.Args.TryGetPropertyValue("message", out var m) && m is JsonValue v
                     ? v.GetValue<string>()
                     : "(no message)";
-                return new AgentToolSession(turns, doneMsg, TerminatedCleanly: true, FailureReason: null);
+                return new AgentToolSession(turns, doneMsg, TerminatedCleanly: true, FailureReason: null)
+                    { GuardStats = guards.Snapshot() };
+            }
+
+            // 2-stage repeat defense: first occurrence over the cap is fed
+            // back to the model as an error toolResult so it can self-correct.
+            // Only when the model ignores that feedback MaxConsecutiveBlocks
+            // times in a row do we abort the whole session.
+            var blockMsg = guards.CheckRepeat(call, _opts.MaxSameCallRepeats);
+            if (blockMsg is not null)
+            {
+                if (guards.ShouldHardStop(_opts.MaxConsecutiveBlocks))
+                {
+                    failure = $"aborted after {guards.ConsecutiveBlocks} consecutive blocked repeats";
+                    break;
+                }
+                var blockTurn = new ToolTurn(call, blockMsg);
+                turns.Add(blockTurn);
+                try { _opts.OnTurnCompleted?.Invoke(blockTurn); } catch { /* UI errors must not break the loop */ }
+                continue;
             }
 
             string toolResult;
@@ -131,6 +151,7 @@ public sealed class AgentToolLoop : IAgentToolLoop
             }
             var turn = new ToolTurn(call, toolResult);
             turns.Add(turn);
+            guards.RecordResult(call, toolResult);
 
             // Stream this turn to the UI immediately so the user sees the
             // agent's progress in real time. Callback runs on the task that
@@ -142,7 +163,8 @@ public sealed class AgentToolLoop : IAgentToolLoop
             turns,
             FinalMessage: failure ?? $"max iterations ({_opts.MaxIterations}) reached without 'done'",
             TerminatedCleanly: false,
-            FailureReason: failure);
+            FailureReason: failure)
+            { GuardStats = guards.Snapshot() };
     }
 
     private async Task<string> GenerateOneTurnAsync(string promptForThisTurn, CancellationToken ct)
@@ -351,4 +373,30 @@ public sealed record AgentToolLoopOptions
     /// flooding the dispatcher. Tuneable for tests.
     /// </summary>
     public int ProgressTokenInterval { get; init; } = 64;
+
+    /// <summary>
+    /// Maximum times a model may emit the *same* (tool + canonicalized args)
+    /// call before the loop intercepts and feeds an error toolResult back.
+    /// 3 mirrors AgentWin's ReActActor.MaxSameCallRepeats — enough to cover
+    /// legitimate "send → wait → send same again" patterns once or twice
+    /// while still catching genuine loops.
+    /// </summary>
+    public int MaxSameCallRepeats { get; init; } = 3;
+
+    /// <summary>
+    /// Hard stop after N consecutive blocked calls. When the model ignores
+    /// the block-feedback message and tries the same call yet again, escalate
+    /// from "warn the model" to "abort the session". 3 keeps the session
+    /// alive long enough for self-correction without burning the whole
+    /// MaxIterations budget on rejected calls.
+    /// </summary>
+    public int MaxConsecutiveBlocks { get; init; } = 3;
+
+    /// <summary>
+    /// How many transient HTTP errors (502/503/504/408/429/timeout/etc.) a
+    /// REST-backed loop may absorb before declaring the iteration failed.
+    /// Local LLamaSharp loops never trip this — the field exists on the
+    /// shared options record because both backends share <see cref="ToolLoopGuards"/>.
+    /// </summary>
+    public int MaxLlmRetries { get; init; } = 1;
 }

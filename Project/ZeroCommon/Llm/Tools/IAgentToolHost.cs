@@ -57,4 +57,11 @@ public sealed record AgentToolSession(
     string? FailureReason)
 {
     public int TurnCount => Turns.Count;
+
+    /// <summary>
+    /// Guard activity over the session — non-zero values mean the loop hit
+    /// repeat-blocks or transient-retry budgets. Defaults to <see cref="GuardStats.Empty"/>
+    /// so callers from before the guard rollout keep compiling.
+    /// </summary>
+    public GuardStats GuardStats { get; init; } = GuardStats.Empty;
 }
