@@ -64,7 +64,7 @@ public partial class SettingsPanel
             {
                 tbVoiceSensitivityValue.Text = ((int)slVoiceSensitivity.Value).ToString();
                 if (_voiceCapture is not null)
-                    _voiceCapture.VadThreshold = (100 - (int)slVoiceSensitivity.Value) / 100f;
+                    _voiceCapture.VadThreshold = SensitivityToThreshold(slVoiceSensitivity.Value);
             };
 
             rbVoiceModeAuto.IsChecked = v.VoiceTestAutoMode;
@@ -244,6 +244,39 @@ public partial class SettingsPanel
 
     private static int ParseDeviceNumber(string id) => int.TryParse(id, out var n) ? n : 0;
 
+    /// <summary>
+    /// Origin parity (<c>SettingsPanel.xaml.cs:1499 SensitivityToThreshold</c>).
+    /// Map UI sensitivity (0–100, higher = more sensitive) to a raw RMS amplitude
+    /// threshold using <c>(100 - sens) / 400</c> with a 0.005 floor.
+    ///   sens 100 → 0.005 (very sensitive — picks up breathing)
+    ///   sens 92  → 0.020 (quiet room recommended)
+    ///   sens 75  → 0.0625 (normal)  ← stored default
+    ///   sens 50  → 0.125 (noisy)
+    ///   sens 0   → 0.250 (loud only)
+    /// A linear (sens / 100) mapping is wrong by ~4×: at sens=75 it would give
+    /// 0.25 and the VAD never triggers on normal speech. The /400 curve is what
+    /// origin proved on the same hardware.
+    /// </summary>
+    private static float SensitivityToThreshold(double sensitivityPercent)
+    {
+        var inv = Math.Max(0, 100 - sensitivityPercent) / 400.0;
+        return Math.Max(0.005f, (float)inv);
+    }
+
+    /// <summary>
+    /// Marshalled status update for the Voice Test row. Safe to call from any
+    /// thread — pipeline runs on a thread-pool thread per origin parity, so all
+    /// UI mutations must hop the dispatcher.
+    /// </summary>
+    private void SetVoiceTestStatus(string text, System.Windows.Media.Brush brush)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            tbVoiceTestStatus.Text = text;
+            tbVoiceTestStatus.Foreground = brush;
+        }));
+    }
+
     /// <summary>Build the active <see cref="ISpeechToText"/> from the saved settings.</summary>
     private static ISpeechToText? CreateSttProvider(VoiceSettings v)
     {
@@ -302,12 +335,59 @@ public partial class SettingsPanel
             tbSttSaveStatus.Text = "✓ Saved.";
             tbSttSaveStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
             AppLogger.Log($"[Voice-STT] Saved provider={v.SttProvider} model={v.SttWhisperModel} lang={v.SttLanguage} gpu={v.SttUseGpu}");
+
+            // Origin parity (SettingsPanel.xaml.cs:785). Eagerly warm up the
+            // chosen STT provider so the first transcribe doesn't stall the UI
+            // on cold-start factory init (Whisper "small" is 487 MB on CPU).
+            // Fire-and-forget — failures are surfaced into tbSttSaveStatus but
+            // don't roll back the saved settings.
+            _ = WarmUpSttProviderAsync(v);
         }
         catch (Exception ex)
         {
             tbSttSaveStatus.Text = $"✗ {ex.Message}";
             tbSttSaveStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
             AppLogger.LogError("[Voice-STT] Save failed", ex);
+        }
+    }
+
+    private async Task WarmUpSttProviderAsync(VoiceSettings v)
+    {
+        var stt = CreateSttProvider(v);
+        if (stt is null) return;
+
+        var progress = new Progress<string>(msg => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            tbSttSaveStatus.Text = msg;
+            tbSttSaveStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
+        })));
+
+        try
+        {
+            // Whisper.net's factory init is synchronous CPU+IO-bound work
+            // (mmap + native init). Even though EnsureReadyAsync is `async`,
+            // it doesn't yield internally, so the call must be off-loaded to
+            // a thread-pool thread or the UI freezes for several seconds.
+            var ready = await Task.Run(async () => await stt.EnsureReadyAsync(progress));
+            _ = Dispatcher.BeginInvoke(new Action(() =>
+            {
+                tbSttSaveStatus.Text = ready
+                    ? "✓ Saved + model ready."
+                    : "✓ Saved (provider not ready — see status).";
+                tbSttSaveStatus.Foreground = ready
+                    ? System.Windows.Media.Brushes.LightGreen
+                    : System.Windows.Media.Brushes.Goldenrod;
+            }));
+            AppLogger.Log($"[Voice-STT] Warm-up done | provider={stt.ProviderName} ready={ready}");
+        }
+        catch (Exception ex)
+        {
+            _ = Dispatcher.BeginInvoke(new Action(() =>
+            {
+                tbSttSaveStatus.Text = $"✓ Saved (warm-up failed: {ex.Message})";
+                tbSttSaveStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
+            }));
+            AppLogger.LogError("[Voice-STT] Warm-up failed", ex);
         }
     }
 
@@ -383,12 +463,13 @@ public partial class SettingsPanel
     private void OnVoiceRefreshDevices(object sender, RoutedEventArgs e)
     {
         RefreshVoiceInputDevices(VoiceSettingsStore.Load().InputDeviceId);
-        tbVoiceTestStatus.Text = $"Device list refreshed ({cbVoiceInputDevice.Items.Count} item(s)).";
-        tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
+        SetVoiceTestStatus(
+            $"Device list refreshed ({cbVoiceInputDevice.Items.Count} item(s)).",
+            System.Windows.Media.Brushes.SkyBlue);
     }
 
     // Voice Test — START/STOP toggle drives the full pipeline.
-    private async void OnVoiceTestStartStop(object sender, RoutedEventArgs e)
+    private void OnVoiceTestStartStop(object sender, RoutedEventArgs e)
     {
         UpdateVoiceTestActiveLlmLabel();
 
@@ -405,11 +486,19 @@ public partial class SettingsPanel
             try { _voiceCapture?.Stop(); } catch { }
             _pipelineCts?.Cancel();
             btnVoiceTestStart.Content = "START";
-            tbVoiceTestStatus.Text = "Stopped.";
-            tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
+            SetVoiceTestStatus("Stopped.", System.Windows.Media.Brushes.SkyBlue);
 
             if (manual && pendingPcm is { Length: > 0 } && !_pipelineBusy)
-                await RunPipelineOnceAsync(pendingPcm);
+            {
+                var pcmRef = pendingPcm;
+                _ = Task.Run(async () =>
+                {
+                    AppLogger.Log($"[Voice] Task.Run transcribe start (manual) | thread=#{Environment.CurrentManagedThreadId} pcm={pcmRef.Length}");
+                    try { await RunPipelineOnceAsync(pcmRef); }
+                    catch (Exception ex) { AppLogger.LogError("[Voice] Manual pipeline crashed", ex); }
+                    AppLogger.Log("[Voice] Task.Run transcribe done (manual)");
+                });
+            }
             return;
         }
 
@@ -421,8 +510,9 @@ public partial class SettingsPanel
         _voicePlayback ??= new VoicePlaybackService();
         _pipelineCts = new CancellationTokenSource();
 
-        _voiceCapture.VadThreshold = v.VadThreshold / 100f;
+        _voiceCapture.VadThreshold = SensitivityToThreshold(slVoiceSensitivity.Value);
         _voiceCapture.BufferPcm = true;
+        AppLogger.Log($"[Voice] VAD threshold = {_voiceCapture.VadThreshold:F4} (sensitivity {(int)slVoiceSensitivity.Value}/100)");
 
         // Marshal events back to the UI thread — NAudio fires them from its
         // own capture thread.
@@ -439,16 +529,16 @@ public partial class SettingsPanel
             var deviceNumber = ParseDeviceNumber(v.InputDeviceId);
             _voiceCapture.Start(deviceNumber);
             btnVoiceTestStart.Content = "STOP";
-            tbVoiceTestStatus.Text = rbVoiceModeAuto.IsChecked == true
-                ? "Listening (Auto VAD) — speak; press STOP to end."
-                : "Recording (Manual) — press STOP to transcribe.";
-            tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
+            SetVoiceTestStatus(
+                rbVoiceModeAuto.IsChecked == true
+                    ? "Listening (Auto VAD) — speak; press STOP to end."
+                    : "Recording (Manual) — press STOP to transcribe.",
+                System.Windows.Media.Brushes.LightGreen);
         }
         catch (Exception ex)
         {
             btnVoiceTestStart.Content = "START";
-            tbVoiceTestStatus.Text = $"✗ Capture start failed: {ex.Message}";
-            tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
+            SetVoiceTestStatus($"✗ Capture start failed: {ex.Message}", System.Windows.Media.Brushes.OrangeRed);
             AppLogger.LogError("[Voice] Capture start failed", ex);
         }
     }
@@ -466,12 +556,24 @@ public partial class SettingsPanel
         _voiceCapture?.SeedBufferWithPreRoll();
     }
 
-    private async void OnUtteranceEndedAsync()
+    private void OnUtteranceEndedAsync()
     {
         if (_voiceCapture is null) return;
         var pcm = _voiceCapture.ConsumePcmBuffer();
         if (pcm.Length < 8000) return; // <0.25s — too short to bother
-        await Dispatcher.InvokeAsync(() => RunPipelineOnceAsync(pcm));
+
+        // Origin parity (SettingsPanel.xaml.cs:1268). Run the whole STT → LLM
+        // → TTS pipeline on a thread-pool thread so the UI never freezes
+        // during the synchronous Whisper factory init or the LLM call. UI
+        // updates inside RunPipelineOnceAsync hop the dispatcher via
+        // SetVoiceTestStatus / AppendTranscript.
+        _ = Task.Run(async () =>
+        {
+            AppLogger.Log($"[Voice] Task.Run transcribe start (auto) | thread=#{Environment.CurrentManagedThreadId} pcm={pcm.Length}");
+            try { await RunPipelineOnceAsync(pcm); }
+            catch (Exception ex) { AppLogger.LogError("[Voice] Auto pipeline crashed", ex); }
+            AppLogger.Log("[Voice] Task.Run transcribe done (auto)");
+        });
     }
 
     private async Task RunPipelineOnceAsync(byte[] pcm)
@@ -491,15 +593,11 @@ public partial class SettingsPanel
                 AppendTranscript($"[STT] Provider '{v.SttProvider}' not recognised.");
                 return;
             }
-            tbVoiceTestStatus.Text = $"STT ({stt.ProviderName})…";
-            tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
+            SetVoiceTestStatus($"STT ({stt.ProviderName})…", System.Windows.Media.Brushes.SkyBlue);
 
             var ready = await stt.EnsureReadyAsync(
-                new Progress<string>(msg => Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    tbVoiceTestStatus.Text = msg;
-                    tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
-                }))), ct);
+                new Progress<string>(msg => SetVoiceTestStatus(msg, System.Windows.Media.Brushes.SkyBlue)),
+                ct);
             if (!ready)
             {
                 AppendTranscript("[STT] Provider reported not-ready (see status above).");
@@ -531,7 +629,7 @@ public partial class SettingsPanel
                 return;
             }
 
-            tbVoiceTestStatus.Text = "LLM…";
+            SetVoiceTestStatus("LLM…", System.Windows.Media.Brushes.SkyBlue);
             string answer;
             try
             {
@@ -555,12 +653,11 @@ public partial class SettingsPanel
             var tts = CreateTtsProvider(v);
             if (tts is null)
             {
-                tbVoiceTestStatus.Text = "Done (TTS off).";
-                tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
+                SetVoiceTestStatus("Done (TTS off).", System.Windows.Media.Brushes.LightGreen);
                 return;
             }
 
-            tbVoiceTestStatus.Text = $"TTS ({tts.ProviderName})…";
+            SetVoiceTestStatus($"TTS ({tts.ProviderName})…", System.Windows.Media.Brushes.SkyBlue);
             byte[] audio;
             try
             {
@@ -575,8 +672,7 @@ public partial class SettingsPanel
             }
             if (audio.Length == 0)
             {
-                tbVoiceTestStatus.Text = "TTS returned empty audio.";
-                tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
+                SetVoiceTestStatus("TTS returned empty audio.", System.Windows.Media.Brushes.Goldenrod);
                 return;
             }
 
@@ -594,8 +690,7 @@ public partial class SettingsPanel
                 };
                 _voicePlayback.PlaybackStopped += unmute;
                 _voicePlayback.Play(audio, tts.AudioFormat);
-                tbVoiceTestStatus.Text = "Playing back AI response…";
-                tbVoiceTestStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
+                SetVoiceTestStatus("Playing back AI response…", System.Windows.Media.Brushes.LightGreen);
             }
             catch (Exception ex)
             {
