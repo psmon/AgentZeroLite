@@ -1698,6 +1698,20 @@ public partial class MainWindow : Window
             }
         };
 
+        // Activate the document when the terminal area receives focus.
+        // EasyTerminalControl is HwndHost-based, so mouse-down on the console
+        // body is consumed by the native control and never reaches WPF as a
+        // PreviewMouseLeftButtonDown — the only consistent signal we get is
+        // the routed focus event that bubbles up from the win32 child. Without
+        // this hook the user has to click the *tab strip* at the top to make
+        // a split-pane Document active; click on the console body itself
+        // doesn't switch active state.
+        terminal.GotFocus += (_, _) =>
+        {
+            if (tab.Document is not null && !tab.Document.IsActive)
+                tab.Document.IsActive = true;
+        };
+
         tab.TerminalHost.Children.Add(terminal);
 
         // Capture group name now (before async Loaded) for session ID
