@@ -1366,6 +1366,18 @@ public partial class MainWindow : Window
     private void ActivateGroup(int index)
     {
         if (index < 0 || index >= _cliGroups.Count) return;
+
+        // Re-clicking the *same* workspace sidebar button (or the CLI+
+        // sidebar button after a Settings round-trip) used to wipe the
+        // user's split-pane layout because RebuildDocumentPane unconditionally
+        // calls terminalDocPane.Children.Clear() and re-adds every Document
+        // into the first pane. The pane structure itself survives, but the
+        // Document → Pane mapping doesn't.
+        //
+        // Only rebuild when the active group actually changes. Sidebar
+        // highlight + active-tab refresh below still run on every call so
+        // a re-click still keeps the active-tab state coherent.
+        var sameGroup = _activeGroupIndex == index;
         _activeGroupIndex = index;
 
         // Update sidebar highlights
@@ -1376,8 +1388,11 @@ public partial class MainWindow : Window
                 : System.Windows.Media.Brushes.Transparent;
         }
 
-        // Rebuild AvalonDock documents for active group
-        RebuildDocumentPane();
+        if (!sameGroup)
+        {
+            // Rebuild AvalonDock documents only on a *real* group switch.
+            RebuildDocumentPane();
+        }
 
         // Ensure at least the first tab is selected when no tab is active
         var tabIdx = _activeConsoleTab;
@@ -1388,7 +1403,7 @@ public partial class MainWindow : Window
         else
             RefreshSessionList();
 
-        AppLogger.Log($"[CLI] 그룹 전환: {_cliGroups[index].DisplayName} ({_cliGroups[index].DirectoryPath})");
+        AppLogger.Log($"[CLI] 그룹 전환: {_cliGroups[index].DisplayName} ({_cliGroups[index].DirectoryPath}) sameGroup={sameGroup}");
     }
 
     private void RebuildDocumentPane()
