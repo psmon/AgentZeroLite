@@ -1,0 +1,40 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.Voice.VoiceWaveformIndicator"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Height="28" MinWidth="120"
+             Background="Transparent"
+             SnapsToDevicePixels="True">
+
+    <UserControl.Resources>
+        <!--
+            Vertical bar template — 4px wide, anchored to baseline, animated
+            via the Height DP from the code-behind rolling buffer. The
+            DropShadowEffect breathes whenever the waveform is active so the
+            indicator reads as "alive" even during natural pauses.
+        -->
+        <Style x:Key="WaveBarStyle" TargetType="Rectangle">
+            <Setter Property="Width" Value="4"/>
+            <Setter Property="RadiusX" Value="2"/>
+            <Setter Property="RadiusY" Value="2"/>
+            <Setter Property="Fill" Value="#3794FF"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Height" Value="3"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Border x:Name="root" Background="Transparent" Padding="6,2" CornerRadius="3">
+        <Border.Effect>
+            <DropShadowEffect x:Name="glow"
+                              ShadowDepth="0"
+                              BlurRadius="0"
+                              Color="#3794FF"
+                              Opacity="0"/>
+        </Border.Effect>
+
+        <StackPanel x:Name="bars" Orientation="Horizontal"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    UseLayoutRounding="True">
+            <!-- Bars are spawned in code-behind so the bar count stays a single source of truth. -->
+        </StackPanel>
+    </Border>
+</UserControl>

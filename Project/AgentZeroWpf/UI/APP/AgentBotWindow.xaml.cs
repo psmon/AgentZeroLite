@@ -164,6 +164,7 @@ public partial class AgentBotWindow : Window
     private void OnWindowClosed(object? sender, EventArgs e)
     {
         DetachEventStream();
+        DisposeVoiceRuntime();
     }
 
     /// <summary>

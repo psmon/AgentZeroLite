@@ -276,26 +276,11 @@ public partial class SettingsPanel
         return LlmGateway.OpenSession();
     }
 
-    private static int ParseDeviceNumber(string id) => int.TryParse(id, out var n) ? n : 0;
+    private static int ParseDeviceNumber(string id) => VoiceRuntimeFactory.ParseDeviceNumber(id);
 
-    /// <summary>
-    /// Origin parity (<c>SettingsPanel.xaml.cs:1499 SensitivityToThreshold</c>).
-    /// Map UI sensitivity (0–100, higher = more sensitive) to a raw RMS amplitude
-    /// threshold using <c>(100 - sens) / 400</c> with a 0.005 floor.
-    ///   sens 100 → 0.005 (very sensitive — picks up breathing)
-    ///   sens 92  → 0.020 (quiet room recommended)
-    ///   sens 75  → 0.0625 (normal)  ← stored default
-    ///   sens 50  → 0.125 (noisy)
-    ///   sens 0   → 0.250 (loud only)
-    /// A linear (sens / 100) mapping is wrong by ~4×: at sens=75 it would give
-    /// 0.25 and the VAD never triggers on normal speech. The /400 curve is what
-    /// origin proved on the same hardware.
-    /// </summary>
+    /// <summary>Origin sensitivity-curve parity. See <see cref="VoiceRuntimeFactory.SensitivityToThreshold"/>.</summary>
     private static float SensitivityToThreshold(double sensitivityPercent)
-    {
-        var inv = Math.Max(0, 100 - sensitivityPercent) / 400.0;
-        return Math.Max(0.005f, (float)inv);
-    }
+        => VoiceRuntimeFactory.SensitivityToThreshold(sensitivityPercent);
 
     /// <summary>
     /// Marshalled status update for the Voice Test row. Safe to call from any
@@ -360,18 +345,8 @@ public partial class SettingsPanel
         return true;
     }
 
-    /// <summary>Build the active <see cref="ISpeechToText"/> from the saved settings.</summary>
-    private static ISpeechToText? CreateSttProvider(VoiceSettings v)
-    {
-        return v.SttProvider switch
-        {
-            SttProviderNames.WhisperLocal => new WhisperLocalStt(v.SttWhisperModel) { UseGpu = v.SttUseGpu },
-            SttProviderNames.OpenAIWhisper => new OpenAiWhisperStt(v.SttOpenAIApiKey),
-            SttProviderNames.WebnoriGemma => new WebnoriGemmaStt(v.SttWebnoriModel),
-            SttProviderNames.LocalGemma => new LocalGemmaStt(v.SttLocalGemmaModelId),
-            _ => null,
-        };
-    }
+    /// <summary>Build the active <see cref="ISpeechToText"/>; delegates to <see cref="VoiceRuntimeFactory.BuildStt"/>.</summary>
+    private static ISpeechToText? CreateSttProvider(VoiceSettings v) => VoiceRuntimeFactory.BuildStt(v);
 
     /// <summary>Build the active <see cref="ITextToSpeech"/>; returns null when TTS is Off.</summary>
     private static ITextToSpeech? CreateTtsProvider(VoiceSettings v)
