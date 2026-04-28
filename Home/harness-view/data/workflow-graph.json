@@ -1,0 +1,54 @@
+{
+  "_description": "Static — workflow graph for AgentZero Lite. Skill-system workflows are intentionally excluded (per project rule). Update when engine .md files change.",
+  "workflows": [
+    {
+      "id": "multi-cli",
+      "label": "Multi-CLI Workflow",
+      "file": "Docs/harness/multi-cli-workflow.md",
+      "description": "Multiple ConPTY tabs hosting different AI CLIs side by side; messages routed between them via WM_COPYDATA + bot-chat",
+      "mermaid": "graph LR\n  U[User] --> S[StageActor]\n  S --> W[WorkspaceActor]\n  W --> T1[Terminal: Claude]\n  W --> T2[Terminal: Codex]\n  T1 -. bot-chat --from .-> S\n  T2 -. bot-chat --from .-> S"
+    },
+    {
+      "id": "aimode-handshake",
+      "label": "AIMODE — Identity-first Handshake",
+      "file": "Docs/harness/aimode-handshake.md",
+      "description": "Local AgentBot first-contacts a peer terminal, the peer acks via -cli bot-chat with --from <peerName>, then substantive exchange begins",
+      "mermaid": "sequenceDiagram\n  participant U as User\n  participant B as AgentBot (local)\n  participant R as AgentReactorActor\n  participant P as Peer terminal\n  U->>B: \"Talk to the Claude tab\"\n  B->>R: StartReactor (Mode 2)\n  R->>P: send_to_terminal(handshake)\n  P->>B: bot-chat \"DONE(handshake-ok)\" --from Claude\n  R->>P: substantive turn\n  P->>B: real reply"
+    },
+    {
+      "id": "tool-call-loop",
+      "label": "Tool-call Loop (dual backend)",
+      "file": "Docs/harness/tool-call-loop.md",
+      "description": "Gemma path enforces structure via GBNF sampler; Nemotron path uses native Llama-3.1 chat template. Both share IAgentToolHost",
+      "mermaid": "flowchart TD\n  U[User prompt] --> L[AgentToolLoop]\n  L -->|Gemma path| GBNF[GBNF sampler<br/>5-tool catalog]\n  L -->|Nemotron path| TPL[Llama-3.1 chat template<br/>native tool channel]\n  GBNF --> P[Parse JSON]\n  TPL --> P\n  P --> H[IAgentToolHost<br/>WorkspaceTerminalToolHost]\n  H -->|tool result| L\n  L -->|loop until done| L"
+    },
+    {
+      "id": "provider-switch",
+      "label": "LLM Provider Switch",
+      "file": "Docs/harness/provider-switch.md",
+      "description": "One Local/External radio in the LLM tab; factory returns the right ILlmProvider at runtime. Four hosted/local providers behind a single OpenAiCompatibleProvider",
+      "mermaid": "flowchart TD\n  S[\"LLM tab — Local · External\"] --> F[LlmProviderFactory]\n  F -->|Local| LH[\"LLamaSharp host<br/>Gemma 4 / Nemotron\"]\n  F -->|External| OAC[OpenAiCompatibleProvider]\n  OAC --> W[Webnori]\n  OAC --> O[OpenAI]\n  OAC --> LMS[LM Studio]\n  OAC --> OLL[Ollama]"
+    },
+    {
+      "id": "voice-pipeline",
+      "label": "Voice Pipeline (STT → LLM → TTS)",
+      "file": "Docs/harness/voice-pipeline.md",
+      "description": "NAudio mic → dual-VAD → ISpeechToText → LlmGateway.OpenSession → ITextToSpeech → NAudio playback. Mute-while-playing prevents the loop talking to itself",
+      "mermaid": "flowchart LR\n  M[Mic<br/>NAudio<br/>16 kHz mono] --> V[VAD<br/>frame + utterance]\n  V -->|UtteranceEnded| STT[ISpeechToText]\n  STT -->|text| GW[LlmGateway.OpenSession]\n  GW -->|reply| CL[TtsTextCleaner]\n  CL --> TTS[ITextToSpeech]\n  TTS -->|audio bytes| PB[VoicePlaybackService]\n  PB -->|while playing| MUTE[Muted=true]\n  MUTE -.-> M"
+    },
+    {
+      "id": "release-pipeline",
+      "label": "Release Pipeline",
+      "file": "Docs/harness/release-pipeline.md",
+      "description": "version.txt bump → annotated git tag → GitHub Actions builds win-x64 self-contained ZIP + Inno Setup installer → publishes to GitHub Releases",
+      "mermaid": "graph LR\n  V[version.txt bump] --> T[annotated git tag]\n  T --> P[git push --tags]\n  P --> GA[GitHub Actions]\n  GA --> Z[win-x64 ZIP]\n  GA --> I[Inno Setup installer]\n  Z --> R[GitHub Releases]\n  I --> R"
+    },
+    {
+      "id": "tech-doc-publish",
+      "label": "Tech Doc Publishing (Notion → X)",
+      "file": "Docs/harness/tech-doc-publish.md",
+      "description": "Vault-first English drafting in a separate Obsidian repo, then Notion AI-DOC publish, then X announcement (canonical pattern: title + URL + 🔗 backlinks + quote card)",
+      "mermaid": "flowchart LR\n  D[Vault draft<br/>D:\\MYNOTE\\Tech\\AgentZeroLite] --> A[Approval]\n  A --> N[Notion AI-DOC]\n  N --> V[Verify publish]\n  V --> X[X post — canonical]\n  X --> AN[Annotate vault]"
+    }
+  ]
+}

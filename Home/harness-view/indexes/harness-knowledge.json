@@ -1,0 +1,77 @@
+{
+  "base": "harness/knowledge",
+  "items": [
+    {
+      "id": "harness/knowledge/agent-origin-reference.md",
+      "file": "harness/knowledge/agent-origin-reference.md",
+      "name": "agent-origin-reference.md",
+      "title": "agent-origin-reference",
+      "heading": "Agent Origin (AgentWin) Reference Protocol",
+      "size": 3616,
+      "modified": "2026-04-27"
+    },
+    {
+      "id": "harness/knowledge/agentzerolite-architecture.md",
+      "file": "harness/knowledge/agentzerolite-architecture.md",
+      "name": "agentzerolite-architecture.md",
+      "title": "agentzerolite-architecture",
+      "heading": "AgentZero Lite — Architecture Map (for harness agents)",
+      "size": 4583,
+      "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
+      "file": "harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
+      "name": "2026-04-22-msys2-bash-crash-llamacpp-build.md",
+      "title": "2026-04-22-msys2-bash-crash-llamacpp-build",
+      "heading": "2026-04-22 — MSYS2 `bash.exe` crash during llama.cpp / Gemma 4 build",
+      "size": 8640,
+      "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/crash-dump-forensics.md",
+      "file": "harness/knowledge/crash-dump-forensics.md",
+      "name": "crash-dump-forensics.md",
+      "title": "crash-dump-forensics",
+      "heading": "Crash Dump Forensics — Playbook",
+      "size": 7205,
+      "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/dotnet-test-execution.md",
+      "file": "harness/knowledge/dotnet-test-execution.md",
+      "name": "dotnet-test-execution.md",
+      "title": "dotnet-test-execution",
+      "heading": "dotnet test 실행 규칙 — 정전(canon)",
+      "size": 4940,
+      "modified": "2026-04-27"
+    },
+    {
+      "id": "harness/knowledge/llm-prompt-conventions.md",
+      "file": "harness/knowledge/llm-prompt-conventions.md",
+      "name": "llm-prompt-conventions.md",
+      "title": "llm-prompt-conventions",
+      "heading": "LLM Prompt Conventions",
+      "size": 4366,
+      "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/ondevice-tool-calling-survey.md",
+      "file": "harness/knowledge/ondevice-tool-calling-survey.md",
+      "name": "ondevice-tool-calling-survey.md",
+      "title": "ondevice-tool-calling-survey",
+      "heading": "On-Device Tool Calling — Gemma 4 vs Nemotron Nano (2026-04 survey)",
+      "size": 8930,
+      "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/security-surface.md",
+      "file": "harness/knowledge/security-surface.md",
+      "name": "security-surface.md",
+      "title": "security-surface",
+      "heading": "Security Surface — Prompt Injection → OS Exec Map",
+      "size": 4836,
+      "modified": "2026-04-25"
+    }
+  ]
+}

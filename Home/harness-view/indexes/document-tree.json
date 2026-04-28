@@ -1,0 +1,292 @@
+{
+  "base": "Docs",
+  "tree": [
+    {
+      "type": "dir",
+      "name": "agent-origin",
+      "path": "agent-origin",
+      "children": [
+        {
+          "type": "file",
+          "name": "01-stack-comparison.md",
+          "path": "agent-origin/01-stack-comparison.md",
+          "size": 20689,
+          "modified": "2026-04-27"
+        },
+        {
+          "type": "file",
+          "name": "02-architecture-comparison.md",
+          "path": "agent-origin/02-architecture-comparison.md",
+          "size": 26290,
+          "modified": "2026-04-27"
+        },
+        {
+          "type": "file",
+          "name": "03-adoption-recommendations.md",
+          "path": "agent-origin/03-adoption-recommendations.md",
+          "size": 19950,
+          "modified": "2026-04-27"
+        },
+        {
+          "type": "file",
+          "name": "README.md",
+          "path": "agent-origin/README.md",
+          "size": 6601,
+          "modified": "2026-04-27"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "gemma4-gpu-load-failures.md",
+      "path": "gemma4-gpu-load-failures.md",
+      "size": 14724,
+      "modified": "2026-04-23"
+    },
+    {
+      "type": "file",
+      "name": "gemma4-performance-benchmarks.md",
+      "path": "gemma4-performance-benchmarks.md",
+      "size": 10609,
+      "modified": "2026-04-23"
+    },
+    {
+      "type": "dir",
+      "name": "harness",
+      "path": "harness",
+      "children": [
+        {
+          "type": "dir",
+          "name": "en",
+          "path": "harness/en",
+          "children": [
+            {
+              "type": "file",
+              "name": "first-world.md",
+              "path": "harness/en/first-world.md",
+              "size": 16517,
+              "modified": "2026-04-25"
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "first-world.md",
+          "path": "harness/first-world.md",
+          "size": 13147,
+          "modified": "2026-04-25"
+        },
+        {
+          "type": "dir",
+          "name": "template",
+          "path": "harness/template",
+          "children": [
+            {
+              "type": "dir",
+              "name": "harness-build",
+              "path": "harness/template/harness-build",
+              "children": [
+                {
+                  "type": "file",
+                  "name": "SKILL.md",
+                  "path": "harness/template/harness-build/SKILL.md",
+                  "size": 7464,
+                  "modified": "2026-04-20"
+                }
+              ]
+            },
+            {
+              "type": "dir",
+              "name": "harness-chakra-kakashi",
+              "path": "harness/template/harness-chakra-kakashi",
+              "children": [
+                {
+                  "type": "dir",
+                  "name": "references",
+                  "path": "harness/template/harness-chakra-kakashi/references",
+                  "children": [
+                    {
+                      "type": "file",
+                      "name": "chakra-masking.md",
+                      "path": "harness/template/harness-chakra-kakashi/references/chakra-masking.md",
+                      "size": 3876,
+                      "modified": "2026-04-20"
+                    },
+                    {
+                      "type": "file",
+                      "name": "claude-code-2-token-sources.md",
+                      "path": "harness/template/harness-chakra-kakashi/references/claude-code-2-token-sources.md",
+                      "size": 6356,
+                      "modified": "2026-04-20"
+                    },
+                    {
+                      "type": "file",
+                      "name": "jutsu-patterns.md",
+                      "path": "harness/template/harness-chakra-kakashi/references/jutsu-patterns.md",
+                      "size": 5450,
+                      "modified": "2026-04-20"
+                    }
+                  ]
+                },
+                {
+                  "type": "file",
+                  "name": "SKILL.md",
+                  "path": "harness/template/harness-chakra-kakashi/SKILL.md",
+                  "size": 10931,
+                  "modified": "2026-04-20"
+                }
+              ]
+            },
+            {
+              "type": "dir",
+              "name": "harness-kakashi-creator",
+              "path": "harness/template/harness-kakashi-creator",
+              "children": [
+                {
+                  "type": "dir",
+                  "name": "references",
+                  "path": "harness/template/harness-kakashi-creator/references",
+                  "children": [
+                    {
+                      "type": "file",
+                      "name": "evaluation.md",
+                      "path": "harness/template/harness-kakashi-creator/references/evaluation.md",
+                      "size": 3437,
+                      "modified": "2026-04-19"
+                    },
+                    {
+                      "type": "file",
+                      "name": "layer-guide.md",
+                      "path": "harness/template/harness-kakashi-creator/references/layer-guide.md",
+                      "size": 2887,
+                      "modified": "2026-04-19"
+                    },
+                    {
+                      "type": "file",
+                      "name": "onboarding-best-case.md",
+                      "path": "harness/template/harness-kakashi-creator/references/onboarding-best-case.md",
+                      "size": 6429,
+                      "modified": "2026-04-19"
+                    },
+                    {
+                      "type": "file",
+                      "name": "skill-separation.md",
+                      "path": "harness/template/harness-kakashi-creator/references/skill-separation.md",
+                      "size": 3408,
+                      "modified": "2026-04-19"
+                    },
+                    {
+                      "type": "file",
+                      "name": "tamer-agent.md",
+                      "path": "harness/template/harness-kakashi-creator/references/tamer-agent.md",
+                      "size": 3820,
+                      "modified": "2026-04-19"
+                    }
+                  ]
+                },
+                {
+                  "type": "file",
+                  "name": "SKILL.md",
+                  "path": "harness/template/harness-kakashi-creator/SKILL.md",
+                  "size": 25300,
+                  "modified": "2026-04-19"
+                },
+                {
+                  "type": "dir",
+                  "name": "templates",
+                  "path": "harness/template/harness-kakashi-creator/templates",
+                  "children": [
+                    {
+                      "type": "dir",
+                      "name": "harness",
+                      "path": "harness/template/harness-kakashi-creator/templates/harness",
+                      "children": [
+                        {
+                          "type": "dir",
+                          "name": "agents",
+                          "path": "harness/template/harness-kakashi-creator/templates/harness/agents",
+                          "children": [
+                            {
+                              "type": "file",
+                              "name": "tamer.md",
+                              "path": "harness/template/harness-kakashi-creator/templates/harness/agents/tamer.md",
+                              "size": 2957,
+                              "modified": "2026-04-19"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "dir",
+                          "name": "docs",
+                          "path": "harness/template/harness-kakashi-creator/templates/harness/docs",
+                          "children": [
+                            {
+                              "type": "file",
+                              "name": "README.md",
+                              "path": "harness/template/harness-kakashi-creator/templates/harness/docs/README.md",
+                              "size": 1251,
+                              "modified": "2026-04-19"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "name": "llm",
+      "path": "llm",
+      "children": [
+        {
+          "type": "dir",
+          "name": "en",
+          "path": "llm/en",
+          "children": [
+            {
+              "type": "file",
+              "name": "gemma4-ondevice-tutorial.md",
+              "path": "llm/en/gemma4-ondevice-tutorial.md",
+              "size": 24716,
+              "modified": "2026-04-25"
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "index.md",
+          "path": "llm/index.md",
+          "size": 5968,
+          "modified": "2026-04-25"
+        },
+        {
+          "type": "dir",
+          "name": "ko",
+          "path": "llm/ko",
+          "children": [
+            {
+              "type": "file",
+              "name": "gemma4-ondevice-tutorial.md",
+              "path": "llm/ko/gemma4-ondevice-tutorial.md",
+              "size": 26562,
+              "modified": "2026-04-25"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "resaerch-geema4.md",
+      "path": "resaerch-geema4.md",
+      "size": 25029,
+      "modified": "2026-04-23"
+    }
+  ]
+}

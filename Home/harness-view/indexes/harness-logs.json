@@ -1,0 +1,265 @@
+{
+  "base": "harness/logs",
+  "categories": [
+    "code-coach",
+    "pre-commit-review",
+    "security-guard",
+    "tamer"
+  ],
+  "counts": {
+    "code-coach": 13,
+    "pre-commit-review": 7,
+    "security-guard": 2,
+    "tamer": 9
+  },
+  "items": [
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-04-28-10-15-voice-subsystem-review.md",
+      "date": "2026-04-28",
+      "time": "10:15",
+      "title": "voice subsystem review",
+      "size": 9378
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-28-09-30-dotnet-test-execution-canon.md",
+      "date": "2026-04-28",
+      "time": "09:30",
+      "title": "dotnet test execution canon",
+      "size": 4426
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-27-2200-precommit-layout-preservation.md",
+      "date": "2026-04-27",
+      "time": "22:00",
+      "title": "precommit layout preservation",
+      "size": 3240
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-27-2010-precommit-path-cli-debuggability.md",
+      "date": "2026-04-27",
+      "time": "20:10",
+      "title": "precommit path cli debuggability",
+      "size": 4553
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-27-15-50-issue-handoff-policy.md",
+      "date": "2026-04-27",
+      "time": "15:50",
+      "title": "issue handoff policy",
+      "size": 7170
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-27-1545-precommit-react-actor-guards.md",
+      "date": "2026-04-27",
+      "time": "15:45",
+      "title": "precommit react actor guards",
+      "size": 6012
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-27-15-30-react-actor-guard-implementation.md",
+      "date": "2026-04-27",
+      "time": "15:30",
+      "title": "react actor guard implementation",
+      "size": 9265
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-27-15-00-react-actor-guard-analysis.md",
+      "date": "2026-04-27",
+      "time": "15:00",
+      "title": "react actor guard analysis",
+      "size": 9445
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-27-14-15-flow-update-agent-origin-reference.md",
+      "date": "2026-04-27",
+      "time": "14:15",
+      "title": "flow update agent origin reference",
+      "size": 7203
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-27-14-04-agent-origin-comparison-doc.md",
+      "date": "2026-04-27",
+      "time": "14:04",
+      "title": "agent origin comparison doc",
+      "size": 6603
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-26-0142-aimode-reactor-actor-plan.md",
+      "date": "2026-04-26",
+      "time": "01:42",
+      "title": "aimode reactor actor plan",
+      "size": 26907
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-26-0110-aimode-nemotron-failure-rca.md",
+      "date": "2026-04-26",
+      "time": "01:10",
+      "title": "aimode nemotron failure rca",
+      "size": 9472
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1930-precommit-nemotron-backend.md",
+      "date": "2026-04-25",
+      "time": "19:30",
+      "title": "precommit nemotron backend",
+      "size": 3922
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-04-25-1930-nemotron-backend.md",
+      "date": "2026-04-25",
+      "time": "19:30",
+      "title": "nemotron backend",
+      "size": 1133
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1900-precommit-aimode-wireup.md",
+      "date": "2026-04-25",
+      "time": "19:00",
+      "title": "precommit aimode wireup",
+      "size": 3726
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-04-25-1900-aimode-wireup.md",
+      "date": "2026-04-25",
+      "time": "19:00",
+      "title": "aimode wireup",
+      "size": 1544
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1845-precommit-toolhost.md",
+      "date": "2026-04-25",
+      "time": "18:45",
+      "title": "precommit toolhost",
+      "size": 2353
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-04-25-1845-toolhost.md",
+      "date": "2026-04-25",
+      "time": "18:45",
+      "title": "toolhost",
+      "size": 707
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1830-precommit-chatmode-ai.md",
+      "date": "2026-04-25",
+      "time": "18:30",
+      "title": "precommit chatmode ai",
+      "size": 2318
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-04-25-1830-chatmode-ai.md",
+      "date": "2026-04-25",
+      "time": "18:30",
+      "title": "chatmode ai",
+      "size": 999
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1740-precommit-t3g-t4g.md",
+      "date": "2026-04-25",
+      "time": "17:40",
+      "title": "precommit t3g t4g",
+      "size": 3554
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-04-25-1740-t3g-t4g.md",
+      "date": "2026-04-25",
+      "time": "17:40",
+      "title": "t3g t4g",
+      "size": 1137
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1720-precommit-tools-layer.md",
+      "date": "2026-04-25",
+      "time": "17:20",
+      "title": "precommit tools layer",
+      "size": 4227
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-04-25-1720-tools-layer.md",
+      "date": "2026-04-25",
+      "time": "17:20",
+      "title": "tools layer",
+      "size": 1545
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1640-precommit-nemotron-catalog.md",
+      "date": "2026-04-25",
+      "time": "16:40",
+      "title": "precommit nemotron catalog",
+      "size": 2263
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-04-25-1640-nemotron-catalog.md",
+      "date": "2026-04-25",
+      "time": "16:40",
+      "title": "nemotron catalog",
+      "size": 1254
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-04-25-1620-aimode-research.md",
+      "date": "2026-04-25",
+      "time": "16:20",
+      "title": "aimode research",
+      "size": 6366
+    },
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-04-25-1600-baseline-full-pass.md",
+      "date": "2026-04-25",
+      "time": "16:00",
+      "title": "baseline full pass",
+      "size": 16874
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-25-1530-fill-msys2-resolution.md",
+      "date": "2026-04-25",
+      "time": "15:30",
+      "title": "fill msys2 resolution",
+      "size": 3622
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-25-1500-designate-crash-dump-owner.md",
+      "date": "2026-04-25",
+      "time": "15:00",
+      "title": "designate crash dump owner",
+      "size": 4115
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-25-1440-plant-four-specialists.md",
+      "date": "2026-04-25",
+      "time": "14:40",
+      "title": "plant four specialists",
+      "size": 4308
+    }
+  ]
+}

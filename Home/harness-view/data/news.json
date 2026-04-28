@@ -1,0 +1,15 @@
+{
+  "updatedAt": "2026-04-28",
+  "headline": "v0.1.5 — Voice subsystem scaffolded; multi-provider LLM expansion shipped",
+  "narrative": "AgentZero Lite reached v0.1.5 with two simultaneous expansions on the same foundation. The LLM layer went from a single local Gemma-4 to five backends (local Gemma, local Nemotron Nano 8B, Webnori, OpenAI, LM Studio, Ollama) behind one OpenAI-compatible interface. The modality layer grew a voice — STT/TTS scaffolded with a Voice tab, dual-VAD mic capture, mute-while-playing feedback suppression, and a default loop that runs end-to-end on Win11 OS-level voices for $0/month. Both expansions slot behind already-named interfaces (ILlmProvider, ISpeechToText, ITextToSpeech) — the agent grows by adding implementations, not new shells.",
+  "highlights": [
+    { "label": "Multi-provider",  "text": "5 LLM backends behind one HTTP interface", "tone": "blue"   },
+    { "label": "Voice scaffold",  "text": "STT × 4 / TTS × 2, free Win11 OS-voice loop", "tone": "purple" },
+    { "label": "AIMODE dual",     "text": "Gemma 4 GBNF + Nemotron Nano (Llama-3.1)",   "tone": "green"  }
+  ],
+  "prompts": [
+    { "tag": "Multi-CLI",       "tone": "blue",   "text": "Open Claude and Codex side by side, then route a message between them" },
+    { "tag": "AIMODE handshake", "tone": "purple", "text": "Talk to the Claude tab — first-contact handshake, then start the conversation" },
+    { "tag": "Voice loop",      "tone": "green",  "text": "Voice in (Whisper.net) → local Gemma → voice out (Win11 SAPI Korean neural)" }
+  ]
+}

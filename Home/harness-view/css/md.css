@@ -1,0 +1,66 @@
+/* ====== Markdown 뷰어 스타일 ====== */
+
+.md-viewer {
+  background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px;
+  padding: 32px 40px; line-height: 1.7; color: #111827;
+  max-width: 960px; margin: 0 auto;
+}
+
+.md-viewer h1 { font-size: 28px; font-weight: 700; margin: 0 0 16px; border-bottom: 1px solid #E5E7EB; padding-bottom: 10px; }
+.md-viewer h2 { font-size: 22px; font-weight: 600; margin: 28px 0 12px; }
+.md-viewer h3 { font-size: 18px; font-weight: 600; margin: 20px 0 8px; }
+.md-viewer h4 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
+.md-viewer p  { font-size: 14px; color: #374151; margin: 0 0 12px; }
+.md-viewer ul, .md-viewer ol { padding-left: 24px; margin: 0 0 12px; }
+.md-viewer li { font-size: 14px; color: #374151; margin: 4px 0; }
+.md-viewer a  { color: #2563EB; text-decoration: underline; }
+.md-viewer code {
+  background: #F3F4F6; color: #BE185D;
+  padding: 2px 6px; border-radius: 4px; font-size: 13px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+.md-viewer pre {
+  background: #0F172A; color: #E5E7EB;
+  padding: 14px 18px; border-radius: 8px; overflow: auto;
+  font-size: 13px; font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  margin: 12px 0;
+}
+.md-viewer pre code { background: transparent; color: inherit; padding: 0; }
+.md-viewer blockquote {
+  border-left: 3px solid #2563EB; background: #EFF6FF;
+  margin: 12px 0; padding: 10px 14px; color: #374151;
+  border-radius: 0 6px 6px 0;
+}
+.md-viewer table {
+  border-collapse: collapse; width: 100%; margin: 12px 0;
+  font-size: 13px;
+}
+.md-viewer th, .md-viewer td {
+  border: 1px solid #E5E7EB; padding: 8px 10px; text-align: left;
+}
+.md-viewer th { background: #F9FAFB; font-weight: 600; }
+.md-viewer img { max-width: 100%; height: auto; border-radius: 6px; }
+.md-viewer hr { border: 0; border-top: 1px solid #E5E7EB; margin: 20px 0; }
+
+/* Mermaid 블록 */
+.md-viewer .mermaid {
+  background: #FAFBFC; border: 1px solid #E5E7EB; border-radius: 8px;
+  padding: 16px; margin: 12px 0; text-align: center;
+  overflow: auto;
+}
+
+/* MD edit mode */
+.md-editor {
+  background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px;
+  overflow: hidden; max-width: 960px; margin: 0 auto;
+}
+.md-editor textarea {
+  width: 100%; min-height: 480px; padding: 20px;
+  border: none; outline: none;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 14px; line-height: 1.6; color: #111827; resize: vertical;
+  background: #FFFFFF;
+}
+
+/* Detail screen wrapping (view/edit screen with topbar breadcrumb) */
+.md-screen { display: flex; flex-direction: column; gap: 16px; }

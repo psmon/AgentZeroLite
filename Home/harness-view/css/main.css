@@ -1,0 +1,96 @@
+/* ====== 기본 레이아웃: Sidebar + Main ====== */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", Roboto, sans-serif;
+  color: #111827;
+  background: #F0F2F5;
+}
+
+body { display: flex; }
+
+a { color: inherit; text-decoration: none; }
+
+/* Sidebar */
+.sidebar {
+  width: 200px;
+  flex: 0 0 200px;
+  height: 100vh;
+  background: #FFFFFF;
+  border-right: 1px solid #E5E7EB;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  position: sticky; top: 0;
+}
+
+.sidebar .logo { padding: 8px 0 16px; }
+.sidebar .logo-text { font-size: 18px; font-weight: 700; color: #111827; }
+
+.sidebar .nav-section { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
+.sidebar .nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  color: #374151; font-size: 13px;
+  user-select: none;
+}
+.sidebar .nav-item:hover { background: #F9FAFB; }
+.sidebar .nav-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
+.sidebar .nav-item.active .icon { color: #2563EB; }
+.sidebar .nav-item .icon { color: #6B7280; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+
+.sidebar .divider { height: 1px; background: #E5E7EB; margin: 12px 0 4px; }
+
+.sidebar .spacer { flex: 1 1 auto; }
+.sidebar .footer { padding: 8px 0; text-align: center; color: #9CA3AF; font-size: 10px; }
+
+/* Main */
+.main {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+}
+
+.topbar {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E5E7EB;
+  padding: 20px 32px;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px;
+}
+
+.topbar .title { font-size: 22px; font-weight: 700; color: #111827; margin: 0 0 4px; }
+.topbar .subtitle { font-size: 13px; color: #6B7280; }
+.topbar .right { display: flex; align-items: center; gap: 12px; }
+
+.subbar {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E5E7EB;
+  padding: 0 32px;
+  display: flex; align-items: center; gap: 0;
+}
+
+.view { flex: 1; padding: 24px 32px; overflow: auto; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Modal overlay */
+.modal-root {
+  position: fixed; inset: 0;
+  background: rgba(17, 23, 39, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px; z-index: 100;
+}
+.modal-root[hidden] { display: none; }
+.modal {
+  width: min(1200px, 100%); height: min(780px, 100%);
+  background: #FFFFFF; border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  display: flex; flex-direction: column; overflow: hidden;
+}
