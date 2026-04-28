@@ -38,7 +38,10 @@ bld/
 [Ll]og/
 [Ll]ogs/
 !harness/logs/
-!Home/_resources/harness/logs/
+
+# harness-view CI-built mirror — generated fresh by pages.yml on every deploy
+# from harness/ + Docs/. Kept out of git so the source tree stays single-truth.
+Home/_resources/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

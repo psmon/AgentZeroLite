@@ -3,8 +3,14 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    # The deploy reads source from Home/ (site shell) AND from harness/ +
+    # Docs/ (mirrored into Home/_resources/ at build time). Any of these
+    # changing should redeploy.
     paths:
       - 'Home/**'
+      - 'harness/**'
+      - 'Docs/**'
+      - '.github/workflows/pages.yml'
 
   # Manual trigger
   workflow_dispatch:
@@ -28,6 +34,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build harness-view manifests + resource mirror
+        # Regenerates Home/harness-view/indexes/*.json AND populates
+        # Home/_resources/{Docs,harness} from the live source tree, so
+        # the deployed Home/ artifact is self-contained without committing
+        # duplicated content. Single source of truth = harness/ + Docs/.
+        run: node Home/harness-view/scripts/build-indexes.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
