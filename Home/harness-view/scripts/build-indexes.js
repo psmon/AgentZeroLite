@@ -422,6 +422,46 @@ function buildClaudeTips() {
   writeJson('claude-tips', { file: PATHS.cliTips, exists });
 }
 
+// ─── Resource mirror — copy site-external folders into Home/_resources/ so
+//      GitHub Pages can serve them. The Pages workflow uploads only `Home/`,
+//      which means anything outside (Docs/, harness/, …) returns 404 in
+//      production. The view fetches everything via `../_resources/<rel>`,
+//      which resolves to Home/_resources/<rel> in both local and Pages runs.
+//
+//      Only mirrors directories that the view actually reads. Cleans the
+//      target dir each build so deletes propagate. ───
+const MIRROR_DIRS = ['Docs', 'harness'];
+function mirrorResources() {
+  const dst = path.join(ROOT, 'Home', '_resources');
+  if (fs.existsSync(dst)) {
+    fs.rmSync(dst, { recursive: true, force: true });
+  }
+  fs.mkdirSync(dst, { recursive: true });
+  let fileCount = 0;
+  for (const dir of MIRROR_DIRS) {
+    const src = path.join(ROOT, dir);
+    if (!fs.existsSync(src)) continue;
+    const target = path.join(dst, dir);
+    fs.cpSync(src, target, {
+      recursive: true,
+      filter: (s) => !path.basename(s).startsWith('.'),  // skip dotfiles
+    });
+    fileCount += countFiles(target);
+  }
+  console.log(`✓ _resources mirror  (${MIRROR_DIRS.join(', ')} → Home/_resources, ${fileCount} files)`);
+}
+function countFiles(absDir) {
+  let n = 0;
+  if (!fs.existsSync(absDir)) return 0;
+  for (const ent of fs.readdirSync(absDir, { withFileTypes: true })) {
+    if (ent.name.startsWith('.')) continue;
+    const ch = path.join(absDir, ent.name);
+    if (ent.isDirectory()) n += countFiles(ch);
+    else n++;
+  }
+  return n;
+}
+
 // ─── Meta snapshot — used by serve.js to decide whether a rebuild is needed ───
 const SCANNED_PATHS = [
   PATHS.docs,
@@ -482,5 +522,6 @@ buildLogs();
 buildDesign();
 buildEngine();
 buildClaudeTips();
+mirrorResources();
 writeMeta(Date.now() - __t0, process.env.BUILD_TRIGGER || 'manual');
 console.log('done.');

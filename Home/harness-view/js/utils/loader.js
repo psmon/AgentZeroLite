@@ -32,11 +32,14 @@ export async function loadData(name) {
   }
 }
 
-/** Resource (MD) loader — relative to project root.
- *  This view lives at Home/harness-view/, so ../../<rel> reaches the repo root. */
+/** Resource (MD) loader.
+ *  External resources (Docs/, harness/) are mirrored into Home/_resources/
+ *  by build-indexes.js so GitHub Pages (which uploads only Home/) can serve
+ *  them. From Home/harness-view/, `../_resources/<rel>` reaches the mirror
+ *  in both local dev and Pages runs. */
 export async function loadMd(relativePath) {
   try {
-    return await fetchText(`../../${relativePath}`);
+    return await fetchText(`../_resources/${relativePath}`);
   } catch (e) {
     console.warn(`[loadMd] ${relativePath}: ${e.message}`);
     return null;

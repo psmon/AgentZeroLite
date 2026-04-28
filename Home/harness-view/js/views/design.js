@@ -13,7 +13,10 @@ import { parsePen, renderFrame } from '../components/pen-renderer.js';
 import { renderTopBar, emptyState, loadingState } from './_common.js';
 import { ICONS } from '../config/menu.js';
 
-const PROJECT_ROOT_PREFIX = '../../';   // Home/harness-view/ → repo root
+// External resources are mirrored under Home/_resources/ at build time so
+// GitHub Pages (Home-only publish) can serve them. ../_resources/<rel>
+// resolves to Home/_resources/<rel> in both local and Pages runs.
+const PROJECT_ROOT_PREFIX = '../_resources/';
 
 export async function render(ctx) {
   const { viewEl, topbarEl } = ctx;
