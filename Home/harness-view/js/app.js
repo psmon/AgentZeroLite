@@ -1,11 +1,16 @@
 /** 메인 라우터 + 사이드바 부트스트랩 */
 import { MENU, ICONS } from './config/menu.js';
 import { h, mount, clear } from './utils/dom.js';
+import { toggleSidebar } from './views/_common.js';
 
-const viewEl    = document.getElementById('view');
-const topbarEl  = document.getElementById('topbar');
-const subbarEl  = document.getElementById('subbar');
-const sidebarEl = document.getElementById('sidebar');
+const viewEl     = document.getElementById('view');
+const topbarEl   = document.getElementById('topbar');
+const subbarEl   = document.getElementById('subbar');
+const sidebarEl  = document.getElementById('sidebar');
+const backdropEl = document.getElementById('sidebar-backdrop');
+
+// Mobile: backdrop click closes the slide-in sidebar.
+if (backdropEl) backdropEl.addEventListener('click', () => toggleSidebar(false));
 
 /** Mermaid 초기화 */
 if (window.mermaid) {
@@ -78,7 +83,8 @@ async function route() {
   }
 }
 
-window.addEventListener('hashchange', route);
+// Route changes — also close the mobile sidebar so users see the new view.
+window.addEventListener('hashchange', () => { toggleSidebar(false); route(); });
 window.addEventListener('DOMContentLoaded', () => {
   if (!location.hash) location.hash = '#dashboard';
   route();
