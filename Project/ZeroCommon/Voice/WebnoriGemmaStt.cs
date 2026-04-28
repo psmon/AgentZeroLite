@@ -84,7 +84,23 @@ public sealed class WebnoriGemmaStt : ISpeechToText
         var response = await _http.SendAsync(request, ct);
         var raw = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
+        {
+            // Webnori's OpenAI-compatible gateway (LM Studio backend) currently
+            // whitelists only `text` and `image_url` as chat content types. Any
+            // model — E2B, E4B, 26B-A4B — fails identically because the audio
+            // pipeline is server-side, not model-side. Detect that signature and
+            // rewrap with an actionable message instead of dumping raw JSON.
+            if ((int)response.StatusCode == 400
+                && raw.Contains("image_url", StringComparison.Ordinal)
+                && raw.Contains("type", StringComparison.Ordinal))
+            {
+                throw new HttpRequestException(
+                    $"Webnori host does not accept audio input on /v1/chat/completions (content types limited to text/image_url). " +
+                    $"This is a server-side limit, not the model — switching Gemma variants will not help. " +
+                    $"Use Whisper-Local STT for now. Raw: {raw}");
+            }
             throw new HttpRequestException($"Webnori STT failed ({(int)response.StatusCode}): {raw}");
+        }
 
         using var doc = JsonDocument.Parse(raw);
         var text = doc.RootElement

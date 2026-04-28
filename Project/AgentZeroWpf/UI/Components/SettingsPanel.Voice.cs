@@ -370,18 +370,74 @@ public partial class SettingsPanel
         tbSttSaveStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
     }
 
-    private void OnSttRefreshWebnoriModels(object sender, RoutedEventArgs e)
+    private async void OnSttRefreshWebnoriModels(object sender, RoutedEventArgs e)
     {
-        // Surface the catalog's known Webnori models. Webnori's /v1/models
-        // endpoint is the canonical source but the audio-capable filter is
-        // server-side, so listing the catalog gives the user a stable picker
-        // even when the model server is offline.
-        cbSttWebnoriModel.Items.Clear();
-        foreach (var id in WebnoriDefaults.KnownModels)
-            cbSttWebnoriModel.Items.Add(id);
-        if (cbSttWebnoriModel.Items.Count > 0) cbSttWebnoriModel.SelectedIndex = 0;
-        tbSttStatus.Text = $"✓ {cbSttWebnoriModel.Items.Count} model(s) listed (catalog).";
-        tbSttStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
+        // Pull the live /v1/models list — same path the LLM-External tab uses.
+        // Audio-capable gating is server-side; we don't pre-filter so users see
+        // every available model. If the call fails (offline / quota), fall back
+        // to the local catalog so the picker is never empty.
+        var current = (cbSttWebnoriModel.SelectedItem as string)
+                      ?? cbSttWebnoriModel.Text
+                      ?? "";
+
+        btnSttRefreshWebnoriModels.IsEnabled = false;
+        tbSttStatus.Text = "Listing models…";
+        tbSttStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
+
+        var provider = LlmProviderFactory.CreateWebnori();
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var models = await provider.ListModelsAsync(cts.Token);
+
+            cbSttWebnoriModel.Items.Clear();
+            foreach (var m in models)
+                cbSttWebnoriModel.Items.Add(m.Id);
+
+            if (cbSttWebnoriModel.Items.Count == 0)
+            {
+                foreach (var id in WebnoriDefaults.KnownModels)
+                    cbSttWebnoriModel.Items.Add(id);
+                tbSttStatus.Text = $"⚠ Server returned 0 models — catalog fallback ({cbSttWebnoriModel.Items.Count}).";
+                tbSttStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
+            }
+            else
+            {
+                tbSttStatus.Text = $"✓ {models.Count} model(s) listed (live).";
+                tbSttStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
+            }
+
+            RestoreOrPickFirst(cbSttWebnoriModel, current);
+        }
+        catch (Exception ex)
+        {
+            cbSttWebnoriModel.Items.Clear();
+            foreach (var id in WebnoriDefaults.KnownModels)
+                cbSttWebnoriModel.Items.Add(id);
+            RestoreOrPickFirst(cbSttWebnoriModel, current);
+            tbSttStatus.Text = $"✗ Live refresh failed: {ex.Message} — catalog fallback.";
+            tbSttStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
+            AppLogger.LogError("[Voice-STT] Webnori ListModels failed", ex);
+        }
+        finally
+        {
+            (provider as IDisposable)?.Dispose();
+            btnSttRefreshWebnoriModels.IsEnabled = true;
+        }
+    }
+
+    private static void RestoreOrPickFirst(System.Windows.Controls.ComboBox box, string previous)
+    {
+        if (!string.IsNullOrEmpty(previous))
+        {
+            foreach (var item in box.Items)
+                if (item is string s && s == previous)
+                {
+                    box.SelectedItem = item;
+                    return;
+                }
+        }
+        if (box.Items.Count > 0) box.SelectedIndex = 0;
     }
 
     private void OnSttSave(object sender, RoutedEventArgs e)
