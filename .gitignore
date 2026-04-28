@@ -38,6 +38,7 @@ bld/
 [Ll]og/
 [Ll]ogs/
 !harness/logs/
+!Home/_resources/harness/logs/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
