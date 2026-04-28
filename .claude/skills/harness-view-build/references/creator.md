@@ -256,15 +256,17 @@ Product Design 메뉴 (`design.js`) 가 reference. 모달이 아닌 in-place ful
 
 | 증상 | 원인 | 대처 |
 |------|------|------|
-| `Failed to fetch dynamically imported module` (Pages) | Jekyll 이 `_*.js` 무시 | 루트에 `.nojekyll` 파일 |
+| `Failed to fetch dynamically imported module` (Pages) | Jekyll 이 `_*.js` 무시 | `Home/.nojekyll` 존재 확인 (이미 6822624 에 추가됨) |
+| Roles/Knowledge/Active Log 등 MD 가 Pages 에서 404 | `_resources/` 미러가 artifact 에 없거나 경로/대소문자 불일치 | `pages.yml` 의 build step 로그 확인 — `_resources mirror (...)` 줄에 카운트 찍히는지. 안 뜨면 paths 트리거 / Node setup 단 점검 |
 | Pen 카드 모두 (0,0) 위치에 겹침 | layout 미지정 frame 을 absolute 처리 | `renderFrameNode` 에서 default `'horizontal'` |
 | `v0.10.0` 가 `v0.1.0` 다음에 정렬 | 알파벳 정렬 | `localeCompare(... { numeric: true })` |
-| 매니페스트 변경 후 Pages 에 안 보임 | 인덱스만 빌드하고 push 안 함 | `git push` 필수 |
+| 콘텐츠 변경 후 Pages 에 안 보임 | push 안 했거나 paths 트리거 미매칭 (`harness/**`, `Docs/**` 외) | git push 확인 → Actions 탭에서 "Deploy to GitHub Pages" 잡 실행 여부 확인 |
 | 한글 폰트 깨짐 | fontFamily 단일 지정 | `"Noto Sans KR"` 폴백 체인 |
 | 모달이 사이드바 위에 안 뜸 | z-index 누락 | `.modal-root { z-index: 100 }` |
 | 클릭 후 빈 화면 | hash 라우팅 인식 못함 | hash 형식 `#menuId` 또는 `#menuId/params` 확인 |
 | Mermaid syntax error 후 그래프 안 뜸 | `|` 문자가 link-label 로 잘못 해석 | 노드 라벨 `"..."` 또는 `·` 로 치환 |
 | `loadMd` 가 404 | path가 ROOT-rel 아닌 단순 basename | items.file 이 ROOT-relative 인지 확인 |
+| `.gitignore` 가 mirror 경로 차단 | VS 템플릿의 `[Ll]ogs/` 같은 광범위 룰이 underscore-prefix mirror 도 잡음 | mirror 는 어차피 gitignored 가 정답 (44e19d4 이후 의도). 미러를 git에 넣으려는 시도 자체가 안티패턴 |
 
 ## 디자인 토큰
 

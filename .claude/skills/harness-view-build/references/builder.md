@@ -3,13 +3,21 @@
 > 운영 모드. 이미 만들어진 하네스뷰의 데이터를 최신화한다.
 > 코드는 건드리지 않는다.
 
-## 목적
+## 목적 — 그리고 새 아키텍처 (44e19d4 이후)
 
 `Home/harness-view/` 정적 페이지가 보여주는 카드/트리/게시판은 모두
-`Home/harness-view/indexes/*.json` 매니페스트에서 데이터를 읽어온다.
+`Home/harness-view/indexes/*.json` 매니페스트 + `Home/_resources/{Docs,harness}`
+미러에서 데이터를 읽어온다.
 
-리소스(.md / .pen) 파일이 추가/삭제/이름 변경되어도 매니페스트가 갱신되지 않으면
-뷰어에는 반영되지 않는다. 이 모드는 매니페스트를 한 번에 부분 재생성한다.
+**중요한 변화** — Pages 배포는 이제 CI 가 매번 새로 빌드한다:
+- `pages.yml` 의 `paths:` 가 `Home/** + harness/** + Docs/** + pages.yml` 매칭 시 발동
+- CI 잡이 `node Home/harness-view/scripts/build-indexes.js` 를 실행 →
+  매니페스트와 `Home/_resources/` 미러를 fresh 하게 만든 뒤 artifact 업로드
+- `Home/_resources/` 는 **gitignored** — 절대 커밋하지 않음
+
+**즉, 사용자가 `harness/agents/foo.md` 같은 콘텐츠를 추가/수정한 뒤 그냥 push 만 해도
+Pages 는 최신을 서빙한다.** BUILDER 를 로컬에서 돌리는 것은 **push 전 로컬 서버에서
+미리 보고 싶을 때** 의 옵션이지, Pages 반영의 필수 단계가 아니다.
 
 ## 수행 절차
 
@@ -76,18 +84,22 @@ node Home/harness-view/scripts/serve.js
 서버 기동 시 preflight 가 자동으로 staleness 판정 → 필요시 자동 재빌드.
 즉, 단순히 `serve.js` 만 띄우면 매니페스트 빌드도 함께 처리된다.
 
-### 4. (선택) GitHub Pages 배포
+### 4. GitHub Pages 배포 — 자동
 
-이 스킬은 git commit / push 를 직접 수행하지 않는다.
-GitHub Pages 연동은 이미 별도 구성되어 있어, 사용자가 수동으로:
+이 스킬은 git commit / push 를 직접 수행하지 않는다 (사용자 권한).
+**Pages 워크플로우 (`.github/workflows/pages.yml`) 가 자동 처리** 한다:
 
-```bash
-git add Home/harness-view/indexes/
-git commit -m "[harness-view] indexes refresh"
-git push
-```
+| 시나리오 | 사용자가 push 할 것 | CI 가 하는 것 |
+|---|---|---|
+| 새 .md 추가 (`harness/agents/foo.md`) | 그 파일만 | `build-indexes.js` 로 indexes + `_resources/` 미러 새로 만듦, Home/ artifact 업로드 |
+| 기존 .md 본문만 수정 | 그 파일만 | 동일 |
+| 인덱스 파일이 stale 한 채 push | 무관 | CI 가 인덱스 새로 덮어써 artifact 에 반영 (Pages 는 항상 신선) |
 
-push 후 GitHub Pages 가 자동 재배포한다 (보통 30-60초).
+push 후 ~1분 내 Pages 재배포 완료.
+
+**커밋 메시지 컨벤션**: 콘텐츠 변경은 `docs(<scope>): ...` 또는
+`feat(harness): ...` 형식. 인덱스만 별도 커밋이 필요한 경우는 거의 없지만,
+필요하면 `[harness-view] indexes refresh`.
 
 ## 사용자에게 보고
 
@@ -104,13 +116,16 @@ push 후 GitHub Pages 가 자동 재배포한다 (보통 30-60초).
 
 ## 주의사항
 
-- 리소스(.md) 파일의 **본문 변경**은 빌드 불필요 (뷰어가 fetch 시점에 직접 읽음).
-- 단, **GitHub Pages 반영을 위해 git push 는 필요** — 본문이 수정되었는데 뷰어에 안 보이면 push 여부부터 확인.
-- **파일 추가/삭제/이름 변경** 시 인덱스 빌드 + git commit + push 가 모두 필요.
+- **로컬 BUILDER 의 의미**: Pages 반영용이 아니라 **로컬 dev 서버 미리보기용**.
+  CI 가 push 시 동일한 빌드를 돌리므로 BUILDER 안 돌리고 push 해도 결과는 같다.
+- 리소스(.md) 파일의 **본문 변경**은 어떤 빌드도 필요 없음 (뷰어가 fetch 시점에 직접 읽음).
 - **Skills (`Docs/harness/template/`) 는 SKILL.md 본문이 인덱스에 인라인 임베드**되므로,
-  본문 수정도 매니페스트 재생성이 필요. (다른 매니페스트는 본문 수정 시 재빌드 불필요.)
+  본문 수정 시도 매니페스트 재생성이 필요. (CI 가 처리하니 push 만 하면 됨.)
+- **`Home/_resources/` 는 절대 git add 금지** — `.gitignore:44` 가 막지만, 어떤
+  스크립트나 사용자 실수로 unignore 되면 어제(`a55c781`)의 19k 줄 중복이 다시 들어감.
+  CI-time 미러는 fresh 보장 + 단일 진실 원천 유지.
 - 빌드 자체는 1초 이내, GitHub Pages 재배포는 30-60초.
-- 인덱스 변경 commit 메시지 컨벤션: `[harness-view] indexes refresh` 권장.
+- 콘텐츠 변경 commit 메시지: `docs(<scope>): ...` 또는 `feat(harness): ...` 권장.
 
 ## 정책 (이 변형의 차이)
 
