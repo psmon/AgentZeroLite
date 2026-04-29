@@ -60,7 +60,7 @@
 
                     <!-- Description -->
                     <TextBlock DockPanel.Dock="Top"
-                               Text="Type a line → TTS synthesises. Bypass mode (default) feeds the synthesised PCM straight into STT — pure TTS↔STT round-trip. Uncheck Bypass to play through the speaker so the AskBot mic re-captures it."
+                               Text="Type a line → TTS synthesises → STT runs on the synthesised PCM directly (deterministic, mic-independent). Bypass mode keeps the result in this popup only. Uncheck Bypass to also inject the transcript into AskBot — that's the deterministic equivalent of speaking the phrase to AgentBot, and the speaker still plays the audio for verification."
                                Foreground="{StaticResource TextDim}" FontSize="10"
                                TextWrapping="Wrap" Margin="0,0,0,8"/>
 
@@ -134,17 +134,17 @@
                     </DockPanel>
 
                     <CheckBox x:Name="chkBypassAcousticLoop" DockPanel.Dock="Top"
-                              Content="Bypass acoustic loop — feed synthesised PCM directly to STT (default ON)"
+                              Content="Bypass — keep the transcript in this popup only (do NOT inject into AskBot; default ON)"
                               Foreground="{StaticResource TextPrimary}" FontSize="10"
                               IsChecked="True" Margin="0,0,0,4"
                               Checked="OnBypassToggled" Unchecked="OnBypassToggled"
-                              ToolTip="ON: synthesise → resample → STT.TranscribeAsync → show. OFF: play through speaker so AskBot mic re-captures (requires OS audio loopback)."/>
+                              ToolTip="ON: STT result is shown only in the history list. OFF: STT result is also injected into AskBot's input as if the user had spoken the phrase, plus the audio plays through the speaker for verification."/>
 
                     <CheckBox x:Name="chkAutoMuteAskBot" DockPanel.Dock="Top"
-                              Content="Auto-mute AskBot mic during each turn (default ON — prevents speaker echo / ambient noise from triggering AskBot STT)"
+                              Content="Auto-mute AskBot mic during each turn (default ON — keeps test-time ambient noise out of AskBot)"
                               Foreground="{StaticResource TextPrimary}" FontSize="10"
                               IsChecked="True" Margin="0,0,0,6"
-                              ToolTip="ON: mic is soft-muted while a turn runs (capture stays alive but VAD/STT ignores frames), restored after. OFF: leave mic state untouched — useful for acoustic-loop testing where AskBot SHOULD hear the speaker output."/>
+                              ToolTip="ON: AskBot mic is soft-muted while a turn runs, restored after. OFF: leave mic state untouched. Either way, the test STT is now decoupled from the mic — this checkbox only controls what AskBot hears AROUND the test, not whether the test runs."/>
 
                     <!-- In-progress status (cleared after each turn lands in history) -->
                     <TextBlock x:Name="txtVoiceStatus" DockPanel.Dock="Top"

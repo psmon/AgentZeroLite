@@ -135,6 +135,40 @@ public partial class AgentBotWindow
     /// <summary>True when the mic is on AND not muted — i.e. live to STT.</summary>
     public bool IsVoiceMicLive() => _voiceMicOn && _voiceCapture is not null && !_voiceCapture.Muted;
 
+    /// <summary>
+    /// Inject a transcript into AgentBot's terminal pipeline as if it had
+    /// arrived from the live mic STT path. Used by
+    /// <see cref="UI.APP.TestToolsWindow"/>'s acoustic-loop test mode so
+    /// the synthesised voice can drive AgentBot deterministically without
+    /// depending on the speaker → microphone round-trip (which Windows
+    /// echo cancellation + noise suppression unreliably zero out).
+    ///
+    /// <para>Behavioural parity with the live mic path: SendCurrentInput
+    /// already routes through AIMODE / Chat / Key dispatchers exactly as
+    /// it would for a microphone-captured transcript, so AgentBot can't
+    /// tell the source apart.</para>
+    /// </summary>
+    public void SendVoiceTranscript(string transcript)
+    {
+        if (string.IsNullOrWhiteSpace(transcript)) return;
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action<string>(SendVoiceTranscript), DispatcherPriority.Normal, transcript);
+            return;
+        }
+        try
+        {
+            txtInput.Text = transcript;
+            txtInput.CaretIndex = transcript.Length;
+            SendCurrentInput();
+            AppLogger.Log($"[BOT-Voice] Transcript injected from test-tools ({transcript.Length} chars)");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[BOT-Voice] SendVoiceTranscript failed", ex);
+        }
+    }
+
     private void ApplyVoiceMuteUi(bool muted)
     {
         if (!Dispatcher.CheckAccess())
