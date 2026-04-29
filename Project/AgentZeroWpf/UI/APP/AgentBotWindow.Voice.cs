@@ -58,6 +58,48 @@ public partial class AgentBotWindow
         SetVoiceStatus("Cancelled.", System.Windows.Media.Brushes.Goldenrod);
     }
 
+    private void OnVoiceMuteToggle(object sender, RoutedEventArgs e)
+    {
+        if (_voiceCapture is null) return;
+        SetVoiceMicMuted(!_voiceCapture.Muted, source: "user");
+    }
+
+    /// <summary>
+    /// Public toggle for soft-mute. Capture continues (level meter stays
+    /// alive) but the VAD / segmenter / STT pipeline ignores incoming
+    /// frames. Used both by the toolbar mute button and by
+    /// <see cref="UI.APP.TestToolsWindow"/> auto-mute during virtual
+    /// voice testing — the bypass path needs AskBot's mic OFF logically
+    /// while leaving it physically capturing for fast resume.
+    /// </summary>
+    public void SetVoiceMicMuted(bool muted, string source = "external")
+    {
+        if (_voiceCapture is null) return;
+        if (_voiceCapture.Muted == muted) return;
+        _voiceCapture.Muted = muted;
+        ApplyVoiceMuteUi(muted);
+        AppLogger.Log($"[BOT-Voice] Mic {(muted ? "MUTED" : "UNMUTED")} ({source})");
+    }
+
+    /// <summary>True when the mic is on AND not muted — i.e. live to STT.</summary>
+    public bool IsVoiceMicLive() => _voiceMicOn && _voiceCapture is not null && !_voiceCapture.Muted;
+
+    private void ApplyVoiceMuteUi(bool muted)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action<bool>(ApplyVoiceMuteUi), DispatcherPriority.Normal, muted);
+            return;
+        }
+        if (btnVoiceMute is null) return;
+        btnVoiceMute.Foreground = muted
+            ? System.Windows.Media.Brushes.OrangeRed
+            : (System.Windows.Media.Brush)FindResource("TextDim");
+        btnVoiceMute.ToolTip = muted
+            ? "Mic is MUTED (frames ignored). Click to unmute."
+            : "Mic is LIVE. Click to mute (frames captured but ignored by VAD/STT).";
+    }
+
     private async Task StartVoiceMicAsync()
     {
         try
@@ -244,6 +286,14 @@ public partial class AgentBotWindow
 
         if (voiceWave is not null)
             voiceWave.IsActive = on;
+
+        if (btnVoiceMute is not null)
+        {
+            btnVoiceMute.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            // Reset visual to unmuted on every mic-on transition; capture is
+            // recreated unmuted so the UI must follow.
+            if (on) ApplyVoiceMuteUi(_voiceCapture?.Muted ?? false);
+        }
     }
 
     private void SetVoiceStatus(string text, System.Windows.Media.Brush? brush = null)

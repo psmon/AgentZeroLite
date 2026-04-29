@@ -30,11 +30,14 @@ namespace AgentZeroWpf.UI.APP;
 /// </summary>
 public partial class TestToolsWindow : Window
 {
-    private VirtualVoiceInjector? _injector;
     private VoicePlaybackService? _replayPlayer;
     private readonly ObservableCollection<VirtualVoiceHistoryItem> _history = new();
     private const int HistoryCap = 50;
     private bool _isBusy;
+    // Tracks whether *we* (the test window) muted AskBot during the current
+    // turn, so we can restore the prior state on turn end without stomping
+    // a manual mute the user set independently.
+    private bool _weMutedAskBot;
 
     // Virtual-voice synth defaults — tuned 2026-04-29 after observing that
     // SAPI Heami's default rate is fast enough to confuse Whisper on phoneme
@@ -134,6 +137,14 @@ public partial class TestToolsWindow : Window
         lstHistory.ScrollIntoView(item);
 
         SetTurnBusy(true);
+        // Soft-mute AskBot's mic for the duration of this turn so its STT
+        // doesn't fire on speaker echo or ambient noise. Bypass mode REALLY
+        // wants this (we're not going through the mic at all). Acoustic-loop
+        // mode wants the *opposite* (the whole point is for AskBot to hear
+        // the speaker), so the auto-mute checkbox is intentionally bypassed
+        // when the bypass checkbox is off.
+        var shouldMute = bypass && (chkAutoMuteAskBot?.IsChecked == true);
+        TryMuteAskBot(shouldMute);
         try
         {
             if (bypass)
@@ -143,9 +154,41 @@ public partial class TestToolsWindow : Window
         }
         finally
         {
+            TryUnmuteAskBot();
             SetTurnBusy(false);
         }
     }
+
+    /// <summary>
+    /// Find the running AskBot window and soft-mute its mic if it isn't
+    /// already muted. Records the fact so <see cref="TryUnmuteAskBot"/>
+    /// only un-mutes when *we* did the muting (preserves a manual mute
+    /// the user might have set independently).
+    /// </summary>
+    private void TryMuteAskBot(bool shouldMute)
+    {
+        _weMutedAskBot = false;
+        if (!shouldMute) return;
+        var bot = FindAskBot();
+        if (bot is null) return;
+        // Only act if AskBot's mic is currently live (no point muting a
+        // mic that's already off or already muted).
+        if (!bot.IsVoiceMicLive()) return;
+        bot.SetVoiceMicMuted(true, source: "test-tools auto-mute");
+        _weMutedAskBot = true;
+    }
+
+    private void TryUnmuteAskBot()
+    {
+        if (!_weMutedAskBot) return;
+        _weMutedAskBot = false;
+        var bot = FindAskBot();
+        if (bot is null) return;
+        bot.SetVoiceMicMuted(false, source: "test-tools auto-restore");
+    }
+
+    private static AgentBotWindow? FindAskBot() =>
+        Application.Current?.Windows.OfType<AgentBotWindow>().FirstOrDefault();
 
     /// <summary>
     /// Toggle UI controls while a turn is in flight. Disables the input
@@ -284,14 +327,6 @@ public partial class TestToolsWindow : Window
     /// </summary>
     private async Task RunAcousticLoopAsync(VirtualVoiceHistoryItem item, VoiceSettings v)
     {
-        if (_injector is null)
-        {
-            _injector = new VirtualVoiceInjector();
-            _injector.Started += () => SetStatus("▶ playing through speaker…", isError: false);
-            _injector.Stopped += () => SetStatus("done — if mic is ON, AskBot should have heard it.", isError: false);
-            _injector.Errored += ex => SetStatus($"✗ {ex.Message}", isError: true);
-        }
-
         try
         {
             // ── Stage 1: synthesise (off the UI thread) ──
@@ -542,9 +577,7 @@ public partial class TestToolsWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        try { _injector?.Dispose(); } catch { }
         try { _replayPlayer?.Dispose(); } catch { }
-        _injector = null;
         _replayPlayer = null;
         base.OnClosed(e);
     }

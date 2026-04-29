@@ -330,6 +330,16 @@
                     <Button x:Name="btnVoiceMic" Content="&#xE720;" FontFamily="Segoe MDL2 Assets"
                             Style="{StaticResource MiniKeyButton}" FontSize="12"
                             Click="OnVoiceMicToggle" ToolTip="Voice AUTO (mic) — toggle live transcription"/>
+                    <!-- Mute toggle (visible only when mic is ON). Soft-mute: capture
+                         keeps running so the level meter stays alive, but VAD/STT
+                         pipeline is frozen so the bot doesn't react to speaker echo
+                         or ambient noise. Useful while running TestToolsWindow's
+                         bypass mode so AskBot doesn't pick up the speaker output. -->
+                    <Button x:Name="btnVoiceMute" Content="&#xE74F;" FontFamily="Segoe MDL2 Assets"
+                            Style="{StaticResource MiniKeyButton}" FontSize="11"
+                            Visibility="Collapsed"
+                            Click="OnVoiceMuteToggle"
+                            ToolTip="Mute mic (capture stays alive but VAD/STT ignores frames)"/>
                     <!-- Virtual voice injector — silent test mode. Synthesises the typed
                          text via TTS and plays it through the default speaker so the
                          active mic re-captures it through the OS audio loop. Validates

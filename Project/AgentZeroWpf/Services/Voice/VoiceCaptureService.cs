@@ -210,11 +210,12 @@ public sealed class VoiceCaptureService : IDisposable
 
         AmplitudeChanged?.Invoke(rms);
 
-        // New stream pipeline subscribes here. Fire even while Muted so the
-        // VAD logic in the segmenter Flow sees real silence rather than a
-        // gap (Muted only applies to legacy buffer accumulation, which the
-        // stream pipeline has replaced with a Flow-internal state machine).
-        if (FrameAvailable is not null)
+        // Stream pipeline subscriber. We deliberately suppress FrameAvailable
+        // when Muted so the segmenter Flow sees no input at all — matches the
+        // legacy batch path's buffer/VAD freeze. Level meter (AmplitudeChanged
+        // above) still updates so the user has visual feedback that capture
+        // is active but ignored.
+        if (FrameAvailable is not null && !Muted)
         {
             try { FrameAvailable.Invoke(new MicFrame(chunk, rms)); }
             catch (Exception ex) { AppLogger.Log($"[Voice] FrameAvailable handler threw: {ex.GetType().Name}: {ex.Message}"); }
