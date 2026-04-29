@@ -1,0 +1,71 @@
+<Window x:Class="AgentZeroWpf.UI.APP.TestToolsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Test Tools"
+        Width="540" Height="240"
+        MinWidth="420" MinHeight="180"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False"
+        Background="#1E1E1E">
+    <!-- Self-contained resources — Windows do NOT inherit StaticResources from
+         the Owner window's resource dictionary, so each test panel needs its
+         own brushes. Keys + colors mirror AgentBotWindow.xaml so the look
+         stays consistent. -->
+    <Window.Resources>
+        <SolidColorBrush x:Key="BgPanel"      Color="#252526"/>
+        <SolidColorBrush x:Key="BgToolbar"    Color="#2D2D30"/>
+        <SolidColorBrush x:Key="BorderDim"    Color="#3E3E42"/>
+        <SolidColorBrush x:Key="TextPrimary"  Color="#D4D4D4"/>
+        <SolidColorBrush x:Key="TextDim"      Color="#858585"/>
+        <SolidColorBrush x:Key="InputBg"      Color="#1F1F1F"/>
+        <SolidColorBrush x:Key="InputBorder"  Color="#3E3E42"/>
+        <SolidColorBrush x:Key="CyanBrush"    Color="#3794FF"/>
+    </Window.Resources>
+
+    <Grid>
+        <!-- One TabControl, one TabItem today (Voice). Future test panels
+             (Virtual Keyboard, Virtual Mouse, IPC ping, …) drop in as
+             additional <TabItem> blocks; the window itself stays unchanged. -->
+        <TabControl Background="#1E1E1E" BorderBrush="{StaticResource BorderDim}"
+                    BorderThickness="0,1,0,0">
+            <TabItem Header="🧪  Virtual Voice"
+                     Background="{StaticResource BgToolbar}"
+                     Foreground="{StaticResource TextPrimary}">
+                <DockPanel LastChildFill="True" Margin="12">
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Type a line → TTS synthesises → plays through speaker → microphone re-captures it through the OS audio loop. Mic must be ON in the AskBot toolbar for the STT round-trip to close."
+                               Foreground="{StaticResource TextDim}" FontSize="10"
+                               TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                    <DockPanel DockPanel.Dock="Top" LastChildFill="True" Margin="0,0,0,8">
+                        <Button x:Name="btnVoiceSpeak" DockPanel.Dock="Right"
+                                Content="Speak" FontSize="11" FontFamily="Consolas"
+                                Background="{StaticResource InputBg}"
+                                BorderBrush="{StaticResource CyanBrush}" BorderThickness="1"
+                                Foreground="{StaticResource TextPrimary}"
+                                Margin="8,0,0,0" Padding="14,4" Cursor="Hand"
+                                Click="OnVoiceSpeak"
+                                ToolTip="Synthesise + play (Enter)"/>
+                        <TextBox x:Name="txtVoiceInput"
+                                 FontSize="11" FontFamily="Consolas"
+                                 Background="{StaticResource InputBg}"
+                                 Foreground="{StaticResource TextPrimary}"
+                                 BorderBrush="{StaticResource InputBorder}" BorderThickness="1"
+                                 Padding="6,4" VerticalContentAlignment="Center"
+                                 KeyDown="OnVoiceInputKeyDown"
+                                 ToolTip="Type the line to speak. Enter=play, Esc=close."/>
+                    </DockPanel>
+
+                    <TextBlock x:Name="txtVoiceStatus" DockPanel.Dock="Top"
+                               FontFamily="Consolas" FontSize="10"
+                               Foreground="{StaticResource TextDim}"
+                               Text="Ready." Margin="0,0,0,4"/>
+
+                    <!-- Spacer -->
+                    <Grid/>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

@@ -41,8 +41,8 @@ public partial class AgentBotWindow
     private IActorRef? _voiceStreamRef;
     private Action<MicFrame>? _voiceFrameForwarder;
 
-    // Virtual voice injector — silent test mode (TTS → speaker → mic).
-    private VirtualVoiceInjector? _virtualVoice;
+    // Test tools popup (Virtual voice today; future virtual keyboard, etc.).
+    private TestToolsWindow? _testToolsWindow;
 
     private void OnVoiceMicToggle(object sender, RoutedEventArgs e)
     {
@@ -376,95 +376,42 @@ public partial class AgentBotWindow
         try { StopVoiceMic("window closed"); } catch { }
         try { _voicePipelineCts?.Dispose(); } catch { }
         try { _voiceCapture?.Dispose(); } catch { }
-        try { _virtualVoice?.Dispose(); } catch { }
+        try { _testToolsWindow?.Close(); } catch { }
         _voicePipelineCts = null;
         _voiceCapture = null;
-        _virtualVoice = null;
+        _testToolsWindow = null;
     }
 
-    // ── Virtual voice test (silent test mode) ───────────────────────────
+    // ── Test tools popup (Virtual voice; future: virtual keyboard, …) ───
     //
-    // The strip is hidden by default; clicking the toggle reveals a textbox.
-    // Submitting (Enter or Speak button) synthesises the line via the active
-    // TTS provider and plays it through the default speaker. If the mic is
-    // ON, the played audio loops back through OS audio → mic capture → STT,
-    // exercising the entire input path without needing a human speaker.
+    // Opens TestToolsWindow as a modeless owned popup. If already open,
+    // brings it to front instead of stacking duplicates.
 
     private void OnVoiceTestToggle(object sender, RoutedEventArgs e)
     {
-        if (pnlVoiceTestStrip is null) return;
-        var willShow = pnlVoiceTestStrip.Visibility != Visibility.Visible;
-        pnlVoiceTestStrip.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
-        if (willShow)
+        if (_testToolsWindow is { } existing)
         {
-            txtVoiceTestStatus.Text = "TTS → speaker → mic. Mic ON for round-trip.";
-            txtVoiceTestStatus.Foreground = (System.Windows.Media.Brush)FindResource("TextDim");
-            try { txtVoiceTestInput?.Focus(); } catch { }
-        }
-    }
-
-    private void OnVoiceTestInputKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-    {
-        if (e.Key == System.Windows.Input.Key.Enter && (e.KeyboardDevice.Modifiers == System.Windows.Input.ModifierKeys.None))
-        {
-            e.Handled = true;
-            _ = RunVirtualVoiceAsync();
-        }
-        else if (e.Key == System.Windows.Input.Key.Escape)
-        {
-            e.Handled = true;
-            if (pnlVoiceTestStrip is not null)
-                pnlVoiceTestStrip.Visibility = Visibility.Collapsed;
-        }
-    }
-
-    private void OnVoiceTestSpeak(object sender, RoutedEventArgs e) => _ = RunVirtualVoiceAsync();
-
-    private async Task RunVirtualVoiceAsync()
-    {
-        if (txtVoiceTestInput is null) return;
-        var text = txtVoiceTestInput.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrEmpty(text))
-        {
-            SetVoiceTestStatus("Type something first.", isError: false);
-            return;
+            try
+            {
+                if (existing.WindowState == WindowState.Minimized)
+                    existing.WindowState = WindowState.Normal;
+                existing.Activate();
+                return;
+            }
+            catch
+            {
+                // Window was closed but reference not nulled — fall through to recreate.
+                _testToolsWindow = null;
+            }
         }
 
-        _virtualVoice ??= new VirtualVoiceInjector();
-        // Wire status updates lazily — only the first call needs the hookup.
-        _virtualVoice.Started -= OnVirtualVoiceStarted;
-        _virtualVoice.Stopped -= OnVirtualVoiceStopped;
-        _virtualVoice.Errored -= OnVirtualVoiceErrored;
-        _virtualVoice.Started += OnVirtualVoiceStarted;
-        _virtualVoice.Stopped += OnVirtualVoiceStopped;
-        _virtualVoice.Errored += OnVirtualVoiceErrored;
-
-        SetVoiceTestStatus("Synthesizing…", isError: false);
-        try
+        var window = new TestToolsWindow { Owner = this };
+        window.Closed += (_, _) =>
         {
-            await _virtualVoice.SpeakAsync(text);
-        }
-        catch (Exception ex)
-        {
-            SetVoiceTestStatus($"✗ {ex.Message}", isError: true);
-        }
-    }
-
-    private void OnVirtualVoiceStarted() => SetVoiceTestStatus("▶ playing", isError: false);
-    private void OnVirtualVoiceStopped() => SetVoiceTestStatus("done — mic should now have it.", isError: false);
-    private void OnVirtualVoiceErrored(Exception ex) => SetVoiceTestStatus($"✗ {ex.Message}", isError: true);
-
-    private void SetVoiceTestStatus(string text, bool isError)
-    {
-        if (!Dispatcher.CheckAccess())
-        {
-            Dispatcher.BeginInvoke(new Action<string, bool>(SetVoiceTestStatus), DispatcherPriority.Normal, text, isError);
-            return;
-        }
-        if (txtVoiceTestStatus is null) return;
-        txtVoiceTestStatus.Text = text;
-        txtVoiceTestStatus.Foreground = isError
-            ? System.Windows.Media.Brushes.OrangeRed
-            : (System.Windows.Media.Brush)FindResource("TextDim");
+            if (ReferenceEquals(_testToolsWindow, window))
+                _testToolsWindow = null;
+        };
+        _testToolsWindow = window;
+        window.Show();
     }
 }

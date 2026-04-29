@@ -356,10 +356,8 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- ===== Voice strips container (waveform + virtual voice test) ===== -->
-                <StackPanel Grid.Row="1" Orientation="Vertical">
                 <!-- ===== Voice waveform strip (only visible while mic is ON) ===== -->
-                <Border x:Name="pnlVoiceWaveStrip"
+                <Border x:Name="pnlVoiceWaveStrip" Grid.Row="1"
                         Background="#1A1F26" CornerRadius="3"
                         Padding="6,2" Margin="0,0,0,4"
                         Visibility="Collapsed">
@@ -381,41 +379,6 @@
                                                        VerticalAlignment="Center"/>
                     </DockPanel>
                 </Border>
-
-                <!-- ===== Virtual voice test strip (silent test mode) =====
-                     Type text → TTS synthesises → plays through speaker → mic
-                     re-captures it. Use to validate the STT path end-to-end
-                     without a human speaker. Mic must be ON for round-trip. -->
-                <Border x:Name="pnlVoiceTestStrip"
-                        Background="#1A1F26" CornerRadius="3"
-                        Padding="6,4" Margin="0,0,0,4"
-                        Visibility="Collapsed">
-                    <DockPanel LastChildFill="True">
-                        <TextBlock DockPanel.Dock="Left"
-                                   Text="🧪" FontSize="11" VerticalAlignment="Center"
-                                   Margin="2,0,6,0" ToolTip="Virtual voice test — TTS → speaker → mic"/>
-                        <Button x:Name="btnVoiceTestSpeak" DockPanel.Dock="Right"
-                                Content="Speak" FontSize="10" FontFamily="Consolas"
-                                Background="{StaticResource InputBg}"
-                                BorderBrush="{StaticResource InputBorder}" BorderThickness="1"
-                                Foreground="{StaticResource TextPrimary}"
-                                Margin="6,0,0,0" Padding="8,2" Cursor="Hand"
-                                Click="OnVoiceTestSpeak"
-                                ToolTip="Synthesise the text and play through speaker (Enter)"/>
-                        <TextBlock x:Name="txtVoiceTestStatus" DockPanel.Dock="Right"
-                                   Text="" FontFamily="Consolas" FontSize="9"
-                                   Foreground="{StaticResource TextDim}"
-                                   VerticalAlignment="Center" Margin="6,0,4,0"/>
-                        <TextBox x:Name="txtVoiceTestInput"
-                                 FontSize="11" FontFamily="Consolas"
-                                 Background="{StaticResource InputBg}" Foreground="{StaticResource TextPrimary}"
-                                 BorderThickness="1" BorderBrush="{StaticResource InputBorder}"
-                                 Padding="4,2" VerticalContentAlignment="Center"
-                                 KeyDown="OnVoiceTestInputKeyDown"
-                                 ToolTip="Type the line to speak. Enter to play."/>
-                    </DockPanel>
-                </Border>
-                </StackPanel>
 
                 <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
