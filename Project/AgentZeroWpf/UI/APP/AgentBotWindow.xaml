@@ -408,8 +408,8 @@
                                    VerticalAlignment="Center" Margin="6,0,4,0"/>
                         <TextBox x:Name="txtVoiceTestInput"
                                  FontSize="11" FontFamily="Consolas"
-                                 Background="#0F141A" Foreground="{StaticResource TextLight}"
-                                 BorderThickness="1" BorderBrush="{StaticResource BorderDim}"
+                                 Background="{StaticResource InputBg}" Foreground="{StaticResource TextPrimary}"
+                                 BorderThickness="1" BorderBrush="{StaticResource InputBorder}"
                                  Padding="4,2" VerticalContentAlignment="Center"
                                  KeyDown="OnVoiceTestInputKeyDown"
                                  ToolTip="Type the line to speak. Enter to play."/>
