@@ -35,6 +35,16 @@ public partial class TestToolsWindow : Window
     private readonly ObservableCollection<VirtualVoiceHistoryItem> _history = new();
     private const int HistoryCap = 50;
 
+    // Virtual-voice synth defaults — tuned 2026-04-29 after observing that
+    // SAPI Heami's default rate is fast enough to confuse Whisper on phoneme
+    // boundaries, and Whisper hallucinates more on absolute-silence-then-
+    // speech transitions than on speech surrounded by quiet room tone.
+    private const int    DefaultSapiRate     = -2;     // SAPI rate (-10..10), -2 ≈ 10–15% slower
+    private const double DefaultOpenAiSpeed  = 0.85;   // OpenAI tts-1 speed (0.25..4.0)
+    private const double DefaultLeadSilence  = 1.0;    // seconds of noise before the speech
+    private const double DefaultTrailSilence = 1.0;    // seconds of noise after the speech
+    private const double DefaultNoiseDbfs    = -45;    // RMS level for the noise (dBFS)
+
     private static readonly Brush PendingBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x85, 0x85, 0x85));
     private static readonly Brush SuccessBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4E, 0xC9, 0xB0));
     private static readonly Brush ErrorBrush   = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF4, 0x87, 0x71));
@@ -140,17 +150,27 @@ public partial class TestToolsWindow : Window
                 try
                 {
                     // ── Stage 1: TTS synthesis ──
+                    // Apply slower-rate setting so phonemes have more headroom
+                    // for the STT model to lock onto (Whisper struggles on the
+                    // SAPI Heami default delivery rate).
+                    ApplySlowSpeechRate(tts);
+
                     var sw = Stopwatch.StartNew();
-                    var wav = await tts.SynthesizeAsync(item.Input, v.TtsVoice);
+                    var rawWav = await tts.SynthesizeAsync(item.Input, v.TtsVoice);
                     sw.Stop();
                     var synthMs = sw.ElapsedMilliseconds;
-                    if (wav is null || wav.Length == 0)
+                    if (rawWav is null || rawWav.Length == 0)
                         throw new InvalidOperationException("TTS returned empty audio.");
-                    AppLogger.Log($"[TestTools-Bypass] [1/3] synth | {synthMs} ms · {wav.Length} bytes · provider={v.TtsProvider}");
 
-                    // Stash the WAV in the history item so the row's ▶ button
-                    // can replay it later. SetAudio fires PropertyChanged on
-                    // CanPlay so the button enables itself.
+                    // Pad with low-level noise so STT sees natural room tone
+                    // bracketing the speech rather than absolute silence.
+                    var wav = WavNoisePadder.PadWithNoise(
+                        rawWav, DefaultLeadSilence, DefaultTrailSilence, DefaultNoiseDbfs);
+
+                    AppLogger.Log($"[TestTools-Bypass] [1/3] synth+pad | {synthMs} ms · raw={rawWav.Length} → padded={wav.Length} bytes · provider={v.TtsProvider} · rate={DescribeTtsSpeed(tts)}");
+
+                    // Stash the PADDED WAV in the history item so the row's ▶
+                    // button replays exactly what STT actually saw.
                     SetItemAudio(item, wav, tts.AudioFormat);
 
                     SetStatus("decoding WAV → PCM 16k mono…", isError: false);
@@ -223,20 +243,75 @@ public partial class TestToolsWindow : Window
         SetStatus("synthesising…", isError: false);
         try
         {
-            var (wav, format) = await _injector.SpeakAsync(item.Input);
-            // Stash for the row's ▶ replay button — same as bypass path.
-            if (wav.Length > 0) SetItemAudio(item, wav, format);
-            // We don't get the STT result back through this path (it goes to
-            // AskBot via the mic), so just record that playback fired.
-            SucceedItem(item, "(played through speaker — see AskBot for STT)",
-                $"acoustic · {ProviderTag(v)} · result delivered to AskBot, not shown here");
+            // Acoustic-loop path: synthesise + pad + play through the same
+            // VoicePlaybackService the injector uses internally. Padding +
+            // slower rate help AskBot's mic→Whisper round-trip just as much
+            // as the bypass path's direct STT call.
+            await Task.Run(() =>
+            {
+                var tts = VoiceRuntimeFactory.BuildTts(v)
+                    ?? throw new InvalidOperationException($"TTS '{v.TtsProvider}' could not be constructed.");
+                try
+                {
+                    ApplySlowSpeechRate(tts);
+                    var rawWav = tts.SynthesizeAsync(item.Input, v.TtsVoice).GetAwaiter().GetResult();
+                    if (rawWav is null || rawWav.Length == 0)
+                        throw new InvalidOperationException("TTS returned empty audio.");
+
+                    var wav = WavNoisePadder.PadWithNoise(
+                        rawWav, DefaultLeadSilence, DefaultTrailSilence, DefaultNoiseDbfs);
+
+                    SetItemAudio(item, wav, tts.AudioFormat);
+
+                    // Reuse the lazy injector's player slot for actual playback
+                    // (it owns the VoicePlaybackService instance + Started/Stopped events).
+                    if (_injector is null)
+                    {
+                        _injector = new VirtualVoiceInjector();
+                        _injector.Started += () => SetStatus("▶ playing through speaker…", isError: false);
+                        _injector.Stopped += () => SetStatus("done — if mic is ON, AskBot should have heard it.", isError: false);
+                        _injector.Errored += ex => SetStatus($"✗ {ex.Message}", isError: true);
+                    }
+                    // Direct play — bypassing the injector's own synth path so we
+                    // play the padded WAV (the injector synthesises raw without padding).
+                    _replayPlayer ??= new VoicePlaybackService();
+                    _replayPlayer.Play(wav, tts.AudioFormat);
+
+                    SucceedItem(item, "(played through speaker — see AskBot for STT)",
+                        $"acoustic · {ProviderTag(v)} · rate={DescribeTtsSpeed(tts)} · raw={rawWav.Length}→padded={wav.Length} · result delivered to AskBot, not shown here");
+                }
+                finally
+                {
+                    (tts as IDisposable)?.Dispose();
+                }
+            });
         }
         catch (Exception ex)
         {
-            AppLogger.Log($"[TestTools] SpeakAsync threw: {ex.GetType().Name}: {ex.Message}");
+            AppLogger.Log($"[TestTools] acoustic-loop synth/play threw: {ex.GetType().Name}: {ex.Message}");
             FailItem(item, $"{ex.GetType().Name}: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Apply the project-default slower speech rate via concrete-type
+    /// downcast — keeps the <see cref="ITextToSpeech"/> interface unchanged
+    /// while still letting the test tooling slow down delivery. WindowsTts
+    /// uses SAPI's integer rate; OpenAiTts uses the API's speed multiplier.
+    /// Other providers are left at their default.
+    /// </summary>
+    private static void ApplySlowSpeechRate(ITextToSpeech tts)
+    {
+        if (tts is WindowsTts win) win.Rate = DefaultSapiRate;
+        else if (tts is OpenAiTts oai) oai.Speed = DefaultOpenAiSpeed;
+    }
+
+    private static string DescribeTtsSpeed(ITextToSpeech tts) => tts switch
+    {
+        WindowsTts w  => $"SAPI rate={w.Rate}",
+        OpenAiTts  o  => $"OpenAI speed={o.Speed:F2}",
+        _             => "default",
+    };
 
     // ── Replay button handler (per-row playback) ─────────────────────────
 

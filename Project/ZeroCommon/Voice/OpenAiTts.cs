@@ -15,6 +15,13 @@ public sealed class OpenAiTts : ITextToSpeech
     public string ProviderName => "OpenAITTS";
     public string AudioFormat => "wav";
 
+    /// <summary>
+    /// OpenAI TTS speed, 0.25..4.0. 1.0 = default, 0.85 ≈ 15% slower (the
+    /// virtual voice tester's default — slightly slower delivery improves
+    /// Whisper recognition on synthesised speech).
+    /// </summary>
+    public double Speed { get; set; } = 1.0;
+
     private readonly string _apiKey;
     private readonly HttpClient _http;
 
@@ -44,6 +51,7 @@ public sealed class OpenAiTts : ITextToSpeech
             input = text,
             voice = string.IsNullOrEmpty(voice) ? "alloy" : voice,
             response_format = "wav",
+            speed = Math.Clamp(Speed, 0.25, 4.0),
         });
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/audio/speech");

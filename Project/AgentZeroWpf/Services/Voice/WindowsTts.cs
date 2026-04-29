@@ -15,6 +15,14 @@ public sealed class WindowsTts : ITextToSpeech
     public string ProviderName => "WindowsTTS";
     public string AudioFormat => "wav";
 
+    /// <summary>
+    /// SAPI rate, integer -10..10. 0 = default. Negative = slower, positive
+    /// = faster. The virtual voice tester sets this to -2 because Heami's
+    /// default delivery is fast enough to confuse Whisper on phoneme
+    /// boundaries; slower delivery measurably improves recognition.
+    /// </summary>
+    public int Rate { get; set; }
+
     public Task<IReadOnlyList<string>> GetAvailableVoicesAsync(CancellationToken ct = default)
     {
         using var synth = new SpeechSynthesizer();
@@ -47,6 +55,8 @@ public sealed class WindowsTts : ITextToSpeech
                     synth.SelectVoice(installed.VoiceInfo.Name);
             }
         }
+
+        synth.Rate = Math.Clamp(Rate, -10, 10);
 
         using var ms = new MemoryStream();
         synth.SetOutputToWaveStream(ms);
