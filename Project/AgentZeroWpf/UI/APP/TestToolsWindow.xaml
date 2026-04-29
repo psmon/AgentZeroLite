@@ -60,7 +60,7 @@
 
                     <!-- Description -->
                     <TextBlock DockPanel.Dock="Top"
-                               Text="Type a line → TTS synthesises → STT runs on the synthesised PCM directly (deterministic, mic-independent). Bypass mode keeps the result in this popup only. Uncheck Bypass to also inject the transcript into AskBot — that's the deterministic equivalent of speaking the phrase to AgentBot, and the speaker still plays the audio for verification."
+                               Text="Type a line → TTS synthesises → STT runs on the synthesised PCM → transcript is injected into AskBot exactly as the live mic path would. Mic-independent, so AskBot mute / volume don't affect this. Optional speaker playback below for human verification."
                                Foreground="{StaticResource TextDim}" FontSize="10"
                                TextWrapping="Wrap" Margin="0,0,0,8"/>
 
@@ -133,18 +133,18 @@
                                  ToolTip="Type the line. Enter=run + clear, Esc=close."/>
                     </DockPanel>
 
-                    <CheckBox x:Name="chkBypassAcousticLoop" DockPanel.Dock="Top"
-                              Content="Bypass — keep the transcript in this popup only (do NOT inject into AskBot; default ON)"
+                    <CheckBox x:Name="chkPlaySpeaker" DockPanel.Dock="Top"
+                              Content="Also play synthesised audio through the speaker (verification — default OFF for a silent test)"
                               Foreground="{StaticResource TextPrimary}" FontSize="10"
-                              IsChecked="True" Margin="0,0,0,4"
-                              Checked="OnBypassToggled" Unchecked="OnBypassToggled"
-                              ToolTip="ON: STT result is shown only in the history list. OFF: STT result is also injected into AskBot's input as if the user had spoken the phrase, plus the audio plays through the speaker for verification."/>
+                              IsChecked="False" Margin="0,0,0,4"
+                              Checked="OnSpeakerPlaybackToggled" Unchecked="OnSpeakerPlaybackToggled"
+                              ToolTip="ON: the same audio that drove the STT also plays through the default speaker so you can hear what was 'spoken'. OFF: silent test — useful when you want to drive AskBot without disturbing colleagues. Either way the transcript is injected into AskBot."/>
 
                     <CheckBox x:Name="chkAutoMuteAskBot" DockPanel.Dock="Top"
                               Content="Auto-mute AskBot mic during each turn (default ON — keeps test-time ambient noise out of AskBot)"
                               Foreground="{StaticResource TextPrimary}" FontSize="10"
                               IsChecked="True" Margin="0,0,0,6"
-                              ToolTip="ON: AskBot mic is soft-muted while a turn runs, restored after. OFF: leave mic state untouched. Either way, the test STT is now decoupled from the mic — this checkbox only controls what AskBot hears AROUND the test, not whether the test runs."/>
+                              ToolTip="ON: AskBot mic is soft-muted while a turn runs, restored after. OFF: leave mic state untouched. The test STT is decoupled from the mic — this checkbox only controls what AskBot hears AROUND the test, not whether the test runs."/>
 
                     <!-- In-progress status (cleared after each turn lands in history) -->
                     <TextBlock x:Name="txtVoiceStatus" DockPanel.Dock="Top"

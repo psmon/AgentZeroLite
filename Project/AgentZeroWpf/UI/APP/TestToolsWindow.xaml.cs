@@ -66,7 +66,7 @@ public partial class TestToolsWindow : Window
         Activated += (_, _) => RefreshActiveModels();
     }
 
-    private void OnBypassToggled(object sender, RoutedEventArgs e) => UpdateModeLine();
+    private void OnSpeakerPlaybackToggled(object sender, RoutedEventArgs e) => UpdateModeLine();
 
     private void OnVoiceInputKeyDown(object sender, KeyEventArgs e)
     {
@@ -126,7 +126,6 @@ public partial class TestToolsWindow : Window
         // Snapshot models for this turn so the history row reflects what was
         // *actually* used, not what the user might switch to mid-turn.
         var v = VoiceSettingsStore.Load();
-        var bypass = chkBypassAcousticLoop?.IsChecked == true;
 
         // Pre-create the history item with a placeholder result; the worker
         // updates it via INotifyPropertyChanged when the result lands.
@@ -137,20 +136,12 @@ public partial class TestToolsWindow : Window
         lstHistory.ScrollIntoView(item);
 
         SetTurnBusy(true);
-        // Soft-mute AskBot's mic for the duration of this turn so its STT
-        // doesn't fire on speaker echo or ambient noise. Bypass mode REALLY
-        // wants this (we're not going through the mic at all). Acoustic-loop
-        // mode wants the *opposite* (the whole point is for AskBot to hear
-        // the speaker), so the auto-mute checkbox is intentionally bypassed
-        // when the bypass checkbox is off.
-        var shouldMute = bypass && (chkAutoMuteAskBot?.IsChecked == true);
+        var shouldMute = chkAutoMuteAskBot?.IsChecked == true;
+        var playSpeaker = chkPlaySpeaker?.IsChecked == true;
         TryMuteAskBot(shouldMute);
         try
         {
-            if (bypass)
-                await RunBypassAsync(item, v);
-            else
-                await RunAcousticLoopAsync(item, v);
+            await RunTurnAsync(item, v, playSpeaker);
         }
         finally
         {
@@ -206,23 +197,29 @@ public partial class TestToolsWindow : Window
         _isBusy = busy;
         if (txtVoiceInput is not null) txtVoiceInput.IsEnabled = !busy;
         if (btnVoiceSpeak is not null) btnVoiceSpeak.IsEnabled = !busy;
-        if (chkBypassAcousticLoop is not null) chkBypassAcousticLoop.IsEnabled = !busy;
+        if (chkPlaySpeaker is not null) chkPlaySpeaker.IsEnabled = !busy;
+        if (chkAutoMuteAskBot is not null) chkAutoMuteAskBot.IsEnabled = !busy;
         if (pnlQuickPhrases is not null) pnlQuickPhrases.IsEnabled = !busy;
     }
 
     /// <summary>
-    /// Bypass mode (default). Synthesise → decode/resample to PCM 16k mono →
-    /// hand straight to <see cref="ISpeechToText.TranscribeAsync"/>. Pure
-    /// TTS↔STT round-trip, no speaker, no microphone, no acoustic loop.
+    /// Single test turn. Always: synth → resample → STT → inject the
+    /// transcript into AskBot (mic-independent). Optionally: also play the
+    /// audio through the speaker so the human can hear what was "spoken".
+    ///
+    /// <para>This unifies what used to be two modes (bypass / acoustic-loop).
+    /// The old acoustic-loop went speaker → mic → STT, which Windows echo
+    /// cancellation reliably broke; the old bypass kept the result in the
+    /// popup only, which the user perceived as "AgentBot unresponsive."
+    /// Both modes now drive AskBot the same way; the only knob is whether
+    /// the speaker plays for human verification.</para>
     ///
     /// <para>Heavy work (SAPI Speak, NAudio resample, Whisper inference) is
-    /// pushed off the UI thread via <c>Task.Run</c> — both
-    /// <c>SpeechSynthesizer.Speak</c> and Whisper's CPU inference are
-    /// synchronous-ish and would freeze the dispatcher otherwise. Per-stage
-    /// Stopwatch timings are logged so the next slowdown can be diagnosed
-    /// without re-instrumenting.</para>
+    /// pushed off the UI thread via <c>Task.Run</c>. Per-stage Stopwatch
+    /// timings are logged so the next slowdown can be diagnosed without
+    /// re-instrumenting.</para>
     /// </summary>
-    private async Task RunBypassAsync(VirtualVoiceHistoryItem item, VoiceSettings v)
+    private async Task RunTurnAsync(VirtualVoiceHistoryItem item, VoiceSettings v, bool playSpeaker)
     {
         if (string.Equals(v.TtsProvider, TtsProviderNames.Off, StringComparison.OrdinalIgnoreCase))
         {
@@ -297,14 +294,48 @@ public partial class TestToolsWindow : Window
                     AppLogger.Log($"[TestTools-Bypass] [3/3] STT | {sttMs} ms · provider={v.SttProvider} · {rtFactor:F2}x realtime · chars={transcript.Length} · text=\"{Trunc(transcript, 80)}\"");
 
                     totalSw.Stop();
-                    var tail = $"bypass · {ProviderTag(v)} · synth {synthMs}ms · decode {decodeMs}ms · STT {sttMs}ms ({rtFactor:F1}x rt) · total {totalSw.ElapsedMilliseconds}ms";
-                    AppLogger.Log($"[TestTools-Bypass] DONE | {tail}");
+
+                    // ── Stage 4: ALWAYS inject transcript into AskBot ──
+                    // Used to be conditional on "acoustic loop" mode, but the
+                    // user's mental model is "the test should drive AskBot."
+                    // Skip only if STT returned empty (nothing useful to send).
+                    var bot = FindAskBot();
+                    string sentTag;
+                    if (bot is not null && !string.IsNullOrWhiteSpace(transcript))
+                    {
+                        bot.SendVoiceTranscript(transcript);
+                        sentTag = "sent to AskBot";
+                    }
+                    else if (bot is null)
+                    {
+                        sentTag = "(no AskBot window)";
+                    }
+                    else
+                    {
+                        sentTag = "(empty transcript — not sent)";
+                    }
+
+                    // ── Stage 5: optional speaker playback for verification ──
+                    long playMs = 0;
+                    if (playSpeaker)
+                    {
+                        playMs = EstimateWavDurationMs(wav);
+                        SetStatus($"▶ playing through speaker (~{playMs / 1000.0:F1}s)…", isError: false);
+                        _replayPlayer ??= new VoicePlaybackService();
+                        _replayPlayer.Play(wav, tts.AudioFormat);
+                        await Task.Delay((int)playMs + 200);
+                    }
+
+                    var tail = $"{ProviderTag(v)} · synth {synthMs}ms · decode {decodeMs}ms · STT {sttMs}ms ({rtFactor:F1}x rt)" +
+                               (playSpeaker ? $" · play {playMs}ms" : " · silent") +
+                               $" · total {totalSw.ElapsedMilliseconds}ms · {sentTag}";
+                    AppLogger.Log($"[TestTools] DONE | {tail}");
 
                     if (string.IsNullOrWhiteSpace(transcript))
                         SucceedItem(item, "(empty transcript)", tail);
                     else
                         SucceedItem(item, transcript, tail);
-                    SetStatus($"✓ done · {totalSw.ElapsedMilliseconds}ms", isError: false);
+                    SetStatus($"✓ done · {totalSw.ElapsedMilliseconds}ms · {sentTag}", isError: false);
                 }
                 finally
                 {
@@ -314,108 +345,7 @@ public partial class TestToolsWindow : Window
         }
         catch (Exception ex)
         {
-            AppLogger.LogError("[TestTools-Bypass] failed", ex);
-            FailItem(item, $"{ex.GetType().Name}: {ex.Message}");
-            SetStatus($"✗ {ex.Message}", isError: true);
-        }
-    }
-
-    /// <summary>
-    /// Acoustic-loop mode (rebuilt 2026-04-29). Originally meant
-    /// "synthesise → speaker → mic → STT → AgentBot terminal". In practice
-    /// Windows echo cancellation + mic enhancements unreliably zero out
-    /// the speaker output from the mic input, so the round-trip delivered
-    /// nothing — AgentBot picked up only ambient noise.
-    ///
-    /// New semantics: synthesise → STT directly on the synthesised PCM
-    /// → inject transcript into AgentBot exactly as the live-mic path
-    /// would (via <see cref="AgentBotWindow.SendVoiceTranscript"/>). Also
-    /// play the audio through the speaker for the human to hear what was
-    /// "spoken" — but recognition is decoupled from the (broken) acoustic
-    /// loop. Mic mute / volume state is irrelevant; the test is now
-    /// deterministic.
-    /// </summary>
-    private async Task RunAcousticLoopAsync(VirtualVoiceHistoryItem item, VoiceSettings v)
-    {
-        try
-        {
-            // ── Stage 1: synthesise (off the UI thread) ──
-            SetStatus($"synthesising via {v.TtsProvider}…", isError: false);
-            var (rawWav, paddedWav, format, pcm, synthMs, decodeMs) = await Task.Run(() =>
-            {
-                var tts = VoiceRuntimeFactory.BuildTts(v)
-                    ?? throw new InvalidOperationException($"TTS '{v.TtsProvider}' could not be constructed.");
-                try
-                {
-                    ApplySlowSpeechRate(tts);
-                    var sw = Stopwatch.StartNew();
-                    var raw = tts.SynthesizeAsync(item.Input, v.TtsVoice).GetAwaiter().GetResult();
-                    sw.Stop();
-                    if (raw is null || raw.Length == 0)
-                        throw new InvalidOperationException("TTS returned empty audio.");
-                    var synthMsLocal = sw.ElapsedMilliseconds;
-
-                    var padded = WavNoisePadder.PadWithNoise(
-                        raw, DefaultLeadSilence, DefaultTrailSilence, DefaultNoiseDbfs);
-
-                    sw.Restart();
-                    var pcmLocal = WavToPcm.To16kMono(padded);
-                    sw.Stop();
-
-                    return (raw, padded, tts.AudioFormat, pcmLocal, synthMsLocal, sw.ElapsedMilliseconds);
-                }
-                finally
-                {
-                    (tts as IDisposable)?.Dispose();
-                }
-            });
-
-            SetItemAudio(item, paddedWav, format);
-
-            // ── Stage 2: STT directly on synthesised PCM ──
-            // (decoupled from speaker → mic; deterministic regardless of mic state)
-            SetStatus($"transcribing via {v.SttProvider} (direct, no mic)…", isError: false);
-            var stt = VoiceRuntimeFactory.BuildStt(v)
-                ?? throw new InvalidOperationException($"STT '{v.SttProvider}' could not be constructed.");
-            var sttSw = Stopwatch.StartNew();
-            await stt.EnsureReadyAsync();
-            var transcript = (await stt.TranscribeAsync(pcm, v.SttLanguage))?.Trim() ?? string.Empty;
-            sttSw.Stop();
-            var sttMs = sttSw.ElapsedMilliseconds;
-            AppLogger.Log($"[TestTools-Acoustic] synth+pad+stt | synth={synthMs}ms decode={decodeMs}ms stt={sttMs}ms · text=\"{Trunc(transcript, 80)}\"");
-
-            // ── Stage 3: inject transcript into AgentBot ──
-            // (skip if STT returned empty — better to drop than to send blank)
-            var bot = Application.Current?.Windows.OfType<AgentBotWindow>().FirstOrDefault();
-            if (bot is not null && !string.IsNullOrWhiteSpace(transcript))
-            {
-                bot.SendVoiceTranscript(transcript);
-            }
-
-            // ── Stage 4: speaker playback for human verification ──
-            // (parallel-ish — Play returns immediately, audio plays on
-            // NAudio thread. We still wait for it to release the busy gate
-            // so the user can't fire overlapping turns.)
-            var durationMs = EstimateWavDurationMs(paddedWav);
-            SetStatus($"▶ playing through speaker for verification (~{durationMs / 1000.0:F1}s)…", isError: false);
-            _replayPlayer ??= new VoicePlaybackService();
-            _replayPlayer.Play(paddedWav, format);
-            await Task.Delay(durationMs + 200);
-
-            // ── Done ──
-            var resultDisplay = string.IsNullOrEmpty(transcript)
-                ? "(empty transcript)"
-                : transcript;
-            var sentTag = bot is not null && !string.IsNullOrWhiteSpace(transcript)
-                ? "sent to AskBot"
-                : "(NOT sent — empty or no AskBot)";
-            SucceedItem(item, resultDisplay,
-                $"acoustic · {ProviderTag(v)} · synth {synthMs}ms · decode {decodeMs}ms · STT {sttMs}ms · play {durationMs}ms · {sentTag}");
-            SetStatus($"✓ done · STT={sttMs}ms · played {durationMs}ms · {sentTag}", isError: false);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Log($"[TestTools] acoustic-loop failed: {ex.GetType().Name}: {ex.Message}");
+            AppLogger.LogError("[TestTools] turn failed", ex);
             FailItem(item, $"{ex.GetType().Name}: {ex.Message}");
             SetStatus($"✗ {ex.Message}", isError: true);
         }
@@ -532,10 +462,10 @@ public partial class TestToolsWindow : Window
     private void UpdateModeLine()
     {
         if (txtActiveMode is null) return;
-        var bypass = chkBypassAcousticLoop?.IsChecked == true;
-        txtActiveMode.Text = bypass
-            ? "mode: bypass — TTS → resample → STT (no audio I/O)"
-            : "mode: acoustic loop — TTS → speaker → AskBot mic → STT (requires OS audio loopback)";
+        var playSpeaker = chkPlaySpeaker?.IsChecked == true;
+        txtActiveMode.Text = playSpeaker
+            ? "mode: synth → STT direct → AskBot · ALSO speaker playback (verification)"
+            : "mode: synth → STT direct → AskBot · silent (no speaker playback)";
     }
 
     private static string FormatStt(VoiceSettings v) => v.SttProvider switch
