@@ -88,15 +88,22 @@ public sealed class VoiceCaptureService : IDisposable
     }
 
     /// <summary>
-    /// Copy the pre-roll ring (the last <see cref="PreRollSeconds"/> of audio)
-    /// into the segment buffer. Call this on UtteranceStarted so the segment
-    /// includes the ~1 s preceding the VAD trigger.
+    /// Reset the segment buffer and seed it with the pre-roll ring (the last
+    /// <see cref="PreRollSeconds"/> of audio). Call on UtteranceStarted so
+    /// the segment begins with the ~1 s preceding the VAD trigger.
+    ///
+    /// <para><b>Clears first</b> so the seeded buffer starts at exactly
+    /// pre-roll length. Earlier the buffer would have arbitrary leftover
+    /// content (audio captured between utterances), inflating the eventual
+    /// <see cref="ConsumePcmBuffer"/> by 5–15 s of garbage that confused
+    /// STT and slowed the round-trip.</para>
     /// </summary>
     public void SeedBufferWithPreRoll()
     {
         if (!BufferPcm) return;
         lock (_pcmBuffer)
         {
+            _pcmBuffer.Clear();
             foreach (var chunk in _preRollRing)
                 _pcmBuffer.AddRange(chunk);
         }
@@ -174,8 +181,10 @@ public sealed class VoiceCaptureService : IDisposable
         var chunk = new byte[e.BytesRecorded];
         Buffer.BlockCopy(e.Buffer, 0, chunk, 0, e.BytesRecorded);
 
-        // Skip pre-roll ring + main buffer while muted so the AI's own TTS
-        // playback never bleeds into the next transcription segment.
+        // Pre-roll ring updates every frame regardless of utterance state —
+        // it's a sliding window of the last PreRollSeconds. Skipped while
+        // muted so the AI's own TTS playback doesn't poison the next
+        // utterance's pre-roll.
         if (!Muted)
         {
             lock (_preRollRing)
@@ -189,15 +198,14 @@ public sealed class VoiceCaptureService : IDisposable
                     _preRollBytes -= old.Length;
                 }
             }
-
-            if (BufferPcm)
-            {
-                lock (_pcmBuffer)
-                {
-                    _pcmBuffer.AddRange(chunk);
-                }
-            }
         }
+        // (Note: _pcmBuffer used to accumulate every frame here unconditionally.
+        //  That bug surfaced in 2026-04-29 streaming-pipeline timing logs —
+        //  ConsumePcmBuffer was returning 9–17 s of audio for 2 s of speech
+        //  because between-utterance frames piled up. Buffer accumulation now
+        //  happens INSIDE the VAD state transitions below: pre-roll on
+        //  utterance-start, then per-frame during the utterance, then a
+        //  closing chunk before UtteranceEnded fires.)
 
         double sumSquares = 0;
         for (var i = 0; i < e.BytesRecorded; i += 2)
@@ -262,6 +270,11 @@ public sealed class VoiceCaptureService : IDisposable
             _utteranceSilenceFrames = 0;
             if (!_inUtterance)
             {
+                // ── Utterance starts ──
+                // SeedBufferWithPreRoll (called by UtteranceStarted handler)
+                // clears _pcmBuffer and adds the pre-roll ring, which
+                // already includes this trigger chunk. Don't re-add it
+                // here; that would duplicate one frame at the seam.
                 _inUtterance = true;
                 try { UtteranceStarted?.Invoke(); }
                 catch (Exception ex)
@@ -269,12 +282,29 @@ public sealed class VoiceCaptureService : IDisposable
                     AppLogger.Log($"[Voice] UtteranceStarted handler threw: {ex.GetType().Name}: {ex.Message}");
                 }
             }
+            else
+            {
+                // ── Continuing utterance, above threshold ──
+                if (BufferPcm)
+                {
+                    lock (_pcmBuffer) { _pcmBuffer.AddRange(chunk); }
+                }
+            }
         }
         else if (_inUtterance)
         {
             _utteranceSilenceFrames++;
+            // Always accumulate the chunk — it's part of the trailing
+            // silence that the utterance carries. Whether this is the
+            // last frame (hangover satisfied) or one before, the audio
+            // up to and including this frame is what STT should see.
+            if (BufferPcm)
+            {
+                lock (_pcmBuffer) { _pcmBuffer.AddRange(chunk); }
+            }
             if (_utteranceSilenceFrames >= UtteranceHangoverFrames)
             {
+                // ── Utterance ends ──
                 _inUtterance = false;
                 try { UtteranceEnded?.Invoke(); }
                 catch (Exception ex)
@@ -283,6 +313,7 @@ public sealed class VoiceCaptureService : IDisposable
                 }
             }
         }
+        // else: outside an utterance, below threshold. Don't accumulate.
     }
 }
 
