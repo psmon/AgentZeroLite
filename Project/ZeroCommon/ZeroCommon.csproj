@@ -15,8 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Akka" Version="1.5.40" />
-    <PackageReference Include="Akka.DependencyInjection" Version="1.5.40" />
+    <PackageReference Include="Akka" Version="1.5.67" />
+    <PackageReference Include="Akka.DependencyInjection" Version="1.5.67" />
+    <PackageReference Include="Akka.Streams" Version="1.5.67" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0-preview.3.25171.6" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0-preview.3.25171.6">
       <PrivateAssets>all</PrivateAssets>

@@ -24,6 +24,17 @@ internal static class VoiceRuntimeFactory
         };
     }
 
+    /// <summary>Build the active <see cref="ITextToSpeech"/> from saved voice settings; null when Off.</summary>
+    public static ITextToSpeech? BuildTts(VoiceSettings v)
+    {
+        return v.TtsProvider switch
+        {
+            TtsProviderNames.WindowsTts => new WindowsTts(),
+            TtsProviderNames.OpenAITts => new OpenAiTts(v.TtsOpenAIApiKey),
+            _ => null,
+        };
+    }
+
     public static int ParseDeviceNumber(string id) => int.TryParse(id, out var n) ? n : 0;
 
     /// <summary>

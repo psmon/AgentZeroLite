@@ -9,7 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Akka.TestKit.Xunit2" Version="1.5.40" />
+    <PackageReference Include="Akka.TestKit.Xunit2" Version="1.5.67" />
+    <PackageReference Include="Akka.Streams.TestKit" Version="1.5.67" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />

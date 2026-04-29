@@ -1,5 +1,6 @@
 using System.IO;
 using Agent.Common;
+using Agent.Common.Voice.Streams;
 using NAudio.Wave;
 
 namespace AgentZeroWpf.Services.Voice;
@@ -44,6 +45,15 @@ public sealed class VoiceCaptureService : IDisposable
     public event Action<bool>? SpeakingStateChanged;
     public event Action? UtteranceStarted;
     public event Action? UtteranceEnded;
+
+    /// <summary>
+    /// Per-frame PCM + RMS, fired alongside <see cref="AmplitudeChanged"/>.
+    /// The new Akka.Streams pipeline (P1+) forwards this directly to
+    /// <c>VoiceStreamActor</c> without going through the legacy VAD/buffer
+    /// state — those concerns now live inside the segmenter Flow.
+    /// Subscribers must not block the capture thread.
+    /// </summary>
+    public event Action<MicFrame>? FrameAvailable;
 
     /// <summary>When true, the service accumulates raw PCM into an internal buffer
     /// the caller drains via <see cref="ConsumePcmBuffer"/>. Always-on amplitude
@@ -199,6 +209,16 @@ public sealed class VoiceCaptureService : IDisposable
         var rms = (float)Math.Sqrt(sumSquares / sampleCount);
 
         AmplitudeChanged?.Invoke(rms);
+
+        // New stream pipeline subscribes here. Fire even while Muted so the
+        // VAD logic in the segmenter Flow sees real silence rather than a
+        // gap (Muted only applies to legacy buffer accumulation, which the
+        // stream pipeline has replaced with a Flow-internal state machine).
+        if (FrameAvailable is not null)
+        {
+            try { FrameAvailable.Invoke(new MicFrame(chunk, rms)); }
+            catch (Exception ex) { AppLogger.Log($"[Voice] FrameAvailable handler threw: {ex.GetType().Name}: {ex.Message}"); }
+        }
 
         // Muted path: keep the level meter alive but freeze the VAD state machine
         // so releasing the mute doesn't immediately fire UtteranceStarted on stale state.

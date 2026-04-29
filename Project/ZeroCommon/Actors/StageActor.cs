@@ -14,6 +14,7 @@
 using Akka.Actor;
 using Akka.Event;
 using Agent.Common;
+using Agent.Common.Voice.Streams;
 
 namespace Agent.Common.Actors;
 
@@ -23,6 +24,7 @@ public sealed class StageActor : ReceiveActor
 
     private readonly Dictionary<string, IActorRef> _workspaces = new();
     private IActorRef? _botActor;
+    private IActorRef? _voiceActor;
 
     private string? _activeWorkspace;
     private string? _activeTerminalId;
@@ -104,6 +106,21 @@ public sealed class StageActor : ReceiveActor
             _botActor = Context.ActorOf(Props.Create(() => new AgentBotActor(Self)), "bot");
             Sender.Tell(new BotCreated(_botActor));
             _log.Info("Bot created via CreateBot: {0}", _botActor.Path);
+        });
+
+        Receive<CreateVoiceStream>(msg =>
+        {
+            if (_voiceActor is not null)
+            {
+                Sender.Tell(new VoiceStreamCreated(_voiceActor));
+                return;
+            }
+            _voiceActor = Context.ActorOf(
+                Props.Create(() => new VoiceStreamActor(
+                    msg.SttFactory, msg.OnTranscript, msg.TtsFactory, msg.PlaybackFactory)),
+                "voice");
+            Sender.Tell(new VoiceStreamCreated(_voiceActor));
+            _log.Info("Voice stream actor created: {0}", _voiceActor.Path);
         });
 
         Receive<TerminalRegistered>(msg =>

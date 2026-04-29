@@ -81,7 +81,7 @@ public sealed class VoicePlaybackService : IDisposable
         return string.Join(" ", Enumerable.Range(0, take).Select(i => b[i].ToString("X2")));
     }
 
-    private static string DetectFormat(byte[] b, string declared)
+    internal static string DetectFormat(byte[] b, string declared)
     {
         if (b.Length >= 4 && b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46) return "wav";
         if (b.Length >= 3 && b[0] == 0x49 && b[1] == 0x44 && b[2] == 0x33) return "mp3";
@@ -90,7 +90,7 @@ public sealed class VoicePlaybackService : IDisposable
         return declared;
     }
 
-    private static WaveStream CreateSource(byte[] bytes, string format)
+    internal static WaveStream CreateSource(byte[] bytes, string format)
     {
         return format?.ToLowerInvariant() switch
         {

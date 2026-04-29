@@ -122,4 +122,18 @@ public sealed class VoiceSettings
     /// tab surfaces that asymmetry in the field's tooltip.
     /// </summary>
     public int LlmMaxTokens { get; set; } = 128;
+
+    // ── Stream pipeline (P1+) ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Opt-in flag for the new Akka.Streams-based voice pipeline
+    /// (VoiceStreamActor + INPUT graph). Default false — existing batch
+    /// path stays primary until P3 lands and the new path proves itself
+    /// across restart-on-failure / barge-in scenarios. Voice settings UI
+    /// surfaces this as an "Experimental: streaming pipeline" toggle.
+    /// </summary>
+    public bool UseStreamPipeline { get; set; } = false;
+
+    /// <summary>STT pool size for the streaming pipeline (default 1).</summary>
+    public int StreamSttParallelism { get; set; } = 1;
 }

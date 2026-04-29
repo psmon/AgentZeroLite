@@ -1,8 +1,11 @@
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
+using Akka.Actor;
 using Agent.Common;
 using Agent.Common.Voice;
+using Agent.Common.Voice.Streams;
+using AgentZeroWpf.Actors;
 using AgentZeroWpf.Services.Voice;
 
 namespace AgentZeroWpf.UI.APP;
@@ -34,6 +37,10 @@ public partial class AgentBotWindow
     private volatile bool _voicePipelineBusy;
     private bool _voiceMicOn;
 
+    // Stream pipeline (P1+) — non-null when VoiceSettings.UseStreamPipeline is true.
+    private IActorRef? _voiceStreamRef;
+    private Action<MicFrame>? _voiceFrameForwarder;
+
     private void OnVoiceMicToggle(object sender, RoutedEventArgs e)
     {
         if (_voiceMicOn)
@@ -58,39 +65,62 @@ public partial class AgentBotWindow
             _voicePipelineCts?.Dispose();
             _voicePipelineCts = new CancellationTokenSource();
 
-            _voiceCapture.VadThreshold = VoiceRuntimeFactory.SensitivityToThreshold(100 - v.VadThreshold);
-            _voiceCapture.BufferPcm = true;
+            var threshold = VoiceRuntimeFactory.SensitivityToThreshold(100 - v.VadThreshold);
+            _voiceCapture.VadThreshold = threshold;
 
+            // Always wire the level meter — needed by both pipelines.
             _voiceCapture.AmplitudeChanged -= OnVoiceAmplitudeChanged;
+            _voiceCapture.AmplitudeChanged += OnVoiceAmplitudeChanged;
+
+            // Detach legacy hooks defensively (they may be re-attached below).
             _voiceCapture.UtteranceStarted -= OnVoiceUtteranceStarted;
             _voiceCapture.UtteranceEnded -= OnVoiceUtteranceEnded;
-            _voiceCapture.AmplitudeChanged += OnVoiceAmplitudeChanged;
-            _voiceCapture.UtteranceStarted += OnVoiceUtteranceStarted;
-            _voiceCapture.UtteranceEnded += OnVoiceUtteranceEnded;
+            if (_voiceFrameForwarder is not null)
+                _voiceCapture.FrameAvailable -= _voiceFrameForwarder;
+            _voiceFrameForwarder = null;
+
+            if (v.UseStreamPipeline)
+            {
+                // Stream path: segmenter Flow handles VAD+buffering, so the
+                // legacy PCM buffer + utterance events are unused.
+                _voiceCapture.BufferPcm = false;
+                await StartStreamPipelineAsync(v, threshold);
+            }
+            else
+            {
+                _voiceCapture.BufferPcm = true;
+                _voiceCapture.UtteranceStarted += OnVoiceUtteranceStarted;
+                _voiceCapture.UtteranceEnded += OnVoiceUtteranceEnded;
+            }
 
             var deviceNumber = VoiceRuntimeFactory.ParseDeviceNumber(v.InputDeviceId);
             _voiceCapture.Start(deviceNumber);
 
             _voiceMicOn = true;
             ApplyVoiceMicUi(on: true);
+            var modeTag = v.UseStreamPipeline ? "stream" : "batch";
             SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
-            AppLogger.Log($"[BOT-Voice] Mic ON | provider={v.SttProvider} sens={v.VadThreshold} device={deviceNumber}");
+            AppLogger.Log($"[BOT-Voice] Mic ON | provider={v.SttProvider} sens={v.VadThreshold} device={deviceNumber} mode={modeTag}");
 
             // Warm the STT factory off-thread so the first utterance doesn't
             // pay the cold-start tax (Whisper.net "small" is ~487 MB on CPU).
-            _ = Task.Run(async () =>
+            // Stream path warms via the SttWorkerActor on first segment instead.
+            if (!v.UseStreamPipeline)
             {
-                try
+                _ = Task.Run(async () =>
                 {
-                    var stt = VoiceRuntimeFactory.BuildStt(v);
-                    if (stt is null) return;
-                    await stt.EnsureReadyAsync(
-                        new Progress<string>(msg => SetVoiceStatus(msg, System.Windows.Media.Brushes.SkyBlue)),
-                        _voicePipelineCts?.Token ?? CancellationToken.None);
-                    SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
-                }
-                catch (Exception ex) { AppLogger.LogError("[BOT-Voice] STT warm-up failed", ex); }
-            });
+                    try
+                    {
+                        var stt = VoiceRuntimeFactory.BuildStt(v);
+                        if (stt is null) return;
+                        await stt.EnsureReadyAsync(
+                            new Progress<string>(msg => SetVoiceStatus(msg, System.Windows.Media.Brushes.SkyBlue)),
+                            _voicePipelineCts?.Token ?? CancellationToken.None);
+                        SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
+                    }
+                    catch (Exception ex) { AppLogger.LogError("[BOT-Voice] STT warm-up failed", ex); }
+                });
+            }
         }
         catch (Exception ex)
         {
@@ -98,7 +128,67 @@ public partial class AgentBotWindow
             SetVoiceStatus($"✗ {ex.Message}", System.Windows.Media.Brushes.OrangeRed);
             StopVoiceMic("start failed");
         }
-        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Bring up the Akka.Streams INPUT pipeline. The actor is created lazily
+    /// (idempotent — Stage caches the singleton) and the per-frame forwarder
+    /// is wired so NAudio's capture thread Tells the actor for every 50 ms
+    /// frame. Transcript callback fires off the actor's Receive thread —
+    /// marshal back to the dispatcher before touching txtInput.
+    /// </summary>
+    private async Task StartStreamPipelineAsync(VoiceSettings v, float threshold)
+    {
+        var settingsSnapshot = v;
+        var snapshotForFactory = v;
+
+        var created = await ActorSystemManager.Stage.Ask<VoiceStreamCreated>(
+            new CreateVoiceStream(
+                SttFactory: () => VoiceRuntimeFactory.BuildStt(snapshotForFactory)
+                    ?? throw new InvalidOperationException(
+                        $"STT '{snapshotForFactory.SttProvider}' unavailable"),
+                OnTranscript: OnVoiceStreamTranscript,
+                TtsFactory: () => VoiceRuntimeFactory.BuildTts(snapshotForFactory)
+                    ?? throw new InvalidOperationException(
+                        $"TTS '{snapshotForFactory.TtsProvider}' unavailable"),
+                PlaybackFactory: () => new NAudioPlaybackQueue()),
+            TimeSpan.FromSeconds(5));
+
+        _voiceStreamRef = created.VoiceRef;
+
+        _voiceFrameForwarder = frame => _voiceStreamRef?.Tell(frame);
+        _voiceCapture!.FrameAvailable += _voiceFrameForwarder;
+
+        _voiceStreamRef.Tell(new StartListening(
+            VadThreshold: threshold,
+            PreRollSeconds: 1.0,
+            UtteranceHangoverFrames: 40,
+            MicBufferSize: 64,
+            SttParallelism: Math.Max(1, settingsSnapshot.StreamSttParallelism),
+            Language: settingsSnapshot.SttLanguage));
+    }
+
+    /// <summary>
+    /// Called from VoiceStreamActor's Receive thread when the segmenter +
+    /// STT pool produce a non-empty transcript. Same downstream behaviour as
+    /// the legacy <see cref="OnVoiceUtteranceEnded"/> path: fill txtInput
+    /// then SendCurrentInput so AIMODE / Chat routing stays unchanged.
+    /// </summary>
+    private void OnVoiceStreamTranscript(string transcript, double durationSeconds)
+    {
+        if (string.IsNullOrWhiteSpace(transcript)) return;
+        if (_voicePipelineCts?.IsCancellationRequested == true) return;
+
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_voiceMicOn) return;
+            var v = VoiceSettingsStore.Load();
+            txtInput.Text = transcript;
+            txtInput.CaretIndex = transcript.Length;
+            SendCurrentInput();
+            SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
+        }));
+        AppLogger.Log($"[BOT-Voice] (stream) Transcript sent ({transcript.Length} chars, {durationSeconds:F2}s utterance)");
     }
 
     private void StopVoiceMic(string reason)
@@ -110,7 +200,16 @@ public partial class AgentBotWindow
             _voiceCapture.AmplitudeChanged -= OnVoiceAmplitudeChanged;
             _voiceCapture.UtteranceStarted -= OnVoiceUtteranceStarted;
             _voiceCapture.UtteranceEnded -= OnVoiceUtteranceEnded;
+            if (_voiceFrameForwarder is not null)
+                _voiceCapture.FrameAvailable -= _voiceFrameForwarder;
         }
+        _voiceFrameForwarder = null;
+
+        // Stream pipeline: tell the actor to tear down its graph + STT pool.
+        // The actor itself stays alive (Stage caches the singleton) — next
+        // StartListening will re-materialize.
+        try { _voiceStreamRef?.Tell(new StopListening()); } catch { }
+
         _voiceMicOn = false;
         ApplyVoiceMicUi(on: false);
         AppLogger.Log($"[BOT-Voice] Mic OFF ({reason})");

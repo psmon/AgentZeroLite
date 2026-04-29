@@ -1290,6 +1290,29 @@ public partial class AgentBotWindow : Window
         AppLogger.Log($"[AIMODE] result success={r.Success} turns={r.TurnCount} elapsed={elapsed}ms final=\"{r.FinalMessage}\"");
         _aiSendInFlight = false;
         _aiSendStopwatch = null;
+
+        // Stream pipeline (P2): when ON and TTS is configured, push the
+        // final reply through the OUTPUT graph for progressive playback.
+        // For now this still operates on the *complete* response (the
+        // OUTPUT graph chunks per-sentence and synthesises in parallel
+        // with playback). True token-stream wiring from the reactor's
+        // SSE feed is a future iteration.
+        try
+        {
+            if (r.Success && _voiceStreamRef is not null)
+            {
+                var v = Agent.Common.Voice.VoiceSettingsStore.Load();
+                if (v.UseStreamPipeline
+                    && !string.Equals(v.TtsProvider, Agent.Common.Voice.TtsProviderNames.Off, StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(r.FinalMessage))
+                {
+                    _voiceStreamRef.Tell(new Agent.Common.Voice.Streams.SpeakText(
+                        Text: r.FinalMessage,
+                        Voice: v.TtsVoice ?? string.Empty));
+                }
+            }
+        }
+        catch (Exception ex) { AppLogger.LogError("[BOT-Voice] Speak-on-result threw", ex); }
     }
 
     private static async Task SendLargeTextAsync(ITerminalSession session, string text, bool isMultiLine)
