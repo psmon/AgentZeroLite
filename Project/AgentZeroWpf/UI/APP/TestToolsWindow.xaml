@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Test Tools"
-        Width="540" Height="240"
-        MinWidth="420" MinHeight="180"
+        Width="680" Height="480"
+        MinWidth="520" MinHeight="320"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False"
@@ -21,6 +21,9 @@
         <SolidColorBrush x:Key="InputBg"      Color="#1F1F1F"/>
         <SolidColorBrush x:Key="InputBorder"  Color="#3E3E42"/>
         <SolidColorBrush x:Key="CyanBrush"    Color="#3794FF"/>
+        <SolidColorBrush x:Key="GreenBrush"   Color="#4EC9B0"/>
+        <SolidColorBrush x:Key="OrangeBrush"  Color="#CE9178"/>
+        <SolidColorBrush x:Key="RedBrush"     Color="#F48771"/>
     </Window.Resources>
 
     <Grid>
@@ -33,11 +36,34 @@
                      Background="{StaticResource BgToolbar}"
                      Foreground="{StaticResource TextPrimary}">
                 <DockPanel LastChildFill="True" Margin="12">
-                    <TextBlock DockPanel.Dock="Top"
-                               Text="Type a line → TTS synthesises. Bypass mode (default) feeds the synthesised PCM straight into STT — pure TTS↔STT round-trip with no acoustic loop. Uncheck Bypass to play through the speaker so the AskBot mic can re-capture it (requires Windows mic enhancements OFF + audible speaker)."
-                               Foreground="{StaticResource TextDim}" FontSize="10"
-                               TextWrapping="Wrap" Margin="0,0,0,10"/>
 
+                    <!-- Description -->
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Type a line → TTS synthesises. Bypass mode (default) feeds the synthesised PCM straight into STT — pure TTS↔STT round-trip. Uncheck Bypass to play through the speaker so the AskBot mic re-captures it."
+                               Foreground="{StaticResource TextDim}" FontSize="10"
+                               TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                    <!-- Active models — refreshed on window Activated and on every Speak.
+                         Lets the user verify which STT/TTS combo is being exercised
+                         after switching models in Settings → Voice. -->
+                    <Border DockPanel.Dock="Top"
+                            Background="{StaticResource BgPanel}"
+                            BorderBrush="{StaticResource BorderDim}" BorderThickness="1"
+                            CornerRadius="3" Padding="8,5" Margin="0,0,0,8">
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock x:Name="txtActiveModels"
+                                       FontFamily="Consolas" FontSize="10"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       Text="STT: — · TTS: —"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock x:Name="txtActiveMode"
+                                       FontFamily="Consolas" FontSize="9"
+                                       Foreground="{StaticResource TextDim}"
+                                       Text="mode: bypass" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Input row -->
                     <DockPanel DockPanel.Dock="Top" LastChildFill="True" Margin="0,0,0,8">
                         <Button x:Name="btnVoiceSpeak" DockPanel.Dock="Right"
                                 Content="Speak" FontSize="11" FontFamily="Consolas"
@@ -46,7 +72,7 @@
                                 Foreground="{StaticResource TextPrimary}"
                                 Margin="8,0,0,0" Padding="14,4" Cursor="Hand"
                                 Click="OnVoiceSpeak"
-                                ToolTip="Synthesise + (bypass: STT directly | acoustic: play through speaker). Enter."/>
+                                ToolTip="Synthesise + (bypass: STT direct | acoustic: play). Enter."/>
                         <TextBox x:Name="txtVoiceInput"
                                  FontSize="11" FontFamily="Consolas"
                                  Background="{StaticResource InputBg}"
@@ -54,23 +80,87 @@
                                  BorderBrush="{StaticResource InputBorder}" BorderThickness="1"
                                  Padding="6,4" VerticalContentAlignment="Center"
                                  KeyDown="OnVoiceInputKeyDown"
-                                 ToolTip="Type the line to speak. Enter=run, Esc=close."/>
+                                 ToolTip="Type the line. Enter=run + clear, Esc=close."/>
                     </DockPanel>
 
                     <CheckBox x:Name="chkBypassAcousticLoop" DockPanel.Dock="Top"
                               Content="Bypass acoustic loop — feed synthesised PCM directly to STT (default ON)"
                               Foreground="{StaticResource TextPrimary}" FontSize="10"
                               IsChecked="True" Margin="0,0,0,6"
-                              ToolTip="When ON: synthesise → resample to 16k mono → STT.TranscribeAsync → show transcript. When OFF: play through speaker so the AskBot mic re-captures it (requires functioning OS audio loopback)."/>
+                              Checked="OnBypassToggled" Unchecked="OnBypassToggled"
+                              ToolTip="ON: synthesise → resample → STT.TranscribeAsync → show. OFF: play through speaker so AskBot mic re-captures (requires OS audio loopback)."/>
 
+                    <!-- In-progress status (cleared after each turn lands in history) -->
                     <TextBlock x:Name="txtVoiceStatus" DockPanel.Dock="Top"
                                FontFamily="Consolas" FontSize="10"
                                Foreground="{StaticResource TextDim}"
-                               Text="Ready." Margin="0,0,0,4"
+                               Text="Ready." Margin="0,0,0,6"
                                TextWrapping="Wrap"/>
 
-                    <!-- Spacer -->
-                    <Grid/>
+                    <!-- History list — every turn (input + result + timing) is appended
+                         here. Latest first. Lets the user A/B different inputs against
+                         the same model, or compare model swaps without losing prior runs. -->
+                    <Border BorderBrush="{StaticResource BorderDim}" BorderThickness="1"
+                            CornerRadius="3" Background="{StaticResource BgPanel}">
+                        <ListBox x:Name="lstHistory"
+                                 Background="Transparent" BorderThickness="0"
+                                 Foreground="{StaticResource TextPrimary}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 HorizontalContentAlignment="Stretch">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="8,4"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                    <Setter Property="BorderBrush" Value="#252526"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <!-- Time -->
+                                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                                   Text="{Binding Time}"
+                                                   FontFamily="Consolas" FontSize="9"
+                                                   Foreground="{StaticResource TextDim}"
+                                                   Margin="0,0,8,0"/>
+                                        <!-- Input -->
+                                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                                   FontFamily="Consolas" FontSize="11"
+                                                   Foreground="{StaticResource CyanBrush}"
+                                                   TextWrapping="Wrap">
+                                            <Run Text="⌨ "/><Run Text="{Binding Input}"/>
+                                        </TextBlock>
+                                        <!-- Result -->
+                                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                                   FontFamily="Consolas" FontSize="11"
+                                                   Foreground="{Binding ResultBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,2,0,0">
+                                            <Run Text="→ "/><Run Text="{Binding Result}"/>
+                                        </TextBlock>
+                                        <!-- Tail (timing + provider) -->
+                                        <TextBlock Grid.Row="2" Grid.Column="1"
+                                                   Text="{Binding Tail}"
+                                                   FontFamily="Consolas" FontSize="9"
+                                                   Foreground="{StaticResource TextDim}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,2,0,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
                 </DockPanel>
             </TabItem>
         </TabControl>
