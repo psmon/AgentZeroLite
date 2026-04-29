@@ -134,20 +134,21 @@
                                                    FontFamily="Consolas" FontSize="9"
                                                    Foreground="{StaticResource TextDim}"
                                                    Margin="0,0,8,0"/>
-                                        <!-- Input -->
+                                        <!-- Input. NOTE Run.Text defaults to TwoWay binding —
+                                             must be explicit OneWay since Input is read-only. -->
                                         <TextBlock Grid.Row="0" Grid.Column="1"
                                                    FontFamily="Consolas" FontSize="11"
                                                    Foreground="{StaticResource CyanBrush}"
                                                    TextWrapping="Wrap">
-                                            <Run Text="⌨ "/><Run Text="{Binding Input}"/>
+                                            <Run Text="⌨ "/><Run Text="{Binding Input, Mode=OneWay}"/>
                                         </TextBlock>
                                         <!-- Result -->
                                         <TextBlock Grid.Row="1" Grid.Column="1"
                                                    FontFamily="Consolas" FontSize="11"
-                                                   Foreground="{Binding ResultBrush}"
+                                                   Foreground="{Binding ResultBrush, Mode=OneWay}"
                                                    TextWrapping="Wrap"
                                                    Margin="0,2,0,0">
-                                            <Run Text="→ "/><Run Text="{Binding Result}"/>
+                                            <Run Text="→ "/><Run Text="{Binding Result, Mode=OneWay}"/>
                                         </TextBlock>
                                         <!-- Tail (timing + provider) -->
                                         <TextBlock Grid.Row="2" Grid.Column="1"
