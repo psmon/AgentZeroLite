@@ -37,6 +37,14 @@ public partial class AgentBotWindow
     private volatile bool _voicePipelineBusy;
     private bool _voiceMicOn;
 
+    // Per-utterance timing checkpoints. Stage 1 of finding "where did the
+    // 10 seconds go?" — without these, all we know is "transcript appeared
+    // late." With them: VAD hangover vs STT prep vs STT inference vs
+    // dispatch are separable line items in the log.
+    private DateTime? _utteranceStartedAtUtc;
+    private DateTime? _utteranceEndedAtUtc;
+    private DateTime? _pipelineEnqueuedAtUtc;
+
     // Stream pipeline (P1+) — non-null when VoiceSettings.UseStreamPipeline is true.
     private IActorRef? _voiceStreamRef;
     private Action<MicFrame>? _voiceFrameForwarder;
@@ -325,25 +333,39 @@ public partial class AgentBotWindow
 
     private void OnVoiceUtteranceStarted()
     {
+        _utteranceStartedAtUtc = DateTime.UtcNow;
         _voiceCapture?.SeedBufferWithPreRoll();
+        AppLogger.Log("[BOT-Voice-pipe] [t0] utterance-start");
     }
 
     private void OnVoiceUtteranceEnded()
     {
         if (_voiceCapture is null) return;
+        _utteranceEndedAtUtc = DateTime.UtcNow;
         var pcm = _voiceCapture.ConsumePcmBuffer();
-        if (pcm.Length < 8000) return; // <0.25s — too short to bother
+        var pcmSec = pcm.Length / 32_000.0; // 16-bit PCM 16 kHz mono = 32 kB/s
+        var sinceStartMs = _utteranceStartedAtUtc is { } t0
+            ? (int)(_utteranceEndedAtUtc!.Value - t0).TotalMilliseconds
+            : -1;
+        AppLogger.Log($"[BOT-Voice-pipe] [t1] utterance-end | t1-t0={sinceStartMs}ms · pcm={pcm.Length} bytes (~{pcmSec:F2}s audio · includes ~2s VAD hangover + 1s pre-roll)");
+
+        if (pcm.Length < 8000)
+        {
+            AppLogger.Log("[BOT-Voice-pipe] dropped — utterance < 0.25s");
+            return;
+        }
 
         if (_voicePipelineBusy)
         {
             // Skip — a previous transcription hasn't finished. We could queue
             // it but that'd let utterances stack while a slow STT crawls.
             // Simpler: drop, surface "busy" so the user knows to pause briefly.
-            AppLogger.Log("[BOT-Voice] Skipping utterance — pipeline busy");
+            AppLogger.Log("[BOT-Voice-pipe] dropped — pipeline busy (previous turn still in flight)");
             SetVoiceStatus("Busy — pause briefly…", System.Windows.Media.Brushes.Goldenrod);
             return;
         }
 
+        _pipelineEnqueuedAtUtc = DateTime.UtcNow;
         _ = Task.Run(() => RunVoicePipelineOnceAsync(pcm));
     }
 
@@ -353,6 +375,18 @@ public partial class AgentBotWindow
         _voicePipelineBusy = true;
         var ct = _voicePipelineCts?.Token ?? CancellationToken.None;
 
+        // Per-stage Stopwatch instrumentation. The legacy path before today
+        // logged only "Transcript sent (N chars)" — useless for diagnosing
+        // "why does this take 10 seconds?". Now: enqueue→prep→transcribe→
+        // dispatch are each measured. Combined with the t0/t1 log lines
+        // from OnVoiceUtteranceStarted/Ended, the full breakdown of perceived
+        // latency is in the log without re-instrumenting per debug session.
+        var pipelineStartUtc = DateTime.UtcNow;
+        var enqueueLagMs = _pipelineEnqueuedAtUtc is { } enq
+            ? (int)(pipelineStartUtc - enq).TotalMilliseconds
+            : -1;
+        var pcmSec = pcm.Length / 32_000.0;
+
         SetInflightCancelVisible(true);
         try
         {
@@ -361,32 +395,56 @@ public partial class AgentBotWindow
             if (stt is null)
             {
                 SetVoiceStatus($"✗ STT '{v.SttProvider}' unavailable", System.Windows.Media.Brushes.OrangeRed);
+                AppLogger.Log($"[BOT-Voice-pipe] dropped — STT '{v.SttProvider}' unavailable");
                 return;
             }
 
+            AppLogger.Log($"[BOT-Voice-pipe] [t2] pipeline-start | enqueue-lag={enqueueLagMs}ms · provider={v.SttProvider} · lang={v.SttLanguage} · pcm=~{pcmSec:F2}s audio");
+
             SetVoiceStatus($"Transcribing · {ShortProviderLabel(v)}…", System.Windows.Media.Brushes.SkyBlue);
+
+            var prepSw = System.Diagnostics.Stopwatch.StartNew();
             var ready = await stt.EnsureReadyAsync(
                 new Progress<string>(msg => SetVoiceStatus(msg, System.Windows.Media.Brushes.SkyBlue)),
                 ct);
-            if (!ready || ct.IsCancellationRequested) return;
+            prepSw.Stop();
+            AppLogger.Log($"[BOT-Voice-pipe] [stage] STT prep | {prepSw.ElapsedMilliseconds}ms · ready={ready}");
+
+            if (!ready || ct.IsCancellationRequested)
+            {
+                AppLogger.Log("[BOT-Voice-pipe] dropped — STT not ready or cancelled");
+                return;
+            }
 
             string transcript;
+            var transcribeSw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 transcript = await stt.TranscribeAsync(pcm, v.SttLanguage, ct);
+                transcribeSw.Stop();
             }
-            catch (OperationCanceledException) { return; }
+            catch (OperationCanceledException)
+            {
+                transcribeSw.Stop();
+                AppLogger.Log($"[BOT-Voice-pipe] cancelled at transcribe ({transcribeSw.ElapsedMilliseconds}ms in)");
+                return;
+            }
             catch (Exception ex)
             {
-                AppLogger.LogError("[BOT-Voice] Transcribe failed", ex);
+                transcribeSw.Stop();
+                AppLogger.LogError($"[BOT-Voice-pipe] transcribe failed at {transcribeSw.ElapsedMilliseconds}ms", ex);
                 SetVoiceStatus($"✗ {ex.Message}", System.Windows.Media.Brushes.OrangeRed);
                 return;
             }
+
+            var rtFactor = pcmSec > 0 ? transcribeSw.ElapsedMilliseconds / 1000.0 / pcmSec : 0;
+            AppLogger.Log($"[BOT-Voice-pipe] [stage] STT transcribe | {transcribeSw.ElapsedMilliseconds}ms · {rtFactor:F2}x realtime · chars={(transcript ?? "").Length}");
 
             transcript = (transcript ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(transcript))
             {
                 SetVoiceStatus("(empty) — try again", System.Windows.Media.Brushes.Goldenrod);
+                AppLogger.Log("[BOT-Voice-pipe] dropped — empty transcript");
                 return;
             }
             if (ct.IsCancellationRequested) return;
@@ -394,6 +452,7 @@ public partial class AgentBotWindow
             // Hand the transcript off to the existing send pipeline. SendCurrentInput
             // already handles AIMODE vs Chat/Key routing, attachments, the
             // multi-line case, and the single-instance terminal write.
+            var dispatchSw = System.Diagnostics.Stopwatch.StartNew();
             Dispatcher.Invoke(() =>
             {
                 txtInput.Text = transcript;
@@ -401,7 +460,23 @@ public partial class AgentBotWindow
                 SendCurrentInput();
                 SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
             });
-            AppLogger.Log($"[BOT-Voice] Transcript sent ({transcript.Length} chars)");
+            dispatchSw.Stop();
+
+            // ── Final summary line: every measurement on one row ──
+            // Reading order: end-to-end perceived latency from when the
+            // user finished speaking to when the terminal saw the input.
+            var t1 = _utteranceEndedAtUtc;
+            var totalSinceUtteranceEndMs = t1 is { } t
+                ? (int)(DateTime.UtcNow - t).TotalMilliseconds
+                : -1;
+            AppLogger.Log(
+                $"[BOT-Voice-pipe] [t3] DONE | " +
+                $"end-to-end {totalSinceUtteranceEndMs}ms (utt-end → terminal) · " +
+                $"enqueue {enqueueLagMs}ms · " +
+                $"prep {prepSw.ElapsedMilliseconds}ms · " +
+                $"transcribe {transcribeSw.ElapsedMilliseconds}ms ({rtFactor:F1}x rt) · " +
+                $"dispatch {dispatchSw.ElapsedMilliseconds}ms · " +
+                $"chars={transcript.Length} · provider={v.SttProvider}");
         }
         finally
         {
