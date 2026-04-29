@@ -395,9 +395,11 @@
                                    Text="🧪" FontSize="11" VerticalAlignment="Center"
                                    Margin="2,0,6,0" ToolTip="Virtual voice test — TTS → speaker → mic"/>
                         <Button x:Name="btnVoiceTestSpeak" DockPanel.Dock="Right"
-                                Content="Speak" FontSize="10"
-                                Style="{StaticResource MiniKeyButton}"
-                                Margin="6,0,0,0" Padding="8,2"
+                                Content="Speak" FontSize="10" FontFamily="Consolas"
+                                Background="{StaticResource InputBg}"
+                                BorderBrush="{StaticResource InputBorder}" BorderThickness="1"
+                                Foreground="{StaticResource TextPrimary}"
+                                Margin="6,0,0,0" Padding="8,2" Cursor="Hand"
                                 Click="OnVoiceTestSpeak"
                                 ToolTip="Synthesise the text and play through speaker (Enter)"/>
                         <TextBlock x:Name="txtVoiceTestStatus" DockPanel.Dock="Right"
