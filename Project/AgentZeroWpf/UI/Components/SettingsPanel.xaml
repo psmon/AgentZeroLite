@@ -817,12 +817,23 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Use GPU (CUDA)" FontFamily="Consolas" FontSize="10"
+                                    <TextBlock Text="Use GPU (Vulkan)" FontFamily="Consolas" FontSize="10"
                                                Foreground="#888899" VerticalAlignment="Center"/>
                                     <CheckBox x:Name="chkSttUseGpu" Grid.Column="1"
-                                              Content="auto-detect; falls back to CPU if unavailable"
+                                              Content="cross-vendor (AMD/Intel/NVIDIA); falls back to CPU if Vulkan is unavailable"
                                               Foreground="#888899" FontFamily="Consolas" FontSize="10"
                                               VerticalAlignment="Center"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="GPU device" FontFamily="Consolas" FontSize="10"
+                                               Foreground="#888899" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="cbSttGpuDevice" Grid.Column="1"
+                                              Style="{StaticResource DarkComboBox}"
+                                              ToolTip="Auto = best (vendor + VRAM heuristic). Override on multi-GPU systems if Auto picks the wrong adapter."/>
                                 </Grid>
                             </StackPanel>
 

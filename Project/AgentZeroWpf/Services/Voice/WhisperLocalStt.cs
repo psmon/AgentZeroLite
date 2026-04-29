@@ -10,12 +10,12 @@ namespace AgentZeroWpf.Services.Voice;
 /// <summary>
 /// Offline STT via whisper.cpp through Whisper.net. Models live under
 /// <c>%USERPROFILE%\.ollama\models\agentzero\whisper\</c> and are downloaded
-/// on first use per size. Lite ships CPU runtime only — the GPU flag is
-/// preserved on the settings tab for forward compatibility but currently
-/// always falls back to CPU (Whisper.net.Runtime.Cuda intentionally not
-/// referenced to keep the installer slim). Origin's CUDA helper is dropped
-/// here for the same reason; we'll bring it back when the matching runtime
-/// package is in.
+/// on first use per size. Two runtimes are bundled — CPU and Vulkan — and
+/// the loader picks based on <see cref="UseGpu"/>: <c>true</c> probes
+/// Vulkan → CPU, <c>false</c> stays on CPU. Vulkan is cross-vendor so a
+/// single binary covers AMD/Intel/NVIDIA. CUDA runtime is not bundled
+/// (~750 MB of cuBLAS DLLs would balloon the installer); revisit as an
+/// on-demand download if benchmark wins justify it.
 /// </summary>
 public sealed class WhisperLocalStt : ISpeechToText
 {
@@ -24,6 +24,8 @@ public sealed class WhisperLocalStt : ISpeechToText
     private static readonly object Lock = new();
     private static WhisperFactory? _factory;
     private static string? _loadedModelPath;
+    private static bool _loadedUseGpu;
+    private static int _loadedGpuIndex;
 
     // minBytes guards against truncated/aborted downloads — anything smaller is
     // treated as missing and re-fetched.
@@ -42,6 +44,13 @@ public sealed class WhisperLocalStt : ISpeechToText
     }
 
     public bool UseGpu { get; set; }
+
+    /// <summary>
+    /// Vulkan device index. <c>-1</c> = auto (pick best via WMI heuristic);
+    /// <c>0..N</c> = explicit Vulkan physical-device index. Ignored when
+    /// <see cref="UseGpu"/> is false.
+    /// </summary>
+    public int GpuDeviceIndex { get; set; } = -1;
 
     public static IReadOnlyList<string> AvailableModels => ["tiny", "small", "medium"];
 
@@ -68,10 +77,11 @@ public sealed class WhisperLocalStt : ISpeechToText
     public async Task<bool> EnsureReadyAsync(IProgress<string>? progress = null, CancellationToken ct = default)
     {
         var path = GetModelPath(_modelName);
+        var backend = UseGpu ? "GPU/Vulkan→CPU" : "CPU";
         if (IsModelDownloaded(_modelName))
         {
-            progress?.Report($"Whisper {_modelName} model ready (CPU).");
-            EnsureLoaded(path);
+            progress?.Report($"Whisper {_modelName} model ready ({backend}).");
+            EnsureLoaded(path, UseGpu, GpuDeviceIndex);
             return true;
         }
 
@@ -87,14 +97,14 @@ public sealed class WhisperLocalStt : ISpeechToText
         await modelStream.CopyToAsync(fileWriter, ct);
 
         progress?.Report($"Whisper model saved: {new FileInfo(path).Length / (1024 * 1024)} MB");
-        EnsureLoaded(path);
+        EnsureLoaded(path, UseGpu, GpuDeviceIndex);
         return true;
     }
 
     public async Task<string> TranscribeAsync(byte[] pcm16kMono, string language = "auto", CancellationToken ct = default)
     {
         var path = GetModelPath(_modelName);
-        EnsureLoaded(path);
+        EnsureLoaded(path, UseGpu, GpuDeviceIndex);
 
         if (_factory is null) throw new InvalidOperationException("Whisper factory unexpectedly null");
         if (pcm16kMono.Length == 0) return "";
@@ -119,19 +129,38 @@ public sealed class WhisperLocalStt : ISpeechToText
         return sb.ToString().Trim();
     }
 
-    private static void EnsureLoaded(string path)
+    private static void EnsureLoaded(string path, bool useGpu, int gpuIndex)
     {
         lock (Lock)
         {
-            if (_factory is not null && _loadedModelPath == path) return;
+            // Resolve auto (-1) → WMI best-pick once per load so the log line
+            // captures the actual device index that hit Whisper.net.
+            var resolvedIndex = useGpu
+                ? (gpuIndex < 0 ? GpuEnumerator.PickBestIndex() : gpuIndex)
+                : 0;
+
+            if (_factory is not null
+                && _loadedModelPath == path
+                && _loadedUseGpu == useGpu
+                && _loadedGpuIndex == resolvedIndex) return;
             if (!File.Exists(path))
                 throw new InvalidOperationException($"Whisper model missing: {path}. Call EnsureReadyAsync first.");
 
             _factory?.Dispose();
-            RuntimeOptions.RuntimeLibraryOrder = [RuntimeLibrary.Cpu];
-            _factory = WhisperFactory.FromPath(path, new WhisperFactoryOptions { UseGpu = false });
+            RuntimeOptions.RuntimeLibraryOrder = useGpu
+                ? [RuntimeLibrary.Vulkan, RuntimeLibrary.Cpu]
+                : [RuntimeLibrary.Cpu];
+            _factory = WhisperFactory.FromPath(path, new WhisperFactoryOptions
+            {
+                UseGpu = useGpu,
+                GpuDevice = resolvedIndex,
+            });
             _loadedModelPath = path;
-            AppLogger.Log($"[Voice] Whisper factory loaded | model={Path.GetFileName(path)} runtime=CPU");
+            _loadedUseGpu = useGpu;
+            _loadedGpuIndex = resolvedIndex;
+            var probe = string.Join("→", RuntimeOptions.RuntimeLibraryOrder);
+            var deviceLabel = useGpu ? $"device={resolvedIndex}{(gpuIndex < 0 ? " (auto)" : "")}" : "device=cpu";
+            AppLogger.Log($"[Voice] Whisper factory loaded | model={Path.GetFileName(path)} useGpu={useGpu} {deviceLabel} probe={probe}");
         }
     }
 
@@ -142,6 +171,8 @@ public sealed class WhisperLocalStt : ISpeechToText
             _factory?.Dispose();
             _factory = null;
             _loadedModelPath = null;
+            _loadedUseGpu = false;
+            _loadedGpuIndex = 0;
         }
     }
 }

@@ -36,12 +36,19 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
 
-    <!-- Voice (phase 2) — mic capture + playback (NAudio), offline STT (Whisper.net,
-         CPU only — Cuda runtime intentionally omitted to keep the installer slim;
-         CUDA acceleration arrives in a future phase), Windows SAPI TTS. -->
+    <!-- Voice — mic capture + playback (NAudio), offline STT (Whisper.net),
+         Windows SAPI TTS. Two Whisper runtimes are bundled so the loader can
+         probe Vulkan → Cpu at startup based on SttUseGpu:
+           • Runtime         (CPU, AVX/AVX2 — always present, ultimate fallback)
+           • Runtime.Vulkan  (~50 MB, cross-vendor — AMD/Intel/NVIDIA all OK)
+         Cuda runtime is intentionally not bundled (~750 MB of cuBLAS DLLs
+         would balloon the installer) — will revisit as on-demand download. -->
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Whisper.net" Version="1.9.0" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" />
+    <!-- WMI Win32_VideoController access for GPU enumeration / picker. -->
+    <PackageReference Include="System.Management" Version="10.0.0-preview.3.25171.5" />
     <PackageReference Include="System.Speech" Version="10.0.0-preview.3.25171.5" />
   </ItemGroup>
 

@@ -47,6 +47,7 @@ public partial class SettingsPanel
             SelectComboTag(cbSttWhisperModel, v.SttWhisperModel);
             SelectComboTag(cbSttLanguage, v.SttLanguage);
             chkSttUseGpu.IsChecked = v.SttUseGpu;
+            PopulateGpuDevicePicker(v.SttGpuDeviceIndex);
             pbSttOpenAIKey.Password = v.SttOpenAIApiKey;
             ApplySttProviderUi(v.SttProvider);
 
@@ -228,6 +229,8 @@ public partial class SettingsPanel
         v.SttWhisperModel = ReadComboTag(cbSttWhisperModel, "small");
         v.SttLanguage = ReadComboTag(cbSttLanguage, "auto");
         v.SttUseGpu = chkSttUseGpu.IsChecked == true;
+        v.SttGpuDeviceIndex = (cbSttGpuDevice.SelectedItem as ComboBoxItem)?.Tag is string idxTag
+                              && int.TryParse(idxTag, out var idx) ? idx : -1;
         v.SttOpenAIApiKey = pbSttOpenAIKey.Password ?? "";
         v.SttWebnoriModel = (cbSttWebnoriModel.SelectedItem as string)
                             ?? cbSttWebnoriModel.Text
@@ -439,6 +442,42 @@ public partial class SettingsPanel
         }
         if (box.Items.Count > 0) box.SelectedIndex = 0;
     }
+
+    /// <summary>
+    /// Fill the GPU device picker with "Auto" + WMI-detected adapters.
+    /// Tag stores the int index ("-1" = auto, "0..N" = explicit). The
+    /// auto-best vendor is annotated in its label so the user knows what
+    /// "Auto" would resolve to without having to read the log file.
+    /// </summary>
+    private void PopulateGpuDevicePicker(int currentIndex)
+    {
+        cbSttGpuDevice.Items.Clear();
+        var adapters = GpuEnumerator.Enumerate();
+        var bestIdx = adapters.Count > 0 ? GpuEnumerator.PickBestIndex(adapters) : 0;
+
+        var autoLabel = adapters.Count == 0
+            ? "Auto (no GPUs detected via WMI)"
+            : $"Auto (best — {Truncate(adapters.FirstOrDefault(a => a.Index == bestIdx)?.Name ?? "?", 40)})";
+        cbSttGpuDevice.Items.Add(new ComboBoxItem { Content = autoLabel, Tag = "-1" });
+
+        foreach (var a in adapters)
+        {
+            var vramGb = a.VramBytes / (1024.0 * 1024.0 * 1024.0);
+            var vramLabel = vramGb >= 0.5 ? $" · {vramGb:F1} GB" : "";
+            cbSttGpuDevice.Items.Add(new ComboBoxItem
+            {
+                Content = $"#{a.Index} — {Truncate(a.Name, 50)}{vramLabel}",
+                Tag = a.Index.ToString(),
+            });
+        }
+
+        var match = cbSttGpuDevice.Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(it => (it.Tag as string) == currentIndex.ToString());
+        cbSttGpuDevice.SelectedItem = match ?? cbSttGpuDevice.Items[0];
+    }
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s.Substring(0, max - 1) + "…";
 
     private void OnSttSave(object sender, RoutedEventArgs e)
     {

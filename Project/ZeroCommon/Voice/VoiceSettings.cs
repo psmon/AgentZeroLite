@@ -64,10 +64,21 @@ public sealed class VoiceSettings
     public string SttLanguage { get; set; } = "auto";
 
     /// <summary>
-    /// Try CUDA when loading Whisper.net. Falls back to CPU automatically if
-    /// the runtime isn't available — purely an opt-in performance hint.
+    /// Try Vulkan (cross-vendor GPU) when loading Whisper.net. Falls back to
+    /// CPU automatically if the Vulkan runtime/driver isn't available —
+    /// purely an opt-in performance hint. CUDA is not bundled (cuBLAS DLLs
+    /// are ~750 MB) so this flag never selects CUDA today.
     /// </summary>
     public bool SttUseGpu { get; set; } = false;
+
+    /// <summary>
+    /// Vulkan device index when <see cref="SttUseGpu"/> is true.
+    /// <c>-1</c> = Auto (best by WMI vendor + VRAM heuristic — typical case).
+    /// <c>0..N</c> = explicit physical-device index. Useful on dual-GPU
+    /// systems (laptop dGPU+iGPU, multi-card workstations) when the auto
+    /// pick lands on the wrong adapter.
+    /// </summary>
+    public int SttGpuDeviceIndex { get; set; } = -1;
 
     /// <summary>OpenAIWhisper provider API key. Stored even when another provider is active.</summary>
     public string SttOpenAIApiKey { get; set; } = "";

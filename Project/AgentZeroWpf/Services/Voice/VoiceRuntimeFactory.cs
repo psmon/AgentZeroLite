@@ -16,7 +16,11 @@ internal static class VoiceRuntimeFactory
     {
         return v.SttProvider switch
         {
-            SttProviderNames.WhisperLocal => new WhisperLocalStt(v.SttWhisperModel) { UseGpu = v.SttUseGpu },
+            SttProviderNames.WhisperLocal => new WhisperLocalStt(v.SttWhisperModel)
+            {
+                UseGpu = v.SttUseGpu,
+                GpuDeviceIndex = v.SttGpuDeviceIndex,
+            },
             SttProviderNames.OpenAIWhisper => new OpenAiWhisperStt(v.SttOpenAIApiKey),
             SttProviderNames.WebnoriGemma => new WebnoriGemmaStt(v.SttWebnoriModel),
             SttProviderNames.LocalGemma => new LocalGemmaStt(v.SttLocalGemmaModelId),
