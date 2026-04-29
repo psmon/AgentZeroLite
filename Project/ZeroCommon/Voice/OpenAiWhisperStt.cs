@@ -53,6 +53,22 @@ public sealed class OpenAiWhisperStt : ISpeechToText
         content.Add(new StringContent("whisper-1"), "model");
         content.Add(new StringContent("text"), "response_format");
 
+        // Hallucination-suppression knobs (OpenAI Whisper API):
+        //
+        // temperature=0 — fully deterministic decoding; same input always
+        //   yields the same transcript. Default 0..1 sliding (model picks
+        //   higher temps after low-confidence segments) which actively
+        //   *invites* hallucination on quiet/ambient input. Hard zero.
+        //
+        // prompt="" — explicitly empty seed prompt. The default behaviour
+        //   on whisper-1 carries no prior context across requests, but
+        //   passing an explicit empty string ensures the model doesn't fall
+        //   back to language-style priors that bias towards YouTube-creator
+        //   outros ("시청해주셔서 감사합니다", "Thank you for watching")
+        //   on near-silence audio.
+        content.Add(new StringContent("0"), "temperature");
+        content.Add(new StringContent(string.Empty), "prompt");
+
         if (language != "auto" && !string.IsNullOrEmpty(language))
             content.Add(new StringContent(language), "language");
 

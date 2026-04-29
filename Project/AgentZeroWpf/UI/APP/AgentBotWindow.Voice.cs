@@ -399,7 +399,26 @@ public partial class AgentBotWindow
                 return;
             }
 
-            AppLogger.Log($"[BOT-Voice-pipe] [t2] pipeline-start | enqueue-lag={enqueueLagMs}ms · provider={v.SttProvider} · lang={v.SttLanguage} · pcm=~{pcmSec:F2}s audio");
+            // ── Energy gate ──
+            // VAD set the trigger (sensitivity is user-controlled, often
+            // max'd to catch quiet voice). Post-capture, check whether the
+            // PCM actually contains speech-level energy. If it's mostly
+            // silence (e.g., a fan/keyboard click triggered VAD on max
+            // sensitivity), skip the STT call — Whisper hallucinates
+            // YouTube outros (\"시청해주셔서 감사합니다\", \"Thank you for
+            // watching\") on near-silence audio.
+            var (peakAmp, rmsAmp) = MeasurePcm16Level(pcm);
+            var peakDb = peakAmp > 0 ? 20.0 * Math.Log10(peakAmp) : double.NegativeInfinity;
+            var rmsDb  = rmsAmp  > 0 ? 20.0 * Math.Log10(rmsAmp)  : double.NegativeInfinity;
+            AppLogger.Log($"[BOT-Voice-pipe] [t2] pipeline-start | enqueue-lag={enqueueLagMs}ms · provider={v.SttProvider} · lang={v.SttLanguage} · pcm=~{pcmSec:F2}s · peak={peakDb:F1}dBFS · rms={rmsDb:F1}dBFS");
+
+            const double MinSpeechRmsDbfs = -40.0;   // ambient/typing usually < -45; conversational speech > -30
+            if (rmsDb < MinSpeechRmsDbfs)
+            {
+                AppLogger.Log($"[BOT-Voice-pipe] dropped — energy gate (rms={rmsDb:F1}dBFS < {MinSpeechRmsDbfs}dBFS · likely false VAD trigger on ambient noise)");
+                SetVoiceStatus("(too quiet — try speaking closer to the mic)", System.Windows.Media.Brushes.Goldenrod);
+                return;
+            }
 
             SetVoiceStatus($"Transcribing · {ShortProviderLabel(v)}…", System.Windows.Media.Brushes.SkyBlue);
 
@@ -483,6 +502,28 @@ public partial class AgentBotWindow
             _voicePipelineBusy = false;
             SetInflightCancelVisible(false);
         }
+    }
+
+    /// <summary>
+    /// Walk a 16-bit little-endian PCM byte array and return (peak, rms) in
+    /// normalised [0, 1] amplitude. Used by the energy gate to decide whether
+    /// the captured utterance has enough speech energy to bother transcribing.
+    /// </summary>
+    private static (double peak, double rms) MeasurePcm16Level(byte[] pcm)
+    {
+        if (pcm.Length < 2) return (0, 0);
+        long sumSq = 0;
+        int peak = 0;
+        var sampleCount = pcm.Length / 2;
+        for (int i = 0; i < sampleCount; i++)
+        {
+            short s = (short)(pcm[i * 2] | (pcm[i * 2 + 1] << 8));
+            int abs = s < 0 ? -s : s;
+            if (abs > peak) peak = abs;
+            sumSq += (long)s * s;
+        }
+        var rms = Math.Sqrt(sumSq / (double)sampleCount) / 32768.0;
+        return (peak / 32768.0, rms);
     }
 
     private void SetInflightCancelVisible(bool visible)
