@@ -125,6 +125,19 @@ footer a:hover{color:var(--mint)}
 [data-lang="en"] .ko{display:none}
 [data-lang="ko"] .en{display:none}
 
+/* ─── Pixel-art interactive demo ─── */
+.demo-wrap{max-width:1100px;margin:36px auto 0;padding:0 24px}
+.demo-head{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.demo-head h2{margin:0;border:0;padding:0;font-size:clamp(20px,2.5vw,24px)}
+.demo-head .lede{color:var(--text-dim);font-size:13px;margin:0}
+.demo-head .badge{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--mint);border:1px solid var(--mint);padding:3px 9px;border-radius:3px}
+.demo-frame{position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border-accent);box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(124,253,176,.1),0 0 32px rgba(55,148,255,.08);background:#0A0A14;aspect-ratio:16/9;min-height:480px}
+#azd-mount,#azd-aitalk,#azd-voice{position:absolute;inset:0;width:100%;height:100%;cursor:default;touch-action:none}
+#azd-mount canvas,#azd-aitalk canvas,#azd-voice canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+#azd-mount{cursor:crosshair}
+.demo-help{margin-top:10px;color:var(--text-dim);font-size:12px;font-family:var(--mono);display:flex;gap:18px;flex-wrap:wrap}
+.demo-help kbd{display:inline-block;padding:1px 6px;background:#0F0F1A;color:var(--mint);border:1px solid var(--border-accent);border-radius:3px;font-size:11px}
+
 /* ─── Responsive ─── */
 @media (max-width:640px){
   .hero{padding-top:32px}
@@ -133,6 +146,7 @@ footer a:hover{color:var(--mint)}
   .hero-pitch,.section{padding:0 18px}
   .recipe{padding:16px 18px}
   .recipe li{padding-left:38px}
+  .demo-frame{aspect-ratio:auto;min-height:560px}
 }
 </style>
 </head>
@@ -172,6 +186,7 @@ footer a:hover{color:var(--mint)}
       <span class="ko">⬇ 최신 버전 다운로드 <span data-az-version></span></span>
       <span class="en">⬇ Download latest <span data-az-version></span></span>
     </a>
+    <a class="btn" href="#live-demo"><span class="ko">▶ 웹에서 만져보기</span><span class="en">▶ Try the live demo</span></a>
     <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
     <a class="btn" href="#voice"><span class="ko">🎙 음성으로 듀얼 멀티태스크</span><span class="en">🎙 Voice — dual multitask</span></a>
     <a class="btn" href="#install"><span class="ko">🛠 설치 옵션</span><span class="en">🛠 Install options</span></a>
@@ -185,6 +200,27 @@ footer a:hover{color:var(--mint)}
     <img src="main.png" alt="AgentZero Lite — multi-CLI multi-view screenshot" loading="lazy">
   </div>
 </div>
+
+<!-- ═════════════════════ Interactive pixel-art demo ═════════════════════ -->
+<section class="demo-wrap" id="live-demo">
+  <div class="demo-head">
+    <span class="badge">▶ LIVE DEMO</span>
+    <h2 class="ko">웹에서 직접 만져보는 AgentZero</h2>
+    <h2 class="en">Try AgentZero in your browser</h2>
+    <p class="lede ko">픽셀아트로 재구성한 실제 셸 — 4가지 모드를 자동 재생하며 실제 동작을 그대로 보여줍니다.</p>
+    <p class="lede en">Pixel-art reconstruction of the real shell — auto-plays four modes that mirror the actual UI flow.</p>
+  </div>
+  <div class="demo-frame">
+    <div id="azd-mount"></div>
+  </div>
+  <div class="demo-help">
+    <span class="ko">← 좌측 아이콘 / 우측 모드 버튼 클릭</span>
+    <span class="en">← click activity icons / right-side mode buttons</span>
+    <span><kbd>1</kbd>–<kbd>4</kbd> <span class="ko">모드</span><span class="en">modes</span></span>
+    <span><kbd>P</kbd> <span class="ko">자동재생 토글</span><span class="en">toggle autoplay</span></span>
+    <span><kbd>S</kbd> <span class="ko">스캔라인 토글</span><span class="en">toggle scanlines</span></span>
+  </div>
+</section>
 
 <!-- ═════════════════════ One-paragraph pitch ═════════════════════ -->
 <div class="hero-pitch">
@@ -272,67 +308,53 @@ footer a:hover{color:var(--mint)}
   </div>
 </section>
 
-<!-- ═════════════════════ AI ↔ AI ═════════════════════ -->
+<!-- ═════════════════════ AI ↔ AI · auto-handshake ═════════════════════ -->
 <section class="section" id="ai-talk">
-  <h2 class="ko">🤝 두 AI CLI 대화시키기 — 1분 레시피</h2>
-  <h2 class="en">🤝 Make two AI CLIs talk — the 1-minute recipe</h2>
+  <h2 class="ko">🤝 AI에게 작업시키기 — 자동 핸드셰이크 + 자율 토론</h2>
+  <h2 class="en">🤝 Tell AIs to work it out — auto-handshake + autonomous discussion</h2>
 
-  <div class="ascii">
-<span class="src">Tab 0 (Claude)</span>                 <span class="dst">Tab 1 (Codex)</span>
-  │                                │
-  │    "Greet the Codex tab."      │
-  │            │                   │
-  │            ▼                   │
-  │ <span class="cmd">AgentZeroLite.ps1 terminal-send 0 1 "hi Codex"</span> ─▶
-  │                                │
-  │                         Codex reads prompt,
-  │                         composes reply
-  │                                │
-  ◀─ <span class="cmd">AgentZeroLite.ps1 terminal-send 0 0 "hey Claude, let's design an API"</span>
-  │                                │
-  │ <span class="cmd">terminal-read 0 1 --last 2000</span>   ─▶  <span class="cmd">terminal-read 0 0 --last 2000</span>
-  │            (continue turn-by-turn)            │
+  <p class="ko" style="color:var(--text-soft);max-width:820px">
+    이전 README 의 "1분 레시피"(각 AI 탭에 도구 사용법을 사람이 직접 붙여넣기)는 <strong style="color:var(--mint)">이제 필요 없습니다</strong>. AgentBot 이 첫 접촉 시 핸드셰이크 헤더를 자동으로 prepend 하고, 피어 AI 는 그 헤더만 읽고 <code>bot-chat</code> 프로토콜을 인지해 회신합니다 — <strong>사용자 사전 학습 0회</strong>.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px">
+    The old README "1-minute recipe" (paste a teaching message into each AI tab) <strong style="color:var(--mint)">is gone</strong>. AgentBot now auto-prepends a handshake header on first contact, and the peer AI reads that header and acks via <code>bot-chat</code> on its own — <strong>zero user prep</strong>.
+  </p>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="card accent-cyan">
+      <span class="tag">TRIGGER</span>
+      <h4 class="ko">한국어 한 줄</h4>
+      <h4 class="en">One Korean line</h4>
+      <p class="ko"><em>"클로드군 코덱스양과 자율토론 5턴이내에 해"</em> · LocalLLM 이 Mode 2 트리거를 인식해 <code>send_to_terminal</code> 자동 발사.</p>
+      <p class="en"><em>"Claude한테 X해"</em>, <em>"토론 시작해"</em>, <em>"물어봐줘"</em> — Gemma 4 recognises Mode 2 phrases and emits <code>send_to_terminal</code> with a GBNF-constrained tool call.</p>
+    </div>
+    <div class="card accent-magenta">
+      <span class="tag">HANDSHAKE</span>
+      <h4 class="ko">첫 메시지에 인라인 첨부</h4>
+      <h4 class="en">In-band on first message</h4>
+      <p class="ko"><code>WorkspaceTerminalToolHost.BuildFirstContactHeader</code> 가 <em>"You are Claude and I am AgentBot..."</em> 헤더를 자동 prepend. <code>bot-chat help</code> + <code>--from</code> 사용법까지 동봉.</p>
+      <p class="en"><code>WorkspaceTerminalToolHost.BuildFirstContactHeader</code> auto-prepends an <em>"You are Claude and I am AgentBot..."</em> header that documents the <code>bot-chat</code> + <code>--from</code> reverse channel inline. The peer reads, runs <code>-cli help</code>, then acks.</p>
+    </div>
+    <div class="card accent-yellow">
+      <span class="tag">REVERSE</span>
+      <h4 class="ko">피어 → 봇 콜백</h4>
+      <h4 class="en">Peer → bot callback</h4>
+      <p class="ko">피어가 <code>bot-chat "DONE(...)" --from Claude</code> 실행 → <code>WM_COPYDATA</code> → <code>HandleBotChat</code> → Reactor 가 새 사이클로 wake. 폴링 안 함.</p>
+      <p class="en">Peer runs <code>bot-chat "DONE(...)" --from Claude</code> → <code>WM_COPYDATA</code> → <code>HandleBotChat</code> → Reactor wakes for a continuation cycle. No <code>read_terminal</code> polling required.</p>
+    </div>
   </div>
 
-  <div class="recipe">
-    <ol class="ko">
-      <li>
-        <strong>CLI 경로 등록 (1회)</strong>
-        Settings → <em>AgentZero CLI</em> → <code>Register PATH</code> 버튼. 이후 어느 셸에서든 <code>AgentZeroLite.ps1</code>이 잡힙니다.
-      </li>
-      <li>
-        <strong>같은 워크스페이스에 AI 탭 2개</strong>
-        예: 그룹 0 탭 0 = <code>claude</code>, 그룹 0 탭 1 = <code>codex</code>. 자연어 지시를 받는 AI CLI면 어느 것이든.
-      </li>
-      <li>
-        <strong>각 AI에게 도구 가르치기 (탭마다 한 번 붙여넣기)</strong>
-        <code>Learn `AgentZeroLite.ps1 help` and use it for cross-terminal talk.
-Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` to speak by name, and `terminal-read &lt;grp&gt; &lt;tab&gt; --last 2000` to read a peer's reply.</code>
-      </li>
-      <li>
-        <strong>대화 시작</strong>
-        Claude 탭에서 <em>"Codex라는 이름의 탭에 인사하고, REST 엔드포인트를 같이 설계하자고 제안해."</em> — Claude는 <code>terminal-send</code>로 메시지를 보내고, Codex는 프롬프트에서 받아 답장을 쏩니다. 두 탭에 대화가 실시간 흐름.
-      </li>
-    </ol>
-    <ol class="en">
-      <li>
-        <strong>Register the CLI path (once)</strong>
-        Settings → <em>AgentZero CLI</em> → <code>Register PATH</code>. <code>AgentZeroLite.ps1</code> resolves from any shell after this.
-      </li>
-      <li>
-        <strong>Open two AI tabs in the same workspace</strong>
-        e.g. group 0 tab 0 = <code>claude</code>, group 0 tab 1 = <code>codex</code>. Any CLI-native AI works.
-      </li>
-      <li>
-        <strong>Teach each AI the tool (paste once per tab)</strong>
-        <code>Learn `AgentZeroLite.ps1 help` and use it for cross-terminal talk.
-Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` to speak by name, and `terminal-read &lt;grp&gt; &lt;tab&gt; --last 2000` to read a peer's reply.</code>
-      </li>
-      <li>
-        <strong>Kick it off</strong>
-        In the Claude tab: <em>"Greet the tab named Codex and propose we co-design a REST endpoint."</em> Claude issues <code>terminal-send</code>, Codex sees it, composes a reply, and sends it back. The conversation streams in both tabs.
-      </li>
-    </ol>
+  <div class="demo-wrap" style="margin-top:24px;padding:0">
+    <div class="demo-head">
+      <span class="badge">▶ AUTO-DISCUSSION</span>
+      <h2 class="ko" style="font-size:18px">5-턴 자율토론 라이브 시뮬레이션</h2>
+      <h2 class="en" style="font-size:18px">Live simulation of a 5-turn autonomous discussion</h2>
+      <p class="lede ko">상단: Claude / Codex 좌우 2분할 · 하단: AgentBot AIMODE — 핸드셰이크 자동 첨부 + 피어 콜백을 그대로 재현.</p>
+      <p class="lede en">Top: Claude / Codex split · Bottom: AgentBot AIMODE — faithful recreation of auto-handshake injection + peer callback.</p>
+    </div>
+    <div class="demo-frame" style="aspect-ratio:16/10;min-height:560px">
+      <div id="azd-aitalk"></div>
+    </div>
   </div>
 </section>
 
@@ -356,7 +378,7 @@ Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` 
   </p>
 
   <div class="ascii">
-<span class="src">Tab 0 — Claude (keyboard)</span>            <span class="dst">Tab 1 — Codex (voice)</span>
+<span class="src">Tab 0 — Claude (keyboard)</span>            <span class="dst">Tab 1 — Claude (voice)</span>
   │                                       │
   │  <span class="cmd">you type:</span>                            │  <span class="cmd">you say into the mic:</span>
   │  "refactor this function ..."         │  "오늘 작업한 PR 요약해줘"
@@ -364,10 +386,23 @@ Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` 
   │            ▼                          │            ▼  <span class="arrow">Whisper.net (Vulkan)</span>
   │     Claude works                      │     AgentBot transcribes
   │            │                          │            │
-  │            ▼                          │            ▼
-  │     reply in tab 0                    │     typed into tab 1
+  │            ▼                          │            ▼  <span class="arrow">CHT mode auto-send</span>
+  │     reply in tab 0                    │     session.WriteAndSubmit
   └───────────────────────────────────────┴───────────────────────────────────────
             <span class="arrow">one supervisor (you), two streams running in parallel</span>
+  </div>
+
+  <div class="demo-wrap" style="margin-top:18px;padding:0">
+    <div class="demo-head">
+      <span class="badge">▶ VOICE LIVE</span>
+      <h2 class="ko" style="font-size:18px">음성 → 터미널 실시간 라이브</h2>
+      <h2 class="en" style="font-size:18px">Voice → terminal, live</h2>
+      <p class="lede ko">상단: Claude 터미널 · 하단: AgentBot CHT 모드 + 음성 툴바 — 실제 마이크/VAD/Whisper/자동전송 흐름을 그대로 재현.</p>
+      <p class="lede en">Top: Claude terminal · Bottom: AgentBot CHT mode + voice toolbar — faithful recreation of mic / VAD / Whisper / auto-send flow.</p>
+    </div>
+    <div class="demo-frame" style="aspect-ratio:16/10;min-height:560px">
+      <div id="azd-voice"></div>
+    </div>
   </div>
 
   <div class="grid" style="margin-top:18px">
@@ -658,5 +693,11 @@ dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release</code></pre>
   }catch(e){}
 })();
 </script>
+
+<!-- ═════════════════════ Pixel-art demo runtime ═════════════════════ -->
+<script src="https://pixijs.download/release/pixi.min.js" defer></script>
+<script src="demo.js" defer></script>
+<script src="demo-aitalk.js" defer></script>
+<script src="demo-voice.js" defer></script>
 </body>
 </html>
