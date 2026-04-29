@@ -52,6 +52,11 @@ public partial class AgentBotWindow
     // Test tools popup (Virtual voice today; future virtual keyboard, etc.).
     private TestToolsWindow? _testToolsWindow;
 
+    // True while we're applying VoiceSettings → UI on mic-on transitions,
+    // so the Slider.ValueChanged handler doesn't re-save the same value
+    // back to disk on every initialisation.
+    private bool _suppressMicVolumePersist;
+
     private void OnVoiceMicToggle(object sender, RoutedEventArgs e)
     {
         if (_voiceMicOn)
@@ -69,7 +74,18 @@ public partial class AgentBotWindow
     private void OnVoiceMuteToggle(object sender, RoutedEventArgs e)
     {
         if (_voiceCapture is null) return;
-        SetVoiceMicMuted(!_voiceCapture.Muted, source: "user");
+        var newState = !_voiceCapture.Muted;
+        SetVoiceMicMuted(newState, source: "user");
+        // Persist user-driven toggles. Auto-mute from TestToolsWindow is
+        // restored on its own and shouldn't permanently flip the user's
+        // saved preference.
+        try
+        {
+            var v = VoiceSettingsStore.Load();
+            v.MicMuted = newState;
+            VoiceSettingsStore.Save(v);
+        }
+        catch (Exception ex) { AppLogger.LogError("[BOT-Voice] Persist MicMuted failed", ex); }
     }
 
     /// <summary>
@@ -79,6 +95,11 @@ public partial class AgentBotWindow
     /// <see cref="UI.APP.TestToolsWindow"/> auto-mute during virtual
     /// voice testing — the bypass path needs AskBot's mic OFF logically
     /// while leaving it physically capturing for fast resume.
+    ///
+    /// Note: this method does NOT persist the new state. The user-driven
+    /// toolbar toggle persists via <see cref="OnVoiceMuteToggle"/>; the
+    /// auto-mute path deliberately doesn't, so a transient test-tool
+    /// mute/unmute cycle doesn't overwrite the user's saved preference.
     /// </summary>
     public void SetVoiceMicMuted(bool muted, string source = "external")
     {
@@ -87,6 +108,28 @@ public partial class AgentBotWindow
         _voiceCapture.Muted = muted;
         ApplyVoiceMuteUi(muted);
         AppLogger.Log($"[BOT-Voice] Mic {(muted ? "MUTED" : "UNMUTED")} ({source})");
+    }
+
+    private void OnVoiceMicVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (sldVoiceMicVolume is null) return;
+        var pct = (int)Math.Round(e.NewValue);
+        if (txtVoiceMicVolumeLabel is not null)
+            txtVoiceMicVolumeLabel.Text = $"{pct}%";
+
+        // Apply to system. Even during silent UI initialisation, applying
+        // is fine — slider value matches what we just read from settings.
+        MicVolumeService.SetVolume(pct / 100.0f);
+
+        if (_suppressMicVolumePersist) return;
+
+        try
+        {
+            var v = VoiceSettingsStore.Load();
+            v.MicVolumePercent = pct;
+            VoiceSettingsStore.Save(v);
+        }
+        catch (Exception ex) { AppLogger.LogError("[BOT-Voice] Persist MicVolumePercent failed", ex); }
     }
 
     /// <summary>True when the mic is on AND not muted — i.e. live to STT.</summary>
@@ -148,6 +191,10 @@ public partial class AgentBotWindow
 
             var deviceNumber = VoiceRuntimeFactory.ParseDeviceNumber(v.InputDeviceId);
             _voiceCapture.Start(deviceNumber);
+
+            // Apply persisted mute state. New VoiceCaptureService starts
+            // unmuted; honour the user's saved preference here.
+            if (v.MicMuted) _voiceCapture.Muted = true;
 
             _voiceMicOn = true;
             ApplyVoiceMicUi(on: true);
@@ -301,6 +348,42 @@ public partial class AgentBotWindow
             // Reset visual to unmuted on every mic-on transition; capture is
             // recreated unmuted so the UI must follow.
             if (on) ApplyVoiceMuteUi(_voiceCapture?.Muted ?? false);
+        }
+
+        // System mic volume slider — show only when mic ON, populate from
+        // settings on transition, and apply to the system endpoint.
+        if (sldVoiceMicVolume is not null && txtVoiceMicVolumeLabel is not null)
+        {
+            sldVoiceMicVolume.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            txtVoiceMicVolumeLabel.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            if (on)
+            {
+                _suppressMicVolumePersist = true;
+                try
+                {
+                    var v = VoiceSettingsStore.Load();
+                    int pct;
+                    if (v.MicVolumePercent < 0)
+                    {
+                        // First-launch / never-set: read current system level
+                        // so the slider shows what Windows is at instead of
+                        // forcing it to a default.
+                        var current = MicVolumeService.GetVolume();
+                        pct = current is { } c ? (int)Math.Round(c * 100) : 100;
+                    }
+                    else
+                    {
+                        pct = Math.Clamp(v.MicVolumePercent, 0, 100);
+                        MicVolumeService.SetVolume(pct / 100f);
+                    }
+                    sldVoiceMicVolume.Value = pct;
+                    sldVoiceMicVolume.IsEnabled = MicVolumeService.IsAvailable();
+                    txtVoiceMicVolumeLabel.Text = $"{pct}%";
+                    if (!sldVoiceMicVolume.IsEnabled)
+                        txtVoiceMicVolumeLabel.Text = "n/a";
+                }
+                finally { _suppressMicVolumePersist = false; }
+            }
         }
     }
 

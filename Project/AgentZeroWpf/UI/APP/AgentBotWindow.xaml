@@ -340,6 +340,24 @@
                             Visibility="Collapsed"
                             Click="OnVoiceMuteToggle"
                             ToolTip="Mute mic (capture stays alive but VAD/STT ignores frames)"/>
+                    <!-- System mic volume — controls the Windows default capture
+                         endpoint's master volume via WASAPI. Visible only when
+                         the mic is ON; persisted in VoiceSettings.MicVolumePercent
+                         so the choice survives app restarts. -->
+                    <Slider x:Name="sldVoiceMicVolume"
+                            Width="80" Height="20" VerticalAlignment="Center"
+                            Minimum="0" Maximum="100"
+                            SmallChange="5" LargeChange="10"
+                            Margin="2,0,0,0"
+                            Visibility="Collapsed"
+                            ValueChanged="OnVoiceMicVolumeChanged"
+                            ToolTip="System mic input volume (0–100%) — affects Windows recording level"/>
+                    <TextBlock x:Name="txtVoiceMicVolumeLabel"
+                               Text="—" FontFamily="Consolas" FontSize="9"
+                               Foreground="{StaticResource TextDim}"
+                               VerticalAlignment="Center" Margin="3,0,4,0"
+                               MinWidth="26"
+                               Visibility="Collapsed"/>
                     <!-- Virtual voice injector — silent test mode. Synthesises the typed
                          text via TTS and plays it through the default speaker so the
                          active mic re-captures it through the OS audio loop. Validates

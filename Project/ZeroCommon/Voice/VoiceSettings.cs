@@ -123,6 +123,25 @@ public sealed class VoiceSettings
     /// </summary>
     public int LlmMaxTokens { get; set; } = 128;
 
+    // ── Mic mute + volume (user convenience + clean test-mode prerequisite) ──
+
+    /// <summary>
+    /// Persisted soft-mute state for AskBot's mic. Applied on every mic-on
+    /// transition so a user who toggled mute (e.g. for a clean virtual-voice
+    /// test session) doesn't lose the state across app restarts.
+    /// Soft-mute = NAudio capture stays alive so the level meter still moves,
+    /// but VAD / FrameAvailable / pipeline stay frozen.
+    /// </summary>
+    public bool MicMuted { get; set; } = false;
+
+    /// <summary>
+    /// Persisted target for the system input device's master volume, 0–100.
+    /// -1 = "leave Windows alone" (default — first launch doesn't override
+    /// the user's existing system level). Any 0–100 value gets applied
+    /// to the default capture endpoint via WASAPI on mic-on.
+    /// </summary>
+    public int MicVolumePercent { get; set; } = -1;
+
     // ── Stream pipeline (P1+) ─────────────────────────────────────────────
 
     /// <summary>
