@@ -59,14 +59,17 @@ public sealed class VirtualVoiceInjector : IDisposable
 
     /// <summary>
     /// Synthesize <paramref name="text"/> via the active TTS provider and play
-    /// it through the default output device. Returns when synthesis finishes
-    /// and playback is queued — actual audio is produced by NAudio on its own
-    /// thread; subscribe to <see cref="Stopped"/> for completion.
+    /// it through the default output device. Returns the WAV bytes that were
+    /// produced + the format string; callers that want to replay the same
+    /// audio later (history rows, A/B comparison) can keep a reference and
+    /// hand it to <see cref="VoicePlaybackService.Play"/> directly.
+    ///
+    /// Returns the empty array on cancellation. Throws on real failures.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// TTS is set to Off, or the configured provider failed to construct.
     /// </exception>
-    public async Task SpeakAsync(string text, CancellationToken ct = default)
+    public async Task<(byte[] Wav, string Format)> SpeakAsync(string text, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new ArgumentException("Text must be non-empty", nameof(text));
@@ -92,12 +95,13 @@ public sealed class VirtualVoiceInjector : IDisposable
         try
         {
             var bytes = await tts.SynthesizeAsync(text, v.TtsVoice, _activeCts.Token);
-            if (_activeCts.IsCancellationRequested) { _isBusy = false; return; }
+            if (_activeCts.IsCancellationRequested) { _isBusy = false; return (Array.Empty<byte>(), tts.AudioFormat); }
             if (bytes is null || bytes.Length == 0)
                 throw new InvalidOperationException("TTS returned empty audio.");
 
             _player.Play(bytes, tts.AudioFormat);
             AppLogger.Log($"[VirtualVoice] play OK | bytes={bytes.Length} format={tts.AudioFormat}");
+            return (bytes, tts.AudioFormat);
         }
         catch (Exception ex)
         {

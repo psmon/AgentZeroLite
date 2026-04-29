@@ -31,7 +31,9 @@ namespace AgentZeroWpf.UI.APP;
 public partial class TestToolsWindow : Window
 {
     private VirtualVoiceInjector? _injector;
+    private VoicePlaybackService? _replayPlayer;
     private readonly ObservableCollection<VirtualVoiceHistoryItem> _history = new();
+    private const int HistoryCap = 50;
 
     private static readonly Brush PendingBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x85, 0x85, 0x85));
     private static readonly Brush SuccessBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4E, 0xC9, 0xB0));
@@ -90,6 +92,11 @@ public partial class TestToolsWindow : Window
         // updates it via INotifyPropertyChanged when the result lands.
         var item = new VirtualVoiceHistoryItem(text);
         _history.Insert(0, item);
+        // Cap memory growth — each row may carry ~50–200 KB of WAV bytes
+        // for the replay button. 50 rows ≈ 5–10 MB, plenty for an A/B
+        // session, low enough not to matter.
+        while (_history.Count > HistoryCap)
+            _history.RemoveAt(_history.Count - 1);
         lstHistory.ScrollIntoView(item);
 
         if (bypass)
@@ -140,6 +147,11 @@ public partial class TestToolsWindow : Window
                     if (wav is null || wav.Length == 0)
                         throw new InvalidOperationException("TTS returned empty audio.");
                     AppLogger.Log($"[TestTools-Bypass] [1/3] synth | {synthMs} ms · {wav.Length} bytes · provider={v.TtsProvider}");
+
+                    // Stash the WAV in the history item so the row's ▶ button
+                    // can replay it later. SetAudio fires PropertyChanged on
+                    // CanPlay so the button enables itself.
+                    SetItemAudio(item, wav, tts.AudioFormat);
 
                     SetStatus("decoding WAV → PCM 16k mono…", isError: false);
 
@@ -211,7 +223,9 @@ public partial class TestToolsWindow : Window
         SetStatus("synthesising…", isError: false);
         try
         {
-            await _injector.SpeakAsync(item.Input);
+            var (wav, format) = await _injector.SpeakAsync(item.Input);
+            // Stash for the row's ▶ replay button — same as bypass path.
+            if (wav.Length > 0) SetItemAudio(item, wav, format);
             // We don't get the STT result back through this path (it goes to
             // AskBot via the mic), so just record that playback fired.
             SucceedItem(item, "(played through speaker — see AskBot for STT)",
@@ -222,6 +236,41 @@ public partial class TestToolsWindow : Window
             AppLogger.Log($"[TestTools] SpeakAsync threw: {ex.GetType().Name}: {ex.Message}");
             FailItem(item, $"{ex.GetType().Name}: {ex.Message}");
         }
+    }
+
+    // ── Replay button handler (per-row playback) ─────────────────────────
+
+    private void OnPlayHistoryItem(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button btn) return;
+        if (btn.Tag is not VirtualVoiceHistoryItem item) return;
+        var (wav, format) = item.GetAudio();
+        if (wav is null || wav.Length == 0) return;
+
+        try
+        {
+            _replayPlayer ??= new VoicePlaybackService();
+            _replayPlayer.Play(wav, format);
+            SetStatus($"▶ replaying turn {item.Time} · {wav.Length} bytes · {format}", isError: false);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[TestTools] replay failed", ex);
+            SetStatus($"✗ replay: {ex.Message}", isError: true);
+        }
+    }
+
+    // Marshal SetAudio to UI thread (PropertyChanged on CanPlay must run
+    // where the binding subscribers live).
+    private void SetItemAudio(VirtualVoiceHistoryItem item, byte[] wav, string format)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action<VirtualVoiceHistoryItem, byte[], string>(SetItemAudio),
+                DispatcherPriority.Normal, item, wav, format);
+            return;
+        }
+        item.SetAudio(wav, format);
     }
 
     // ── History item state transitions (marshal to UI thread) ────────────
@@ -348,7 +397,9 @@ public partial class TestToolsWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         try { _injector?.Dispose(); } catch { }
+        try { _replayPlayer?.Dispose(); } catch { }
         _injector = null;
+        _replayPlayer = null;
         base.OnClosed(e);
     }
 
@@ -384,6 +435,12 @@ public partial class TestToolsWindow : Window
             private set { _resultBrush = value; Notify(nameof(ResultBrush)); }
         }
 
+        // Stored TTS audio for the per-row ▶ replay button. Null until
+        // synthesis succeeds; CanPlay drives Button.IsEnabled binding.
+        private byte[]? _wavBytes;
+        private string _wavFormat = "wav";
+        public bool CanPlay => _wavBytes is not null && _wavBytes.Length > 0;
+
         public VirtualVoiceHistoryItem(string input)
         {
             Time = DateTime.Now.ToString("HH:mm:ss");
@@ -403,6 +460,15 @@ public partial class TestToolsWindow : Window
             Tail = "";
             ResultBrush = ErrorBrush;
         }
+
+        public void SetAudio(byte[] wav, string format)
+        {
+            _wavBytes = wav;
+            _wavFormat = string.IsNullOrEmpty(format) ? "wav" : format;
+            Notify(nameof(CanPlay));
+        }
+
+        public (byte[]? Wav, string Format) GetAudio() => (_wavBytes, _wavFormat);
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void Notify(string p) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(p));

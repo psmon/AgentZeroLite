@@ -122,6 +122,7 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
@@ -157,6 +158,24 @@
                                                    Foreground="{StaticResource TextDim}"
                                                    TextWrapping="Wrap"
                                                    Margin="0,2,0,0"/>
+                                        <!-- Replay button — plays the synthesised audio for
+                                             this row through the default speaker. Lets the
+                                             user A/B prior turns when comparing voices /
+                                             models without re-running synthesis. Disabled
+                                             when this row has no audio (synthesis failed
+                                             before producing bytes). -->
+                                        <Button Grid.Row="0" Grid.Column="2" Grid.RowSpan="3"
+                                                Content="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                Width="30" Height="28"
+                                                Margin="8,0,0,0" VerticalAlignment="Center"
+                                                Background="{StaticResource InputBg}"
+                                                BorderBrush="{StaticResource CyanBrush}" BorderThickness="1"
+                                                Foreground="{StaticResource TextPrimary}"
+                                                Cursor="Hand"
+                                                IsEnabled="{Binding CanPlay, Mode=OneWay}"
+                                                Tag="{Binding}"
+                                                Click="OnPlayHistoryItem"
+                                                ToolTip="Replay this row's synthesised audio through the speaker"/>
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
