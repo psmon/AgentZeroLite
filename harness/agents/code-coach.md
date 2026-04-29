@@ -195,6 +195,18 @@ Treat them as binding for the file types they cover:
   pitfall has a one-grep verification — fail the review if any check
   doesn't pass.
 
+- **`harness/knowledge/voice-roundtrip-testing.md`** — Diffs that
+  touch any LLM-output comparison logic (STT, OCR, generation
+  evaluators) must fold case + punctuation + whitespace via
+  `char.IsPunctuation` + `ToLowerInvariant` before equality, *not*
+  raw `==`. Naive equality fails on tokeniser cosmetics
+  (capitalisation, trailing periods) that aren't real content drift.
+  Naive `Contains` is too loose. Also: when the model auto-corrects a
+  semantic typo (Whisper recognising `모래` as `모레` because the
+  surrounding context demands it), the test should report the
+  one-char drift honestly — that's measurement, not flake. See the
+  full pattern in the knowledge file.
+
 ## Evaluation rubric
 
 | Axis | Measure | Scale |

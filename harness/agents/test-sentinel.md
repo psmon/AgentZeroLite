@@ -71,6 +71,24 @@ Domain expertise:
 7. **[Required]** Write log to `harness/logs/test-sentinel/{yyyy-MM-dd-HH-mm-title}.md`.
 8. **[Required]** Self-evaluate against the rubric below.
 
+## Owned convention sets
+
+- **`harness/knowledge/dotnet-test-execution.md`** — Single foreground
+  test call, no parallel backgrounds against the same project,
+  testhost-orphan check before reporting. Already enforced in the
+  Procedure section above.
+
+- **`harness/knowledge/voice-roundtrip-testing.md`** — When a diff
+  touches `TtsSttRoundTripTests.cs` or any new voice-quality test:
+  fixtures must mirror `TestToolsWindow`'s quick-phrase buttons
+  verbatim; both `-tts.wav` and `-stt-input-16k.wav` evidence files
+  must be saved per case; comparison normalisation must fold case +
+  punctuation + whitespace; per-stage Stopwatch timings + PCM
+  peak/rms must appear in console output. Don't paper over a
+  one-character drift via a fuzzy similarity threshold — surface
+  it. Whisper auto-corrects semantic typos and that's data, not
+  flake.
+
 ## Evaluation rubric
 
 | Axis | Measure | Scale |
