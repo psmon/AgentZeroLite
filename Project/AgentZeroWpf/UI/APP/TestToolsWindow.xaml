@@ -34,7 +34,7 @@
                      Foreground="{StaticResource TextPrimary}">
                 <DockPanel LastChildFill="True" Margin="12">
                     <TextBlock DockPanel.Dock="Top"
-                               Text="Type a line → TTS synthesises → plays through speaker → microphone re-captures it through the OS audio loop. Mic must be ON in the AskBot toolbar for the STT round-trip to close."
+                               Text="Type a line → TTS synthesises. Bypass mode (default) feeds the synthesised PCM straight into STT — pure TTS↔STT round-trip with no acoustic loop. Uncheck Bypass to play through the speaker so the AskBot mic can re-capture it (requires Windows mic enhancements OFF + audible speaker)."
                                Foreground="{StaticResource TextDim}" FontSize="10"
                                TextWrapping="Wrap" Margin="0,0,0,10"/>
 
@@ -46,7 +46,7 @@
                                 Foreground="{StaticResource TextPrimary}"
                                 Margin="8,0,0,0" Padding="14,4" Cursor="Hand"
                                 Click="OnVoiceSpeak"
-                                ToolTip="Synthesise + play (Enter)"/>
+                                ToolTip="Synthesise + (bypass: STT directly | acoustic: play through speaker). Enter."/>
                         <TextBox x:Name="txtVoiceInput"
                                  FontSize="11" FontFamily="Consolas"
                                  Background="{StaticResource InputBg}"
@@ -54,13 +54,20 @@
                                  BorderBrush="{StaticResource InputBorder}" BorderThickness="1"
                                  Padding="6,4" VerticalContentAlignment="Center"
                                  KeyDown="OnVoiceInputKeyDown"
-                                 ToolTip="Type the line to speak. Enter=play, Esc=close."/>
+                                 ToolTip="Type the line to speak. Enter=run, Esc=close."/>
                     </DockPanel>
+
+                    <CheckBox x:Name="chkBypassAcousticLoop" DockPanel.Dock="Top"
+                              Content="Bypass acoustic loop — feed synthesised PCM directly to STT (default ON)"
+                              Foreground="{StaticResource TextPrimary}" FontSize="10"
+                              IsChecked="True" Margin="0,0,0,6"
+                              ToolTip="When ON: synthesise → resample to 16k mono → STT.TranscribeAsync → show transcript. When OFF: play through speaker so the AskBot mic re-captures it (requires functioning OS audio loopback)."/>
 
                     <TextBlock x:Name="txtVoiceStatus" DockPanel.Dock="Top"
                                FontFamily="Consolas" FontSize="10"
                                Foreground="{StaticResource TextDim}"
-                               Text="Ready." Margin="0,0,0,4"/>
+                               Text="Ready." Margin="0,0,0,4"
+                               TextWrapping="Wrap"/>
 
                     <!-- Spacer -->
                     <Grid/>
