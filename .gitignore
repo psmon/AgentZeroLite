@@ -451,6 +451,9 @@ env.json
 /.local-info
 /secret/*
 !/secret/*.template
+# Defense-in-depth — psmon-doc-writer skill stores secrets in D:/MYNOTE/.secret/
+# (outside this repo). The rule below blocks accidental in-repo .secret/ creation.
+/.secret/
 /data-base
 /output
 .claude/scheduled_tasks.lock

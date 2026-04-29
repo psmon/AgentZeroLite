@@ -182,6 +182,19 @@ Treat them as binding for the file types they cover:
   problem already has an Origin solution, cite the relevant
   `Docs/agent-origin/0[1-3]-*.md` section in the proposal options.
 
+- **`harness/knowledge/wpf-xaml-resource-and-window-pitfalls.md`** —
+  Whenever the staged diff touches `*.xaml` or a `Window` code-behind,
+  walk the **P1–P5 checklist at the bottom of that file** before
+  approving the commit. Five classes of crash-on-first-click that all
+  pass `dotnet build` but blow up in DispatcherUnhandled — XAML
+  resource scope (sibling-`<Resources>` invisibility), undefined
+  resource keys, `Window.Resources` not inheriting from `Owner`,
+  `Owner` setter requiring an HWND (AgentBot's embedded vs floating
+  modes), and the `System.Drawing` ↔ `System.Windows.Media` `Brush`
+  ambiguity caused by `<UseWPF>` + `<UseWindowsForms>` together. Each
+  pitfall has a one-grep verification — fail the review if any check
+  doesn't pass.
+
 ## Evaluation rubric
 
 | Axis | Measure | Scale |
