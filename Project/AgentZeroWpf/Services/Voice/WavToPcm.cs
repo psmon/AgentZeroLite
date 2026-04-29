@@ -35,6 +35,14 @@ internal static class WavToPcm
     {
         if (wavBytes is null || wavBytes.Length == 0) return Array.Empty<byte>();
 
+        // OpenAI TTS streams WAV with chunk-size sentinels of 0xFFFFFFFF
+        // ("unknown length"). NAudio's WaveFileReader passes that straight
+        // to MemoryStream.set_Position which overflows Int32 and throws
+        // ArgumentOutOfRangeException. PatchWavHeaderSizes (already used
+        // by VoicePlaybackService for the same providers) rewrites the
+        // RIFF + data chunk sizes to actual byte counts.
+        wavBytes = VoicePlaybackService.PatchWavHeaderSizes(wavBytes);
+
         using var ms = new MemoryStream(wavBytes);
         using var reader = new WaveFileReader(ms);
         var fmt = reader.WaveFormat;

@@ -31,6 +31,12 @@ internal static class WavNoisePadder
 
         try
         {
+            // Same OpenAI-streaming-WAV-sentinel patch WavToPcm uses —
+            // without it NAudio's WaveFileReader fails on
+            // 0xFFFFFFFF chunk sizes via MemoryStream.set_Position
+            // overflow.
+            wavBytes = VoicePlaybackService.PatchWavHeaderSizes(wavBytes);
+
             using var ms = new MemoryStream(wavBytes);
             using var reader = new WaveFileReader(ms);
             var fmt = reader.WaveFormat;
