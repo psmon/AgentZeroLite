@@ -173,6 +173,7 @@ footer a:hover{color:var(--mint)}
       <span class="en">⬇ Download latest <span data-az-version></span></span>
     </a>
     <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
+    <a class="btn" href="#voice"><span class="ko">🎙 음성으로 듀얼 멀티태스크</span><span class="en">🎙 Voice — dual multitask</span></a>
     <a class="btn" href="#install"><span class="ko">🛠 설치 옵션</span><span class="en">🛠 Install options</span></a>
     <a class="btn" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">GitHub</span><span class="en">GitHub</span></a>
   </div>
@@ -219,6 +220,14 @@ footer a:hover{color:var(--mint)}
       <h4 class="en">Cross-model tiki-taka</h4>
       <p class="ko">Claude가 탭 0에서 탭 1의 Codex에게 말을 걸고, Codex가 답하고, 사람은 중간에서 감독만 합니다. 클라우드 중계 없음.</p>
       <p class="en">Claude in tab 0 talks to Codex in tab 1, Codex replies, you supervise from the middle. No cloud relay.</p>
+    </div>
+
+    <div class="card accent-cyan">
+      <span class="tag">🎙 VOICE</span>
+      <h4 class="ko">손은 키보드, 입은 옆 탭</h4>
+      <h4 class="en">Hands keyboard, voice the other tab</h4>
+      <p class="ko">한 탭은 손가락으로, <strong style="color:var(--mint)">다른 탭은 음성으로</strong> 동시 진행. Whisper.net 오프라인 STT + Vulkan GPU(AMD/Intel/NVIDIA 공통)로 받아쓴 텍스트가 활성 터미널 AI에 직접 흘러갑니다. <em>음성 출력(TTS)은 개발 중.</em></p>
+      <p class="en">Type into one tab, <strong style="color:var(--mint)">speak to the other</strong> in parallel. Whisper.net offline STT + Vulkan GPU (cross-vendor: AMD/Intel/NVIDIA) feeds the transcribed text straight into the active terminal AI. <em>TTS reply is in development.</em></p>
     </div>
 
     <div class="card accent-magenta">
@@ -324,6 +333,75 @@ Use `terminal-list` to see tabs, `terminal-send &lt;grp&gt; &lt;tab&gt; "text"` 
         In the Claude tab: <em>"Greet the tab named Codex and propose we co-design a REST endpoint."</em> Claude issues <code>terminal-send</code>, Codex sees it, composes a reply, and sends it back. The conversation streams in both tabs.
       </li>
     </ol>
+  </div>
+</section>
+
+<!-- ═════════════════════ Voice — dual multitasking ═════════════════════ -->
+<section class="section" id="voice">
+  <h2 class="ko">🎙 음성 — 손과 입을 동시에 쓰는 듀얼 멀티태스킹</h2>
+  <h2 class="en">🎙 Voice — dual multitasking, hands & voice in parallel</h2>
+
+  <p class="ko" style="color:var(--text-soft);max-width:820px">
+    음성 입력은 AgentBot 에 직결돼 있습니다. 마이크에 말하면 오디오가 <strong style="color:var(--mint)">로컬에서</strong> 받아쓰여지고(Whisper.net 오프라인 GGML, 클라우드 안 거침), 그 텍스트는 채팅창에 직접 타이핑한 것과 동일한 경로로 활성 AI CLI 탭에 흘러 들어갑니다.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px">
+    Voice input is wired straight into AgentBot. Speak into the mic, the audio is transcribed <strong style="color:var(--mint)">locally</strong> (Whisper.net offline GGML, no cloud), and the resulting text takes the same path as if you had typed it into the chat box — straight to whichever AI CLI tab is active.
+  </p>
+
+  <p class="ko" style="color:var(--text-soft);max-width:820px;margin-top:14px">
+    <strong style="color:var(--text-primary)">왜 의미 있나 — 듀얼 멀티태스크 플레이.</strong> 한 터미널이 <em>키보드</em>로 점령돼 있을 때(코드 작성, Claude diff 검토), <em>두 번째</em> 터미널은 손을 대지 않고 <em>음성</em>으로 구동할 수 있습니다. AI 대화 두 개가 동시에 돌고 사람 한 명이 둘 다 감독 — AIMODE 의 <strong>모델 간 티키타카</strong>가 이젠 <strong style="color:var(--mint)">본인 두 입력 채널(손/입) 간 티키타카</strong>로 확장됩니다.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px;margin-top:14px">
+    <strong style="color:var(--text-primary)">Why it matters — the dual-multitask play.</strong> While one terminal is taking your <em>keyboard</em> (writing code, code-reviewing Claude's diff), you can drive a <em>second</em> terminal with your <em>voice</em> without lifting your hands. Two parallel AI conversations supervised by one human — AIMODE's tiki-taka between models extends here into <strong style="color:var(--mint)">tiki-taka between your own two input channels (hands / voice)</strong>.
+  </p>
+
+  <div class="ascii">
+<span class="src">Tab 0 — Claude (keyboard)</span>            <span class="dst">Tab 1 — Codex (voice)</span>
+  │                                       │
+  │  <span class="cmd">you type:</span>                            │  <span class="cmd">you say into the mic:</span>
+  │  "refactor this function ..."         │  "오늘 작업한 PR 요약해줘"
+  │            │                          │            │
+  │            ▼                          │            ▼  <span class="arrow">Whisper.net (Vulkan)</span>
+  │     Claude works                      │     AgentBot transcribes
+  │            │                          │            │
+  │            ▼                          │            ▼
+  │     reply in tab 0                    │     typed into tab 1
+  └───────────────────────────────────────┴───────────────────────────────────────
+            <span class="arrow">one supervisor (you), two streams running in parallel</span>
+  </div>
+
+  <div class="grid" style="margin-top:18px">
+    <div class="card accent-cyan">
+      <span class="tag">STT</span>
+      <h4 class="ko">Whisper.net 오프라인</h4>
+      <h4 class="en">Whisper.net offline</h4>
+      <p class="ko">GGML <code>small</code>(~466 MB) / <code>medium</code>(~1.5 GB) 모델이 첫 사용 시 자동 다운로드. <code>%USERPROFILE%\.ollama\models\agentzero\whisper\</code> 캐시. <strong style="color:var(--mint)">클라우드 안 거침.</strong></p>
+      <p class="en">GGML <code>small</code> (~466 MB) / <code>medium</code> (~1.5 GB) models, downloaded on first use to <code>%USERPROFILE%\.ollama\models\agentzero\whisper\</code>. <strong style="color:var(--mint)">Nothing leaves the machine.</strong></p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">GPU</span>
+      <h4 class="ko">크로스 벤더 Vulkan</h4>
+      <h4 class="en">Cross-vendor Vulkan</h4>
+      <p class="ko">CPU + Vulkan 동시 번들 (~63 MB 추가). <strong style="color:var(--mint)">AMD · Intel · NVIDIA</strong> 가 같은 바이너리로 가속. CUDA 미포함 (cuBLAS ~750 MB 비대화 회피).</p>
+      <p class="en">CPU + Vulkan runtimes bundled (~63 MB extra). <strong style="color:var(--mint)">AMD · Intel · NVIDIA</strong> all accelerate the same binary. CUDA stays out (its ~750 MB cuBLAS payload is disproportionate).</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">MULTI-GPU</span>
+      <h4 class="ko">자동 베스트 + 수동 픽커</h4>
+      <h4 class="en">Auto-best + manual picker</h4>
+      <p class="ko">설정탭의 GPU 디바이스 콤보 — <em>Auto</em> 가 벤더 + VRAM 휴리스틱으로 베스트 어댑터 선정 (NVIDIA dGPU > AMD dGPU > Intel Arc > iGPU). 노트북 dGPU+iGPU 환경도 자동 처리, 잘못 잡혔을 땐 한 클릭 오버라이드.</p>
+      <p class="en">Voice settings expose a GPU device combo — <em>Auto</em> picks the best adapter via vendor + VRAM heuristic (NVIDIA dGPU > AMD dGPU > Intel Arc > iGPU). Handles laptop dGPU + iGPU correctly; one-click manual override if it picks wrong.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">🚧 TTS</span>
+      <h4 class="ko">음성 출력은 개발 중</h4>
+      <h4 class="en">TTS reply — in development</h4>
+      <p class="ko">Off / Windows SAPI / OpenAI tts-1 설정 자체는 들어와 있지만, 터미널 AI 출력을 받아 스피커로 뱉어주는 응답 스트리밍 파이프라인은 아직 미완. <strong>지금은 음성 입력 전용.</strong></p>
+      <p class="en">Off / Windows SAPI / OpenAI tts-1 settings are wired up, but the response-streaming pipeline that pipes terminal AI output into the speaker is still under development. <strong>Today voice is input-only.</strong></p>
+    </div>
   </div>
 </section>
 

@@ -73,6 +73,18 @@ macros to whichever terminal is in focus — nothing more, nothing less.
   terminals call back through the existing `bot-chat` CLI so the LocalLLM
   doesn't have to keep polling. Nothing leaves the machine. See
   [AIMODE section](#-aimode--locallm-as-your-in-shell-coordinator) below.
+- **🎙 Voice — drive AgentBot hands-free while you keyboard the next tab** —
+  speak into your mic and AgentBot transcribes the audio locally (Whisper.net,
+  GGML small/medium models cached on disk) and types the text straight into
+  the active terminal AI. The point is **dual multitasking**: while one tab
+  takes your fingers (writing code, reading Claude's diff), the *other* tab
+  takes your voice. Two parallel AI conversations, one supervisor — same
+  AgentBot pipeline, just a different input channel. Backend ships **CPU +
+  Vulkan** so AMD / Intel / NVIDIA all accelerate the same binary; multi-GPU
+  systems get an auto-best heuristic plus a manual override in Voice settings.
+  **Voice output (TTS reply) is still in development** — the SAPI / OpenAI
+  TTS plumbing is wired up but the response-streaming pipeline isn't
+  shipping yet, so today voice is input-only.
 - **AgentBot `[+]` menu — 3 ways to arm a terminal AI** —
   - **`AgentZeroCLI Helper`** — drops a ready-made briefing into the chat input that
     teaches any terminal AI (Claude, Codex, shell-hosted model) how to call
@@ -411,6 +423,67 @@ loop / actor / prompt.
 
 ---
 
+## 🎙 Voice — dual multitasking, hands & voice in parallel
+
+Voice input is wired straight into AgentBot. You speak, the audio is
+transcribed **locally** (no cloud, Whisper.net offline GGML models cached
+on disk), and the resulting text takes the same path as if you had typed
+it into the chat box — straight to whichever AI CLI tab is active.
+
+**Why it matters — this is the dual-multitask play:** while one terminal
+is taking your *keyboard* (writing code, navigating files, code-reviewing
+Claude's diff), you can drive a *second* terminal with your *voice*
+without lifting your hands. Two parallel AI conversations supervised by
+one human, two distinct input channels. AIMODE's tiki-taka between models
+extends here into tiki-taka between **your own two input modalities**.
+
+```
+┌─ Tab 0 ─ Claude (keyboard) ──┐   ┌─ Tab 1 ─ Codex (voice) ──────┐
+│ you type:                    │   │ you say into the mic:        │
+│ "refactor this function …"   │   │ "오늘 작업한 PR 요약해줘"    │
+│         │                    │   │         │                    │
+│         ▼                    │   │         ▼ Whisper.net (Vulkan)│
+│   Claude works               │   │   AgentBot transcribes        │
+│         │                    │   │         │                     │
+│         ▼                    │   │         ▼                     │
+│   reply in tab 0             │   │   typed into tab 1            │
+└──────────────────────────────┘   └──────────────────────────────┘
+                  one supervisor (you), two streams running in parallel
+```
+
+### Stack
+
+- **Whisper.net** — offline STT, GGML `small` (~466 MB) and `medium`
+  (~1.5 GB) models cached at `%USERPROFILE%\.ollama\models\agentzero\
+  whisper\`. Downloaded on first use.
+- **CPU + Vulkan runtimes bundled** (~63 MB Vulkan added to the
+  installer). The Vulkan backend is **cross-vendor** — AMD / Intel /
+  NVIDIA all accelerate the same binary. CUDA isn't bundled (its
+  cuBLAS payload is ~750 MB; revisit later as on-demand download).
+- **Multi-GPU support** — Voice settings exposes a GPU device picker.
+  *Auto* uses a vendor + VRAM heuristic to pick the best adapter
+  (NVIDIA discrete > AMD discrete > Intel Arc > Intel iGPU); on
+  laptops with dGPU + iGPU it correctly picks the dGPU. Manual
+  override is one click away.
+- **Mic capture** — NAudio with VAD silence-segmentation; sensitivity
+  slider; persistent mute + system-volume control on the AskBot
+  toolbar.
+- **Test harness** — `WhisperCpuVsGpuBenchmarkTests` runs the same
+  TTS sample through CPU and GPU and prints prep / transcribe / RT
+  factor / similarity, so you can verify the Vulkan runtime
+  actually loaded on your machine.
+
+### Status: input ✓ · output 🚧
+
+- ✅ **STT (you → terminal AI)** — shipping. Mic → AgentBot →
+  active terminal.
+- 🚧 **TTS (terminal AI → spoken reply)** — settings (Off / Windows
+  SAPI / OpenAI tts-1) are wired up, but the response-streaming
+  pipeline that pipes terminal AI output into the speaker is still
+  under development. Today voice is input-only.
+
+---
+
 ## 🧪 Harness — making the function-call chain self-improve
 
 Wiring an LLM into a useful tool chain is **hard**, and it is honestly
@@ -519,7 +592,7 @@ whole product.
 | Name | Description |
 | --- | --- |
 | **AgentZeroAIMODE** | On-device model, built-in AI chat mode — e.g. *Gemma 4* ↔ *Claude Code* dialogues, delegating task execution to an on-device LLM controller |
-| **AgentZeroVoice** | Voice input / output — e.g. *Gemma 4* as the voice controller, with output via **Windows 11 built-in Natural Voices** (free neural TTS) |
+| **AgentZeroVoice** | Voice input / output — STT input is **shipping** (Whisper.net + Vulkan, see [Voice section](#-voice--dual-multitasking-hands--voice-in-parallel)); TTS output (Windows 11 Natural Voices) is staged |
 | **AgentZeroOS** | Native OS automation — AI control via an **OS metadata (UI Automation) screen parser** instead of screenshot capture, delivering macro-level responsiveness |
 
 ---
