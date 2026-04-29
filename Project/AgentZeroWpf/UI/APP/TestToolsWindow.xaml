@@ -88,7 +88,8 @@
                          Spans Korean (short, weather query, long stress test)
                          and English (greeting, question) so the same panel
                          covers most typical test cases without re-typing. -->
-                    <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <WrapPanel x:Name="pnlQuickPhrases"
+                               DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                         <Button Style="{StaticResource QuickPhraseButton}"
                                 Content="안녕하세요" Tag="안녕하세요"
                                 Click="OnQuickPhraseClick"

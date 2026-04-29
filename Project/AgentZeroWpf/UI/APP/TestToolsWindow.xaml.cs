@@ -34,6 +34,7 @@ public partial class TestToolsWindow : Window
     private VoicePlaybackService? _replayPlayer;
     private readonly ObservableCollection<VirtualVoiceHistoryItem> _history = new();
     private const int HistoryCap = 50;
+    private bool _isBusy;
 
     // Virtual-voice synth defaults — tuned 2026-04-29 after observing that
     // SAPI Heami's default rate is fast enough to confuse Whisper on phoneme
@@ -96,6 +97,16 @@ public partial class TestToolsWindow : Window
 
     private async Task RunSpeakAsync()
     {
+        // Re-entrancy guard. One turn at a time so the user can't fire
+        // overlapping playbacks (acoustic-loop) or stack queued bypass
+        // calls. Visual: SetTurnBusy disables Speak / quick-phrase / input
+        // until the turn lands.
+        if (_isBusy)
+        {
+            SetStatus("(busy — wait for the previous turn to finish)", isError: false);
+            return;
+        }
+
         var text = txtVoiceInput.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrEmpty(text))
         {
@@ -103,8 +114,10 @@ public partial class TestToolsWindow : Window
             return;
         }
 
-        // Clear the textbox so the user can type the next test line while STT
-        // is still running. The submitted text lives on in the history list.
+        // Clear the textbox so the typed phrase is visibly captured and
+        // the field is ready for the next line. (Buttons are disabled
+        // until the turn lands, so the user can't actually type+submit
+        // mid-turn — but they can type ahead while waiting.)
         txtVoiceInput.Clear();
 
         // Snapshot models for this turn so the history row reflects what was
@@ -116,17 +129,42 @@ public partial class TestToolsWindow : Window
         // updates it via INotifyPropertyChanged when the result lands.
         var item = new VirtualVoiceHistoryItem(text);
         _history.Insert(0, item);
-        // Cap memory growth — each row may carry ~50–200 KB of WAV bytes
-        // for the replay button. 50 rows ≈ 5–10 MB, plenty for an A/B
-        // session, low enough not to matter.
         while (_history.Count > HistoryCap)
             _history.RemoveAt(_history.Count - 1);
         lstHistory.ScrollIntoView(item);
 
-        if (bypass)
-            await RunBypassAsync(item, v);
-        else
-            await RunAcousticLoopAsync(item, v);
+        SetTurnBusy(true);
+        try
+        {
+            if (bypass)
+                await RunBypassAsync(item, v);
+            else
+                await RunAcousticLoopAsync(item, v);
+        }
+        finally
+        {
+            SetTurnBusy(false);
+        }
+    }
+
+    /// <summary>
+    /// Toggle UI controls while a turn is in flight. Disables the input
+    /// textbox, Speak button, quick-phrase buttons, and bypass checkbox so
+    /// the user can't fire overlapping turns. Re-enabled when the turn lands
+    /// in the history row (success or failure).
+    /// </summary>
+    private void SetTurnBusy(bool busy)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action<bool>(SetTurnBusy), DispatcherPriority.Normal, busy);
+            return;
+        }
+        _isBusy = busy;
+        if (txtVoiceInput is not null) txtVoiceInput.IsEnabled = !busy;
+        if (btnVoiceSpeak is not null) btnVoiceSpeak.IsEnabled = !busy;
+        if (chkBypassAcousticLoop is not null) chkBypassAcousticLoop.IsEnabled = !busy;
+        if (pnlQuickPhrases is not null) pnlQuickPhrases.IsEnabled = !busy;
     }
 
     /// <summary>
@@ -254,57 +292,76 @@ public partial class TestToolsWindow : Window
             _injector.Errored += ex => SetStatus($"✗ {ex.Message}", isError: true);
         }
 
-        SetStatus("synthesising…", isError: false);
         try
         {
-            // Acoustic-loop path: synthesise + pad + play through the same
-            // VoicePlaybackService the injector uses internally. Padding +
-            // slower rate help AskBot's mic→Whisper round-trip just as much
-            // as the bypass path's direct STT call.
-            await Task.Run(() =>
+            // ── Stage 1: synthesise (off the UI thread) ──
+            SetStatus($"synthesising via {v.TtsProvider}…", isError: false);
+            var (rawWav, paddedWav, format, synthMs) = await Task.Run(() =>
             {
                 var tts = VoiceRuntimeFactory.BuildTts(v)
                     ?? throw new InvalidOperationException($"TTS '{v.TtsProvider}' could not be constructed.");
                 try
                 {
                     ApplySlowSpeechRate(tts);
-                    var rawWav = tts.SynthesizeAsync(item.Input, v.TtsVoice).GetAwaiter().GetResult();
-                    if (rawWav is null || rawWav.Length == 0)
+                    var sw = Stopwatch.StartNew();
+                    var raw = tts.SynthesizeAsync(item.Input, v.TtsVoice).GetAwaiter().GetResult();
+                    sw.Stop();
+                    if (raw is null || raw.Length == 0)
                         throw new InvalidOperationException("TTS returned empty audio.");
-
-                    var wav = WavNoisePadder.PadWithNoise(
-                        rawWav, DefaultLeadSilence, DefaultTrailSilence, DefaultNoiseDbfs);
-
-                    SetItemAudio(item, wav, tts.AudioFormat);
-
-                    // Reuse the lazy injector's player slot for actual playback
-                    // (it owns the VoicePlaybackService instance + Started/Stopped events).
-                    if (_injector is null)
-                    {
-                        _injector = new VirtualVoiceInjector();
-                        _injector.Started += () => SetStatus("▶ playing through speaker…", isError: false);
-                        _injector.Stopped += () => SetStatus("done — if mic is ON, AskBot should have heard it.", isError: false);
-                        _injector.Errored += ex => SetStatus($"✗ {ex.Message}", isError: true);
-                    }
-                    // Direct play — bypassing the injector's own synth path so we
-                    // play the padded WAV (the injector synthesises raw without padding).
-                    _replayPlayer ??= new VoicePlaybackService();
-                    _replayPlayer.Play(wav, tts.AudioFormat);
-
-                    SucceedItem(item, "(played through speaker — see AskBot for STT)",
-                        $"acoustic · {ProviderTag(v)} · rate={DescribeTtsSpeed(tts)} · raw={rawWav.Length}→padded={wav.Length} · result delivered to AskBot, not shown here");
+                    var padded = WavNoisePadder.PadWithNoise(
+                        raw, DefaultLeadSilence, DefaultTrailSilence, DefaultNoiseDbfs);
+                    return (raw, padded, tts.AudioFormat, sw.ElapsedMilliseconds);
                 }
                 finally
                 {
                     (tts as IDisposable)?.Dispose();
                 }
             });
+
+            SetItemAudio(item, paddedWav, format);
+
+            // ── Stage 2: play through the speaker, wait for it to actually finish ──
+            var durationMs = EstimateWavDurationMs(paddedWav);
+            SetStatus($"▶ playing through speaker (~{durationMs / 1000.0:F1}s)…", isError: false);
+
+            _replayPlayer ??= new VoicePlaybackService();
+            _replayPlayer.Play(paddedWav, format);
+
+            // Wait for the audio to finish before releasing the busy gate —
+            // otherwise users can click another quick phrase while audio is
+            // still playing, causing overlapping speaker output and corrupt
+            // mic capture. WAV duration is deterministic; +200 ms buffer
+            // catches NAudio buffer flush + driver latency.
+            await Task.Delay(durationMs + 200);
+
+            SetStatus($"playback done · {durationMs} ms — wait for AskBot to transcribe…", isError: false);
+            SucceedItem(item, "(played through speaker — see AskBot for STT)",
+                $"acoustic · {ProviderTag(v)} · synth {synthMs}ms · raw={rawWav.Length}→padded={paddedWav.Length} · play {durationMs}ms · result delivered to AskBot, not shown here");
         }
         catch (Exception ex)
         {
             AppLogger.Log($"[TestTools] acoustic-loop synth/play threw: {ex.GetType().Name}: {ex.Message}");
             FailItem(item, $"{ex.GetType().Name}: {ex.Message}");
+            SetStatus($"✗ {ex.Message}", isError: true);
         }
+    }
+
+    /// <summary>
+    /// Parse a WAV byte array's total playback duration. Returns 0 on
+    /// any failure — caller falls back to a best-effort fixed delay if
+    /// it cares about timing precision.
+    /// </summary>
+    private static int EstimateWavDurationMs(byte[] wavBytes)
+    {
+        if (wavBytes is null || wavBytes.Length < 44) return 0;
+        try
+        {
+            var patched = VoicePlaybackService.PatchWavHeaderSizes(wavBytes);
+            using var ms = new MemoryStream(patched);
+            using var reader = new NAudio.Wave.WaveFileReader(ms);
+            return (int)reader.TotalTime.TotalMilliseconds;
+        }
+        catch { return 0; }
     }
 
     /// <summary>
