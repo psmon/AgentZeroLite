@@ -235,6 +235,14 @@ public partial class TestToolsWindow : Window
             var stt = VoiceRuntimeFactory.BuildStt(v)
                 ?? throw new InvalidOperationException($"STT '{v.SttProvider}' could not be constructed.");
 
+            // Capture the AskBot reference *here*, on the UI thread.
+            // Application.Current.Windows is dispatcher-owned and throws
+            // InvalidOperationException ("다른 스레드가 이 개체를 소유…")
+            // when accessed from a Task.Run worker. Capturing once and
+            // closing over the local var keeps SendVoiceTranscript callable
+            // from the worker (it Dispatcher.BeginInvokes internally).
+            var bot = FindAskBot();
+
             SetStatus($"synthesising via {v.TtsProvider}…", isError: false);
             await Task.Run(async () =>
             {
@@ -299,7 +307,8 @@ public partial class TestToolsWindow : Window
                     // Used to be conditional on "acoustic loop" mode, but the
                     // user's mental model is "the test should drive AskBot."
                     // Skip only if STT returned empty (nothing useful to send).
-                    var bot = FindAskBot();
+                    // `bot` was captured on the UI thread before this Task.Run
+                    // (Application.Windows is dispatcher-owned).
                     string sentTag;
                     if (bot is not null && !string.IsNullOrWhiteSpace(transcript))
                     {
