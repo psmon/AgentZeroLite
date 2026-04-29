@@ -72,6 +72,24 @@
       "heading": "Security Surface — Prompt Injection → OS Exec Map",
       "size": 4836,
       "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/voice-roundtrip-testing.md",
+      "file": "harness/knowledge/voice-roundtrip-testing.md",
+      "name": "voice-roundtrip-testing.md",
+      "title": "voice-roundtrip-testing",
+      "heading": "Voice TTS↔STT Round-Trip Testing — Methodology",
+      "size": 10034,
+      "modified": "2026-04-29"
+    },
+    {
+      "id": "harness/knowledge/wpf-xaml-resource-and-window-pitfalls.md",
+      "file": "harness/knowledge/wpf-xaml-resource-and-window-pitfalls.md",
+      "name": "wpf-xaml-resource-and-window-pitfalls.md",
+      "title": "wpf-xaml-resource-and-window-pitfalls",
+      "heading": "WPF XAML Resource Scope & Window Lifecycle Pitfalls",
+      "size": 11187,
+      "modified": "2026-04-29"
     }
   ]
 }

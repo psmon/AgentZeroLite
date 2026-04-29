@@ -10,9 +10,57 @@
     "code-coach": 13,
     "pre-commit-review": 7,
     "security-guard": 2,
-    "tamer": 9
+    "tamer": 15
   },
   "items": [
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-29-18-15-voice-roundtrip-testing-knowledge.md",
+      "date": "2026-04-29",
+      "time": "18:15",
+      "title": "voice roundtrip testing knowledge",
+      "size": 4933
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-29-15-12-wpf-pitfalls-knowledge-update.md",
+      "date": "2026-04-29",
+      "time": "15:12",
+      "title": "wpf pitfalls knowledge update",
+      "size": 3841
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-29-13-50-p2-p3-output-graph-and-bargein.md",
+      "date": "2026-04-29",
+      "time": "13:50",
+      "title": "p2 p3 output graph and bargein",
+      "size": 8946
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-29-13-00-p1-input-graph.md",
+      "date": "2026-04-29",
+      "time": "13:00",
+      "title": "p1 input graph",
+      "size": 5128
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-29-12-30-p0-akka-streams-bump.md",
+      "date": "2026-04-29",
+      "time": "12:30",
+      "title": "p0 akka streams bump",
+      "size": 2245
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-04-29-12-04-akka-streams-voice-pipeline-design.md",
+      "date": "2026-04-29",
+      "time": "12:04",
+      "title": "akka streams voice pipeline design",
+      "size": 5565
+    },
     {
       "category": "security-guard",
       "file": "harness/logs/security-guard/2026-04-28-10-15-voice-subsystem-review.md",
