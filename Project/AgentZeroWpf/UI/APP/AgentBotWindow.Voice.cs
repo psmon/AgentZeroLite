@@ -399,24 +399,46 @@ public partial class AgentBotWindow
                 return;
             }
 
-            // ── Energy gate ──
-            // VAD set the trigger (sensitivity is user-controlled, often
-            // max'd to catch quiet voice). Post-capture, check whether the
-            // PCM actually contains speech-level energy. If it's mostly
-            // silence (e.g., a fan/keyboard click triggered VAD on max
-            // sensitivity), skip the STT call — Whisper hallucinates
-            // YouTube outros (\"시청해주셔서 감사합니다\", \"Thank you for
-            // watching\") on near-silence audio.
+            // ── Voice-activity gate ──
+            //
+            // Whisper hallucinates YouTube-creator outros on near-silence
+            // input ("시청해주셔서 감사합니다"). VAD set the trigger
+            // (sensitivity is user-controlled, often max'd for quiet voice),
+            // so the captured PCM may contain a brief speech burst inside
+            // a much longer envelope of pre-roll + hangover silence.
+            //
+            // Naïve RMS-over-whole-clip is the wrong measure here — silence
+            // padding pulls the average way down even when the speech itself
+            // is clear. Real-world data: user's audible "안녕하세요" came
+            // back as peak=-27 dBFS / rms=-56 dBFS — peak honestly reflects
+            // the speech burst, but rms tracks the surrounding silence.
+            //
+            // Two-tier gate:
+            //   (1) Peak — must reach at least -38 dBFS somewhere in the clip
+            //       (any actual audible moment).
+            //   (2) Voice activity ratio — fraction of 50 ms frames whose
+            //       peak exceeds -45 dBFS. Distinguishes "0.5 s of sustained
+            //       speech surrounded by silence" (≈ 17 % ratio) from a
+            //       single typing click in 3 s of silence (≈ 1.7 %).
             var (peakAmp, rmsAmp) = MeasurePcm16Level(pcm);
             var peakDb = peakAmp > 0 ? 20.0 * Math.Log10(peakAmp) : double.NegativeInfinity;
             var rmsDb  = rmsAmp  > 0 ? 20.0 * Math.Log10(rmsAmp)  : double.NegativeInfinity;
-            AppLogger.Log($"[BOT-Voice-pipe] [t2] pipeline-start | enqueue-lag={enqueueLagMs}ms · provider={v.SttProvider} · lang={v.SttLanguage} · pcm=~{pcmSec:F2}s · peak={peakDb:F1}dBFS · rms={rmsDb:F1}dBFS");
+            var var50ms = MeasurePcm16VoiceActivityRatio(pcm, frameLoudThresholdDbfs: -45.0);
+            AppLogger.Log($"[BOT-Voice-pipe] [t2] pipeline-start | enqueue-lag={enqueueLagMs}ms · provider={v.SttProvider} · lang={v.SttLanguage} · pcm=~{pcmSec:F2}s · peak={peakDb:F1}dBFS · rms={rmsDb:F1}dBFS · VAR={var50ms:P1}");
 
-            const double MinSpeechRmsDbfs = -40.0;   // ambient/typing usually < -45; conversational speech > -30
-            if (rmsDb < MinSpeechRmsDbfs)
+            const double MinSpeechPeakDbfs       = -38.0;   // any audible moment
+            const double MinVoiceActivityRatio   = 0.10;    // ≥10% of 50 ms frames active
+
+            if (peakDb < MinSpeechPeakDbfs)
             {
-                AppLogger.Log($"[BOT-Voice-pipe] dropped — energy gate (rms={rmsDb:F1}dBFS < {MinSpeechRmsDbfs}dBFS · likely false VAD trigger on ambient noise)");
+                AppLogger.Log($"[BOT-Voice-pipe] dropped — peak gate (peak={peakDb:F1}dBFS < {MinSpeechPeakDbfs}dBFS · no audible speech burst in clip)");
                 SetVoiceStatus("(too quiet — try speaking closer to the mic)", System.Windows.Media.Brushes.Goldenrod);
+                return;
+            }
+            if (var50ms < MinVoiceActivityRatio)
+            {
+                AppLogger.Log($"[BOT-Voice-pipe] dropped — VAR gate (active-frame ratio={var50ms:P1} < {MinVoiceActivityRatio:P0} · likely brief click/tap, not sustained speech)");
+                SetVoiceStatus("(brief click only — speak a longer phrase)", System.Windows.Media.Brushes.Goldenrod);
                 return;
             }
 
@@ -506,8 +528,9 @@ public partial class AgentBotWindow
 
     /// <summary>
     /// Walk a 16-bit little-endian PCM byte array and return (peak, rms) in
-    /// normalised [0, 1] amplitude. Used by the energy gate to decide whether
-    /// the captured utterance has enough speech energy to bother transcribing.
+    /// normalised [0, 1] amplitude. Used by the voice-activity gate to decide
+    /// whether the captured utterance has enough speech energy to bother
+    /// transcribing.
     /// </summary>
     private static (double peak, double rms) MeasurePcm16Level(byte[] pcm)
     {
@@ -524,6 +547,37 @@ public partial class AgentBotWindow
         }
         var rms = Math.Sqrt(sumSq / (double)sampleCount) / 32768.0;
         return (peak / 32768.0, rms);
+    }
+
+    /// <summary>
+    /// Fraction of 50 ms frames in the buffer whose peak exceeds
+    /// <paramref name="frameLoudThresholdDbfs"/>. A simple voice-activity
+    /// proxy that distinguishes "sustained speech" (many active frames in
+    /// a row) from "single click in silence" (one active frame, rest dead).
+    /// 16 kHz / 16-bit / mono = 1600 samples = 3200 bytes per 50 ms frame.
+    /// </summary>
+    private static double MeasurePcm16VoiceActivityRatio(byte[] pcm, double frameLoudThresholdDbfs)
+    {
+        const int FrameBytes = 3200;
+        if (pcm.Length < FrameBytes) return 0.0;
+        var amplitudeThreshold = Math.Pow(10.0, frameLoudThresholdDbfs / 20.0) * 32768.0;
+        var totalFrames = pcm.Length / FrameBytes;
+        if (totalFrames == 0) return 0.0;
+
+        int loudFrames = 0;
+        for (int f = 0; f < totalFrames; f++)
+        {
+            int framePeak = 0;
+            int start = f * FrameBytes;
+            for (int i = start; i < start + FrameBytes; i += 2)
+            {
+                short s = (short)(pcm[i] | (pcm[i + 1] << 8));
+                int abs = s < 0 ? -s : s;
+                if (abs > framePeak) framePeak = abs;
+            }
+            if (framePeak >= amplitudeThreshold) loudFrames++;
+        }
+        return loudFrames / (double)totalFrames;
     }
 
     private void SetInflightCancelVisible(bool visible)
