@@ -405,7 +405,15 @@ public partial class AgentBotWindow
             }
         }
 
-        var window = new TestToolsWindow { Owner = this };
+        // Owner must be a window that has actually been Shown (has an HWND).
+        // When AskBot is in embedded mode (DetachContent → MainWindow's dock),
+        // `this` AgentBotWindow is Hide()'n — its handle was never created, so
+        // assigning Owner=this throws "Owner cannot be set to a Window that
+        // has not been previously shown". Pick whichever top-level window is
+        // actually visible.
+        var owner = ResolveVisibleOwner();
+        var window = new TestToolsWindow();
+        if (owner is not null) window.Owner = owner;
         window.Closed += (_, _) =>
         {
             if (ReferenceEquals(_testToolsWindow, window))
@@ -413,5 +421,15 @@ public partial class AgentBotWindow
         };
         _testToolsWindow = window;
         window.Show();
+    }
+
+    private Window? ResolveVisibleOwner()
+    {
+        if (IsVisible) return this;
+        var mw = Application.Current?.MainWindow;
+        if (mw is not null && mw.IsVisible) return mw;
+        return Application.Current?.Windows
+            .OfType<Window>()
+            .FirstOrDefault(w => w.IsVisible && w.IsLoaded);
     }
 }
