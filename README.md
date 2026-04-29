@@ -4,29 +4,6 @@
 
 > 🇰🇷 한국어 문서: [README-KR.md](README-KR.md)
 
----
-
-## ⚠️ Security Notice — Please Read First
-
-**Before you clone & build this repo, or run the installer**, I strongly recommend you self-review the code first.
-
-- This app **directly drives and brokers CLIs**, and the **AgentChatBot forwards typed text / raw keystrokes into the active terminal**. That means there is a real surface where **prompt injection can turn into OS command execution**. Please audit the source for malicious behavior or code paths designed to weaponize that injection surface before running it.
-- Building a tool that gives an AI **OS-level control** while putting *complete* guardrails around it is genuinely hard, and I do not claim the current guardrails are sufficient.
-- **Use the installer only if you trust me (the maintainer).** If you cannot independently judge this project as safe, **do not install it.**
-- I do **not market this as a product** — it is published purely as **technical research**. Security issues and improvement suggestions are very welcome via GitHub issues.
-
----
-
-## 🧪 Project Concept — What This Is Actually Experimenting With
-
-AgentZero Lite is an **experimental repository preparing for the on-device AI era**, built on .NET — currently **Windows-only** as a starting point.
-
-- After the recent string of security incidents in the npm open-source ecosystem, I came to believe that **MS-managed channels like NuGet / winget** still have **a defensible niche in the AI-CLI / OS-native era — one anchored on security and stability**. Within .NET's huge surface, the *native-adjacent slice* in particular looks like an opening to push back into a market that npm has come to dominate, using **MS-stewarded native tech**. That belief is what made me pick up .NET again.
-- On the Linux side, capable AI agent CLIs keep landing **macOS-first**, which leaves a real gap on Windows-native. So this repo is also a live experiment asking: **does Windows-native have any opening at all in the AI era?** When good Windows-native agent CLIs are scarce, this is an attempt to fill that gap directly with a .NET-based stack.
-- So treat this repo as **a living research notebook, not a product**. The pattern is: experiment fast, document the dead ends (see `Docs/llm/`), and rip out workarounds the moment official NuGet support catches up.
-
----
-
 ![AgentZero Lite — multi-CLI multi-view](Home/main.png)
 
 🎬 **Demo** — driving Claude and Codex in parallel:
