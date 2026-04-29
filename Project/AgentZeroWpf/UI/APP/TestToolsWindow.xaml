@@ -24,6 +24,27 @@
         <SolidColorBrush x:Key="GreenBrush"   Color="#4EC9B0"/>
         <SolidColorBrush x:Key="OrangeBrush"  Color="#CE9178"/>
         <SolidColorBrush x:Key="RedBrush"     Color="#F48771"/>
+
+        <!-- One-click quick-phrase button. Single click fills the input
+             AND triggers the synth pipeline; saves the user from
+             re-typing common test fixtures. -->
+        <Style x:Key="QuickPhraseButton" TargetType="Button">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Background" Value="{StaticResource InputBg}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDim}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Margin" Value="0,0,4,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MaxWidth" Value="240"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -62,6 +83,34 @@
                                        Text="mode: bypass" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
+
+                    <!-- Quick-phrase fixtures. One-click → fills input + runs.
+                         Spans Korean (short, weather query, long stress test)
+                         and English (greeting, question) so the same panel
+                         covers most typical test cases without re-typing. -->
+                    <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Style="{StaticResource QuickPhraseButton}"
+                                Content="안녕하세요" Tag="안녕하세요"
+                                Click="OnQuickPhraseClick"
+                                ToolTip="안녕하세요"/>
+                        <Button Style="{StaticResource QuickPhraseButton}"
+                                Content="오늘의날씨어때" Tag="오늘의날씨어때"
+                                Click="OnQuickPhraseClick"
+                                ToolTip="오늘의날씨어때"/>
+                        <Button Style="{StaticResource QuickPhraseButton}"
+                                Content="hello" Tag="hello"
+                                Click="OnQuickPhraseClick"
+                                ToolTip="hello"/>
+                        <Button Style="{StaticResource QuickPhraseButton}"
+                                Content="how are you?" Tag="how are you?"
+                                Click="OnQuickPhraseClick"
+                                ToolTip="how are you?"/>
+                        <Button Style="{StaticResource QuickPhraseButton}"
+                                Content="모래 날씨 (긴 문장)…"
+                                Tag="내일의 날씨는 말고 모래의날씨는 흐리고 그리고 주간내내 비올예정입니다."
+                                Click="OnQuickPhraseClick"
+                                ToolTip="내일의 날씨는 말고 모래의날씨는 흐리고 그리고 주간내내 비올예정입니다."/>
+                    </WrapPanel>
 
                     <!-- Input row -->
                     <DockPanel DockPanel.Dock="Top" LastChildFill="True" Margin="0,0,0,8">

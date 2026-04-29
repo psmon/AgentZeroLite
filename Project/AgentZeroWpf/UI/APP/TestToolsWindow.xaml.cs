@@ -80,6 +80,20 @@ public partial class TestToolsWindow : Window
 
     private void OnVoiceSpeak(object sender, RoutedEventArgs e) => _ = RunSpeakAsync();
 
+    /// <summary>
+    /// Quick-phrase button handler. One click both fills the textbox
+    /// (so the user can see what was sent) and kicks off the synth +
+    /// STT pipeline. RunSpeakAsync clears the textbox after capture,
+    /// matching the manual-Enter flow.
+    /// </summary>
+    private void OnQuickPhraseClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button btn) return;
+        if (btn.Tag is not string phrase || string.IsNullOrWhiteSpace(phrase)) return;
+        txtVoiceInput.Text = phrase;
+        _ = RunSpeakAsync();
+    }
+
     private async Task RunSpeakAsync()
     {
         var text = txtVoiceInput.Text?.Trim() ?? string.Empty;
