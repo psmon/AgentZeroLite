@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -74,6 +76,12 @@ public partial class TestToolsWindow : Window
     /// configuration drift. Result is shown inline in this window only;
     /// AskBot is intentionally NOT notified (this is a validation tool,
     /// not an input path).
+    ///
+    /// <para>Heavy work (SAPI Speak, NAudio resample, Whisper inference) is
+    /// pushed off the UI thread via Task.Run — both <c>SpeechSynthesizer.Speak</c>
+    /// and Whisper's CPU inference are synchronous-ish and would freeze the
+    /// dispatcher otherwise. Per-stage Stopwatch timings are logged so the
+    /// next slowdown can be diagnosed without re-instrumenting.</para>
     /// </summary>
     private async Task RunBypassAsync(string text)
     {
@@ -84,47 +92,130 @@ public partial class TestToolsWindow : Window
             return;
         }
 
-        ITextToSpeech? tts = null;
-        ISpeechToText? stt = null;
         try
         {
-            tts = VoiceRuntimeFactory.BuildTts(v)
+            // Build factories on the UI thread (cheap), then offload everything
+            // synchronous to a worker. SetStatus marshals back automatically.
+            var tts = VoiceRuntimeFactory.BuildTts(v)
                 ?? throw new InvalidOperationException($"TTS '{v.TtsProvider}' could not be constructed.");
-            stt = VoiceRuntimeFactory.BuildStt(v)
+            var stt = VoiceRuntimeFactory.BuildStt(v)
                 ?? throw new InvalidOperationException($"STT '{v.SttProvider}' could not be constructed.");
 
             SetStatus($"synthesising via {v.TtsProvider}…", isError: false);
-            var wav = await tts.SynthesizeAsync(text, v.TtsVoice);
-            if (wav is null || wav.Length == 0)
-                throw new InvalidOperationException("TTS returned empty audio.");
-            AppLogger.Log($"[TestTools-Bypass] synth OK | bytes={wav.Length} provider={v.TtsProvider}");
+            await Task.Run(async () =>
+            {
+                var totalSw = Stopwatch.StartNew();
+                try
+                {
+                    // ── Stage 1: TTS synthesis ──
+                    var sw = Stopwatch.StartNew();
+                    var wav = await tts.SynthesizeAsync(text, v.TtsVoice);
+                    sw.Stop();
+                    var synthMs = sw.ElapsedMilliseconds;
+                    if (wav is null || wav.Length == 0)
+                        throw new InvalidOperationException("TTS returned empty audio.");
+                    AppLogger.Log($"[TestTools-Bypass] [1/3] synth | {synthMs} ms · {wav.Length} bytes · provider={v.TtsProvider}");
 
-            SetStatus("decoding WAV → PCM 16k mono…", isError: false);
-            var pcm = WavToPcm.To16kMono(wav);
-            if (pcm.Length == 0)
-                throw new InvalidOperationException("WAV decode produced empty PCM.");
-            AppLogger.Log($"[TestTools-Bypass] decoded | pcm_bytes={pcm.Length} (~{pcm.Length / 32_000.0:F2}s)");
+                    SetStatus("decoding WAV → PCM 16k mono…", isError: false);
 
-            SetStatus($"transcribing via {v.SttProvider}…", isError: false);
-            var ready = await stt.EnsureReadyAsync();
-            if (!ready) throw new InvalidOperationException("STT failed to ready.");
-            var transcript = (await stt.TranscribeAsync(pcm, v.SttLanguage)) ?? string.Empty;
-            AppLogger.Log($"[TestTools-Bypass] STT result | chars={transcript.Length} text=\"{Trunc(transcript, 80)}\"");
+                    // ── Stage 2: WAV → PCM 16k mono (resample if needed) ──
+                    sw.Restart();
+                    var pcm = WavToPcm.To16kMono(wav);
+                    sw.Stop();
+                    var decodeMs = sw.ElapsedMilliseconds;
+                    if (pcm.Length == 0)
+                        throw new InvalidOperationException("WAV decode produced empty PCM.");
+                    var pcmSeconds = pcm.Length / 32_000.0;
+                    AppLogger.Log($"[TestTools-Bypass] [2/3] decode | {decodeMs} ms · pcm_bytes={pcm.Length} (~{pcmSeconds:F2}s audio)");
 
-            if (string.IsNullOrWhiteSpace(transcript))
-                SetStatus("✓ done · transcript empty (silent input or VAD-trimmed)", isError: false);
-            else
-                SetStatus($"✓ {v.SttProvider}: \"{transcript}\"", isError: false);
+                    // Save the synthesised audio to disk for inspection. The user
+                    // can listen to it directly to verify TTS quality before
+                    // blaming STT for the recognition failure.
+                    var debugPath = SaveDebugWav(wav, pcm);
+                    if (debugPath is not null)
+                        AppLogger.Log($"[TestTools-Bypass] debug WAV → {debugPath}");
+
+                    SetStatus($"transcribing via {v.SttProvider}… (~{pcmSeconds:F1}s audio)", isError: false);
+
+                    // ── Stage 3: STT inference ──
+                    sw.Restart();
+                    var ready = await stt.EnsureReadyAsync();
+                    if (!ready) throw new InvalidOperationException("STT failed to ready.");
+                    var transcript = (await stt.TranscribeAsync(pcm, v.SttLanguage)) ?? string.Empty;
+                    sw.Stop();
+                    var sttMs = sw.ElapsedMilliseconds;
+                    var rtFactor = pcmSeconds > 0 ? sttMs / 1000.0 / pcmSeconds : 0;
+                    AppLogger.Log($"[TestTools-Bypass] [3/3] STT | {sttMs} ms · provider={v.SttProvider} · {rtFactor:F2}x realtime · chars={transcript.Length} · text=\"{Trunc(transcript, 80)}\"");
+
+                    totalSw.Stop();
+                    var timing = $"synth {synthMs}ms · decode {decodeMs}ms · STT {sttMs}ms ({rtFactor:F1}x rt) · total {totalSw.ElapsedMilliseconds}ms";
+                    AppLogger.Log($"[TestTools-Bypass] DONE | {timing}");
+
+                    if (string.IsNullOrWhiteSpace(transcript))
+                        SetStatus($"✓ empty transcript · {timing}", isError: false);
+                    else
+                        SetStatus($"✓ \"{transcript}\"  ·  {timing}", isError: false);
+                }
+                finally
+                {
+                    (tts as IDisposable)?.Dispose();
+                }
+            });
         }
         catch (Exception ex)
         {
             AppLogger.LogError("[TestTools-Bypass] failed", ex);
             SetStatus($"✗ {ex.GetType().Name}: {ex.Message}", isError: true);
         }
-        finally
+    }
+
+    /// <summary>
+    /// Persist the synthesised WAV (as TTS produced it) and the resampled
+    /// PCM (as STT actually saw it) into <c>%LOCALAPPDATA%\AgentZeroLite\debug\</c>.
+    /// Both are written; comparing them isolates whether a recognition
+    /// problem is in the TTS output or in the resample step. Returns the
+    /// folder path so callers can log where to look.
+    /// </summary>
+    private static string? SaveDebugWav(byte[] origWav, byte[] pcm16k)
+    {
+        try
         {
-            (tts as IDisposable)?.Dispose();
+            var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (string.IsNullOrEmpty(local)) return null;
+            var dir = Path.Combine(local, "AgentZeroLite", "debug");
+            Directory.CreateDirectory(dir);
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var origPath = Path.Combine(dir, $"virtualvoice-{stamp}-tts.wav");
+            var pcmPath  = Path.Combine(dir, $"virtualvoice-{stamp}-stt-input-16k.wav");
+
+            File.WriteAllBytes(origPath, origWav);
+
+            // Wrap the resampled PCM as a WAV so the user can play it back
+            // and hear exactly what STT was fed (post-resample, pre-inference).
+            var wrapped = WrapPcmAsWav(pcm16k, 16_000, 16, 1);
+            File.WriteAllBytes(pcmPath, wrapped);
+            return dir;
         }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[TestTools-Bypass] debug WAV save failed: {ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static byte[] WrapPcmAsWav(byte[] pcm, int sampleRate, int bitsPerSample, int channels)
+    {
+        var byteRate = sampleRate * channels * bitsPerSample / 8;
+        var blockAlign = channels * bitsPerSample / 8;
+        var dataSize = pcm.Length;
+        var fileSize = 36 + dataSize;
+        using var ms = new MemoryStream(44 + dataSize);
+        using var bw = new BinaryWriter(ms);
+        bw.Write("RIFF"u8); bw.Write(fileSize); bw.Write("WAVE"u8);
+        bw.Write("fmt "u8); bw.Write(16); bw.Write((short)1); bw.Write((short)channels);
+        bw.Write(sampleRate); bw.Write(byteRate); bw.Write((short)blockAlign); bw.Write((short)bitsPerSample);
+        bw.Write("data"u8); bw.Write(dataSize); bw.Write(pcm);
+        return ms.ToArray();
     }
 
     /// <summary>
