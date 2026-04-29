@@ -24,7 +24,7 @@ namespace AgentZeroWpf.Services.Voice;
 /// the quality is plenty for STT (Whisper / cloud models tolerate
 /// linear-phase resampling without measurable accuracy loss).
 /// </summary>
-internal static class WavToPcm
+public static class WavToPcm
 {
     /// <summary>
     /// Decode a WAV blob to raw PCM 16k mono 16-bit. Logs the source format
