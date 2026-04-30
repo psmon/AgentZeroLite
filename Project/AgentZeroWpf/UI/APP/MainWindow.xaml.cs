@@ -2261,10 +2261,20 @@ public partial class MainWindow : Window
         }
     }
 
+    // Float windows we've already detached from Owner. ConditionalWeakTable
+    // so closing a float window doesn't leak. Without this guard the
+    // OnLayoutRootUpdated handler unsets Owner every layout tick — and
+    // Owner changes themselves cause focus events that retrigger
+    // Layout.Updated, producing a focus ping-pong between the float and
+    // the main window's tab in the same pane.
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, object>
+        _processedFloatOwners = new();
+
     private void OnLayoutRootUpdated(object? sender, EventArgs e)
     {
         // Ensure terminalDocPane stays in layout after splits/rearranges.
-        // Fix floating window Owner to prevent parent-blocking.
+        // Fix floating window Owner ONCE per window to prevent parent-blocking
+        // without retriggering the layout/focus loop.
         Dispatcher.BeginInvoke(() =>
         {
             try
@@ -2277,16 +2287,20 @@ public partial class MainWindow : Window
                     root.RootPanel.Children.Add(terminalDocPane);
                 }
 
-                // Fix floating windows: unset Owner to prevent parent input blocking
+                // Fix floating windows: unset Owner exactly once per window.
                 var floats = dockManager.FloatingWindows?.ToArray();
                 if (floats is not null)
                 {
                     foreach (var fw in floats)
                     {
-                        if (fw?.Owner is not null)
+                        if (fw is null) continue;
+                        if (_processedFloatOwners.TryGetValue(fw, out _)) continue;
+                        _processedFloatOwners.Add(fw, new object());
+                        if (fw.Owner is not null)
                         {
                             fw.Owner = null;
                             fw.ShowInTaskbar = true;
+                            AppLogger.Log($"[Dock] Float owner unset | title=\"{fw.Title}\"");
                         }
                     }
                 }
