@@ -4,6 +4,20 @@
 
 > 🇰🇷 한국어 문서: [README-KR.md](README-KR.md)
 
+---
+
+## ⚠️ Notice for Developers Reading This Source
+
+If you are reading this source, you are a developer. AgentZero Lite is a **CLI helper that takes security as a first-class concern**:
+
+- It has a **model download** feature, but **never transmits your data to external networks**.
+- To prevent deployment tampering, **builds are produced transparently only through GitHub Actions** — there is no other release path.
+- It does **not ship a risky auto-update mechanism** either.
+
+**Is this actually true?** Don't take my word for it — **verify it yourself**, and if you find any risk, please open a GitHub issue at any time. Sub-modules that surface security warnings are wired into an AI improvement loop for fast follow-up, but the loop is not perfect. **Security-hardening contributions are always welcome.**
+
+---
+
 ![AgentZero Lite — multi-CLI multi-view](Home/main.png)
 
 🎬 **Demo** — driving Claude and Codex in parallel:
