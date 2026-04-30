@@ -1088,8 +1088,9 @@ public partial class MainWindow : Window
     /// <summary>
     /// Bind the session to the Akka actor system once it's available. Dedup via
     /// LastBoundSessionId/LastBoundHwnd so repeat Loaded events are idempotent.
+    /// Also wires the channel-health alert so wedge events surface a banner.
     /// </summary>
-    private static void BindSessionToActors(ConsoleTabInfo tab, EasyWindowsTerminalControl.EasyTerminalControl terminal, string groupName)
+    private void BindSessionToActors(ConsoleTabInfo tab, EasyWindowsTerminalControl.EasyTerminalControl terminal, string groupName)
     {
         if (!ActorSystemManager.IsInitialized || tab.Session is null) return;
 
@@ -1101,6 +1102,7 @@ public partial class MainWindow : Window
                 groupName, tab.Title, tab.Session), ActorRefs.NoSender);
             tab.LastBoundSessionId = tab.Session.SessionId;
             AppLogger.Log($"[Akka] Terminal actor bound: {groupName}/{tab.Title} session={tab.Session.SessionId}");
+            WireHealthAlert(tab);
         }
 
         try
@@ -1123,7 +1125,7 @@ public partial class MainWindow : Window
     /// returns before the pipe connects, leaving the tab with a null session and
     /// silent input until the next Loaded event.
     /// </summary>
-    private static void StartSessionPendingRetry(ConsoleTabInfo tab, EasyWindowsTerminalControl.EasyTerminalControl terminal, string groupName)
+    private void StartSessionPendingRetry(ConsoleTabInfo tab, EasyWindowsTerminalControl.EasyTerminalControl terminal, string groupName)
     {
         const int MaxAttempts = 100;
         var attempts = 0;
@@ -1164,6 +1166,168 @@ public partial class MainWindow : Window
             }
         };
         timer.Start();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    //  Wedge recovery: banner + Restart Terminal
+    //
+    //  Background: ConPTY's input pipe sometimes wedges one-way after a quick
+    //  burst of tab activations during init — _pty.WriteToTerm returns success,
+    //  outLen never advances, neither AgentBot writes nor direct keyboard
+    //  reach the foreground child. The third-party openconsole layer is the
+    //  source; we cannot fix it from here. Instead we DETECT (HealthState
+    //  machine in ConPtyTerminalSession) and OFFER RECOVERY (this code).
+    // ──────────────────────────────────────────────────────────────────────
+
+    private void WireHealthAlert(ConsoleTabInfo tab)
+    {
+        if (tab.Session is null || tab.HealthWired) return;
+        tab.HealthWired = true;
+        var session = tab.Session;
+        session.HealthChanged += state =>
+        {
+            // HealthChanged fires from a TaskScheduler.Default thread — marshal
+            // to the UI dispatcher before touching tab.WedgeBanner / TerminalHost.
+            try { Dispatcher.BeginInvoke(new Action(() => OnTabHealthChanged(tab, state))); }
+            catch { /* dispatcher may be shutting down */ }
+        };
+    }
+
+    private void OnTabHealthChanged(ConsoleTabInfo tab, TerminalHealthState state)
+    {
+        if (state == TerminalHealthState.Dead) ShowWedgeBanner(tab);
+        else if (state == TerminalHealthState.Alive) HideWedgeBanner(tab);
+        // Stale = early warning, intentionally no UI change — we don't want
+        // to flash a banner during slow TUI loads (claude/tailscale handshake).
+    }
+
+    private void ShowWedgeBanner(ConsoleTabInfo tab)
+    {
+        if (tab.WedgeBanner is not null || tab.TerminalHost is null) return;
+
+        var msg = new TextBlock
+        {
+            Text = "⚠ Input channel wedged — keystrokes are not reaching the shell. Output may still appear.",
+            Foreground = System.Windows.Media.Brushes.White,
+            FontSize = 12,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+            TextWrapping = System.Windows.TextWrapping.Wrap,
+        };
+        DockPanel.SetDock(msg, Dock.Left);
+
+        var restartBtn = new System.Windows.Controls.Button
+        {
+            Content = "Restart Terminal",
+            Padding = new Thickness(10, 3, 10, 3),
+            Margin = new Thickness(8, 0, 0, 0),
+            Foreground = System.Windows.Media.Brushes.White,
+            Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x8B, 0x1A, 0x1A)),
+            BorderBrush = System.Windows.Media.Brushes.White,
+            BorderThickness = new Thickness(1),
+        };
+        restartBtn.Click += (_, _) => RestartWedgedTerminal(tab);
+        DockPanel.SetDock(restartBtn, Dock.Right);
+
+        var dock = new DockPanel { LastChildFill = true };
+        dock.Children.Add(restartBtn);
+        dock.Children.Add(msg);
+
+        var banner = new Border
+        {
+            Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC0, 0x32, 0x2D)),
+            BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x6B, 0x6B)),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(10, 6, 10, 6),
+            VerticalAlignment = System.Windows.VerticalAlignment.Top,
+            Child = dock,
+        };
+        // Banner sits on top of the terminal in the same Grid cell — Grid stacks
+        // children in z-order they were added, so adding last puts it on top.
+        tab.TerminalHost.Children.Add(banner);
+        tab.WedgeBanner = banner;
+        AppLogger.Log($"[CLI] Wedge banner shown | label={tab.Title}");
+    }
+
+    private void HideWedgeBanner(ConsoleTabInfo tab)
+    {
+        if (tab.WedgeBanner is null) return;
+        tab.TerminalHost?.Children.Remove(tab.WedgeBanner);
+        tab.WedgeBanner = null;
+        AppLogger.Log($"[CLI] Wedge banner cleared | label={tab.Title}");
+    }
+
+    /// <summary>
+    /// Tear down the current PTY/session and spawn a fresh one in the same tab.
+    /// Used for wedge recovery and from the context menu. After this returns,
+    /// the next Loaded fire (or the polling retry inside this method) rebinds
+    /// session + actor + health alert just like a first-time start.
+    /// </summary>
+    private void RestartWedgedTerminal(ConsoleTabInfo tab)
+    {
+        var terminal = tab.Terminal;
+        if (terminal is null)
+        {
+            AppLogger.Log($"[CLI] Restart: terminal null | label={tab.Title}");
+            return;
+        }
+
+        // Resolve the tab's group for logging + rebind.
+        string? groupName = null;
+        foreach (var g in _cliGroups)
+            if (g.Tabs.Contains(tab)) { groupName = g.DisplayName; break; }
+        if (groupName is null)
+        {
+            AppLogger.Log($"[CLI] Restart: group not found for tab | label={tab.Title}");
+            return;
+        }
+
+        AppLogger.Log($"[CLI] Restart requested | label={groupName}/{tab.Title} prevSessionId={tab.LastBoundSessionId ?? "(none)"}");
+
+        // 1) Cancel any pending retry timer so it doesn't race with the fresh start.
+        try { tab.SessionPendingRetry?.Stop(); } catch { }
+        tab.SessionPendingRetry = null;
+
+        // 2) Dispose the old session — closes its write-loop channel, frees timers.
+        //    The underlying ConPTYTerm reference is owned by terminal, not the
+        //    session, so disposing the session does NOT kill the PTY itself.
+        try { tab.Session?.Dispose(); }
+        catch (Exception ex) { AppLogger.Log($"[CLI] Restart: session dispose threw {ex.GetType().Name}: {ex.Message}"); }
+        tab.Session = null;
+
+        // 3) Reset rebind dedup + health-wire flag so the new session is treated as fresh.
+        tab.LastBoundSessionId = null;
+        tab.LastBoundHwnd = 0;
+        tab.HealthWired = false;
+
+        // 4) Hide banner immediately — UX feedback that the request was accepted.
+        HideWedgeBanner(tab);
+
+        // 5) Force RestartTerm() — this is the actual recovery: a new PTY child
+        //    process is spawned, the terminal control re-binds its renderer, and
+        //    a fresh stdin pipe is opened.
+        tab.IsTerminalStarted = false;
+        try
+        {
+            terminal.RestartTerm();
+            tab.IsTerminalStarted = true;
+            var ptyHashAfter = terminal.ConPTYTerm is null
+                ? 0
+                : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
+            AppLogger.Log($"[CLI] RestartTerm() (recovery) | label={groupName}/{tab.Title} ptyHash=0x{ptyHashAfter:X8}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[CLI] Restart: RestartTerm threw {ex.GetType().Name}: {ex.Message}");
+            return;
+        }
+
+        // 6) Try to bind immediately; if the new PTY's ConsoleOutputLog is not
+        //    ready yet, fall back to the polling retry — same path that
+        //    handles fresh-start init races.
+        EnsureSession(tab, terminal, groupName);
+        BindSessionToActors(tab, terminal, groupName);
+        if (tab.Session is null && tab.SessionPendingRetry is null)
+            StartSessionPendingRetry(tab, terminal, groupName);
     }
 
 
@@ -1841,6 +2005,10 @@ public partial class MainWindow : Window
         ctxRename.Click += OnDocTabRename;
         ctx.Items.Add(ctxRename);
 
+        var ctxRestart = new System.Windows.Controls.MenuItem { Header = "Restart Terminal" };
+        ctxRestart.Click += OnDocTabRestart;
+        ctx.Items.Add(ctxRestart);
+
         ctx.Items.Add(new System.Windows.Controls.Separator());
 
         var ctxCloseAll = new System.Windows.Controls.MenuItem { Header = "Close All" };
@@ -1885,6 +2053,15 @@ public partial class MainWindow : Window
         var activeTab = (_activeConsoleTab >= 0 && _activeConsoleTab < _consoleTabs.Count)
             ? _consoleTabs[_activeConsoleTab] : null;
         return activeTab?.Document;
+    }
+
+    private void OnDocTabRestart(object sender, RoutedEventArgs e)
+    {
+        var doc = GetContextDocument(sender);
+        if (doc is null) return;
+        var tab = FindTabByDocument(doc);
+        if (tab is null) return;
+        RestartWedgedTerminal(tab);
     }
 
     private void OnDocTabRename(object sender, RoutedEventArgs e)

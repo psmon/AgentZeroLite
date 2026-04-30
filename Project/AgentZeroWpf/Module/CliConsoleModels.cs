@@ -33,6 +33,14 @@ public sealed class ConsoleTabInfo : IConsoleTabInfo
     // Active retry timer when EnsureSession is waiting for ConPTY output log —
     // guarded so only one timer runs per tab at a time.
     public System.Windows.Threading.DispatcherTimer? SessionPendingRetry { get; set; }
+
+    // ── Wedge-recovery UI state ──
+    // HealthChanged subscription is wired exactly once per session. New sessions
+    // (after RestartWedgedTerminal) reset this flag so the next session re-wires.
+    public bool HealthWired { get; set; }
+    // Banner overlay shown when HealthState transitions to Dead. Stored on the
+    // tab so Show/Hide are idempotent without a global lookup table.
+    public Border? WedgeBanner { get; set; }
 }
 
 public sealed class CliGroupInfo : ICliGroupInfo
