@@ -1916,10 +1916,6 @@ public partial class MainWindow : Window
                 tab.Session?.NoteInputAttempt($"keyboard:{e.Key}");
         };
 
-        // PTY-FREEZE-DIAG: focus trace — pure logging, no IsActive write.
-        // Earlier IsActive-from-GotFocus attempt (commit 6143c60, reverted in
-        // f679a7a) caused an active-document ricochet loop. These logs only
-        // observe; nothing changes the dock state.
         terminal.GotFocus += (_, _) =>
         {
             // PTY-FREEZE-DIAG: snapshot PTY state on focus. If a tab "doesn't
@@ -1932,6 +1928,38 @@ public partial class MainWindow : Window
             var outLogNull = pty?.ConsoleOutputLog is null;
             var outLen = pty?.ConsoleOutputLog?.Length ?? -1;
             AppLogger.Log($"[CLI-Input-DIAG] GotFocus  | tab={tab.Title} active={tab.Document?.IsActive == true} ptyHash=0x{ptyHash:X8} outLogNull={outLogNull} outLen={outLen}");
+
+            // Click-to-target: EasyTerminalControl is HwndHost-based, so a
+            // click on the console body is consumed by the native child and
+            // never reaches WPF as PreviewMouseDown. The only signal we get
+            // is the routed focus event when the win32 child takes keyboard
+            // focus.
+            //
+            // Design split (intentional, per UX feedback):
+            //  - Terminal body click → updates AgentBot's send target only
+            //    (group.ActiveTabIndex / actor SetActiveTerminal / bot window
+            //    label). The dock's active document stays where it is.
+            //  - Tab strip click → AvalonDock's normal path; flips IsActive,
+            //    OnDockActiveContentChanged updates state.
+            //
+            // Why not touch Document.IsActive here: the prior attempt
+            // (6143c60, reverted in f679a7a) caused dock-cascade ricochet
+            // freezes. Even with a reentrance guard the active-document
+            // change feels intrusive when the user just wanted to focus the
+            // pane to type. Keeping the heavier dock-flip on the explicit
+            // tab-strip click matches what users actually expect.
+            if (_targetingFromTerminalFocus) return;
+            var idx = _consoleTabs.IndexOf(tab);
+            if (idx < 0 || idx == _activeConsoleTab) return;
+            _targetingFromTerminalFocus = true;
+            try { MarkTabAsBotTarget(idx); }
+            catch (Exception ex) { AppLogger.Log($"[CLI-Input-DIAG] Click-target threw {ex.GetType().Name}: {ex.Message}"); }
+            finally
+            {
+                Dispatcher.BeginInvoke(
+                    new Action(() => _targetingFromTerminalFocus = false),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            }
         };
         terminal.LostFocus += (_, _) =>
             AppLogger.Log($"[CLI-Input-DIAG] LostFocus | tab={tab.Title} active={tab.Document?.IsActive == true}");
@@ -1990,6 +2018,13 @@ public partial class MainWindow : Window
     // --- AvalonDock DockingManager integration ---
 
     private bool _isDockSyncInProgress;
+
+    // Reentrance guard for the terminal-focus → bot-target update. The dock
+    // active state isn't touched anymore (so the 6143c60 ricochet is moot)
+    // but the actor SetActiveTerminal + bot window refresh path can still
+    // re-enter via Dispatcher chains. Released on a Background-priority
+    // dispatcher tick so any in-flight refresh settles first.
+    private bool _targetingFromTerminalFocus;
 
     private void InitializeDockManager()
     {
@@ -2300,6 +2335,46 @@ public partial class MainWindow : Window
                 }
             }
         }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// Lighter cousin of <see cref="ActivateConsoleTab"/> — used when the
+    /// user clicks a terminal body to retarget AgentBot without changing the
+    /// dock's active document. Updates ONLY the state AgentBot reads
+    /// (group.ActiveTabIndex via _activeConsoleTab, actor SetActiveTerminal,
+    /// bot window's session label) plus the SESSIONS panel + LastActivityAt.
+    /// Leaves Document.IsActive alone — the explicit tab-strip click owns
+    /// that path so the user keeps a clear "I want to switch the dock"
+    /// affordance separate from "I just want to type here".
+    /// </summary>
+    private void MarkTabAsBotTarget(int idx)
+    {
+        if (idx < 0 || idx >= _consoleTabs.Count) return;
+        if (idx == _activeConsoleTab) return;
+
+        var tab = _consoleTabs[idx];
+        AppLogger.Log($"[CLI-Input-DIAG] Click-target | tab={tab.Title} idx={idx} (dock active unchanged)");
+
+        _activeConsoleTab = idx;
+        tab.LastActivityAt = DateTime.Now;
+        RefreshSessionList();
+
+        if (ActorSystemManager.IsInitialized && _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count)
+            ActorSystemManager.Stage.Tell(new SetActiveTerminal(
+                _cliGroups[_activeGroupIndex].DisplayName, tab.Title), ActorRefs.NoSender);
+
+        _botWindow?.RefreshSessionInfo();
+        if (_botWindow is not null
+            && _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count)
+        {
+            var g = _cliGroups[_activeGroupIndex];
+            var ti = g.ActiveTabIndex;
+            if (ti >= 0 && ti < g.Tabs.Count)
+            {
+                var tabLabel = $"{g.Tabs[ti].Title}-{ti + 1}";
+                _botWindow.ShowWelcomeMessage(g.DisplayName, tabLabel);
+            }
+        }
     }
 
     private static void FocusTerminal(EasyWindowsTerminalControl.EasyTerminalControl terminal)
