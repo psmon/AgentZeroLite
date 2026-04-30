@@ -2044,6 +2044,29 @@ public partial class MainWindow : Window
         ctxRestart.Click += OnDocTabRestart;
         ctx.Items.Add(ctxRestart);
 
+        // Float / Dock — explicit detach + re-merge controls. Drag-drop in
+        // AvalonDock is unreliable when the drop lands outside any valid
+        // target (snap-back / orphaning), so these menu items give the user
+        // a deterministic path: right-click → Float to pull the tab into
+        // its own window, then right-click on the floating tab → Dock to
+        // return it to the main layout.
+        var ctxFloat = new System.Windows.Controls.MenuItem { Header = "Float (detach as window)" };
+        ctxFloat.Click += OnDocTabFloat;
+        ctx.Items.Add(ctxFloat);
+
+        var ctxDock = new System.Windows.Controls.MenuItem { Header = "Dock (return to main)" };
+        ctxDock.Click += OnDocTabDock;
+        ctx.Items.Add(ctxDock);
+
+        // Toggle enabled state based on the right-clicked document's float status.
+        ctx.Opened += (s, _) =>
+        {
+            var doc = GetContextDocument(s!);
+            if (doc is null) { ctxFloat.IsEnabled = ctxDock.IsEnabled = false; return; }
+            ctxFloat.IsEnabled = !doc.IsFloating;
+            ctxDock.IsEnabled = doc.IsFloating;
+        };
+
         ctx.Items.Add(new System.Windows.Controls.Separator());
 
         var ctxCloseAll = new System.Windows.Controls.MenuItem { Header = "Close All" };
@@ -2097,6 +2120,30 @@ public partial class MainWindow : Window
         var tab = FindTabByDocument(doc);
         if (tab is null) return;
         RestartWedgedTerminal(tab);
+    }
+
+    private void OnDocTabFloat(object sender, RoutedEventArgs e)
+    {
+        var doc = GetContextDocument(sender);
+        if (doc is null || doc.IsFloating) return;
+        try
+        {
+            doc.Float();
+            AppLogger.Log($"[Dock] Float | tab={doc.Title}");
+        }
+        catch (Exception ex) { AppLogger.LogError("[Dock] Float failed", ex); }
+    }
+
+    private void OnDocTabDock(object sender, RoutedEventArgs e)
+    {
+        var doc = GetContextDocument(sender);
+        if (doc is null || !doc.IsFloating) return;
+        try
+        {
+            doc.Dock();
+            AppLogger.Log($"[Dock] Dock | tab={doc.Title}");
+        }
+        catch (Exception ex) { AppLogger.LogError("[Dock] Dock failed", ex); }
     }
 
     private void OnDocTabRename(object sender, RoutedEventArgs e)
