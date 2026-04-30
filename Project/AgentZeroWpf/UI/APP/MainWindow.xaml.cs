@@ -2232,8 +2232,15 @@ public partial class MainWindow : Window
         if (!tab.IsInitialized)
             InitializeTerminal(tab);
 
-        // Focus
-        if (tab.Terminal is { } terminal)
+        // Focus — skip for floating documents. Windows already manages
+        // floating-window activation; calling our Win32 SetFocus path on a
+        // floated terminal yanks the foreground back to the floating window
+        // every time AvalonDock fires ActiveContentChanged for it (which
+        // can happen as a side-effect of layout changes, not just user
+        // intent), creating the "focus keeps jumping back to the new
+        // window" UX bug. The user's actual click on the floating window
+        // already focuses its terminal natively.
+        if (tab.Terminal is { } terminal && tab.Document?.IsFloating != true)
         {
             Dispatcher.BeginInvoke(() => FocusTerminal(terminal),
                 System.Windows.Threading.DispatcherPriority.Loaded);
@@ -2367,7 +2374,11 @@ public partial class MainWindow : Window
         int safeIdx = index;
         Dispatcher.BeginInvoke(() =>
         {
-            if (safeIdx >= 0 && safeIdx < _consoleTabs.Count && _consoleTabs[safeIdx].Terminal is { } t)
+            // Same float-skip rule as OnDockActiveContentChanged — don't yank
+            // focus into a floating window when the user is interacting elsewhere.
+            if (safeIdx >= 0 && safeIdx < _consoleTabs.Count
+                && _consoleTabs[safeIdx].Terminal is { } t
+                && _consoleTabs[safeIdx].Document?.IsFloating != true)
                 FocusTerminal(t);
             _botWindow?.RefreshSessionInfo();
             if (_botWindow is not null
