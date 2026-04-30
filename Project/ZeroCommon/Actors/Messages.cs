@@ -268,7 +268,7 @@ public sealed record ClearConversationActive(string PeerName);
 public sealed record QueryActiveConversations;
 
 /// <summary>Reply for QueryActiveConversations.</summary>
-public sealed record ActiveConversationsReply(IReadOnlyList<string> Active);
+public sealed record ActiveConversationsReply(IReadOnlyCollection<string> Active);
 
 // ─── Handshake state (per peer) ───
 //

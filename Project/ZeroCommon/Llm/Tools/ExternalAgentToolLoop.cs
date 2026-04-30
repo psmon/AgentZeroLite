@@ -199,7 +199,7 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
         var request = new LlmRequest
         {
             Model = _model,
-            Messages = _messages.ToList(),
+            Messages = _messages.AsReadOnly(),
             Temperature = _opts.Temperature,
             MaxTokens = _opts.MaxTokensPerTurn,
         };

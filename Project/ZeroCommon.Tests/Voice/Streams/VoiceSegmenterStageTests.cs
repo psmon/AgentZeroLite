@@ -115,6 +115,38 @@ public sealed class VoiceSegmenterStageTests : TestKit
         Assert.Equal(7 * 1600, s2.Pcm16k.Length);
     }
 
+    [Fact]
+    public void Consecutive_utterances_reuse_pooled_buffers_without_corruption()
+    {
+        var cfg = Cfg(preRollSec: 0.0, hangoverFrames: 2);
+        var (probe, sink) = CreateProbedFlow(cfg);
+
+        sink.Request(10);
+        for (int round = 0; round < 3; round++)
+        {
+            for (int i = 0; i < 3; i++) probe.SendNext(Loud(frameBytes: 800));
+            for (int i = 0; i < 2; i++) probe.SendNext(Quiet(frameBytes: 800));
+
+            var seg = sink.ExpectNext();
+            Assert.Equal(5 * 800, seg.Pcm16k.Length);
+            Assert.True(seg.DurationSeconds > 0.0);
+        }
+    }
+
+    [Fact]
+    public void Large_utterance_produces_correct_output()
+    {
+        var cfg = Cfg(preRollSec: 0.0, hangoverFrames: 2);
+        var (probe, sink) = CreateProbedFlow(cfg);
+
+        sink.Request(2);
+        for (int i = 0; i < 200; i++) probe.SendNext(Loud());
+        for (int i = 0; i < 2; i++) probe.SendNext(Quiet());
+
+        var seg = sink.ExpectNext();
+        Assert.Equal(202 * 1600, seg.Pcm16k.Length);
+    }
+
     private (TestPublisher.Probe<MicFrame> source, TestSubscriber.Probe<PcmSegment> sink)
         CreateProbedFlow(VadConfig cfg)
     {

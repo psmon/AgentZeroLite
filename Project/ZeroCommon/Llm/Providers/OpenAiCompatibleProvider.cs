@@ -158,7 +158,7 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider, IDisposable
             {
                 ["role"] = m.Role,
                 ["content"] = m.Content,
-            }).ToList(),
+            }),
             ["stream"] = stream,
         };
         if (request.Temperature.HasValue) body["temperature"] = request.Temperature.Value;

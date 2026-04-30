@@ -17,7 +17,7 @@ public sealed record LlmMessage(string Role, string Content)
 public sealed record LlmRequest
 {
     public string Model { get; init; } = "";
-    public List<LlmMessage> Messages { get; init; } = [];
+    public IReadOnlyList<LlmMessage> Messages { get; init; } = [];
     public float? Temperature { get; init; }
     public int? MaxTokens { get; init; }
 }

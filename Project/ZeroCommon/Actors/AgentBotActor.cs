@@ -170,7 +170,7 @@ public sealed class AgentBotActor : ReceiveActor
 
         Receive<QueryActiveConversations>(_ =>
         {
-            Sender.Tell(new ActiveConversationsReply(_activeConversations.ToList()));
+            Sender.Tell(new ActiveConversationsReply(_activeConversations));
         });
 
         Receive<MarkHandshakeSent>(msg =>

@@ -135,7 +135,7 @@ public static class AppLogger
     {
         if (_fileWriter is null) return;
         _fileWriter.WriteLine(entry);
-        _fileSizeEstimate += Encoding.UTF8.GetByteCount(entry) + 2;
+        _fileSizeEstimate += entry.Length + 2;
         if (_fileSizeEstimate > MaxLogBytes)
             RotateLogFile();
     }

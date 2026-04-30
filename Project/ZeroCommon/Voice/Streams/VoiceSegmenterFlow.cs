@@ -2,6 +2,7 @@ using Akka;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using Akka.Streams.Stage;
+using Microsoft.IO;
 
 namespace Agent.Common.Voice.Streams;
 
@@ -49,6 +50,8 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
 
     protected override GraphStageLogic CreateLogic(Attributes inheritedAttributes) => new Logic(this);
 
+    private static readonly RecyclableMemoryStreamManager PoolManager = new();
+
     private sealed class Logic : InAndOutGraphStageLogic
     {
         private readonly VoiceSegmenterStage _stage;
@@ -60,7 +63,7 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
         private readonly Queue<byte[]> _preRoll = new();
         private long _preRollBytes;
 
-        private List<byte>? _buffer;
+        private RecyclableMemoryStream? _buffer;
         private DateTimeOffset _startedAt;
 
         public Logic(VoiceSegmenterStage stage) : base(stage.Shape)
@@ -96,16 +99,17 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
                     _inUtterance = true;
                     var capacityHint = (int)Math.Min(int.MaxValue,
                         _maxPreRollBytes + BytesPerSecondMono16k16 * 8L);
-                    _buffer = new List<byte>(capacityHint);
+                    _buffer = (RecyclableMemoryStream)PoolManager.GetStream(
+                        "VoiceSegmenter", capacityHint);
                     foreach (var chunk in _preRoll)
                         if (!ReferenceEquals(chunk, frame.Pcm16k))
-                            _buffer.AddRange(chunk);
-                    _buffer.AddRange(frame.Pcm16k);
+                            _buffer.Write(chunk);
+                    _buffer.Write(frame.Pcm16k);
                     _startedAt = DateTimeOffset.UtcNow;
                 }
                 else
                 {
-                    _buffer!.AddRange(frame.Pcm16k);
+                    _buffer!.Write(frame.Pcm16k);
                 }
                 Pull(_stage.In);
                 return;
@@ -113,12 +117,13 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
 
             if (_inUtterance)
             {
-                _buffer!.AddRange(frame.Pcm16k);
+                _buffer!.Write(frame.Pcm16k);
                 _utteranceSilenceFrames++;
                 if (_utteranceSilenceFrames >= _stage._config.UtteranceHangoverFrames)
                 {
                     _inUtterance = false;
-                    var pcm = _buffer.ToArray();
+                    var pcm = _buffer.GetBuffer().AsSpan(0, (int)_buffer.Length).ToArray();
+                    _buffer.Dispose();
                     _buffer = null;
                     var duration = pcm.Length / (double)BytesPerSecondMono16k16;
                     Push(_stage.Out, new PcmSegment(pcm, duration, _startedAt));
@@ -133,6 +138,12 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
         }
 
         public override void OnPull() => Pull(_stage.In);
+
+        public override void PostStop()
+        {
+            _buffer?.Dispose();
+            _buffer = null;
+        }
     }
 }
 

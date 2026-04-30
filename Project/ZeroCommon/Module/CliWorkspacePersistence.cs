@@ -119,6 +119,7 @@ public static class CliWorkspacePersistence
     {
         using var db = new AppDbContext();
         return db.CliGroups
+            .AsNoTracking()
             .Include(group => group.Tabs)
             .ThenInclude(tab => tab.CliDefinition)
             .OrderBy(group => group.SortOrder)
@@ -140,6 +141,7 @@ public static class CliWorkspacePersistence
     {
         using var db = new AppDbContext();
         return db.CliDefinitions
+            .AsNoTracking()
             .OrderBy(definition => definition.SortOrder)
             .Select(definition => new CliDefinitionSnapshot(
                 definition.Id,

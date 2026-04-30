@@ -52,7 +52,7 @@ public sealed class ExternalChatSession : ILocalChatSession
         var request = new LlmRequest
         {
             Model = _model,
-            Messages = _history.ToList(),
+            Messages = _history.AsReadOnly(),
             Temperature = _temperature,
             MaxTokens = _maxTokens,
         };
