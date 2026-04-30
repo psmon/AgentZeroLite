@@ -39,6 +39,7 @@ public sealed class VoiceStreamActor : ReceiveActor
     private readonly Func<ITextToSpeech>? _ttsFactory;
     private readonly Func<IAudioPlaybackQueue>? _playbackFactory;
     private readonly Action<string, double> _onTranscript;
+    private readonly Action<bool>? _onTtsPlaybackChanged;
 
     private ISourceQueueWithComplete<MicFrame>? _frameQueue;
     private UniqueKillSwitch? _inputKillSwitch;
@@ -64,12 +65,14 @@ public sealed class VoiceStreamActor : ReceiveActor
         Func<ISpeechToText> sttFactory,
         Action<string, double> onTranscript,
         Func<ITextToSpeech>? ttsFactory = null,
-        Func<IAudioPlaybackQueue>? playbackFactory = null)
+        Func<IAudioPlaybackQueue>? playbackFactory = null,
+        Action<bool>? onTtsPlaybackChanged = null)
     {
         _sttFactory = sttFactory;
         _onTranscript = onTranscript;
         _ttsFactory = ttsFactory;
         _playbackFactory = playbackFactory;
+        _onTtsPlaybackChanged = onTtsPlaybackChanged;
         _materializer = Context.System.Materializer();
 
         // ── INPUT graph ──
@@ -246,11 +249,15 @@ public sealed class VoiceStreamActor : ReceiveActor
             {
                 _outputActive = true;
                 _consecutiveLoudFrames = 0;
+                try { _onTtsPlaybackChanged?.Invoke(true); }
+                catch (Exception ex) { _log.Error(ex, "[Voice] OnTtsPlaybackChanged(true) threw"); }
             };
             _playback.PlaybackStopped += () =>
             {
                 _outputActive = false;
                 _consecutiveLoudFrames = 0;
+                try { _onTtsPlaybackChanged?.Invoke(false); }
+                catch (Exception ex) { _log.Error(ex, "[Voice] OnTtsPlaybackChanged(false) threw"); }
             };
         }
 

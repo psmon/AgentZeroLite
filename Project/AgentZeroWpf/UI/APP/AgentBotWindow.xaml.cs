@@ -712,6 +712,14 @@ public partial class AgentBotWindow : Window
         };
         pnlMessages.Children.Add(border);
         scrollChat.ScrollToEnd();
+
+        // Voice output (AI mode) — speak the bubble unless TTS is Off.
+        // System logs go through AddSystemMessage and are not spoken (per
+        // user spec "시스템 로그는 제외"). We don't gate on AI vs Chat
+        // mode here because AddBotMessage is only called from AI/LLM
+        // result paths today; should Chat-mode start producing bot
+        // bubbles later, the same speak behaviour is the natural one.
+        SpeakBotMessageIfEnabled(text);
     }
 
 
@@ -960,7 +968,12 @@ public partial class AgentBotWindow : Window
         var session = _getActiveSession?.Invoke();
         if (session is null)
         {
-            AddSystemMessage("No active terminal.");
+            // Surface to the log too — voice-driven sends with system messages
+            // hidden (chkHideSysMsg) silently leave the transcript stuck in
+            // txtInput otherwise, looking like "voice broke". Log line lets
+            // the user (or future diagnosis) see the actual reason.
+            AppLogger.Log($"[BOT-SEND] dropped — no active terminal session (chatMode={_chatMode}, len={textToSend.Length})");
+            AddSystemMessage("No active terminal — focus or start a terminal tab and try again.");
             return;
         }
 
@@ -1291,28 +1304,35 @@ public partial class AgentBotWindow : Window
         _aiSendInFlight = false;
         _aiSendStopwatch = null;
 
-        // Stream pipeline (P2): when ON and TTS is configured, push the
-        // final reply through the OUTPUT graph for progressive playback.
-        // For now this still operates on the *complete* response (the
-        // OUTPUT graph chunks per-sentence and synthesises in parallel
-        // with playback). True token-stream wiring from the reactor's
-        // SSE feed is a future iteration.
+        // TTS for the final bubble is now handled inside AddBotMessage
+        // (single hook for every bot bubble, regardless of pipeline mode).
+    }
+
+    /// <summary>
+    /// Send <paramref name="text"/> through the OUTPUT TTS graph if voice
+    /// TTS is enabled in settings. No-op when TtsProvider is Off or
+    /// <paramref name="text"/> is empty. Fire-and-forget — the actor runs
+    /// the synth + playback off the UI thread and the kill switch (BargeIn)
+    /// is what the "그만" command later uses to interrupt.
+    /// </summary>
+    private void SpeakBotMessageIfEnabled(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
         try
         {
-            if (r.Success && _voiceStreamRef is not null)
+            var v = Agent.Common.Voice.VoiceSettingsStore.Load();
+            if (string.Equals(v.TtsProvider, Agent.Common.Voice.TtsProviderNames.Off,
+                StringComparison.OrdinalIgnoreCase)) return;
+
+            _ = Task.Run(async () =>
             {
-                var v = Agent.Common.Voice.VoiceSettingsStore.Load();
-                if (v.UseStreamPipeline
-                    && !string.Equals(v.TtsProvider, Agent.Common.Voice.TtsProviderNames.Off, StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(r.FinalMessage))
-                {
-                    _voiceStreamRef.Tell(new Agent.Common.Voice.Streams.SpeakText(
-                        Text: r.FinalMessage,
-                        Voice: v.TtsVoice ?? string.Empty));
-                }
-            }
+                await EnsureVoiceStreamRefAsync();
+                _voiceStreamRef?.Tell(new Agent.Common.Voice.Streams.SpeakText(
+                    Text: text,
+                    Voice: v.TtsVoice ?? string.Empty));
+            });
         }
-        catch (Exception ex) { AppLogger.LogError("[BOT-Voice] Speak-on-result threw", ex); }
+        catch (Exception ex) { AppLogger.LogError("[BOT-Voice] SpeakBotMessageIfEnabled threw", ex); }
     }
 
     private static async Task SendLargeTextAsync(ITerminalSession session, string text, bool isMultiLine)

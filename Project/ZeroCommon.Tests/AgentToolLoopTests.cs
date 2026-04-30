@@ -733,6 +733,38 @@ public sealed class AgentToolLoopTests
         Assert.Equal("done", call.Tool);
         Assert.Equal("All set.", call.Args["message"]!.GetValue<string>());
     }
+
+    /// <summary>
+    /// External (REST) loop has no GBNF, so Gemma 4 / non-Gemma can emit
+    /// JSON missing 'tool' or 'args'. Both must surface as JsonException so
+    /// the loop's catch normalises them into a useful failure reason —
+    /// previously KeyNotFoundException leaked through and the user saw
+    /// "The given key was not present in the dictionary."
+    /// </summary>
+    [Fact]
+    public void Parser_missing_tool_field_throws_JsonException()
+    {
+        var raw = """{"args": {"x": 1}}""";
+        var ex = Assert.Throws<System.Text.Json.JsonException>(() => AgentToolLoop.ParseToolCall(raw));
+        Assert.Contains("tool", ex.Message);
+    }
+
+    [Fact]
+    public void Parser_missing_args_field_defaults_to_empty()
+    {
+        // 'args' is optional — many models omit it for zero-arg tools.
+        var raw = """{"tool": "list_terminals"}""";
+        var call = AgentToolLoop.ParseToolCall(raw);
+        Assert.Equal("list_terminals", call.Tool);
+        Assert.Empty(call.Args);
+    }
+
+    [Fact]
+    public void Parser_non_string_tool_throws_JsonException()
+    {
+        var raw = """{"tool": 42, "args": {}}""";
+        Assert.Throws<System.Text.Json.JsonException>(() => AgentToolLoop.ParseToolCall(raw));
+    }
 }
 
 /// <summary>

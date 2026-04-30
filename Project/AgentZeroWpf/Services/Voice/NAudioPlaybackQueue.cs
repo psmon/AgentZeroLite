@@ -27,6 +27,14 @@ public sealed class NAudioPlaybackQueue : IAudioPlaybackQueue
     private WaveStream? _current;
     private bool _disposed;
 
+    // Tracks whether we have already raised <see cref="PlaybackStarted"/> for
+    // the current burst. The contract on <see cref="IAudioPlaybackQueue"/>
+    // says PlaybackStarted fires *once* on idle→busy. Without this flag every
+    // clip start (including the next-clip drain inside <see cref="OnPlaybackStopped"/>)
+    // would re-fire — and downstream consumers that pair start/stop into a
+    // mute envelope would latch into a permanent state.
+    private bool _started;
+
     public bool IsBusy
     {
         get
@@ -51,6 +59,7 @@ public sealed class NAudioPlaybackQueue : IAudioPlaybackQueue
 
     public void Stop()
     {
+        bool wasStarted;
         lock (_lock)
         {
             _pending.Clear();
@@ -59,9 +68,15 @@ public sealed class NAudioPlaybackQueue : IAudioPlaybackQueue
             try { _current?.Dispose(); } catch { }
             _output = null;
             _current = null;
+            wasStarted = _started;
+            _started = false;
         }
         AppLogger.Log("[NAudioPlayback] Stop — queue cleared");
-        PlaybackStopped?.Invoke();
+        // Only signal Stopped if we actually were in a started state — saves
+        // downstream consumers from a phantom stop event when Stop() is
+        // called on an already-idle queue (happens during CancelOutputGraph
+        // for the very first SpeakResponse of a session).
+        if (wasStarted) PlaybackStopped?.Invoke();
     }
 
     public void Dispose()
@@ -88,8 +103,16 @@ public sealed class NAudioPlaybackQueue : IAudioPlaybackQueue
             _current = src;
             _output = output;
             output.Play();
-            // First-clip-of-burst notification.
-            PlaybackStarted?.Invoke();
+            // PlaybackStarted is contractually a *single* idle→busy edge per
+            // burst, not per clip. Only raise on the first clip; subsequent
+            // clips in the same burst (drained via OnPlaybackStopped → here)
+            // must stay quiet so consumers using the event for state envelopes
+            // (e.g. mic auto-mute) don't double-fire.
+            if (!_started)
+            {
+                _started = true;
+                PlaybackStarted?.Invoke();
+            }
         }
         catch (Exception ex)
         {
@@ -112,7 +135,10 @@ public sealed class NAudioPlaybackQueue : IAudioPlaybackQueue
             if (_pending.Count > 0 && !_disposed)
                 StartNextLocked();
             else
-                wentIdle = true;
+            {
+                wentIdle = _started;
+                _started = false;
+            }
         }
         if (wentIdle) PlaybackStopped?.Invoke();
     }

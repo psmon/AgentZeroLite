@@ -265,30 +265,16 @@ public partial class AgentBotWindow
     }
 
     /// <summary>
-    /// Bring up the Akka.Streams INPUT pipeline. The actor is created lazily
-    /// (idempotent — Stage caches the singleton) and the per-frame forwarder
-    /// is wired so NAudio's capture thread Tells the actor for every 50 ms
-    /// frame. Transcript callback fires off the actor's Receive thread —
+    /// Bring up the Akka.Streams INPUT pipeline. Reuses
+    /// <see cref="EnsureVoiceStreamRefAsync"/> so the actor is created once
+    /// and shared across input (mic → STT) and output (AI bubble → TTS)
+    /// concerns. Transcript callback fires off the actor's Receive thread —
     /// marshal back to the dispatcher before touching txtInput.
     /// </summary>
     private async Task StartStreamPipelineAsync(VoiceSettings v, float threshold)
     {
-        var settingsSnapshot = v;
-        var snapshotForFactory = v;
-
-        var created = await ActorSystemManager.Stage.Ask<VoiceStreamCreated>(
-            new CreateVoiceStream(
-                SttFactory: () => VoiceRuntimeFactory.BuildStt(snapshotForFactory)
-                    ?? throw new InvalidOperationException(
-                        $"STT '{snapshotForFactory.SttProvider}' unavailable"),
-                OnTranscript: OnVoiceStreamTranscript,
-                TtsFactory: () => VoiceRuntimeFactory.BuildTts(snapshotForFactory)
-                    ?? throw new InvalidOperationException(
-                        $"TTS '{snapshotForFactory.TtsProvider}' unavailable"),
-                PlaybackFactory: () => new NAudioPlaybackQueue()),
-            TimeSpan.FromSeconds(5));
-
-        _voiceStreamRef = created.VoiceRef;
+        await EnsureVoiceStreamRefAsync();
+        if (_voiceStreamRef is null) return;
 
         _voiceFrameForwarder = frame => _voiceStreamRef?.Tell(frame);
         _voiceCapture!.FrameAvailable += _voiceFrameForwarder;
@@ -298,8 +284,96 @@ public partial class AgentBotWindow
             PreRollSeconds: 1.0,
             UtteranceHangoverFrames: 40,
             MicBufferSize: 64,
-            SttParallelism: Math.Max(1, settingsSnapshot.StreamSttParallelism),
-            Language: settingsSnapshot.SttLanguage));
+            SttParallelism: Math.Max(1, v.StreamSttParallelism),
+            Language: v.SttLanguage));
+    }
+
+    /// <summary>
+    /// Idempotent lazy creation of <see cref="_voiceStreamRef"/>. Used both by
+    /// the streaming INPUT path (mic on) and by the TTS-only OUTPUT path
+    /// (AI mode bubble → speak). Factories load voice settings *at call time*
+    /// so the user's currently-saved TTS provider/voice applies on each new
+    /// worker spawn — no need to recreate the actor when settings change
+    /// (the existing pool will however keep using the provider it loaded
+    /// originally, which is acceptable for MVP).
+    ///
+    /// <para>OnTtsPlaybackChanged drives the mic auto-mute envelope: when the
+    /// AI's voice is playing, the mic must not capture it back as a new
+    /// utterance — otherwise the bot transcribes its own speech, sends it
+    /// as a new turn, and the AI responds without tools because it's just
+    /// "answering" its own previous answer. Auto-mute breaks the loop.</para>
+    /// </summary>
+    private async Task EnsureVoiceStreamRefAsync()
+    {
+        if (_voiceStreamRef is not null) return;
+        try
+        {
+            var created = await ActorSystemManager.Stage.Ask<VoiceStreamCreated>(
+                new CreateVoiceStream(
+                    SttFactory: () => VoiceRuntimeFactory.BuildStt(VoiceSettingsStore.Load())
+                        ?? throw new InvalidOperationException("STT provider unavailable"),
+                    OnTranscript: OnVoiceStreamTranscript,
+                    TtsFactory: () => VoiceRuntimeFactory.BuildTts(VoiceSettingsStore.Load())
+                        ?? throw new InvalidOperationException("TTS provider unavailable"),
+                    PlaybackFactory: () => new NAudioPlaybackQueue(),
+                    OnTtsPlaybackChanged: OnTtsPlaybackChanged),
+                TimeSpan.FromSeconds(5));
+            _voiceStreamRef = created.VoiceRef;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[BOT-Voice] EnsureVoiceStreamRefAsync failed", ex);
+        }
+    }
+
+    // True iff *we* applied the current mute as part of an active TTS burst.
+    // Self-tracked instead of derived from a snapshot of the user's prior
+    // mute state — earlier we used `_userMutedBeforeTts` and a spurious
+    // double-start event (NAudio queue draining clip-by-clip) would re-snapshot
+    // the already-muted state as `True` and latch the mic permanently muted
+    // because the auto-unmute path checked that snapshot. With this flag the
+    // unmute decision depends only on whether *we* were the muter.
+    private bool _autoMutedByTts;
+
+    /// <summary>
+    /// Fires from the voice actor when the TTS playback queue transitions
+    /// idle ↔ busy. We auto-mute the mic for the duration so the bot's own
+    /// voice doesn't bleed back into Whisper as a new utterance — that
+    /// feedback loop both echoes the bot and silently triggers tool-less
+    /// AI turns that look like "function calls were skipped".
+    /// </summary>
+    private void OnTtsPlaybackChanged(bool isPlaying)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action<bool>(OnTtsPlaybackChanged), isPlaying);
+            return;
+        }
+        if (_voiceCapture is null) return;
+
+        if (isPlaying)
+        {
+            // Mute only if not already muted. If the user manually muted
+            // before TTS started, we leave their state alone (and importantly
+            // do NOT set _autoMutedByTts) so the natural drain at end won't
+            // unmute against their will.
+            if (!_voiceCapture.Muted)
+            {
+                SetVoiceMicMuted(true, source: "tts-auto");
+                _autoMutedByTts = true;
+            }
+            AppLogger.Log($"[BOT-Voice] TTS started — autoMuted={_autoMutedByTts} micMuted={_voiceCapture.Muted}");
+        }
+        else
+        {
+            // Unmute only if WE muted — never override a user-driven mute.
+            if (_autoMutedByTts)
+            {
+                SetVoiceMicMuted(false, source: "tts-auto");
+                _autoMutedByTts = false;
+            }
+            AppLogger.Log($"[BOT-Voice] TTS stopped — autoMutedNow={_autoMutedByTts} micMuted={_voiceCapture.Muted}");
+        }
     }
 
     /// <summary>
@@ -313,16 +387,99 @@ public partial class AgentBotWindow
         if (string.IsNullOrWhiteSpace(transcript)) return;
         if (_voicePipelineCts?.IsCancellationRequested == true) return;
 
-        Dispatcher.BeginInvoke(new Action(() =>
+        // Drop known Whisper hallucination outros ("감사합니다" etc.) emitted
+        // on near-silence input — see WhisperHallucinationFilter. The stream
+        // pipeline has no peak/VAR gate yet, so this is the only line of
+        // defence against forwarding "thanks for watching" as a user prompt.
+        if (WhisperHallucinationFilter.IsLikelyHallucination(transcript))
         {
-            if (!_voiceMicOn) return;
-            var v = VoiceSettingsStore.Load();
-            txtInput.Text = transcript;
-            txtInput.CaretIndex = transcript.Length;
-            SendCurrentInput();
-            SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
-        }));
+            AppLogger.Log($"[BOT-Voice] (stream) dropped — Whisper hallucination pattern: \"{transcript}\" ({durationSeconds:F2}s)");
+            return;
+        }
+
+        Dispatcher.BeginInvoke(new Action(() => DispatchVoiceTranscriptOnUi(transcript, "stream")));
         AppLogger.Log($"[BOT-Voice] (stream) Transcript sent ({transcript.Length} chars, {durationSeconds:F2}s utterance)");
+    }
+
+    /// <summary>
+    /// Shared dispatch logic used by both voice pipelines once a transcript
+    /// has cleared the hallucination filter. Runs on the UI thread.
+    ///
+    /// <para>Three intents are recognised before falling back to
+    /// <c>SendCurrentInput()</c>:</para>
+    /// <list type="bullet">
+    ///   <item><b>StopSpeaking</b> — say "그만" to interrupt any TTS that is
+    ///     currently playing. Sends <c>BargeIn</c> to the voice actor; the
+    ///     OUTPUT graph (kill switch + token queue + playback) tears down
+    ///     atomically. No LLM dispatch.</item>
+    ///   <item><b>SummarizeTerminal</b> — say "터미널 작업 요약해" to ask the
+    ///     AI to summarise the active terminal's screen text. We snapshot
+    ///     <c>GetConsoleText()</c> once at request time and embed it inline
+    ///     in the prompt — that way the LLM gets a static, complete window
+    ///     of output instead of racing the still-streaming PTY buffer
+    ///     (which would risk re-summarising overlapping chunks across
+    ///     repeated requests). Only fires in AI mode; in other modes the
+    ///     phrase falls through as regular speech.</item>
+    ///   <item><b>PassThrough</b> — fill <c>txtInput</c> and call
+    ///     <see cref="SendCurrentInput"/> as before.</item>
+    /// </list>
+    /// </summary>
+    private void DispatchVoiceTranscriptOnUi(string transcript, string sourceTag)
+    {
+        if (!_voiceMicOn) return;
+        var intent = VoiceCommandInterceptor.Classify(transcript);
+
+        switch (intent)
+        {
+            case VoiceCommandIntent.StopSpeaking:
+                AppLogger.Log($"[BOT-Voice] ({sourceTag}) stop command — sending BargeIn");
+                _voiceStreamRef?.Tell(new BargeIn());
+                SetVoiceStatus("(stopped speaking)", System.Windows.Media.Brushes.Goldenrod);
+                return;
+
+            case VoiceCommandIntent.SummarizeTerminal when _chatMode == ChatMode.Ai:
+                var session = _getActiveSession?.Invoke();
+                var terminalText = session?.GetConsoleText() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(terminalText))
+                {
+                    AppLogger.Log($"[BOT-Voice] ({sourceTag}) summarize — no active terminal text");
+                    AddSystemMessage("활성 터미널 출력이 비어 있어 요약할 내용이 없습니다.");
+                    return;
+                }
+                AppLogger.Log($"[BOT-Voice] ({sourceTag}) summarize-terminal | terminalChars={terminalText.Length}");
+                txtInput.Clear();
+                _ = SendThroughAiToolLoopAsync(
+                    BuildTerminalSummaryPrompt(transcript, terminalText),
+                    transcript);
+                return;
+
+            case VoiceCommandIntent.PassThrough:
+            case VoiceCommandIntent.SummarizeTerminal: // fell through (not AI mode)
+            default:
+                var v = VoiceSettingsStore.Load();
+                txtInput.Text = transcript;
+                txtInput.CaretIndex = transcript.Length;
+                SendCurrentInput();
+                SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
+                return;
+        }
+    }
+
+    /// <summary>
+    /// Build the LLM prompt for a "summarize terminal" voice command. The
+    /// snapshot is fenced in a code block so the model parses it as a verbatim
+    /// observation instead of treating individual lines as separate
+    /// instructions. Verbose by design — easier for a small local LLM to
+    /// follow than a terse one-liner.
+    /// </summary>
+    private static string BuildTerminalSummaryPrompt(string userPhrase, string terminalText)
+    {
+        return
+            $"{userPhrase}\n\n" +
+            "아래는 사용자가 보고 있는 활성 터미널의 현재 화면 출력입니다. " +
+            "이 내용을 한국어로 간결하게 요약해 주세요. " +
+            "어떤 작업이 실행되었고 어떤 결과 / 에러가 있었는지 핵심만 짚어주세요.\n\n" +
+            "```\n" + terminalText + "\n```";
     }
 
     private void StopVoiceMic(string reason)
@@ -605,19 +762,23 @@ public partial class AgentBotWindow
                 AppLogger.Log("[BOT-Voice-pipe] dropped — empty transcript");
                 return;
             }
+            // Drop known Whisper hallucination outros ("감사합니다",
+            // "Thank you for watching" etc.) — see WhisperHallucinationFilter.
+            // Peak/VAR gates above keep most quiet clips out, but Whisper can
+            // still hallucinate on borderline-energy input that passed both.
+            if (WhisperHallucinationFilter.IsLikelyHallucination(transcript))
+            {
+                SetVoiceStatus("(noise — try again)", System.Windows.Media.Brushes.Goldenrod);
+                AppLogger.Log($"[BOT-Voice-pipe] dropped — Whisper hallucination pattern: \"{transcript}\"");
+                return;
+            }
             if (ct.IsCancellationRequested) return;
 
-            // Hand the transcript off to the existing send pipeline. SendCurrentInput
-            // already handles AIMODE vs Chat/Key routing, attachments, the
-            // multi-line case, and the single-instance terminal write.
+            // Hand the transcript off via the shared dispatch helper, which
+            // applies VoiceCommandInterceptor (stop / summarize-terminal)
+            // before falling back to txtInput + SendCurrentInput.
             var dispatchSw = System.Diagnostics.Stopwatch.StartNew();
-            Dispatcher.Invoke(() =>
-            {
-                txtInput.Text = transcript;
-                txtInput.CaretIndex = transcript.Length;
-                SendCurrentInput();
-                SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
-            });
+            Dispatcher.Invoke(() => DispatchVoiceTranscriptOnUi(transcript, "batch"));
             dispatchSw.Stop();
 
             // ── Final summary line: every measurement on one row ──

@@ -263,15 +263,25 @@ public sealed class AgentToolLoop : IAgentToolLoop
 
     internal static ToolCall ParseToolCall(string rawJson)
     {
-        // Grammar guarantees structural validity at the sampler level, but the
-        // emitted text may still have leading/trailing whitespace. Trim and parse.
+        // Grammar guarantees structural validity for the local LLamaSharp loop
+        // (GBNF sampler), but the *external* loop (Webnori/OpenAI/etc.) has no
+        // grammar hook — Gemma 4 / non-Gemma can emit JSON that omits "tool"
+        // or "args". JsonElement.GetProperty would throw KeyNotFoundException
+        // ("The given key was not present in the dictionary."), which is *not*
+        // a JsonException, so callers can't catch it as one. Use TryGetProperty
+        // and raise JsonException for both shape errors so all malformed-shape
+        // failures funnel through the same catch in the loop.
         using var doc = JsonDocument.Parse(rawJson);
         var root = doc.RootElement;
-        var tool = root.GetProperty("tool").GetString()
-            ?? throw new JsonException("missing 'tool' string");
-        var argsElement = root.GetProperty("args");
-        var argsObj = JsonNode.Parse(argsElement.GetRawText())?.AsObject()
-            ?? new JsonObject();
+        if (!root.TryGetProperty("tool", out var toolEl))
+            throw new JsonException("missing 'tool' field");
+        if (toolEl.ValueKind != JsonValueKind.String)
+            throw new JsonException($"'tool' must be a string, got {toolEl.ValueKind}");
+        var tool = toolEl.GetString()
+            ?? throw new JsonException("'tool' is null");
+        var argsObj = root.TryGetProperty("args", out var argsElement)
+            ? JsonNode.Parse(argsElement.GetRawText())?.AsObject() ?? new JsonObject()
+            : new JsonObject();
         return new ToolCall(tool, argsObj);
     }
 

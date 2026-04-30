@@ -117,7 +117,7 @@ public sealed class StageActor : ReceiveActor
             }
             _voiceActor = Context.ActorOf(
                 Props.Create(() => new VoiceStreamActor(
-                    msg.SttFactory, msg.OnTranscript, msg.TtsFactory, msg.PlaybackFactory)),
+                    msg.SttFactory, msg.OnTranscript, msg.TtsFactory, msg.PlaybackFactory, msg.OnTtsPlaybackChanged)),
                 "voice");
             Sender.Tell(new VoiceStreamCreated(_voiceActor));
             _log.Info("Voice stream actor created: {0}", _voiceActor.Path);

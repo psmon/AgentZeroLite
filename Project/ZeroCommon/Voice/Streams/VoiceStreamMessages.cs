@@ -99,7 +99,8 @@ public sealed record CreateVoiceStream(
     Func<ISpeechToText> SttFactory,
     Action<string, double> OnTranscript,
     Func<ITextToSpeech>? TtsFactory = null,
-    Func<IAudioPlaybackQueue>? PlaybackFactory = null);
+    Func<IAudioPlaybackQueue>? PlaybackFactory = null,
+    Action<bool>? OnTtsPlaybackChanged = null);
 
 /// <summary>Reply for <see cref="CreateVoiceStream"/>.</summary>
 public sealed record VoiceStreamCreated(IActorRef VoiceRef);
