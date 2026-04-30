@@ -1744,25 +1744,12 @@ public partial class MainWindow : Window
                 e.Handled = true;
             }
 
-            // PTY-FREEZE-DIAG: echo verification — snapshot outLen, recheck
-            // 800ms later. If unchanged, the key never produced any visible
-            // response from the foreground child (shell echo, TUI redraw,
-            // anything). Skip noise keys (modifiers, IME composing, repeats)
-            // since those legitimately don't echo. Skip Tab too — handled
-            // path above writes \t and shells often respond with completion
-            // not text growth.
-            if (!IsEchoCandidateKey(e.Key)) return;
-            var pty = terminal.ConPTYTerm;
-            var beforeLen = pty?.ConsoleOutputLog?.Length ?? -1;
-            if (beforeLen < 0) return;
-            var keyName = e.Key.ToString();
-            var tabTitle = tab.Title;
-            _ = Task.Delay(800).ContinueWith(_ =>
-            {
-                var afterLen = pty?.ConsoleOutputLog?.Length ?? -1;
-                if (afterLen == beforeLen)
-                    AppLogger.Log($"[CLI-Input-DIAG] KEY-NO-ECHO | tab={tabTitle} key={keyName} outLenStable={afterLen} after=800ms");
-            }, TaskScheduler.Default);
+            // PTY-FREEZE-DIAG: route this keystroke through the session's
+            // input-attempt probe. The session schedules an echo check + drives
+            // the shared HealthState machine — same path AgentBot Write uses,
+            // so HealthState reflects BOTH user typing and bot writes.
+            if (IsEchoCandidateKey(e.Key))
+                tab.Session?.NoteInputAttempt($"keyboard:{e.Key}");
         };
 
         // PTY-FREEZE-DIAG: focus trace — pure logging, no IsActive write.

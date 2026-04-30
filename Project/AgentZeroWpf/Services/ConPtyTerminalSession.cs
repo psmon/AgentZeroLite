@@ -108,7 +108,6 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
 
         try
         {
-            var beforeLen = _pty.ConsoleOutputLog?.Length ?? -1;
             _pty.WriteToTerm(text);
             // PTY-FREEZE-DIAG: success line proves the write reached WriteToTerm.
             // If a freeze leaves no [Session] write ok line for a tab while the
@@ -116,7 +115,7 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
             // (route never reaches this method). If lines exist but the PTY
             // doesn't echo, the failure is inside WriteToTerm / the pipe.
             AppLogger.Log($"[Session] write ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length} outLen={_pty.ConsoleOutputLog?.Length ?? -1}");
-            ScheduleEchoCheck(beforeLen, text.Length, $"write bytes={text.Length}");
+            NoteInputAttempt($"write bytes={text.Length}");
         }
         catch (Exception ex)
         {
@@ -124,16 +123,30 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
         }
     }
 
-    // PTY-FREEZE-DIAG: echo check — bytes left this side, did the PTY echo
-    // anything back within EchoCheckMs? Silent channel = "write ok" but no
-    // delta means write hit a dead pipe or the foreground child isn't
-    // consuming stdin. Skipped for control sequences that legitimately
-    // produce no echo (e.g. ClearScreen overwrites in-place).
+    // ── Channel health state machine ─────────────────────────────────────
+    // Every input attempt (Write, SendControl, or direct keyboard via
+    // NoteInputAttempt) schedules an output-growth check after EchoCheckMs.
+    // No growth → bump _consecutiveNoEcho. Output growth (detected by the
+    // poll thread in CheckOutputChanged) atomically resets the counter and
+    // restores Alive. Thresholds 3 / 5 are conservative — slow TUI loads
+    // (claude CLI startup, tailscale ssh handshake) can briefly produce
+    // no echo without being truly dead, so Stale (3) is the early warning
+    // and Dead (5) is the actionable signal.
     private const int EchoCheckMs = 1000;
+    private const int StaleThreshold = 3;
+    private const int DeadThreshold = 5;
 
-    private void ScheduleEchoCheck(int beforeLen, int bytes, string what)
+    private int _consecutiveNoEcho;
+    private TerminalHealthState _healthState = TerminalHealthState.Alive;
+
+    public TerminalHealthState HealthState => _healthState;
+    public event Action<TerminalHealthState>? HealthChanged;
+
+    public void NoteInputAttempt(string source)
     {
-        if (beforeLen < 0 || bytes <= 0) return;
+        if (_disposed) return;
+        var beforeLen = _pty.ConsoleOutputLog?.Length ?? -1;
+        if (beforeLen < 0) return;
         var snapshot = beforeLen;
         var hash = PtyRefHash;
         var id = _internalId;
@@ -142,9 +155,38 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
         {
             if (_disposed) return;
             var afterLen = _pty.ConsoleOutputLog?.Length ?? -1;
-            if (afterLen == snapshot)
-                AppLogger.Log($"[Session] WRITE-NO-ECHO | id={id} label={label} ptyHash=0x{hash:X8} {what} outLenStable={afterLen} after={EchoCheckMs}ms");
+            if (afterLen != snapshot) return; // got echo
+            AppLogger.Log($"[Session] INPUT-NO-ECHO | id={id} label={label} ptyHash=0x{hash:X8} source={source} outLenStable={afterLen} after={EchoCheckMs}ms");
+            var n = Interlocked.Increment(ref _consecutiveNoEcho);
+            EvaluateHealth(n, source);
         }, TaskScheduler.Default);
+    }
+
+    private void EvaluateHealth(int consecutive, string source)
+    {
+        var newState = consecutive switch
+        {
+            >= DeadThreshold => TerminalHealthState.Dead,
+            >= StaleThreshold => TerminalHealthState.Stale,
+            _ => _healthState, // do not regress on a single OK
+        };
+        if (newState == _healthState) return;
+        _healthState = newState;
+        AppLogger.Log($"[Session] HEALTH | id={_internalId} label={_sessionId} state={newState} consecutive={consecutive} source={source}");
+        try { HealthChanged?.Invoke(newState); } catch { /* subscriber bug, not load-bearing */ }
+    }
+
+    private void OnOutputObserved()
+    {
+        if (Interlocked.Exchange(ref _consecutiveNoEcho, 0) == 0
+            && _healthState == TerminalHealthState.Alive)
+            return;
+        if (_healthState != TerminalHealthState.Alive)
+        {
+            _healthState = TerminalHealthState.Alive;
+            AppLogger.Log($"[Session] HEALTH | id={_internalId} label={_sessionId} state=Alive (output recovered)");
+            try { HealthChanged?.Invoke(TerminalHealthState.Alive); } catch { }
+        }
     }
 
     public void WriteAndSubmit(string text)
@@ -248,14 +290,13 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
 
         try
         {
-            var beforeLen = _pty.ConsoleOutputLog?.Length ?? -1;
             _pty.WriteToTerm(seq);
             AppLogger.Log($"[Session] control ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} control={control}");
             // ClearScreen overwrites in place — no echo expected. Other
             // controls (Enter/CR, Tab, Space, arrows in cooked mode) should
             // produce some response from a healthy shell.
             if (control != TerminalControl.ClearScreen)
-                ScheduleEchoCheck(beforeLen, seq.Length, $"control={control}");
+                NoteInputAttempt($"control={control}");
         }
         catch (Exception ex)
         {
@@ -294,6 +335,10 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
 
             var newText = outputLog.ToString(lastLen, currentLen - lastLen);
             OutputReceived?.Invoke(new TerminalOutputFrame(newText, DateTimeOffset.UtcNow));
+            // Output growth = the channel just produced something. Reset the
+            // no-echo counter and lift Stale/Dead back to Alive. Idempotent
+            // so the 50ms poll thread can call this every tick safely.
+            OnOutputObserved();
         }
         catch
         {

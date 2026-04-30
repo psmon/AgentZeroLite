@@ -9,6 +9,24 @@ namespace Agent.Common.Services;
 public readonly record struct TerminalOutputFrame(string Text, DateTimeOffset Timestamp);
 
 /// <summary>
+/// Channel health derived from input-vs-output flow. Slow-loading TUIs
+/// (claude CLI, tailscale ssh handshake) intermittently leave the pipe in
+/// a state where neither stdin writes nor Ctrl+C reach the foreground
+/// child — output frozen, input silent. This enum surfaces that.
+/// </summary>
+public enum TerminalHealthState
+{
+    /// Default — input attempts produce output (echo, redraw, anything).
+    Alive,
+    /// Recent input attempts produced no echo. Could be transient (slow
+    /// load) or the start of a wedge.
+    Stale,
+    /// Sustained silent input — channel is wedged. UI should offer
+    /// "Restart this terminal".
+    Dead,
+}
+
+/// <summary>
 /// Abstraction over a terminal session (ConPTY or other).
 /// Separates the "session/stream" concern from the "UI renderer" concern.
 /// Bot, approval watcher, skill sync depend on this — not on the UI control.
@@ -58,6 +76,24 @@ public interface ITerminalSession
 
     /// <summary>Get all visible console text.</summary>
     string GetConsoleText();
+
+    /// <summary>
+    /// Notify the session that an input attempt was made — by AgentBot's
+    /// Write/SendControl, or by direct keyboard input forwarded through
+    /// TermControl. The session schedules a deferred output-growth check;
+    /// if the input produced no echo, an INPUT-NO-ECHO log is emitted and
+    /// the consecutive-no-echo counter advances, eventually transitioning
+    /// <see cref="HealthState"/> to Stale and then Dead.
+    /// <para><c>source</c> is a short tag for the log line, e.g.
+    /// "write bytes=2", "control=Enter", or "keyboard:H".</para>
+    /// </summary>
+    void NoteInputAttempt(string source);
+
+    /// <summary>Current input-channel health.</summary>
+    TerminalHealthState HealthState { get; }
+
+    /// <summary>Raised on health transitions. Subscribers receive the new state.</summary>
+    event Action<TerminalHealthState>? HealthChanged;
 }
 
 /// <summary>Well-known terminal control sequences.</summary>

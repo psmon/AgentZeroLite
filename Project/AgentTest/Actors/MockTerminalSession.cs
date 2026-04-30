@@ -40,8 +40,13 @@ public sealed class MockTerminalSession : ITerminalSession
 
     public void SendControl(TerminalControl control) => SendControlCalls.Add(control);
 
-#pragma warning disable CS0067 // Event never used — fine for mock
+    public List<string> InputAttempts { get; } = new();
+    public void NoteInputAttempt(string source) => InputAttempts.Add(source);
+    public TerminalHealthState HealthState { get; set; } = TerminalHealthState.Alive;
+
+#pragma warning disable CS0067 // Events never used — fine for mock
     public event Action<TerminalOutputFrame>? OutputReceived;
+    public event Action<TerminalHealthState>? HealthChanged;
 #pragma warning restore CS0067
 
     public string ReadOutput(int start, int length) => "";

@@ -47,6 +47,13 @@ public class FakeTerminalSession : ITerminalSession
     public void SendControl(TerminalControl control)
         => SentControls.Add(control);
 
+    public List<string> InputAttempts { get; } = [];
+    public void NoteInputAttempt(string source) => InputAttempts.Add(source);
+    public TerminalHealthState HealthState { get; set; } = TerminalHealthState.Alive;
+#pragma warning disable CS0067
+    public event Action<TerminalHealthState>? HealthChanged;
+#pragma warning restore CS0067
+
     public int OutputLength => _fullOutput.Length;
 
     public string ReadOutput(int start, int length)
