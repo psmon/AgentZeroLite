@@ -17,6 +17,7 @@ public sealed class MockTerminalSession : ITerminalSession
 
     // Recorded calls
     public List<string> WriteAndSubmitCalls { get; } = new();
+    public List<string> WriteAndEnterCalls { get; } = new();
     public List<TerminalControl> SendControlCalls { get; } = new();
     public List<string> WriteCalls { get; } = new();
 
@@ -28,6 +29,8 @@ public sealed class MockTerminalSession : ITerminalSession
     public void Write(ReadOnlySpan<char> text) => WriteCalls.Add(text.ToString());
 
     public void WriteAndSubmit(string text) => WriteAndSubmitCalls.Add(text);
+
+    public void WriteAndEnter(string text) => WriteAndEnterCalls.Add(text);
 
     public Task WriteAsync(ReadOnlyMemory<char> text, CancellationToken ct = default)
     {

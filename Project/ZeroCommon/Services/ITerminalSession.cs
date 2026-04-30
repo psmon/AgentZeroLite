@@ -32,6 +32,12 @@ public interface ITerminalSession
     /// distinguish pasted text from key events (e.g. Codex) treat it as submit.</summary>
     void WriteAndSubmit(string text);
 
+    /// <summary>Write text without Enter, then after a 200ms delay submit
+    /// Enter via <see cref="SendControl"/>. Default ChatMode path: some TUIs
+    /// (e.g. Codex) eat the trailing \r when it lands too close to the text,
+    /// even with WriteAndSubmit's 50ms gap.</summary>
+    void WriteAndEnter(string text);
+
     /// <summary>Write text to the terminal stdin (async, queued with backpressure).</summary>
     Task WriteAsync(ReadOnlyMemory<char> text, CancellationToken ct = default);
 

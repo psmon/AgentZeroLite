@@ -989,7 +989,7 @@ public partial class AgentBotWindow : Window
         }
         else
         {
-            session.WriteAndSubmit(textToSend);
+            session.WriteAndEnter(textToSend);
             if (isMultiLine)
                 session.SendControl(TerminalControl.Enter);
         }
@@ -1346,7 +1346,7 @@ public partial class AgentBotWindow : Window
 
         var sessionLabel = _getSessionName?.Invoke() ?? "Terminal";
         AddUserMessage(cmdName, sessionLabel);
-        session.WriteAndSubmit(cmdName);
+        session.WriteAndEnter(cmdName);
         HideSlashPopup();
         txtInput.Clear();
     }
@@ -1365,7 +1365,7 @@ public partial class AgentBotWindow : Window
 
         AddSystemMessage("Sending /skills to terminal...");
         var logBefore = session.OutputLength;
-        session.WriteAndSubmit("/skills");
+        session.WriteAndEnter("/skills");
 
         // Wait for skill list to render (interactive list needs time)
         await Task.Delay(3500);
@@ -2012,7 +2012,7 @@ public partial class AgentBotWindow : Window
                 {
                     var slabel = _getSessionName?.Invoke() ?? "Terminal";
                     AddUserMessage(cmd.Name, slabel);
-                    session.WriteAndSubmit(cmd.Name);
+                    session.WriteAndEnter(cmd.Name);
                 }
                 HideSlashPopup();
                 txtInput.Clear();

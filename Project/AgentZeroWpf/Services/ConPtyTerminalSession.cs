@@ -108,6 +108,7 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
 
         try
         {
+            var beforeLen = _pty.ConsoleOutputLog?.Length ?? -1;
             _pty.WriteToTerm(text);
             // PTY-FREEZE-DIAG: success line proves the write reached WriteToTerm.
             // If a freeze leaves no [Session] write ok line for a tab while the
@@ -115,11 +116,35 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
             // (route never reaches this method). If lines exist but the PTY
             // doesn't echo, the failure is inside WriteToTerm / the pipe.
             AppLogger.Log($"[Session] write ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length} outLen={_pty.ConsoleOutputLog?.Length ?? -1}");
+            ScheduleEchoCheck(beforeLen, text.Length, $"write bytes={text.Length}");
         }
         catch (Exception ex)
         {
             AppLogger.Log($"[Session] WriteToTerm failed | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} bytes={text.Length} error={ex.GetType().Name}: {ex.Message}");
         }
+    }
+
+    // PTY-FREEZE-DIAG: echo check — bytes left this side, did the PTY echo
+    // anything back within EchoCheckMs? Silent channel = "write ok" but no
+    // delta means write hit a dead pipe or the foreground child isn't
+    // consuming stdin. Skipped for control sequences that legitimately
+    // produce no echo (e.g. ClearScreen overwrites in-place).
+    private const int EchoCheckMs = 1000;
+
+    private void ScheduleEchoCheck(int beforeLen, int bytes, string what)
+    {
+        if (beforeLen < 0 || bytes <= 0) return;
+        var snapshot = beforeLen;
+        var hash = PtyRefHash;
+        var id = _internalId;
+        var label = _sessionId;
+        _ = Task.Delay(EchoCheckMs).ContinueWith(_ =>
+        {
+            if (_disposed) return;
+            var afterLen = _pty.ConsoleOutputLog?.Length ?? -1;
+            if (afterLen == snapshot)
+                AppLogger.Log($"[Session] WRITE-NO-ECHO | id={id} label={label} ptyHash=0x{hash:X8} {what} outLenStable={afterLen} after={EchoCheckMs}ms");
+        }, TaskScheduler.Default);
     }
 
     public void WriteAndSubmit(string text)
@@ -129,6 +154,17 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
         // Without this, TUIs like Codex interpret text+\r as a pasted block with
         // an embedded newline instead of "input text → submit".
         _ = Task.Delay(50).ContinueWith(_ => Write("\r".AsSpan()),
+            TaskScheduler.Default);
+    }
+
+    public void WriteAndEnter(string text)
+    {
+        Write(text.AsSpan());
+        // 200ms gap + SendControl path: Codex still eats the \r at 50ms via the
+        // raw Write path. Routing Enter through SendControl gives it the same
+        // treatment as a user keypress and the longer gap lets the TUI commit
+        // the text buffer before the submit lands.
+        _ = Task.Delay(200).ContinueWith(_ => SendControl(TerminalControl.Enter),
             TaskScheduler.Default);
     }
 
@@ -212,8 +248,14 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
 
         try
         {
+            var beforeLen = _pty.ConsoleOutputLog?.Length ?? -1;
             _pty.WriteToTerm(seq);
             AppLogger.Log($"[Session] control ok | id={_internalId} label={_sessionId} ptyHash=0x{PtyRefHash:X8} control={control}");
+            // ClearScreen overwrites in place — no echo expected. Other
+            // controls (Enter/CR, Tab, Space, arrows in cooked mode) should
+            // produce some response from a healthy shell.
+            if (control != TerminalControl.ClearScreen)
+                ScheduleEchoCheck(beforeLen, seq.Length, $"control={control}");
         }
         catch (Exception ex)
         {

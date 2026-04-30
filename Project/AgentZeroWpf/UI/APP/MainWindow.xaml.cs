@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -645,6 +646,27 @@ public partial class MainWindow : Window
         }
         catch { return ""; }
     }
+
+    // PTY-FREEZE-DIAG: filter for the KEY-NO-ECHO check. Only count keys that
+    // a healthy shell would normally echo or respond to. Modifiers/IME-in-flight
+    // press events fire on every keystroke and never produce echo on their own,
+    // so including them turns the log into noise.
+    private static bool IsEchoCandidateKey(System.Windows.Input.Key key) => key switch
+    {
+        System.Windows.Input.Key.LeftShift or System.Windows.Input.Key.RightShift
+            or System.Windows.Input.Key.LeftCtrl or System.Windows.Input.Key.RightCtrl
+            or System.Windows.Input.Key.LeftAlt or System.Windows.Input.Key.RightAlt
+            or System.Windows.Input.Key.LWin or System.Windows.Input.Key.RWin
+            or System.Windows.Input.Key.CapsLock or System.Windows.Input.Key.NumLock
+            or System.Windows.Input.Key.Scroll
+            or System.Windows.Input.Key.ImeProcessed
+            or System.Windows.Input.Key.ImeNonConvert or System.Windows.Input.Key.ImeConvert
+            or System.Windows.Input.Key.ImeModeChange or System.Windows.Input.Key.HangulMode
+            or System.Windows.Input.Key.System
+            or System.Windows.Input.Key.Tab
+            => false,
+        _ => true,
+    };
 
     // =========================================================================
     //  IPC: terminal-read — read console output text from a terminal
@@ -1721,6 +1743,26 @@ public partial class MainWindow : Window
                 terminal.ConPTYTerm?.WriteToTerm("\t".AsSpan());
                 e.Handled = true;
             }
+
+            // PTY-FREEZE-DIAG: echo verification — snapshot outLen, recheck
+            // 800ms later. If unchanged, the key never produced any visible
+            // response from the foreground child (shell echo, TUI redraw,
+            // anything). Skip noise keys (modifiers, IME composing, repeats)
+            // since those legitimately don't echo. Skip Tab too — handled
+            // path above writes \t and shells often respond with completion
+            // not text growth.
+            if (!IsEchoCandidateKey(e.Key)) return;
+            var pty = terminal.ConPTYTerm;
+            var beforeLen = pty?.ConsoleOutputLog?.Length ?? -1;
+            if (beforeLen < 0) return;
+            var keyName = e.Key.ToString();
+            var tabTitle = tab.Title;
+            _ = Task.Delay(800).ContinueWith(_ =>
+            {
+                var afterLen = pty?.ConsoleOutputLog?.Length ?? -1;
+                if (afterLen == beforeLen)
+                    AppLogger.Log($"[CLI-Input-DIAG] KEY-NO-ECHO | tab={tabTitle} key={keyName} outLenStable={afterLen} after=800ms");
+            }, TaskScheduler.Default);
         };
 
         // PTY-FREEZE-DIAG: focus trace — pure logging, no IsActive write.
@@ -1728,7 +1770,18 @@ public partial class MainWindow : Window
         // f679a7a) caused an active-document ricochet loop. These logs only
         // observe; nothing changes the dock state.
         terminal.GotFocus += (_, _) =>
-            AppLogger.Log($"[CLI-Input-DIAG] GotFocus  | tab={tab.Title} active={tab.Document?.IsActive == true}");
+        {
+            // PTY-FREEZE-DIAG: snapshot PTY state on focus. If a tab "doesn't
+            // accept input" while focused, the next questions are: is the PTY
+            // ref still wired? is its output log alive? is the process running?
+            // Logging here makes those answers visible at the moment focus
+            // settled — useful when correlated with later KEY-NO-ECHO lines.
+            var pty = terminal.ConPTYTerm;
+            var ptyHash = pty is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(pty);
+            var outLogNull = pty?.ConsoleOutputLog is null;
+            var outLen = pty?.ConsoleOutputLog?.Length ?? -1;
+            AppLogger.Log($"[CLI-Input-DIAG] GotFocus  | tab={tab.Title} active={tab.Document?.IsActive == true} ptyHash=0x{ptyHash:X8} outLogNull={outLogNull} outLen={outLen}");
+        };
         terminal.LostFocus += (_, _) =>
             AppLogger.Log($"[CLI-Input-DIAG] LostFocus | tab={tab.Title} active={tab.Document?.IsActive == true}");
 

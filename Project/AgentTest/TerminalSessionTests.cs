@@ -32,6 +32,12 @@ public class FakeTerminalSession : ITerminalSession
         WrittenTexts.Add("\r");
     }
 
+    public void WriteAndEnter(string text)
+    {
+        WrittenTexts.Add(text);
+        SentControls.Add(TerminalControl.Enter);
+    }
+
     public Task WriteAsync(ReadOnlyMemory<char> text, CancellationToken ct = default)
     {
         AsyncWrittenTexts.Add(text.ToString());
