@@ -1,32 +1,32 @@
 {
-  "analyzedAt": "2026-04-28",
+  "analyzedAt": "2026-05-01",
   "windowDays": 14,
   "sources": [
-    { "date": "2026-04-28", "category": "code", "file": "Docs/harness/first-world.md",                  "title": "Voice subsystem scaffold (Phase 1+2)" },
-    { "date": "2026-04-27", "category": "code", "file": "Docs/harness/first-world.md",                  "title": "INTERRUPT button + voice LLM cap" },
-    { "date": "2026-04-26", "category": "code", "file": "Docs/harness/first-world.md",                  "title": "External provider backend (Webnori/OpenAI/LMStudio/Ollama)" },
-    { "date": "2026-04-26", "category": "code", "file": "Docs/harness/first-world.md",                  "title": "AIMODE Phase 2 — Nemotron native template" },
-    { "date": "2026-04-25", "category": "code", "file": "Docs/harness/first-world.md",                  "title": "AIMODE Phase 1 — Gemma 4 GBNF tool-call backend" }
+    { "date": "2026-05-01", "time": "12:15", "category": "release-build-pipeline", "file": "harness/logs/release-build-pipeline/2026-05-01-1215-v0.3.0.md",            "title": "Release pipeline gate — v0.3.0 (voice TTS + voice commands)" },
+    { "date": "2026-05-01", "time": "12:15", "category": "build-doctor",           "file": "harness/logs/build-doctor/2026-05-01-1215-pre-v0.3.0-release.md",          "title": "Build doctor pre-v0.3.0 — debug build clean, native DLLs pinned" },
+    { "date": "2026-05-01", "time": "12:00", "category": "security-guard",         "file": "harness/logs/security-guard/2026-05-01-1200-pre-v0.3.0-release.md",       "title": "Security gate pre-v0.3.0 — voice subsystem 1-commit delta audit" },
+    { "date": "2026-04-30", "time": "22:10", "category": "release-build-pipeline", "file": "harness/logs/release-build-pipeline/2026-04-30-2210-v0.2.1.md",            "title": "Release pipeline gate — v0.2.1 (terminal diagnostics + UX docking)" },
+    { "date": "2026-04-30", "time": "22:10", "category": "build-doctor",           "file": "harness/logs/build-doctor/2026-04-30-2210-pre-v0.2.1-release.md",          "title": "Build doctor pre-v0.2.1 — 8-commit delta, no DLL drift" }
   ],
   "tried": [
-    "Self-built llama.cpp + LLamaSharp 0.26 path for offline Gemma 4 + Nemotron 8B v1",
-    "Two separate tool-call backends — Gemma via GBNF grammar, Nemotron via Llama-3.1 chat template — under one IAgentToolHost interface",
-    "OpenAI-compatible HTTP layer for four hosted/local providers (Webnori, OpenAI, LM Studio, Ollama)",
-    "Voice subsystem scaffold — Whisper.net (CPU), OpenAI Whisper, Webnori-Gemma audio, Windows SAPI, OpenAI tts-1 — wired through LlmGateway.OpenSession",
-    "Dual-VAD mic capture (frame ~50ms + utterance ~2s silence) with pre-roll buffer and mute-while-playing feedback suppression"
+    "Ran two back-to-back release-build-pipeline gates (v0.2.1 UI/dock, then v0.3.0 voice feature) under the same security-guard → build-doctor cadence",
+    "Shipped voice subsystem v0.3.0 — AI-mode TTS auto-speak on every bot bubble, VoiceCommandInterceptor (\"그만\" stop / terminal-summary / pass-through), Whisper hallucination filter",
+    "Hardened AgentToolLoop.ParseToolCall (TryGetProperty over GetProperty) so malformed JSON from non-GBNF backends funnels through the controlled JsonException path",
+    "Embedded ITerminalSession.GetConsoleText() snapshots into AIMODE prompts via triple-backtick fences for the new terminal-summary voice command",
+    "Widened cloud TTS provider exfil from \"final bubble only\" to \"every bubble\" gated by user-selected TtsProvider"
   ],
   "solved": [
-    "End-to-end multi-CLI loop: identity-first handshake routes peer signals back to the right reactor cycle",
-    "AIMODE FSM transitions + 5-cycle session test: 42/42 pass headless",
-    "Default voice loop runs at $0/month using Win11 OS-level Korean neural voice"
+    "Two consecutive release gates cleared with zero Critical/High findings — the delta-audit pattern (small diff + 7-scope sweep + carry-forward labelling) is reproducible",
+    "VoiceCommandInterceptor proven privilege-neutral: StopSpeaking is local audio teardown, PassThrough reuses the existing v0.2.0 ConPTY route, SummarizeTerminal stays inside the AIMODE consent envelope",
+    "Native DLL pinning, version pipeline, IPC payload, and EF migrations verified unchanged across both releases — csproj diff empty in v0.2.1 (8 commits) and v0.3.0 (1 commit)"
   ],
   "remaining": [
-    "Chunked streaming for STT/TTS — currently full-utterance only; multi-provider streaming is its own multi-week problem",
-    "LocalGemmaStt placeholder — waits for an audio-capable Gemma GGUF in the LlmModelCatalog",
-    "CUDA runtime intentionally omitted from installer to keep size small; revisit when small-model CPU latency becomes a real complaint"
+    "BuildTerminalSummaryPrompt fence-injection (Low / CWE-77 / OWASP LLM01) — fence-escape, length cap, and system-prompt clause deferred to the next release cycle",
+    "Cloud TTS provider settings lack a per-bubble exfil warning UI (Info, new in v0.3.0) — explicit \"speak final reply only\" toggle would let power users bound the surface",
+    "Voice transcript shell-escape (Medium, carry from v0.2.0) and GGML download hash verification (Low, library-internal) remain open across three consecutive releases"
   ],
   "learned": {
-    "lead": "An agent grows by adding implementations behind already-named interfaces — not by adding agents.",
-    "body": "Both this cycle's expansions (multi-provider LLM and voice modality) followed the same shape that originally defined the agent: ILlmProvider, ISpeechToText, ITextToSpeech each absorbed multiple new implementations, and no new actor or gateway was introduced. The 2,000-line PR shape (vs a 20,000-line one) is a direct consequence. Next slot is for a streaming provider and a fully-offline audio Gemma — both are new classes, not new shells."
+    "lead": "Indirect prompt injection becomes the dominant new risk class once an agent can read its own UI surfaces.",
+    "body": "The v0.3.0 voice delta added zero shell-exec primitives, zero new packages, zero new actor paths — the only new attack surface was a single LLM prompt that fences user-visible terminal output. That is now the entire delta-relevant security class for this kind of feature. Future audits should pre-emptively scan for GetConsoleText(), Clipboard.GetText(), screen-capture, or any \"summarize what the user is seeing\" feeder paths and treat them as fence-injection candidates by default. Next action: extract a shared fence-escape + length-cap utility into ZeroCommon so every screen→LLM-prompt site routes through one hardened helper instead of inlining the fence."
   }
 }
