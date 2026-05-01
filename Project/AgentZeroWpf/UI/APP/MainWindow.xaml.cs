@@ -1837,7 +1837,13 @@ public partial class MainWindow : Window
         tab.IsInitialized = true;  // Set immediately to prevent re-entrant calls from OnDockActiveContentChanged
 
         string workDir = _cliGroups[_activeGroupIndex].DirectoryPath;
-        string rawCmd = string.IsNullOrEmpty(tab.Arguments) ? tab.ExePath : $"{tab.ExePath} {tab.Arguments}";
+        // cmd /c otherwise parses only the first whitespace-delimited token as the
+        // executable, which breaks paths like "C:\Program Files\Git\usr\bin\bash.exe".
+        var exePath = tab.ExePath.Trim();
+        if (exePath.Length >= 2 && exePath[0] == '"' && exePath[^1] == '"')
+            exePath = exePath[1..^1];
+        string quotedExe = exePath.IndexOfAny([' ', '\t']) >= 0 ? $"\"{exePath}\"" : exePath;
+        string rawCmd = string.IsNullOrEmpty(tab.Arguments) ? quotedExe : $"{quotedExe} {tab.Arguments}";
 
         // Prepend our exe directory to PATH for *this PTY only*. Why:
         //   - The skills-starter-pack scripts call `& AgentZeroLite.ps1`,

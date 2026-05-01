@@ -412,9 +412,10 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        _outputPollTimer.Dispose();
         _cts.Cancel();
         _writeChannel.Writer.TryComplete();
+        _outputPollTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        _outputPollTimer.Dispose();
 
         try { _writeLoopTask.Wait(TimeSpan.FromSeconds(1)); }
         catch { /* shutdown */ }
