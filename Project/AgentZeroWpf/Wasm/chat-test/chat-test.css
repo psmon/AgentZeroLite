@@ -1,0 +1,200 @@
+:root {
+  --bg: #08081a;
+  --panel: #12122a;
+  --panel-2: #14143a;
+  --line: #2a2a5e;
+  --fg: #d4d4d4;
+  --muted: #808080;
+  --accent: #00fff0;
+  --hot: #ff2d95;
+  --ok: #b5cea8;
+  --warn: #f5c878;
+  --user-bubble: #1a1a3a;
+  --ai-bubble: #0e1a1a;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: Consolas, 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+header {
+  border-bottom: 1px solid var(--line);
+  padding: 14px 18px 10px;
+  background: linear-gradient(180deg, #0f0f22, #0a0a1a);
+}
+header h1 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+.tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-size: 10px;
+  border: 1px solid var(--hot);
+  color: var(--hot);
+  border-radius: 2px;
+  vertical-align: middle;
+}
+.meta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.meta code { color: var(--ok); }
+.hint.mono { font-family: inherit; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.hint.mono.err { color: var(--hot); }
+.hint.mono.ok  { color: var(--ok); }
+
+main {
+  padding: 14px 18px 22px;
+  display: grid;
+  gap: 14px;
+  max-width: 880px;
+}
+
+.card, .chat-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.card { padding: 12px 14px; }
+.card.subtle { background: transparent; border-style: dashed; }
+.card h2 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.hint {
+  margin: 4px 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.hint code, p code { color: var(--ok); }
+
+.chat-card { display: flex; flex-direction: column; min-height: 360px; }
+.thread {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: 50vh;
+}
+.thread:empty::before {
+  content: 'No turns yet — type a prompt below.';
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.bubble {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  max-width: 100%;
+}
+.bubble.user {
+  background: var(--user-bubble);
+  border-color: #2c2c66;
+  align-self: flex-end;
+  max-width: 78%;
+}
+.bubble.ai {
+  background: var(--ai-bubble);
+  border-color: #1d4646;
+  align-self: flex-start;
+  max-width: 88%;
+}
+.bubble.ai.streaming::after {
+  content: '▋';
+  color: var(--accent);
+  margin-left: 2px;
+  animation: blink 1s step-start infinite;
+}
+.bubble .who {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.bubble.err { border-color: var(--hot); color: var(--hot); }
+@keyframes blink { 50% { opacity: 0; } }
+
+.composer {
+  border-top: 1px solid var(--line);
+  padding: 10px 14px;
+}
+.composer textarea {
+  width: 100%;
+  background: #0a0a14;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+.composer textarea:focus { outline: none; border-color: var(--accent); }
+
+.composer-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.check { color: var(--muted); font-size: 11px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+
+button {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--accent);
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 2px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: default; }
+button.ghost { color: var(--muted); }
+button.ghost:hover { color: var(--hot); border-color: var(--hot); }
+
+.status { margin-left: auto; color: var(--muted); font-size: 11px; }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--hot); }
+.status.busy { color: var(--warn); }
+
+pre#log {
+  margin: 0;
+  background: #0a0a14;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 8px 10px;
+  color: #c8c8d8;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+}

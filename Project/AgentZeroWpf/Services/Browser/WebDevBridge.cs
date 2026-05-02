@@ -13,7 +13,7 @@ namespace AgentZeroWpf.Services.Browser;
 /// Wire format:
 ///   request  → { id: number, op: string, args?: object }
 ///   response → { id: number, ok: boolean, result?: any, error?: string }
-///   event    → { op: "event", channel: string, data: any }   (host-pushed; not used yet)
+///   event    → { op: "event", channel: string, data: any }   (host-pushed; chat streaming)
 /// </summary>
 public sealed class WebDevBridge
 {
@@ -85,8 +85,52 @@ public sealed class WebDevBridge
                 _host.StopSpeaking();
                 return new { stopped = true };
 
+            case "chat.status":
+                return _host.GetLlmStatus();
+
+            case "chat.send":
+            {
+                var text = args?.TryGetProperty("text", out var t) == true ? t.GetString() ?? "" : "";
+                var r = await _host.ChatSendAsync(text);
+                return r;
+            }
+
+            case "chat.stream":
+            {
+                // Fire-and-forget: token + done events go back via PostEvent; the
+                // immediate response just acknowledges the streamId so JS can
+                // correlate. JS picks up the stream via window.zero.chat.stream(...)
+                // which wraps the event flow.
+                var text = args?.TryGetProperty("text", out var t) == true ? t.GetString() ?? "" : "";
+                var streamId = args?.TryGetProperty("streamId", out var sid) == true
+                    ? sid.GetString() ?? Guid.NewGuid().ToString("N")
+                    : Guid.NewGuid().ToString("N");
+                _ = StreamChatAsync(text, streamId);
+                return new { streamId };
+            }
+
+            case "chat.reset":
+                await _host.ResetChatAsync();
+                return new { reset = true };
+
             default:
                 throw new InvalidOperationException($"unknown op '{op}'");
+        }
+    }
+
+    private async Task StreamChatAsync(string text, string streamId)
+    {
+        try
+        {
+            await foreach (var tok in _host.ChatStreamAsync(text))
+                PostEvent("chat.token", new { streamId, token = tok });
+
+            PostEvent("chat.done", new { streamId, ok = true });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[WebDev] chat stream failed: {ex.GetType().Name}: {ex.Message}");
+            PostEvent("chat.done", new { streamId, ok = false, error = ex.Message });
         }
     }
 
@@ -95,5 +139,12 @@ public sealed class WebDevBridge
         var payload = new { id, ok, result, error };
         try { _core.PostWebMessageAsJson(JsonSerializer.Serialize(payload, JsonOpts)); }
         catch (Exception ex) { AppLogger.Log($"[WebDev] post failed: {ex.Message}"); }
+    }
+
+    private void PostEvent(string channel, object data)
+    {
+        var payload = new { op = "event", channel, data };
+        try { _core.PostWebMessageAsJson(JsonSerializer.Serialize(payload, JsonOpts)); }
+        catch (Exception ex) { AppLogger.Log($"[WebDev] event post failed ({channel}): {ex.Message}"); }
     }
 }

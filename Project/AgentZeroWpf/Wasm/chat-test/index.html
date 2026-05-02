@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Chat Test — WebDev Sandbox</title>
+  <link rel="stylesheet" href="chat-test.css" />
+</head>
+<body>
+  <header>
+    <h1>Chat Test <span class="tag">WASM Sandbox</span></h1>
+    <div class="meta">
+      <span>app <code id="ver">…</code></span>
+      <span>backend <code id="backend">…</code></span>
+      <span>model <code id="model">…</code></span>
+      <span>turn <code id="turn">0</code></span>
+    </div>
+    <div id="statusBar" class="hint mono">checking backend…</div>
+  </header>
+
+  <main>
+    <section id="chat" class="chat-card">
+      <div id="thread" class="thread" aria-live="polite"></div>
+
+      <div class="composer">
+        <textarea id="input" rows="2"
+          placeholder="Ask the active LLM something… (Enter to send, Shift+Enter for newline)"></textarea>
+        <div class="composer-row">
+          <label class="check">
+            <input type="checkbox" id="streamMode" checked />
+            <span>stream tokens</span>
+          </label>
+          <span id="status" class="status">idle</span>
+          <button id="resetBtn" class="ghost">⟲ Reset</button>
+          <button id="sendBtn">▶ Send</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card subtle">
+      <h2>About</h2>
+      <p class="hint">
+        Routes through <code>window.zero.chat.*</code> → native
+        <code>LlmGateway.OpenSession()</code>. Whatever's selected on
+        <em>Settings → LLM</em> (Local Gemma/Nemotron, External Webnori/OpenAI/etc.)
+        is what answers. The session is persistent — turn history is preserved
+        until you press Reset or the WebDev panel is rebuilt.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Trace</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script src="../common/zero-bridge.js"></script>
+  <script src="chat-test.js"></script>
+</body>
+</html>

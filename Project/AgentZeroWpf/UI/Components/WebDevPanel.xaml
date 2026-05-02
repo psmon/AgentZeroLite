@@ -3,6 +3,101 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
              Background="#08081A">
+    <UserControl.Resources>
+        <!-- Dark ComboBox — local copy of the SettingsPanel.DarkComboBox style.
+             SettingsPanel's resources are not visible to this UserControl's
+             StaticResource lookups (different parse scope), so the style is
+             inlined here to keep the toolbar consistent with the rest of the
+             dark theme without reaching across XAML boundaries. -->
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="#14143A"/>
+            <Setter Property="Foreground" Value="#C8C8D8"/>
+            <Setter Property="BorderBrush" Value="#2A2A5E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleBtn" Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Focusable="False" ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition/>
+                                                    <ColumnDefinition Width="20"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="1" Background="Transparent">
+                                                    <TextBlock Text="▾" Foreground="#00FFF0"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               FontSize="11"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                              Margin="8,3,24,3" VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" IsHitTestVisible="False"/>
+                            <Popup x:Name="Popup" Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Border Background="#0F0F22" BorderBrush="#2A2A5E" BorderThickness="1"
+                                        MaxHeight="220" MinWidth="{TemplateBinding ActualWidth}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark ComboBoxItem — implicit style for items inside this UserControl. -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#0F0F22"/>
+            <Setter Property="Foreground" Value="#C8C8D8"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1F1F5A"/>
+                                <Setter Property="Foreground" Value="#00FFF0"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#14143A"/>
+                                <Setter Property="Foreground" Value="#00FFF0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -27,6 +122,12 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <ComboBox x:Name="cbWebDevApp" Width="160" Margin="4,0"
+                              Style="{StaticResource DarkComboBox}"
+                              SelectionChanged="OnWebDevAppChanged">
+                        <ComboBoxItem Content="voice-test" Tag="voice-test/index.html" IsSelected="True"/>
+                        <ComboBoxItem Content="chat-test"  Tag="chat-test/index.html"/>
+                    </ComboBox>
                     <Button x:Name="btnWebDevReload" Content="⟳ Reload"
                             Padding="10,4" Margin="4,0" Cursor="Hand"
                             FontFamily="Consolas" FontSize="11"

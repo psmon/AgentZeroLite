@@ -56,13 +56,7 @@ public partial class WebDevPanel : UserControl
     public string EntryPath
     {
         get => _entryPath;
-        set
-        {
-            _entryPath = string.IsNullOrWhiteSpace(value) ? DefaultEntry : value;
-            lblWebDevApp.Text = "  ·  " + _entryPath.Split('/')[0];
-            if (_initStarted && webDevView.CoreWebView2 is not null)
-                Navigate();
-        }
+        set => _ = SwitchEntryAsync(value);
     }
 
     private async void OnVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -109,6 +103,7 @@ public partial class WebDevPanel : UserControl
         var url = $"https://{VirtualHost}/{_entryPath}";
         webDevView.CoreWebView2.Navigate(url);
         lblWebDevFooter.Text = $"loaded: {url}  ·  bridge: window.zero";
+        AppLogger.Log($"[WebDev] Navigate → {url}");
     }
 
     private void OnWebDevReload(object sender, RoutedEventArgs e)
@@ -123,4 +118,47 @@ public partial class WebDevPanel : UserControl
         webDevView.CoreWebView2.OpenDevToolsWindow();
     }
 
+    private void OnWebDevAppChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (cbWebDevApp.SelectedItem is not ComboBoxItem ci) return;
+        var path = ci.Tag as string;
+        if (string.IsNullOrWhiteSpace(path)) return;
+        _ = SwitchEntryAsync(path);
+    }
+
+    /// <summary>
+    /// Stage <paramref name="path"/> as the active sub-app and navigate when ready.
+    /// Handles three timing cases:
+    ///   1. SelectionChanged fires during InitializeComponent (first IsSelected=True)
+    ///      — `_initStarted` is false, init hasn't kicked off, so the new path just
+    ///      becomes the path the upcoming Init will navigate to.
+    ///   2. User picks combo while init is in flight — `_initStarted` true but
+    ///      CoreWebView2 not ready; awaiting EnsureCoreWebView2Async lets us join
+    ///      the in-flight init, then Navigate uses the new path.
+    ///   3. User picks combo after init — straight Navigate, bypassing the previous
+    ///      EntryPath setter's null-guard (which silently no-op'd if the getter
+    ///      raced to null between checks on rapid clicks).
+    /// </summary>
+    private async Task SwitchEntryAsync(string path)
+    {
+        var normalized = string.IsNullOrWhiteSpace(path) ? DefaultEntry : path;
+        if (normalized == _entryPath && _initStarted) return;
+
+        _entryPath = normalized;
+        if (lblWebDevApp is not null)
+            lblWebDevApp.Text = "  ·  " + _entryPath.Split('/')[0];
+
+        if (!_initStarted) return;
+
+        try
+        {
+            // Idempotent: returns immediately once initialized.
+            await webDevView.EnsureCoreWebView2Async();
+            Navigate();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[WebDev] App switch navigate failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
 }
