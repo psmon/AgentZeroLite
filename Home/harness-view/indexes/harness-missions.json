@@ -10,15 +10,31 @@
     "cancelled"
   ],
   "counts": {
-    "all": 4,
+    "all": 5,
     "inbox": 1,
     "in_progress": 0,
-    "done": 3,
+    "done": 4,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0004",
+      "file": "harness/missions/M0004-AgentZeroHybridLLMWithActor.md",
+      "title": "AgentZero hybrid-LLM tech article — Notion AI-DOC publish",
+      "operator": "psmon",
+      "language": "en",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-02",
+      "recordFile": "harness/logs/mission-records/M0004-execution-result.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-02T10:50:00+09:00",
+      "recordFinished": "2026-05-02T20:35:00+09:00",
+      "modified": "2026-05-02",
+      "size": 3435
+    },
     {
       "id": "M0003",
       "file": "harness/missions/M0003-하네스뷰-미션뷰개선.md",
