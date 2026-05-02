@@ -6,7 +6,7 @@ triggers:
   - "테스트 점검해"
   - "coverage check"
   - "커버리지 점검해"
-description: Guards the headless-vs-WPF test split, hunts ConPTY/Akka deadlock regressions, and surfaces coverage gaps in the brittle parts (ApprovalParser, ActorNameSanitizer, ConPtyTerminalSession lifecycle).
+description: Structural audit of the test landscape — guards the headless-vs-WPF split, hunts WPF/Win32 leaks into ZeroCommon, and surfaces coverage gaps on paper. Does NOT execute dotnet test (that's test-runner's job per harness/knowledge/unit-test-policy.md).
 ---
 
 # Test Sentinel
@@ -50,24 +50,37 @@ Domain expertise:
 
 ## Procedure
 
-> **Test execution canon** — every `dotnet test` invocation in this procedure must
-> obey `harness/knowledge/dotnet-test-execution.md` (single foreground call, no parallel
-> backgrounds against the same project, verify testhost cleanup before reporting).
-> The Sentinel is the canonical owner of that rule — if any other agent violates it,
-> flag it as a procedural finding in the report.
+> **Execution is out of scope.** Per `harness/knowledge/unit-test-policy.md`,
+> the Sentinel does not invoke `dotnet test`. It audits the test landscape on
+> paper and may *cite* recent `harness/logs/test-runner/*.md` to argue current
+> suite health. If actual execution is needed, the user invokes `test-runner`
+> separately (the user, not the Sentinel).
+>
+> The Sentinel remains the canonical owner of `harness/knowledge/dotnet-test-execution.md`
+> — when the test-runner agent invokes dotnet test, it must obey that canon, and
+> the Sentinel flags violations.
 
-1. `dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj` — must pass headless.
-   Single foreground call only (canon R1). If output looks empty, check `tasklist | grep
-   testhost` before re-running (canon R2). For repeated diagnostic cycles, narrow with
-   `--filter "FullyQualifiedName~SpecificClass"` (canon R4).
-2. (If desktop session available) `dotnet test Project/AgentTest/AgentTest.csproj`. Refuse
-   in headless / CI environments — this suite needs ConPTY + WPF (canon R5).
-3. Grep `ZeroCommon` for forbidden-namespace usage (boundary violation check).
-4. For each "coverage hot spot" above, confirm at least one test exists and asserts
-   the documented invariant.
-5. Produce report: gaps, boundary violations, flaky tests, missing scenarios.
-6. **[Required]** Before reporting, run `tasklist | grep -iE "testhost|vstest"` and
-   include the result (cleared / orphans-killed / orphans-left) in the log (canon R6).
+1. **Boundary check** — grep `ZeroCommon` and `ZeroCommon.Tests` for any
+   `System.Windows`, `System.Windows.Forms`, `Microsoft.Terminal`, or P/Invoke
+   for Win32-only APIs. Findings = boundary violation.
+2. **Coverage hot-spot review** — for each item below, confirm at least one
+   test class exists and that it asserts the documented invariant. Read the
+   test code; do not infer from filename.
+   - `ActorNameSanitizer` — every reserved character class
+   - `ApprovalParser` — every prompt shape (bash, pwsh, cmd, claude approve dialog)
+   - `CliHandler` — `-cli` argument parsing
+   - `CliTerminalIpcHelper` — `WM_COPYDATA` marker `0x414C` round-trip
+   - `ActorSystemManager.Shutdown()` — non-blocking from UI thread
+3. **Project boundary** — `Project/ZeroCommon.Tests/` (headless) vs
+   `Project/AgentTest/` (desktop). Any new test placed wrong = finding.
+4. **Suite-health citation** (optional, no execution) — read the latest
+   `harness/logs/test-runner/*.md` for "tests_passed/failed" trend and quote
+   it in the report. If logs are stale (> 7 days) flag it as "suite health
+   unverified — recommend user invoke 전체 유닛테스트 수행해 to refresh".
+5. **Migration tests** — confirm at least one test exercises
+   `AppDbContext.InitializeDatabase()` idempotency on a temp DB path.
+6. Produce report: gaps, boundary violations, flaky tests, missing scenarios,
+   suite-health citation.
 7. **[Required]** Write log to `harness/logs/test-sentinel/{yyyy-MM-dd-HH-mm-title}.md`.
 8. **[Required]** Self-evaluate against the rubric below.
 
@@ -95,6 +108,6 @@ Domain expertise:
 |------|---------|-------|
 | Boundary integrity | Zero WPF/Win32 deps in ZeroCommon(.Tests) | Pass/Fail |
 | Hot-spot coverage | All 5 hot spots have at least one assertion | 0–5 |
-| Suite health | Headless suite green; WPF suite green when session available | A/B/C/D |
+| Suite-health citation | Cited recent test-runner log; flagged if stale | A/B/C/D |
 | Regression hooks | Tests added for past incidents (Akka shutdown, ConPTY garble) | A/B/C/D |
-| Test-execution hygiene | Followed `dotnet-test-execution.md` canon; no orphan testhost left | Pass/Fail |
+| Scope discipline | Did NOT invoke `dotnet test` (test-runner owns execution) | Pass/Fail |

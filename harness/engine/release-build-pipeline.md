@@ -30,10 +30,13 @@ mechanical instead of vibes.
    - **Gate**: any **Critical** or **High** finding → engine **stops here**.
 
 2. **Build (build-doctor)** — only if Step 1 produced no Critical/High.
-   - Validates version pipeline, native DLL pinning, csproj configurations.
-   - Runs `dotnet test` per `harness/knowledge/dotnet-test-execution.md` (single
-     foreground call, no parallel backgrounds, verify no orphan testhost before
-     handing off to the tag step).
+   - Validates version pipeline, native DLL pinning, csproj configurations,
+     EF migrations location, and `App.OnStartup` `-cli` detection.
+   - Runs `dotnet build -c Debug` to confirm a clean compile.
+   - **Does NOT run `dotnet test`** — per `harness/knowledge/unit-test-policy.md`
+     the release pipeline no longer auto-executes the unit suite. If the user
+     wants tests run before tagging, they invoke `test-runner` ("전체 유닛테스트
+     수행해") explicitly before initiating the release.
    - Writes log under `harness/logs/build-doctor/`.
    - On success → hand off to the `agent-zero-build` skill (or whatever release path
      the user invoked) for tag + push + GitHub Actions.

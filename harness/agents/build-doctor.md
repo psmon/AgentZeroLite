@@ -56,24 +56,21 @@ because:
 
 ## Procedure
 
-> **Test execution canon** — Steps 2 and 3 must obey
-> `harness/knowledge/dotnet-test-execution.md`: single foreground call, no parallel
-> backgrounds, narrow with `--filter` for diagnostic cycles, and confirm no orphan
-> testhost before handing off to the next phase. The Sentinel owns the rule;
-> the Doctor inherits it.
+> **Test execution is OUT OF SCOPE.** Per `harness/knowledge/unit-test-policy.md`,
+> unit tests run only on explicit user triggers owned by `test-runner`. Build-doctor
+> verifies the build pipeline only — `dotnet test` is no longer part of this procedure.
 
 1. `dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Debug` — must succeed cleanly.
-2. `dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj` — headless suite must
-   pass. Single foreground call (canon R1). If invoking from a release-build pipeline,
-   verify no testhost from a previous step is still alive (canon R3) before starting.
-3. (Optional, if WPF session available) `dotnet test Project/AgentTest/AgentTest.csproj`.
-   Skip entirely in headless / CI environments (canon R5).
-4. Inspect csproj for native DLL `<Content Include>` paths; `ls` each path on disk.
-5. Inspect `version.txt`, last commit's effect on it, and Release post-build target.
-6. **[Required]** Before reporting, `tasklist | grep -iE "testhost|vstest"` must be
-   empty. Kill any orphan, note it in the log (canon R3 + R6).
-7. **[Required]** Write log to `harness/logs/build-doctor/{yyyy-MM-dd-HH-mm-title}.md`.
-8. **[Required]** Self-evaluate against the rubric below.
+2. Inspect csproj for native DLL `<Content Include>` paths; `ls` each path on disk.
+3. Inspect `version.txt`, last commit's effect on it, and Release post-build target.
+4. Inspect EF migrations location (`Project/ZeroCommon/Data/Migrations/` only) and
+   `App.OnStartup` `-cli` detection.
+5. **[Required]** Write log to `harness/logs/build-doctor/{yyyy-MM-dd-HH-mm-title}.md`.
+6. **[Required]** Self-evaluate against the rubric below.
+
+> If the user wants tests run alongside a build check, they invoke `test-runner`
+> separately ("전체 유닛테스트 수행해" or "연관된 유닛테스트 수행해"). The Doctor
+> does not call into the Runner.
 
 ## Release-build gate (hard requirement)
 
@@ -92,8 +89,8 @@ This is not advisory. The Doctor refuses; the gardener does not let it start.
 
 | Axis | Measure | Scale |
 |------|---------|-------|
-| Build correctness | Debug build clean, headless tests green | A/B/C/D |
+| Build correctness | Debug build clean (no errors) | A/B/C/D |
 | Native DLL pinning | All `<Content Include>` paths resolve on disk | Pass/Fail |
 | Version pipeline integrity | `version.txt`, post-build, tag, workflow consistent | A/B/C/D |
 | Security-gate compliance (release only) | Did the gate hold? | Pass/Fail |
-| Test-execution hygiene | `dotnet-test-execution.md` canon obeyed; no orphan testhost on handoff | Pass/Fail |
+| Scope discipline | Did NOT invoke `dotnet test` (test-runner owns that) | Pass/Fail |
