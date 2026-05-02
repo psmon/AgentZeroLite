@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Voice Test — WebDev Sandbox</title>
+  <link rel="stylesheet" href="voice-test.css" />
+</head>
+<body>
+  <header>
+    <h1>Voice Test <span class="tag">WASM Sandbox</span></h1>
+    <div class="meta">
+      <span>app <code id="ver">…</code></span>
+      <span>stt <code id="stt">…</code></span>
+      <span>tts <code id="tts">…</code></span>
+      <span>llm <code id="llm">…</code></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Speak (TTS)</h2>
+      <p class="hint">
+        Type something below. The web UI calls <code>window.zero.voice.speak()</code>,
+        which routes to native .NET via the WebView2 bridge — no internet hop.
+      </p>
+      <textarea id="ttsText" rows="3"
+        placeholder="Hello from the WebDev sandbox.">Hello from the WebDev sandbox.</textarea>
+      <div class="row">
+        <button id="speakBtn">▶ Speak</button>
+        <button id="stopBtn" class="ghost">⏹ Stop</button>
+        <span class="status" id="ttsStatus">idle</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Bridge Log</h2>
+      <p class="hint">Every native call is echoed here so you can see the JS↔.NET round-trip.</p>
+      <pre id="log">[ready]</pre>
+    </section>
+
+    <section class="card subtle">
+      <h2>Roadmap</h2>
+      <ul>
+        <li><strong>Now:</strong> TTS speak/stop end-to-end through <code>IZeroBrowser</code>.</li>
+        <li><strong>Next:</strong> Mic capture + streaming partial transcripts (host pushes events).</li>
+        <li><strong>Later:</strong> Full voice agent loop — STT → LLM → TTS — all over the bridge.</li>
+        <li><strong>Plugin:</strong> Other web apps drop into <code>Wasm/&lt;name&gt;/</code> and reuse <code>window.zero</code>.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="../common/zero-bridge.js"></script>
+  <script src="voice-test.js"></script>
+</body>
+</html>

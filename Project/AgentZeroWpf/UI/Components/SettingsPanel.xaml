@@ -1256,6 +1256,11 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- WebDev Tab — in-app browser sandbox (Wasm plugin-host preview) -->
+            <TabItem x:Name="tabWebDev" Header="&#x1F310; WebDev" Style="{StaticResource SettingsTabItem}">
+                <components:WebDevPanel x:Name="webDevPanel"/>
+            </TabItem>
+
             <!-- AgentZero CLI Tab -->
             <TabItem Header="&#x1F4BB; AgentZero CLI" Style="{StaticResource SettingsTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">

@@ -82,6 +82,14 @@
     </Content>
   </ItemGroup>
 
+  <!-- WebDev sandbox: local web apps mounted as https://zero.local/ inside
+       the in-app browser. Offline — no network; JS↔.NET bridge only. -->
+  <ItemGroup>
+    <Content Include="Wasm\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- Ship version.txt next to the exe so the CLI can report the *exact*
        file the installer/build pipeline used as the source of truth. The
        same file feeds AssemblyVersion below; copying it to the output

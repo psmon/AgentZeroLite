@@ -1,0 +1,64 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.WebDevPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             Background="#08081A">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Background="#0F0F22" BorderBrush="#2A2A5E"
+                BorderThickness="0,0,0,1" Padding="8,6">
+            <DockPanel LastChildFill="True">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <Rectangle Width="3" Height="14" Fill="#00FFF0"
+                               RadiusX="1" RadiusY="1" Margin="0,0,8,0"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="WebDev Sandbox" FontFamily="Consolas"
+                               FontSize="12" FontWeight="Bold" Foreground="#00FFF0"
+                               VerticalAlignment="Center"/>
+                    <TextBlock x:Name="lblWebDevApp" Text="  ·  voice-test"
+                               FontFamily="Consolas" FontSize="11"
+                               Foreground="#808080" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button x:Name="btnWebDevReload" Content="⟳ Reload"
+                            Padding="10,4" Margin="4,0" Cursor="Hand"
+                            FontFamily="Consolas" FontSize="11"
+                            Foreground="#C8C8D8" Background="#14143A"
+                            BorderBrush="#2A2A5E" BorderThickness="1"
+                            Click="OnWebDevReload"/>
+                    <Button x:Name="btnWebDevDevTools" Content="⚙ DevTools"
+                            Padding="10,4" Margin="4,0" Cursor="Hand"
+                            FontFamily="Consolas" FontSize="11"
+                            Foreground="#C8C8D8" Background="#14143A"
+                            BorderBrush="#2A2A5E" BorderThickness="1"
+                            Click="OnWebDevDevTools"/>
+                </StackPanel>
+
+                <TextBlock Text="" />
+            </DockPanel>
+        </Border>
+
+        <!-- WebView2 host -->
+        <Grid Grid.Row="1" Background="#0A0A14">
+            <wv2:WebView2 x:Name="webDevView"/>
+            <TextBlock x:Name="lblWebDevStatus" Text="Initializing WebView2…"
+                       FontFamily="Consolas" FontSize="11" Foreground="#556677"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="#0F0F22" BorderBrush="#2A2A5E"
+                BorderThickness="0,1,0,0" Padding="8,4">
+            <TextBlock x:Name="lblWebDevFooter"
+                       FontFamily="Consolas" FontSize="10" Foreground="#556677"
+                       Text="Web app calls native .NET via window.zero — see Wasm/README.md"/>
+        </Border>
+    </Grid>
+</UserControl>
