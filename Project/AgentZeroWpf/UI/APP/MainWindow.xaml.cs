@@ -1241,8 +1241,9 @@ public partial class MainWindow : Window
             VerticalAlignment = System.Windows.VerticalAlignment.Top,
             Child = dock,
         };
-        // Banner sits on top of the terminal in the same Grid cell — Grid stacks
-        // children in z-order they were added, so adding last puts it on top.
+        // Banner sits on top of the terminal in row 1 — Grid stacks children
+        // in z-order they were added, so adding last puts it on top.
+        Grid.SetRow(banner, 1);
         tab.TerminalHost.Children.Add(banner);
         tab.WedgeBanner = banner;
         AppLogger.Log($"[CLI] Wedge banner shown | label={tab.Title}");
@@ -1749,6 +1750,11 @@ public partial class MainWindow : Window
 
         int idx = _consoleTabs.Count;
         var termHost = new Grid { Background = System.Windows.Media.Brushes.Transparent };
+        // Two rows: REDOCK strip (auto, collapsed by default) on top, terminal area below.
+        // The REDOCK strip is collapsed when not floating so it consumes 0 px and the
+        // terminal HWND has the full cell — no airspace overlap concerns in docked mode.
+        termHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        termHost.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         // Prevent WPF KeyboardNavigation from consuming Tab/arrow keys
         // so they reach the HWND-based terminal control.
         KeyboardNavigation.SetTabNavigation(termHost, KeyboardNavigationMode.None);
@@ -1768,6 +1774,13 @@ public partial class MainWindow : Window
             ExePath = exe, Arguments = arguments,
             Terminal = null, IsInitialized = false,
         };
+
+        // Build the REDOCK strip — sits in row 0, collapsed until the tab floats.
+        // Travels with doc.Content into floating windows automatically.
+        newTab.RedockStrip = BuildRedockStrip(newTab);
+        Grid.SetRow(newTab.RedockStrip, 0);
+        termHost.Children.Add(newTab.RedockStrip);
+
         _consoleTabs.Add(newTab);
         AppLogger.Log($"[CLI-Init-DIAG] ConsoleTabInfo created | title=\"{title}\" tabHash=#{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(newTab):X8} idx={idx}");
 
@@ -1970,6 +1983,8 @@ public partial class MainWindow : Window
         terminal.LostFocus += (_, _) =>
             AppLogger.Log($"[CLI-Input-DIAG] LostFocus | tab={tab.Title} active={tab.Document?.IsActive == true}");
 
+        // Row 1 = terminal area (row 0 is the REDOCK strip).
+        Grid.SetRow(terminal, 1);
         tab.TerminalHost.Children.Add(terminal);
 
         // Capture group name now (before async Loaded) for session ID
@@ -2152,6 +2167,223 @@ public partial class MainWindow : Window
         catch (Exception ex) { AppLogger.LogError("[Dock] Dock failed", ex); }
     }
 
+    // CONSOLE-strip toolbar handler: explicit detach entry point that replaces
+    // AvalonDock's redundant tab-switch chevron. The matching REDOCK action lives
+    // inside the floating window — see RedockOneTab + per-tab strip wiring in
+    // CreateConsoleTab (the strip is row 0 of TerminalHost, hidden until float).
+    private void OnDetachActiveTabClick(object sender, RoutedEventArgs e)
+    {
+        if (_activeConsoleTab < 0 || _activeConsoleTab >= _consoleTabs.Count) return;
+        var doc = _consoleTabs[_activeConsoleTab].Document;
+        if (doc is null || doc.IsFloating) return;
+        try
+        {
+            doc.Float();
+            AppLogger.Log($"[Dock] DetachActive | tab={doc.Title}");
+        }
+        catch (Exception ex) { AppLogger.LogError("[Dock] DetachActive failed", ex); }
+    }
+
+    // Build the per-tab REDOCK strip. Hidden by default; flipped Visible when
+    // the tab is in a floating window (RefreshAllRedockStripVisibility).
+    // Stays attached to TerminalHost row 0 — travels with the doc so the same
+    // strip renders inside the floating window automatically.
+    private Border BuildRedockStrip(ConsoleTabInfo tab)
+    {
+        var label = new TextBlock
+        {
+            Text = "↩  Floating window — click to dock back to main",
+            Foreground = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF0)),
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            FontSize = 11,
+            FontWeight = System.Windows.FontWeights.Bold,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 8, 0),
+        };
+        DockPanel.SetDock(label, Dock.Left);
+
+        var redockBtn = new System.Windows.Controls.Button
+        {
+            Content = "↩ DOCK BACK",
+            Padding = new Thickness(12, 4, 12, 4),
+            Margin = new Thickness(0, 0, 8, 0),
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            FontSize = 10,
+            FontWeight = System.Windows.FontWeights.Bold,
+            Foreground = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF0)),
+            Background = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0x14, 0x24, 0x32)),
+            BorderBrush = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF0)),
+            BorderThickness = new Thickness(1),
+            Cursor = Cursors.Hand,
+            ToolTip = "이 탭을 메인 윈도우의 탭으로 복원",
+        };
+        redockBtn.Click += (_, _) => RedockOneTab(tab);
+        DockPanel.SetDock(redockBtn, Dock.Right);
+
+        var dock = new DockPanel { LastChildFill = true };
+        dock.Children.Add(redockBtn);
+        dock.Children.Add(label);
+
+        return new Border
+        {
+            Background = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0x0A, 0x1A, 0x24)),
+            BorderBrush = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0x00, 0x6B, 0x80)),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(4, 4, 4, 4),
+            Visibility = Visibility.Collapsed,
+            Child = dock,
+        };
+    }
+
+    // Redock a single tab back to the main document pane. Called from the
+    // per-tab REDOCK strip click handler. Uses the proven RemoveChild + add
+    // pattern (LayoutContent.Dock silently no-ops when PreviousContainer is
+    // an orphaned pane — see M0002 post-mortem).
+    private void RedockOneTab(ConsoleTabInfo tab)
+    {
+        var doc = tab.Document;
+        if (doc is null || !doc.IsFloating) return;
+        try
+        {
+            AppLogger.Log($"[Dock-DIAG] RedockOne ENTER | tab={doc.Title} " +
+                          $"docParent={doc.Parent?.GetType().Name ?? "<null>"} " +
+                          $"fwCount={dockManager.FloatingWindows?.Count() ?? -1} " +
+                          $"appWindows={Application.Current.Windows.Count}");
+
+            if (doc.Parent is AvalonDock.Layout.ILayoutContainer parent)
+                parent.RemoveChild(doc);
+            GetActiveDocumentPane().Children.Add(doc);
+            doc.IsActive = true;
+            doc.IsSelected = true;
+            AppLogger.Log($"[Dock-DIAG] RedockOne POST-MOVE | tab={doc.Title} " +
+                          $"docParent={doc.Parent?.GetType().Name ?? "<null>"} " +
+                          $"isFloating={doc.IsFloating} " +
+                          $"fwCount={dockManager.FloatingWindows?.Count() ?? -1}");
+
+            // Sweep right after the move — feels snappier than waiting for the
+            // OnLayoutRootUpdated safety-net pass.
+            CloseEmptyFloatingWindows("RedockOneTab");
+
+            AppLogger.Log($"[Dock-DIAG] RedockOne DONE | tab={doc.Title} " +
+                          $"fwCount={dockManager.FloatingWindows?.Count() ?? -1} " +
+                          $"appWindows={Application.Current.Windows.Count}");
+        }
+        catch (Exception ex) { AppLogger.LogError("[Dock] RedockOne failed", ex); }
+    }
+
+    // Close any floating windows that have no LayoutDocument descendants.
+    // Triggered after a redock (RedockOneTab) and as a safety net from
+    // OnLayoutRootUpdated — also covers the case where the user closes the
+    // last tab in a floating window via the tab's X.
+    //
+    // Heavy logging path: empty floating windows have proven sticky in 4.72
+    // (Close on the control alone is ignored when the layout still references
+    // it). We try multiple removal strategies in sequence and log which one
+    // actually got rid of the window so a future maintainer can see the truth.
+    private void CloseEmptyFloatingWindows(string callerTag)
+    {
+        var fws = dockManager.FloatingWindows?.ToArray();
+        AppLogger.Log($"[Dock-DIAG] CloseEmptyFW ENTER | caller={callerTag} " +
+                      $"fwCount={fws?.Length ?? -1} " +
+                      $"layoutFwCount={dockManager.Layout?.FloatingWindows?.Count() ?? -1}");
+        if (fws is null) return;
+
+        for (int i = 0; i < fws.Length; i++)
+        {
+            var fw = fws[i];
+            try
+            {
+                var modelType = fw.Model?.GetType().Name ?? "<null>";
+                bool empty;
+                int docCount = 0;
+                if (fw.Model is AvalonDock.Layout.ILayoutElement modelEl)
+                {
+                    docCount = CountLayoutDocuments(modelEl);
+                    empty = docCount == 0;
+                }
+                else
+                {
+                    empty = true; // No model → orphaned shell.
+                }
+
+                AppLogger.Log($"[Dock-DIAG] FW[{i}] | title=\"{fw.Title}\" " +
+                              $"type={fw.GetType().Name} model={modelType} " +
+                              $"docCount={docCount} empty={empty} " +
+                              $"isVisible={fw.IsVisible} isLoaded={fw.IsLoaded}");
+                if (!empty) continue;
+
+                // Strategy 1: standard Close()
+                AppLogger.Log($"[Dock-DIAG] FW[{i}] strategy=Close()");
+                fw.Close();
+                if (!fw.IsVisible)
+                {
+                    AppLogger.Log($"[Dock-DIAG] FW[{i}] result=closed-via-Close");
+                    continue;
+                }
+
+                // Strategy 2: remove the model from Layout.FloatingWindows.
+                // The Layout collection is what AvalonDock uses to recreate
+                // controls — clearing it usually forces the control to dispose.
+                if (fw.Model is AvalonDock.Layout.LayoutFloatingWindow lfw
+                    && dockManager.Layout?.FloatingWindows is { } layoutFws
+                    && layoutFws.Contains(lfw))
+                {
+                    AppLogger.Log($"[Dock-DIAG] FW[{i}] strategy=Layout.FloatingWindows.Remove");
+                    if (lfw.Parent is AvalonDock.Layout.ILayoutContainer parent)
+                        parent.RemoveChild(lfw);
+                    fw.Close();
+                    if (!fw.IsVisible)
+                    {
+                        AppLogger.Log($"[Dock-DIAG] FW[{i}] result=closed-via-LayoutRemove");
+                        continue;
+                    }
+                }
+
+                // Strategy 3: hard-hide as last resort so the user at least
+                // doesn't see the empty shell; window will be GC'd later.
+                AppLogger.Log($"[Dock-DIAG] FW[{i}] strategy=Hide (fallback)");
+                fw.Hide();
+                AppLogger.Log($"[Dock-DIAG] FW[{i}] result=hidden " +
+                              $"finalIsVisible={fw.IsVisible}");
+            }
+            catch (Exception ex) { AppLogger.LogError($"[Dock-DIAG] FW[{i}] close failed", ex); }
+        }
+
+        AppLogger.Log($"[Dock-DIAG] CloseEmptyFW EXIT | caller={callerTag} " +
+                      $"fwCountAfter={dockManager.FloatingWindows?.Count() ?? -1}");
+    }
+
+    private static int CountLayoutDocuments(AvalonDock.Layout.ILayoutElement element)
+    {
+        if (element is AvalonDock.Layout.LayoutDocument) return 1;
+        if (element is AvalonDock.Layout.ILayoutContainer container)
+        {
+            int n = 0;
+            foreach (var child in container.Children)
+                n += CountLayoutDocuments(child);
+            return n;
+        }
+        return 0;
+    }
+
+    // Flip every tab's REDOCK strip visibility based on its current float state.
+    // Called from OnLayoutRootUpdated — fires whenever AvalonDock mutates its
+    // layout (button click, drag-drop float, redock via right-click menu).
+    private void RefreshAllRedockStripVisibility()
+    {
+        foreach (var group in _cliGroups)
+            foreach (var tab in group.Tabs)
+                if (tab.RedockStrip is not null && tab.Document is not null)
+                    tab.RedockStrip.Visibility = tab.Document.IsFloating
+                        ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void OnDocTabRename(object sender, RoutedEventArgs e)
     {
         var doc = GetContextDocument(sender);
@@ -2310,6 +2542,16 @@ public partial class MainWindow : Window
                         }
                     }
                 }
+
+                // Per-tab REDOCK strip lives inside the tab's content (row 0 of
+                // TerminalHost) and travels with the tab into floating windows.
+                // Show it only while the tab is floating.
+                RefreshAllRedockStripVisibility();
+
+                // Safety net: catch any FW that became empty via paths we
+                // didn't explicitly sweep (e.g. user closes last tab via X,
+                // drag-drop scenarios that abandoned a window).
+                CloseEmptyFloatingWindows("OnLayoutRootUpdated");
             }
             catch (Exception ex)
             {

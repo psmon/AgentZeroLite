@@ -41,6 +41,12 @@ public sealed class ConsoleTabInfo : IConsoleTabInfo
     // Banner overlay shown when HealthState transitions to Dead. Stored on the
     // tab so Show/Hide are idempotent without a global lookup table.
     public Border? WedgeBanner { get; set; }
+
+    // Redock strip — sits in row 0 of TerminalHost. Visible only while
+    // the tab's LayoutDocument is in a floating window; hidden otherwise.
+    // Travels with the doc, so it appears inside the floating window
+    // automatically (the floating window hosts Document.Content).
+    public Border? RedockStrip { get; set; }
 }
 
 public sealed class CliGroupInfo : ICliGroupInfo

@@ -677,6 +677,20 @@
                                             <ContextMenu x:Name="ctxConsoleType"/>
                                         </Button.ContextMenu>
                                     </Button>
+                                    <!-- Detach: float the active terminal tab into its own window.
+                                         The matching REDOCK control lives inside the floating window
+                                         itself (rendered as a strip at the top of the tab content),
+                                         not here — putting the "go back" button on the main window
+                                         was a mismatch with the user's mental model ("I'm in the
+                                         floating window, I want to come back from here"). -->
+                                    <Button DockPanel.Dock="Right" x:Name="btnDetachTab"
+                                            Content="&#x2922; DETACH"
+                                            FontSize="10" FontWeight="Bold" Padding="10,4"
+                                            Margin="0,0,4,0"
+                                            Foreground="{StaticResource CyberMintBrush}"
+                                            Style="{StaticResource FlatButton}"
+                                            ToolTip="현재 탭을 새 창으로 분리"
+                                            Click="OnDetachActiveTabClick"/>
 <!-- Note/Harness buttons moved to BottomPanel tabs -->
                                     <StackPanel Orientation="Horizontal">
                                         <Rectangle Width="3" Height="10" Fill="{StaticResource CyberCyanBrush}" Margin="0,0,6,0"

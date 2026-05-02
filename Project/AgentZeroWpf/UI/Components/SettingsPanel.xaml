@@ -74,6 +74,68 @@
             </Setter>
         </Style>
 
+        <!-- Dark editable ComboBox — used for free-text model IDs (cbExtModel).
+             Renders an editable TextBox in the closed state so the typed value
+             stays visible, while keeping the same dark popup as DarkComboBox. -->
+        <Style x:Key="DarkComboBoxEditable" TargetType="ComboBox">
+            <Setter Property="Background" Value="#12122A"/>
+            <Setter Property="Foreground" Value="#D4D4D4"/>
+            <Setter Property="BorderBrush" Value="#2A2A5E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Padding" Value="4,3"/>
+            <Setter Property="IsEditable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="20"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.ColumnSpan="2"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"/>
+                            <TextBox x:Name="PART_EditableTextBox" Grid.Column="0"
+                                     Margin="4,0,0,0" Padding="{TemplateBinding Padding}"
+                                     Background="Transparent" BorderThickness="0"
+                                     Foreground="{TemplateBinding Foreground}"
+                                     CaretBrush="#00E5FF"
+                                     VerticalContentAlignment="Center"
+                                     IsReadOnly="{TemplateBinding IsReadOnly}"/>
+                            <ToggleButton Grid.Column="1"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Background="Transparent" BorderThickness="0"
+                                          Focusable="False" ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}">
+                                            <TextBlock Text="&#x25BE;" Foreground="#556677"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       FontSize="10"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="Popup" Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True" Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
+                                        MaxHeight="200" MinWidth="{TemplateBinding ActualWidth}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Dark ComboBoxItem -->
         <Style TargetType="ComboBoxItem">
             <Setter Property="Background" Value="#1A1A2E"/>
@@ -89,10 +151,12 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#264F78"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#00E5FF"/>
+                                <Setter Property="Foreground" Value="#0B0B0B"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#0D4477"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#00B8D4"/>
+                                <Setter Property="Foreground" Value="#0B0B0B"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -144,6 +208,75 @@
             </Setter>
         </Style>
 
+        <!-- Dark ListViewItem — full-inversion selection so the picked row is unmistakable.
+             Default WPF ListViewItem uses SystemColors.HighlightBrush which barely contrasts
+             against #1E1E1E on dark themes. We swap to the cyan accent + dark text. -->
+        <Style x:Key="DarkListViewItem" TargetType="ListViewItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#D4D4D4"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="0"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <GridViewRowPresenter
+                                Columns="{TemplateBinding GridView.ColumnCollection}"
+                                Content="{TemplateBinding Content}"
+                                TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E2F45"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#00E5FF"/>
+                                <Setter Property="Foreground" Value="#0B0B0B"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True"/>
+                                    <Condition Property="Selector.IsSelectionActive" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="#0099AA"/>
+                                <Setter Property="Foreground" Value="#0B0B0B"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark GridView column header — keeps the table header dark too -->
+        <Style x:Key="DarkGridViewColumnHeader" TargetType="GridViewColumnHeader">
+            <Setter Property="Background" Value="#12122A"/>
+            <Setter Property="Foreground" Value="#9FB7CC"/>
+            <Setter Property="BorderBrush" Value="#2A2A5E"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GridViewColumnHeader">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Tab item style -->
         <Style x:Key="SettingsTabItem" TargetType="TabItem">
             <Setter Property="FontFamily" Value="Consolas"/>
@@ -187,9 +320,11 @@
         <!-- Header -->
         <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="True">
             <Button x:Name="btnSettingsClose" DockPanel.Dock="Right"
-                    Content="&#x2715;" Width="28" Height="22" Padding="0"
-                    Background="Transparent" BorderThickness="0"
-                    Foreground="#888899" FontSize="13" FontFamily="Segoe UI"
+                    Content="&#x2715;  CLOSE" Padding="14,5"
+                    Background="#2A1320" BorderThickness="1"
+                    BorderBrush="#5A2540"
+                    Foreground="#FFB0C8" FontSize="11" FontWeight="Bold"
+                    FontFamily="Consolas"
                     Cursor="Hand" ToolTip="닫기 (일반 화면으로)"
                     Click="OnSettingsCloseClick">
                 <Button.Style>
@@ -198,13 +333,20 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                            BorderThickness="0" CornerRadius="2">
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="2"
+                                            Padding="{TemplateBinding Padding}">
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="bd" Property="Background" Value="#E81123"/>
+                                            <Setter TargetName="bd" Property="Background" Value="#C42B1C"/>
+                                            <Setter TargetName="bd" Property="BorderBrush" Value="#E81123"/>
                                             <Setter Property="Foreground" Value="#FFFFFF"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="#7A1810"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -235,9 +377,10 @@
                             Background="#1E1E1E">
                         <ListView x:Name="lvCliDefs" Background="Transparent" BorderThickness="0"
                                   Foreground="#D4D4D4" FontFamily="Consolas" FontSize="12"
+                                  ItemContainerStyle="{StaticResource DarkListViewItem}"
                                   SelectionChanged="OnCliDefSelectionChanged">
                             <ListView.View>
-                                <GridView>
+                                <GridView ColumnHeaderContainerStyle="{StaticResource DarkGridViewColumnHeader}">
                                     <GridViewColumn Header="Name" Width="100"
                                                     DisplayMemberBinding="{Binding Name}"/>
                                     <GridViewColumn Header="ExePath" Width="200"
@@ -628,12 +771,11 @@
                                                     </Grid.ColumnDefinitions>
                                                     <!-- IsEditable lets users type a model id that's not in the
                                                          provider's /v1/models list (common for niche LM Studio
-                                                         loads). The DarkComboBox template renders only
-                                                         SelectionBoxItem so it can't show the typed Text — fall
-                                                         back to the default ComboBox visuals here. -->
+                                                         loads). DarkComboBoxEditable provides the dark template
+                                                         with a real PART_EditableTextBox so the typed value stays
+                                                         visible. -->
                                                     <ComboBox x:Name="cbExtModel" Grid.Column="0"
-                                                              IsEditable="True"
-                                                              FontFamily="Consolas" FontSize="10"
+                                                              Style="{StaticResource DarkComboBoxEditable}"
                                                               SelectionChanged="OnExtModelChanged"/>
                                                     <Button x:Name="btnExtRefreshModels" Grid.Column="1"
                                                             Content="Refresh" Padding="12,5" Margin="8,0,0,0"
