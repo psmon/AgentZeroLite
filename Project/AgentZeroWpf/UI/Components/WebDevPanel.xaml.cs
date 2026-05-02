@@ -21,13 +21,35 @@ public partial class WebDevPanel : UserControl
     private WebDevHost? _host;
     private WebDevBridge? _bridge;
     private bool _initStarted;
+    private bool _windowClosedHooked;
     private string _entryPath = DefaultEntry;
 
     public WebDevPanel()
     {
         InitializeComponent();
         IsVisibleChanged += OnVisibleChanged;
-        Unloaded += OnUnloaded;
+        Loaded += OnLoaded;
+    }
+
+    // Disposal is bound to the host window's Closed event, NOT to UserControl.Unloaded.
+    // The Settings TabControl raises Unloaded every time the user switches away from
+    // the WebDev tab; disposing webDevView there killed the WebView2 and made the next
+    // Reload/DevTools click throw ObjectDisposedException — the typical trigger was
+    // editing the Voice/TTS provider on a sibling tab and returning here to reload.
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_windowClosedHooked) return;
+        var w = Window.GetWindow(this);
+        if (w is null) return;
+        _windowClosedHooked = true;
+        w.Closed += OnHostWindowClosed;
+    }
+
+    private void OnHostWindowClosed(object? sender, EventArgs e)
+    {
+        try { _bridge?.Detach(); } catch { }
+        try { _host?.Dispose(); } catch { }
+        try { webDevView.Dispose(); } catch { }
     }
 
     /// <summary>Optional — change the loaded sub-app path (e.g. "voice-test/index.html").</summary>
@@ -101,10 +123,4 @@ public partial class WebDevPanel : UserControl
         webDevView.CoreWebView2.OpenDevToolsWindow();
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e)
-    {
-        try { _bridge?.Detach(); } catch { }
-        try { _host?.Dispose(); } catch { }
-        try { webDevView.Dispose(); } catch { }
-    }
 }
