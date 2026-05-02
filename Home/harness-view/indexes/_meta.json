@@ -1,7 +1,7 @@
 {
-  "builtAt": "2026-05-02T11:38:30.545Z",
-  "builtAtMs": 1777721910545,
-  "durationMs": 421,
+  "builtAt": "2026-05-02T14:29:59.059Z",
+  "builtAtMs": 1777732199059,
+  "durationMs": 440,
   "trigger": "manual",
   "scannedPaths": [
     "harness/docs",
@@ -16,5 +16,5 @@
     "harness/missions",
     "harness/logs/mission-records"
   ],
-  "sourceMaxMs": 1777721904111.308
+  "sourceMaxMs": 1777731276893.803
 }

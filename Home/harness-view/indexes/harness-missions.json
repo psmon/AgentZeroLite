@@ -10,8 +10,8 @@
     "cancelled"
   ],
   "counts": {
-    "all": 5,
-    "inbox": 1,
+    "all": 6,
+    "inbox": 2,
     "in_progress": 0,
     "done": 4,
     "partial": 0,
@@ -19,6 +19,22 @@
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0005",
+      "file": "harness/missions/M0005-어셈테스트웹뷰.md",
+      "title": "M0005-어셈테스트웹뷰",
+      "operator": null,
+      "language": null,
+      "status": "inbox",
+      "priority": null,
+      "created": null,
+      "recordFile": null,
+      "recordStatus": null,
+      "recordStarted": null,
+      "recordFinished": null,
+      "modified": "2026-05-02",
+      "size": 965
+    },
     {
       "id": "M0004",
       "file": "harness/missions/M0004-AgentZeroHybridLLMWithActor.md",

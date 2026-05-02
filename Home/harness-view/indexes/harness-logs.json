@@ -11,14 +11,38 @@
   ],
   "counts": {
     "build-doctor": 4,
-    "code-coach": 15,
-    "mission-records": 4,
-    "pre-commit-review": 7,
+    "code-coach": 16,
+    "mission-records": 5,
+    "pre-commit-review": 8,
     "release-build-pipeline": 4,
     "security-guard": 6,
     "tamer": 16
   },
   "items": [
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-02-22-55-precommit-m0005-webdev-tab.md",
+      "date": "2026-05-02",
+      "time": "22:55",
+      "title": "precommit m0005 webdev tab",
+      "size": 4728
+    },
+    {
+      "category": "pre-commit-review",
+      "file": "harness/logs/pre-commit-review/2026-05-02-22-55-m0005-webdev-tab.md",
+      "date": "2026-05-02",
+      "time": "22:55",
+      "title": "m0005 webdev tab",
+      "size": 1072
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/2026-05-02-22-49-M0005-webdev-tab-wasm-bridge.md",
+      "date": "2026-05-02",
+      "time": "22:49",
+      "title": "M0005 webdev tab wasm bridge",
+      "size": 6163
+    },
     {
       "category": "build-doctor",
       "file": "harness/logs/build-doctor/2026-05-02-17-50-release-gate-v0-3-1.md",
