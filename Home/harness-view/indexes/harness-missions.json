@@ -11,9 +11,9 @@
   ],
   "counts": {
     "all": 6,
-    "inbox": 2,
+    "inbox": 1,
     "in_progress": 0,
-    "done": 4,
+    "done": 5,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
@@ -22,18 +22,18 @@
     {
       "id": "M0005",
       "file": "harness/missions/M0005-어셈테스트웹뷰.md",
-      "title": "M0005-어셈테스트웹뷰",
-      "operator": null,
-      "language": null,
-      "status": "inbox",
-      "priority": null,
-      "created": null,
-      "recordFile": null,
-      "recordStatus": null,
-      "recordStarted": null,
-      "recordFinished": null,
+      "title": "WebDev 탭 + IZeroBrowser 네이티브 브리지 — Wasm 샌드박스 도입",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-02",
+      "recordFile": "harness/logs/mission-records/M0005-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-02T22:00:00+09:00",
+      "recordFinished": "2026-05-02T22:49:00+09:00",
       "modified": "2026-05-02",
-      "size": 965
+      "size": 1158
     },
     {
       "id": "M0004",
