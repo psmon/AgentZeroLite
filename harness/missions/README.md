@@ -55,7 +55,7 @@ The file IS the request log. It does not need to be copied elsewhere.
    - new agent / harness update → tamer itself (Mode B)
    - documentation only → tamer or specialist depending on topic
 4. After execution, the **completion log** is written to
-   `harness/logs/미션기록/M{NNNN}-수행결과.md` in the **operator's language**
+   `harness/logs/mission-records/M{NNNN}-수행결과.md` in the **operator's language**
    (per the mission's `language` field).
 5. The mission file's `status` is updated `inbox → in_progress → done`.
 
@@ -63,7 +63,7 @@ The file IS the request log. It does not need to be copied elsewhere.
 
 Inside the missions subsystem, output language **matches the requester**.
 This overrides the harness-wide "English-only artifacts" convention for
-mission files and `harness/logs/미션기록/` entries only. Other harness
+mission files and `harness/logs/mission-records/` entries only. Other harness
 artifacts (agents, knowledge, engine) remain English.
 
 ## Quick example
@@ -94,4 +94,4 @@ CLAUDE.md의 Actor topology 섹션이 텍스트뿐이다. mermaid 다이어그�
 Operator: **"M0042 수행해"**
 
 → tamer reads M0042, dispatches to documentation work, edits CLAUDE.md,
-writes `harness/logs/미션기록/M0042-수행결과.md` in Korean.
+writes `harness/logs/mission-records/M0042-수행결과.md` in Korean.

@@ -21,7 +21,7 @@ triggers:
   - "run mission M\\d{4}"
   - "미션 목록"
   - "list missions"
-description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)을 심고, 토양(지식)을 가꾸고, 물길(엔진)을 낸다. operator의 mission 파일(harness/missions/M{NNNN}-*.md)을 받으면 적절한 전문가에게 dispatch하고 결과를 harness/logs/미션기록/에 operator의 언어로 기록한다.
+description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)을 심고, 토양(지식)을 가꾸고, 물길(엔진)을 낸다. operator의 mission 파일(harness/missions/M{NNNN}-*.md)을 받으면 적절한 전문가에게 dispatch하고 결과를 harness/logs/mission-records/에 operator의 언어로 기록한다.
 ---
 
 # 정원지기 카카시 (Tamer)
@@ -113,7 +113,7 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 6. specialist 자체 로그(`harness/logs/{agent}/*.md`) 는 그 agent의 contract대로
    기록되게 둔다 — 별도로 가로채지 않는다.
 7. **[필수] 완료 로그 작성**:
-   - 경로: `harness/logs/미션기록/M{NNNN}-수행결과.md`
+   - 경로: `harness/logs/mission-records/M{NNNN}-수행결과.md`
    - 언어: mission의 `language` 필드를 따른다 (한국어 요청 → 한국어 결과,
      영문 요청 → 영문 결과). 이는 하네스 전체의 영어 우선 정책에 대한
      **mission-scope override** — `harness/knowledge/missions-protocol.md`
@@ -141,7 +141,7 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 - "마감" / "완료" — 이미 작업이 끝난 미션의 `status: done` 갱신만 수행
   (보통 dispatch 절차가 자동으로 처리하므로 명시 호출은 드물다).
 - "취소" — `status: cancelled` 로 갱신하고
-  `harness/logs/미션기록/M{NNNN}-수행결과.md` 에 cancel rationale 한 단락
+  `harness/logs/mission-records/M{NNNN}-수행결과.md` 에 cancel rationale 한 단락
   기록 (mission language로). dispatch는 수행하지 않는다.
 
 ## 평가 기준

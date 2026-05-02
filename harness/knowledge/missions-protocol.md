@@ -29,16 +29,20 @@ harness/
 │   ├── M0042-document-actor-topology.md
 │   └── …
 └── logs/
-    └── 미션기록/                                ← completion logs (operator-language)
+    └── mission-records/                                ← completion logs (operator-language)
         ├── M0001-수행결과.md
         ├── M0042-수행결과.md
         └── …
 ```
 
-The directory name `미션기록` is intentionally Korean — it's the *operator's*
-record cabinet and lives in the operator's language. This is a deliberate
-exception to the harness-wide "all artifacts in English" convention; see
-"Language policy" below.
+The **directory name is English** for tooling safety (grep, paths in URLs,
+git, IDE outline panes). The **files inside** can be named in the operator's
+language — see "Completion log filenames" below — and the **body content** is
+always in the operator's language per the "Language policy" section.
+
+Earlier drafts (v1.3.0) used a Korean directory name (`미션기록/`); v1.3.1
+renamed it to `mission-records/` after operator feedback that mixed-script
+paths complicate external tooling.
 
 ## Mission file contract
 
@@ -112,8 +116,10 @@ The harness-wide convention is "all artifacts in English"
 | Artifact | Language |
 |---|---|
 | Mission file body (`harness/missions/*.md`) | Operator's choice (whatever the brief is written in) |
-| Completion log (`harness/logs/미션기록/*.md`) | **Match the mission's `language` field** |
-| Mission filename slug | English (kebab-case) — for tooling safety |
+| Mission filename slug | **English** (kebab-case) — for tooling safety |
+| Mission `missions/` and `logs/mission-records/` directory names | **English** — for tooling safety |
+| Completion log file body | **Match the mission's `language` field** |
+| Completion log filename slug | May match the mission's language (e.g. `M0001-수행결과.md` for ko, `M0002-execution-result.md` for en) |
 | Tamer / specialist agent files (`harness/agents/*.md`) | English (unchanged) |
 | Knowledge / engine / docs (`harness/knowledge/*`, `harness/engine/*`, `harness/docs/*`) | English (unchanged) |
 
@@ -123,7 +129,13 @@ specialist agents and external tooling don't fragment.
 
 ## Completion log contract
 
-Path: `harness/logs/미션기록/M{NNNN}-수행결과.md`
+Path: `harness/logs/mission-records/M{NNNN}-{slug}.md`
+
+Slug rules:
+- Korean missions → `M{NNNN}-수행결과.md` (Korean slug OK).
+- English missions → `M{NNNN}-execution-result.md` (or any English kebab-case).
+- Other languages → analogous; the file lives next to peers and grep tolerates
+  Unicode filenames, but English is always a safe default if uncertain.
 
 Frontmatter (mirror of the mission's metadata + execution outcome):
 

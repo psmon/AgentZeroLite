@@ -23,7 +23,8 @@ type: meta — bootstraps the missions subsystem itself
 ## 기록 분리 원칙
 
 - **요청 기록**: 미션 파일 자체가 그대로 요청서 (별도 사본 만들지 않음)
-- **수행 기록**: 별도 기록 담당이 분리되어 작동 — `harness/logs/미션기록/M{NNNN}-수행결과.md`
+- **수행 기록**: 별도 기록 담당이 분리되어 작동 — `harness/logs/mission-records/M{NNNN}-{slug}.md`
+  (참고: 원 요청 본문은 한국어 디렉터리명 `미션기록/`로 적었으나, v1.3.1에서 tooling 호환성을 위해 `mission-records/`로 rename. 파일 slug는 미션 언어를 따라 `수행결과` 또는 `execution-result` 둘 다 가능.)
 
 ## 언어 정책
 
@@ -43,7 +44,7 @@ type: meta — bootstraps the missions subsystem itself
 - [ ] `harness/missions/README.md` (네이밍/사용법)
 - [ ] `harness/knowledge/missions-protocol.md` 작성
 - [ ] `harness/agents/tamer.md` — mission dispatch 트리거 + 절차 추가
-- [ ] `harness/logs/미션기록/M0001-수행결과.md` (한국어)
+- [ ] `harness/logs/mission-records/M0001-수행결과.md` (한국어 — 파일 slug는 한국어, 디렉터리는 영문)
 - [ ] `harness/harness.config.json` v1.2.0 → v1.3.0 + missions 디렉터리 명시
 - [ ] `harness/docs/v1.3.0.md` 작성
 - [ ] `MEMORY.md` 인덱스 갱신 (필요 시 신규 메모리)
@@ -55,5 +56,5 @@ type: meta — bootstraps the missions subsystem itself
 tamer:  → harness/missions/M0042-*.md 읽음
         → 미션 타입 판별 (코드개선 / 문서화 / 역할추가 …)
         → 전문가 소환 (code-coach / build-doctor / tamer 자기 자신 …)
-        → 수행 후 harness/logs/미션기록/M0042-수행결과.md 기록 (요청 언어로)
+        → 수행 후 harness/logs/mission-records/M0042-수행결과.md 기록 (요청 언어로)
 ```
