@@ -113,12 +113,22 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 6. specialist 자체 로그(`harness/logs/{agent}/*.md`) 는 그 agent의 contract대로
    기록되게 둔다 — 별도로 가로채지 않는다.
 7. **[필수] 완료 로그 작성**:
-   - 경로: `harness/logs/mission-records/M{NNNN}-수행결과.md`
+   - **경로 규칙은 인덱서 contract 가 강제한다** — 자세히는
+     **`.claude/skills/harness-view-build/references/data-contracts.md`** 의
+     "Rule 1 — Mission records must start with `M{NNNN}`" 참고.
+     - 한국어 mission → `harness/logs/mission-records/M{NNNN}-수행결과.md`
+     - 영문 mission → `harness/logs/mission-records/M{NNNN}-execution-result.md`
+     - **타임스탬프 prefix 금지** — 인덱서 regex `^(M\d+)\b` 가 매칭에 실패해서
+       Missions 카드의 `recordFile` 이 null 로 남는다. 일반 tamer Mode A 로그
+       (`harness/logs/tamer/{yyyy-MM-dd-HH-mm-title}.md`) 와 다른 규칙임에 주의.
    - 언어: mission의 `language` 필드를 따른다 (한국어 요청 → 한국어 결과,
      영문 요청 → 영문 결과). 이는 하네스 전체의 영어 우선 정책에 대한
      **mission-scope override** — `harness/knowledge/missions-protocol.md`
      "Language policy" 섹션 참고.
-   - 형식: missions-protocol.md 의 "Completion log contract" 섹션을 따른다.
+   - Frontmatter: `mission / title / operator / language / dispatched_to /
+     status / started / finished / artifacts` 9개 필드 모두. 임의 필드
+     (`date / agent / type` 등) 박지 말 것 — 인덱서 + 감사 일관성을 위해
+     `missions-protocol.md` "Completion log contract" 섹션의 형식만 사용.
 8. mission 파일의 `status` 를 `done` (성공) / `partial` (부분 완료) /
    `blocked` / `cancelled` 중 하나로 갱신.
 9. operator에게 결과 보고. 보고문도 mission language를 따른다.

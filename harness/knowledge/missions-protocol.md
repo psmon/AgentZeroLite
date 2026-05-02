@@ -131,11 +131,22 @@ specialist agents and external tooling don't fragment.
 
 Path: `harness/logs/mission-records/M{NNNN}-{slug}.md`
 
+> **Filename is enforced by the harness-view indexer**, not just convention.
+> `Home/harness-view/scripts/build-indexes.js:431` matches mission records
+> with regex `^(M\d+)\b` — anything that doesn't start with the mission ID
+> is silently dropped, leaving the Missions card's `recordFile` null even
+> when work was completed. The full contract (regex source, anti-patterns,
+> frontmatter shape consumed by the indexer) lives at
+> **`.claude/skills/harness-view-build/references/data-contracts.md`** —
+> consult that file before changing this section.
+
 Slug rules:
 - Korean missions → `M{NNNN}-수행결과.md` (Korean slug OK).
 - English missions → `M{NNNN}-execution-result.md` (or any English kebab-case).
 - Other languages → analogous; the file lives next to peers and grep tolerates
   Unicode filenames, but English is always a safe default if uncertain.
+- **Never** prefix with timestamp / `mission-` / any other token that pushes
+  `M{NNNN}` off the start of the filename.
 
 Frontmatter (mirror of the mission's metadata + execution outcome):
 

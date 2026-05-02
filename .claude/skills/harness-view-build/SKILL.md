@@ -98,6 +98,23 @@ DEV SERVER / PDSA UPDATE 는 본 파일 하단 인라인 절차를 바로 수행
 
 판별이 모호하면 사용자에게 한 줄 확인.
 
+## Data contracts (다른 스킬이 봐야 할 파일)
+
+뷰어 인덱서 (`Home/harness-view/scripts/build-indexes.js`) 가 어떤 파일명·
+frontmatter 모양만 받아들이는지의 단일 진실 원천:
+
+> **`references/data-contracts.md`**
+
+이 스킬 외부의 워크플로우 (특히 **harness-kakashi-creator** 의 tamer
+mission dispatch) 가 `harness/missions/` · `harness/logs/mission-records/`
+에 파일을 쓸 때, 이 contract 를 먼저 확인해야 한다. 가장 자주 어기는
+규칙은 **mission record 파일명이 `^M\d+\b` 로 시작해야 한다는 것** —
+timestamp prefix 를 붙이면 인덱서가 매칭에 실패해서 Missions 카드의
+`recordFile` 이 `null` 로 남는다.
+
+`harness/knowledge/missions-protocol.md` 와 `harness/agents/tamer.md` 의
+관련 단계가 이 파일을 backlink 한다.
+
 ## DEV SERVER 모드 — 로컬 dev 서버 기동 (인라인 절차)
 
 사용자가 "하네스뷰 데브서버 구동해" 등을 말하면, reference 파일 읽지 말고 **즉시 아래 절차 수행**.
