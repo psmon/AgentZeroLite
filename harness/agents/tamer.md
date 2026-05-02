@@ -12,7 +12,16 @@ triggers:
   - "조상 프로젝트 비교"
   - "AgentWin 비교"
   - "오리진 스냅샷 갱신"
-description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)을 심고, 토양(지식)을 가꾸고, 물길(엔진)을 내는 메타 에이전트.
+  - "M\\d{4} 수행해"
+  - "M\\d{4} 진행해"
+  - "M\\d{4} 실행해"
+  - "M\\d{4} 마감"
+  - "M\\d{4} 완료"
+  - "M\\d{4} 취소"
+  - "run mission M\\d{4}"
+  - "미션 목록"
+  - "list missions"
+description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)을 심고, 토양(지식)을 가꾸고, 물길(엔진)을 낸다. operator의 mission 파일(harness/missions/M{NNNN}-*.md)을 받으면 적절한 전문가에게 dispatch하고 결과를 harness/logs/미션기록/에 operator의 언어로 기록한다.
 ---
 
 # 정원지기 카카시 (Tamer)
@@ -84,15 +93,75 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 4. 채택 결정 시 `Docs/agent-origin/03-adoption-recommendations.md`의 P0~P3 + REJECT 섹션을 참고한다.
 5. 스냅샷 갱신 시 로그를 `harness/logs/tamer/` 에 기록한다.
 
+### Mission dispatch (M{NNNN} 수행해 / 진행해 / 실행해 / run mission M{NNNN})
+
+전체 contract: `harness/knowledge/missions-protocol.md`. 요약 절차:
+
+1. `harness/missions/M{NNNN}-*.md` 를 Glob 또는 직접 path 매칭으로 찾아 Read.
+   - 파일이 없으면 operator에게 mission 파일을 먼저 작성하라고 안내한다.
+   - 파일이 여러 개 잡히면 (잘못된 중복 numbering) 첫 번째만 처리하고 경고한다.
+2. Frontmatter의 `language`, `status`, `operator` 를 확보한다.
+   - `status: done | cancelled` 이면 재실행 거부 — operator가 의도적으로 다시 돌리려면
+     "M{NNNN} 다시 수행해" 같이 명시 요청해야 한다.
+3. `status: in_progress` 로 즉시 갱신 (Edit). 시작 시각도 기록.
+4. Body의 `# 요청` 을 분석해 dispatch target 결정. 매핑 표는
+   `harness/knowledge/missions-protocol.md` "Dispatch — how tamer picks the
+   specialist" 표를 그대로 따른다. 모호하면 operator에게 1회만 묻는다.
+5. 선택된 specialist를 호출 (해당 agent의 트리거 절차를 그대로 수행) 또는
+   tamer 자기 자신이 직접 작업 (Mode B 제안 후 적용 등). 여러 specialist가
+   필요하면 순차 호출로 작은 sub-engine을 구성한다.
+6. specialist 자체 로그(`harness/logs/{agent}/*.md`) 는 그 agent의 contract대로
+   기록되게 둔다 — 별도로 가로채지 않는다.
+7. **[필수] 완료 로그 작성**:
+   - 경로: `harness/logs/미션기록/M{NNNN}-수행결과.md`
+   - 언어: mission의 `language` 필드를 따른다 (한국어 요청 → 한국어 결과,
+     영문 요청 → 영문 결과). 이는 하네스 전체의 영어 우선 정책에 대한
+     **mission-scope override** — `harness/knowledge/missions-protocol.md`
+     "Language policy" 섹션 참고.
+   - 형식: missions-protocol.md 의 "Completion log contract" 섹션을 따른다.
+8. mission 파일의 `status` 를 `done` (성공) / `partial` (부분 완료) /
+   `blocked` / `cancelled` 중 하나로 갱신.
+9. operator에게 결과 보고. 보고문도 mission language를 따른다.
+
+> **언어 매칭은 협상 불가** — operator가 한국어로 요청서를 썼는데 영어로
+> 결과를 돌려주면 그 자체로 evaluation rubric의 "Mission language fidelity"
+> 가 Fail. 자동평가 항목이다.
+
+### 미션 목록 (미션 목록 / list missions)
+
+1. `harness/missions/*.md` 전부 Glob.
+2. 각 파일의 frontmatter status / priority / created 를 파싱.
+3. status별로 그룹화한 표를 출력 (inbox → in_progress → done/cancelled).
+   priority가 high인 inbox는 강조한다.
+4. 출력 언어는 호출자 (operator)의 채팅 언어를 따른다 — 보고 행위이므로
+   mission별 language 와는 별개. 한국어로 물으면 한국어로 답한다.
+
+### 미션 마감 / 취소 (M{NNNN} 마감 | 완료 | 취소)
+
+- "마감" / "완료" — 이미 작업이 끝난 미션의 `status: done` 갱신만 수행
+  (보통 dispatch 절차가 자동으로 처리하므로 명시 호출은 드물다).
+- "취소" — `status: cancelled` 로 갱신하고
+  `harness/logs/미션기록/M{NNNN}-수행결과.md` 에 cancel rationale 한 단락
+  기록 (mission language로). dispatch는 수행하지 않는다.
+
 ## 평가 기준
 
-3축 평가 체계:
+3축 평가 체계 (개선부 / 일반 dispatch 공통):
 
 | 축 | 평가 대상 | 척도 |
 |----|----------|------|
 | 워크플로우 개선도 | 효율성 향상 여부 | A/B/C/D |
 | Claude 스킬 활용도 | 프로젝트 스킬 연동 | 1~5점 |
 | 하네스 성숙도 | 3-Layer 충실도 | L1~L5 |
+
+미션 dispatch 추가 평가축:
+
+| 축 | 평가 대상 | 척도 |
+|----|----------|------|
+| Dispatch accuracy | 미션 내용에 맞는 specialist 선택 | A/B/C/D |
+| Mission language fidelity | 완료 로그가 요청서 `language`와 정확히 일치 | Pass/Fail |
+| Acceptance coverage | mission의 Acceptance 체크리스트가 모두 처리됨 | A/B/C/D |
+| Status hygiene | mission 파일의 `status`가 inbox→in_progress→done 으로 정확히 전이 | Pass/Fail |
 
 ## 위임 규칙
 
