@@ -10,15 +10,39 @@
     "tamer"
   ],
   "counts": {
-    "build-doctor": 3,
+    "build-doctor": 4,
     "code-coach": 15,
-    "mission-records": 2,
+    "mission-records": 3,
     "pre-commit-review": 7,
-    "release-build-pipeline": 3,
-    "security-guard": 5,
+    "release-build-pipeline": 4,
+    "security-guard": 6,
     "tamer": 16
   },
   "items": [
+    {
+      "category": "build-doctor",
+      "file": "harness/logs/build-doctor/2026-05-02-17-50-release-gate-v0-3-1.md",
+      "date": "2026-05-02",
+      "time": "17:50",
+      "title": "release gate v0 3 1",
+      "size": 7061
+    },
+    {
+      "category": "release-build-pipeline",
+      "file": "harness/logs/release-build-pipeline/2026-05-02-17-50-release-gate-v0-3-1.md",
+      "date": "2026-05-02",
+      "time": "17:50",
+      "title": "release gate v0 3 1",
+      "size": 2378
+    },
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-05-02-17-49-release-gate-v0-3-1.md",
+      "date": "2026-05-02",
+      "time": "17:49",
+      "title": "release gate v0 3 1",
+      "size": 10342
+    },
     {
       "category": "code-coach",
       "file": "harness/logs/code-coach/2026-05-02-16-41-m0002-ui-improvements.md",
@@ -426,6 +450,14 @@
       "time": null,
       "title": "M0002-수행결과",
       "size": 22084
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0003-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0003-수행결과",
+      "size": 17647
     }
   ]
 }

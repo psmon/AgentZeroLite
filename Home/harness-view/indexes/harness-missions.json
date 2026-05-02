@@ -10,15 +10,31 @@
     "cancelled"
   ],
   "counts": {
-    "all": 3,
+    "all": 4,
     "inbox": 1,
     "in_progress": 0,
-    "done": 2,
+    "done": 3,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0003",
+      "file": "harness/missions/M0003-하네스뷰-미션뷰개선.md",
+      "title": "하네스뷰 — 미션뷰 개선",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-02",
+      "recordFile": "harness/logs/mission-records/M0003-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-02T09:00:00+09:00",
+      "recordFinished": "2026-05-02T10:45:00+09:00",
+      "modified": "2026-05-02",
+      "size": 1873
+    },
     {
       "id": "M0002",
       "file": "harness/missions/M0002-UI개선.md",

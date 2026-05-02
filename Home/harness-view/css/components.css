@@ -449,137 +449,408 @@
 .pagination .page:hover { background: #F3F4F6; }
 .pagination .page.active:hover { background: #1D4ED8; }
 
-/* ─── Missions — TODO-style checklist ─────────────────────────────────── */
-.todo-list {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 4px 0;
+/* ─── Missions — fridge + post-it metaphor ───────────────────────────── */
+.fridge {
+  position: relative;
+  margin: 0 -8px;
+  padding: 16px 16px 32px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, #E8ECF2 0%, #D6DCE4 45%, #BFC5CE 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 14px 30px rgba(10, 15, 26, 0.16);
+  /* Faint vertical "brushed metal" lines layered on top of the gradient. */
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 3px,
+      rgba(0, 0, 0, 0.04) 3px 4px,
+      transparent 4px 6px
+    ),
+    linear-gradient(180deg, #E8ECF2 0%, #D6DCE4 45%, #BFC5CE 100%);
 }
-.todo-row {
-  display: grid;
-  grid-template-columns: 32px 1fr auto;
+.fridge-empty { padding: 48px 16px; }
+.fridge-empty-card {
+  margin: 0 auto;
+  max-width: 520px;
+  padding: 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 12px rgba(10, 15, 26, 0.12);
+  text-align: center;
+}
+.fridge-empty-card.subtle { padding: 14px; font-size: 13px; color: #4B5563; }
+.fridge-empty-title { font-weight: 700; color: #1F2937; margin-bottom: 6px; }
+.fridge-empty-sub   { color: #6B7280; font-size: 12px; }
+
+/* ─── Magnet toolbar ─────────────────────────────────────────────────── */
+.fridge-toolbar {
+  display: flex; flex-wrap: wrap; gap: 8px;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  border-left: 3px solid #D1D5DB;
-  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 6px rgba(10, 15, 26, 0.08);
+  backdrop-filter: blur(6px);
+}
+.magnet {
+  display: inline-flex; align-items: center;
+  padding: 6px 12px;
+  border-radius: 14px;
+  font-size: 11px; font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
-}
-.todo-row:hover { background: #F9FAFB; transform: translateX(2px); }
-.todo-row.status-done       { border-left-color: #10B981; background: #F0FDF4; }
-.todo-row.status-done .todo-title { color: #065F46; text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: rgba(6,95,70,0.4); }
-.todo-row.status-progress   { border-left-color: #F59E0B; background: #FFFBEB; }
-.todo-row.status-inbox      { border-left-color: #6B7280; }
-.todo-row.status-partial    { border-left-color: #F59E0B; background: #FFFBEB; }
-.todo-row.status-blocked    { border-left-color: #EF4444; background: #FEF2F2; }
-.todo-row.status-cancelled  { border-left-color: #9CA3AF; background: #F3F4F6; opacity: 0.75; }
-.todo-row.status-cancelled .todo-title { text-decoration: line-through; color: #6B7280; }
-
-.todo-indicator {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px;
-  border-radius: 50%;
+  user-select: none;
   background: #F3F4F6;
-  color: #6B7280;
+  color: #374151;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 2px rgba(10, 15, 26, 0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.todo-indicator.status-done       { background: #DCFCE7; color: #15803D; }
-.todo-indicator.status-progress   { background: #FEF3C7; color: #B45309; }
-.todo-indicator.status-inbox      { background: #F3F4F6; color: #6B7280; }
-.todo-indicator.status-partial    { background: #FEF3C7; color: #B45309; }
-.todo-indicator.status-blocked    { background: #FEE2E2; color: #B91C1C; }
-.todo-indicator.status-cancelled  { background: #F3F4F6; color: #9CA3AF; }
+.magnet:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(10, 15, 26, 0.25); }
+.magnet.active { background: #1F2937; color: #FFFFFF; border-color: #1F2937; }
+.magnet.magnet-inbox      { background: #FEF3C7; color: #92400E; border-color: #FDE68A; }
+.magnet.magnet-progress   { background: #FED7AA; color: #9A3412; border-color: #FDBA74; }
+.magnet.magnet-done       { background: #DCFCE7; color: #15803D; border-color: #BBF7D0; }
+.magnet.magnet-partial    { background: #FEF3C7; color: #B45309; border-color: #FDE68A; }
+.magnet.magnet-blocked    { background: #FEE2E2; color: #B91C1C; border-color: #FCA5A5; }
+.magnet.magnet-cancelled  { background: #F3F4F6; color: #6B7280; border-color: #E5E7EB; }
+.magnet.active.magnet-inbox,
+.magnet.active.magnet-progress,
+.magnet.active.magnet-done,
+.magnet.active.magnet-partial,
+.magnet.active.magnet-blocked,
+.magnet.active.magnet-cancelled {
+  background: #1F2937; color: #FFFFFF; border-color: #1F2937;
+}
 
-.todo-body { min-width: 0; }
-.todo-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.todo-id {
+/* ─── Sticky board ───────────────────────────────────────────────────── */
+.sticky-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 28px 24px;
+  padding: 16px 8px 8px;
+}
+
+@keyframes sticky-sway {
+  0%, 100% { transform: rotate(calc(var(--rot, 0deg) - 0.4deg)); }
+  50%      { transform: rotate(calc(var(--rot, 0deg) + 0.4deg)); }
+}
+@keyframes sticky-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(245, 158, 11, 0), 6px 10px 16px rgba(10, 15, 26, 0.22); }
+  50%      { box-shadow: 0 0 22px rgba(245, 158, 11, 0.55), 6px 10px 16px rgba(10, 15, 26, 0.22); }
+}
+
+.sticky {
+  --rot: 0deg;
+  position: relative;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 16px 18px 14px;
+  min-height: 188px;
+  cursor: pointer;
+  transform: rotate(var(--rot));
+  transform-origin: 50% 0%;
+  background: linear-gradient(135deg, #FFF4B0 0%, #FCD96A 100%);
+  border: 1px solid rgba(180, 130, 30, 0.3);
+  box-shadow: 6px 10px 16px rgba(10, 15, 26, 0.22);
+  transition: transform 280ms cubic-bezier(.5,1.6,.4,.8),
+              box-shadow 200ms ease,
+              filter 200ms ease;
+  animation: sticky-sway 7s ease-in-out infinite;
+  will-change: transform;
+}
+.sticky:nth-child(2n)  { animation-duration: 8.5s; animation-delay: -1.3s; }
+.sticky:nth-child(3n)  { animation-duration: 9.4s; animation-delay: -2.2s; }
+.sticky:nth-child(4n)  { animation-duration: 7.8s; animation-delay: -0.7s; }
+
+.sticky:hover,
+.sticky:focus-visible {
+  transform: rotate(var(--rot)) translateY(-4px) scale(1.04);
+  box-shadow: 12px 22px 28px rgba(10, 15, 26, 0.30);
+  z-index: 2;
+  outline: none;
+  filter: brightness(1.02);
+  animation-play-state: paused;
+}
+.sticky:active {
+  transform: rotate(var(--rot)) scale(0.98);
+  transition-duration: 100ms;
+}
+
+/* Asymmetric corner cuts — pure aesthetic. */
+.sticky-corner-tl { border-radius: 2px 16px 16px 4px; }
+.sticky-corner-tr { border-radius: 16px 2px 4px 16px; }
+.sticky-corner-bl { border-radius: 14px 2px 16px 2px; }
+
+/* Per-status palette. Each variant picks one of the bucket's two colors. */
+.sticky-done-1     { background: linear-gradient(135deg, #D9F7C4 0%, #BCEFA1 100%); border-color: rgba(60, 130, 50, 0.30); }
+.sticky-done-2     { background: linear-gradient(135deg, #E5F8D0 0%, #A8E68A 100%); border-color: rgba(60, 130, 50, 0.30); }
+.sticky-inbox-1    { background: linear-gradient(135deg, #FFF4B0 0%, #FCD96A 100%); border-color: rgba(180, 130, 30, 0.30); }
+.sticky-inbox-2    { background: linear-gradient(135deg, #FFEFD6 0%, #FFD98A 100%); border-color: rgba(180, 130, 30, 0.30); }
+.sticky-progress-1 { background: linear-gradient(135deg, #FFE4B0 0%, #FCC880 100%); border-color: rgba(245, 158, 11, 0.45); }
+.sticky-partial-1  { background: linear-gradient(135deg, #FFE4D2 0%, #FCBC9A 100%); border-color: rgba(220, 130, 80, 0.35); }
+.sticky-blocked-1  { background: linear-gradient(135deg, #FECACA 0%, #F87171 100%); border-color: rgba(180, 40, 40, 0.40); }
+.sticky-cancelled-1{ background: linear-gradient(135deg, #E5E7EB 0%, #C7CCD2 100%); border-color: rgba(120, 120, 130, 0.35); opacity: 0.65; }
+
+/* In-progress glow ring on top of the regular shadow. */
+.sticky.status-progress {
+  animation: sticky-sway 7s ease-in-out infinite, sticky-pulse 1.6s ease-in-out infinite;
+}
+
+.sticky-tape {
+  position: absolute;
+  top: -10px; left: 50%;
+  width: 64px; height: 18px;
+  transform: translateX(-50%) rotate(-1.5deg);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(10, 15, 26, 0.18));
+}
+.sticky-tape svg { width: 100%; height: 100%; display: block; }
+
+.sticky-head {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+}
+.sticky-id {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 11px; font-weight: 700;
-  padding: 2px 8px; border-radius: 4px;
-  background: #1F2937; color: #F9FAFB;
+  padding: 2px 8px; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #1F2937;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.04em;
+}
+.sticky-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 9px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #FFFFFF;
+}
+.sticky-status-done       { background: #16A34A; }
+.sticky-status-inbox      { background: #6B7280; }
+.sticky-status-progress   { background: #F59E0B; }
+.sticky-status-partial    { background: #D97706; }
+.sticky-status-blocked    { background: #DC2626; }
+.sticky-status-cancelled  { background: #9CA3AF; }
+.sticky-status-pulse {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #FFFFFF;
+  animation: sticky-pulse-dot 1.2s ease-in-out infinite;
+}
+@keyframes sticky-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.7); }
+}
+
+.sticky-title {
+  font-family: 'Caveat', 'Gaegu', 'Comic Sans MS', cursive;
+  font-size: 22px; font-weight: 700;
+  line-height: 1.15;
+  color: #1F2937;
+  /* Trim runaway titles so the note keeps a roughly square footprint. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sticky-meta {
+  font-size: 11px; color: #4B5563;
+  font-weight: 500;
   letter-spacing: 0.02em;
 }
-.todo-title {
-  font-size: 14px; font-weight: 600; color: #111827;
-  line-height: 1.4;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.sticky-tags {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: auto;
+  padding-top: 4px;
 }
-.todo-meta-row {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  margin-top: 4px;
-  font-size: 11px; color: #6B7280;
+.sticky-tag {
+  font-size: 9px; font-weight: 600;
+  padding: 2px 8px; border-radius: 9px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.todo-meta { display: inline-flex; align-items: center; }
-.todo-meta.done { color: #15803D; font-weight: 600; }
-.todo-pri {
-  font-size: 10px; font-weight: 600;
-  padding: 1px 6px; border-radius: 10px;
-  background: #E5E7EB; color: #374151;
-}
-.todo-pri.pri-high   { background: #FEE2E2; color: #B91C1C; }
-.todo-pri.pri-medium { background: #FEF3C7; color: #B45309; }
-.todo-pri.pri-low    { background: #DBEAFE; color: #1D4ED8; }
+.sticky-tag.tag-rec  { color: #15803D; border-color: rgba(22, 163, 74, 0.35); }
+.sticky-tag.tag-prd  { color: #6B7280; border-color: rgba(107, 114, 128, 0.30); }
+.sticky-tag.tag-done { color: #15803D; border-color: rgba(22, 163, 74, 0.35); text-transform: none; letter-spacing: 0; }
 
-.todo-links { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.todo-status-text {
-  font-size: 11px; font-weight: 600;
-  padding: 2px 8px; border-radius: 10px;
-  background: #F3F4F6; color: #6B7280;
-}
-.todo-status-text.status-done       { background: #DCFCE7; color: #15803D; }
-.todo-status-text.status-progress   { background: #FEF3C7; color: #B45309; }
-.todo-status-text.status-inbox      { background: #F3F4F6; color: #6B7280; }
-.todo-status-text.status-partial    { background: #FEF3C7; color: #B45309; }
-.todo-status-text.status-blocked    { background: #FEE2E2; color: #B91C1C; }
-.todo-status-text.status-cancelled  { background: #F3F4F6; color: #9CA3AF; }
-.todo-tag {
-  font-size: 10px; font-weight: 500;
+/* "+ pin a new mission" placeholder — never animates, dashed border. */
+.sticky-add-slot {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px;
+  min-height: 188px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 2px dashed rgba(107, 114, 128, 0.55);
   color: #6B7280;
+  background: rgba(255, 255, 255, 0.18);
+  opacity: 0.65;
 }
-.todo-tag.rec { color: #15803D; }
-.todo-tag.prd { color: #9CA3AF; }
+.sticky-add-icon { display: inline-flex; }
+.sticky-add-text {
+  font-family: 'Caveat', 'Gaegu', 'Comic Sans MS', cursive;
+  font-size: 18px; font-weight: 600;
+}
+.sticky-add-hint {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px; color: #9CA3AF;
+}
 
-@media (max-width: 720px) {
-  .todo-row { grid-template-columns: 28px 1fr; }
-  .todo-links { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: flex-end; }
-  .todo-title { white-space: normal; }
+/* ─── Mission detail modal (overlays the fridge) ─────────────────────── */
+.modal-root.mission-modal-root {
+  background: rgba(10, 15, 26, 0.55);
+  align-items: flex-start;
+  padding: 48px 32px;
 }
-
-/* ─── Missions detail — frontmatter card (PRD + Result) ──────────────── */
-.mission-spec { margin-bottom: 16px; }
-.mission-spec.skill-spec .mission-head {
-  align-items: center;
+.mission-modal {
+  width: min(880px, 100%);
+  max-height: calc(100vh - 96px);
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(10, 15, 26, 0.40);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: mission-modal-in 220ms cubic-bezier(.2, .9, .35, 1.05);
 }
-.mission-spec.skill-spec .spec-head .spec-name {
-  font-size: 16px;
-  line-height: 1.4;
+@keyframes mission-modal-in {
+  from { opacity: 0; transform: scale(0.94) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-.mission-strip {
+.mission-modal-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 22px 12px;
+  flex-wrap: wrap;
+}
+.mission-modal-title {
+  flex: 1 1 200px;
+  font-size: 18px; font-weight: 700;
+  color: #1F2937;
+  min-width: 0;
+}
+.mission-modal-status {
+  font-size: 10px;
+  padding: 4px 10px;
+}
+.mission-modal-close {
+  border: 1px solid #E5E7EB;
+  background: #F9FAFB;
+  border-radius: 999px;
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: #6B7280;
+  transition: background 120ms ease, color 120ms ease;
+  flex: 0 0 auto;
+}
+.mission-modal-close:hover { background: #F3F4F6; color: #1F2937; }
+.mission-modal-sub {
+  padding: 0 22px 12px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 11px; color: #6B7280;
-  padding: 2px 0 4px;
-  border-bottom: 1px dashed #E5E7EB;
-  margin-bottom: 6px;
 }
-.mission-artifacts {
+.mission-modal-tabs {
+  display: flex; gap: 0;
+  padding: 0 22px;
+  border-bottom: 1px solid #E5E7EB;
+}
+.mission-modal-tab {
+  padding: 10px 18px;
+  font-size: 12px; font-weight: 600;
+  color: #6B7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.mission-modal-tab.active { color: #1F2937; border-bottom-color: #1F2937; }
+.mission-modal-tab.disabled { opacity: 0.5; cursor: not-allowed; }
+.mission-modal-tab:not(.active):not(.disabled):hover { color: #1F2937; }
+.mission-modal-body {
+  padding: 16px 22px 22px;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.mission-detail-strip {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.mission-detail-row {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px; color: #4B5563;
+}
+.mission-detail-kv {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.mission-detail-key {
+  font-size: 11px; font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mission-detail-value {
+  font-size: 12px;
+  color: #1F2937;
+}
+.mission-detail-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mission-detail-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  color: #374151;
+}
+.mission-detail-artifacts {
   display: flex; flex-direction: column; gap: 4px;
-  flex: 1;
-  max-height: 240px;
+  max-height: 220px;
   overflow-y: auto;
-  padding-right: 4px;
 }
-.mission-artifact {
+.mission-detail-artifact {
   display: flex; align-items: center; gap: 6px;
   font-size: 11px;
 }
-.mission-artifact code {
+.mission-detail-artifact code {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 11px;
   color: #374151;
-  background: #F9FAFB;
+  background: #F3F4F6;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 4px;
   border: 1px solid #E5E7EB;
   word-break: break-all;
+}
+
+@media (max-width: 720px) {
+  .sticky-board {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 22px 16px;
+  }
+  .sticky { min-height: 176px; padding: 14px 16px 12px; }
+  .sticky-title { font-size: 19px; }
+  .modal-root.mission-modal-root { padding: 16px; align-items: stretch; }
+  .mission-modal { max-height: calc(100vh - 32px); }
+  .mission-modal-head, .mission-modal-sub, .mission-modal-tabs, .mission-modal-body {
+    padding-left: 16px; padding-right: 16px;
+  }
+}
+
+/* Honour user motion preferences — disable the idle sway and pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .sticky, .sticky.status-progress { animation: none; }
+  .sticky:hover, .sticky:focus-visible { transition: none; }
+  .sticky-status-pulse { animation: none; }
+  .mission-modal { animation: none; }
 }

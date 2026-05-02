@@ -575,6 +575,43 @@
                     },
                     {
                       "type": "frame",
+                      "id": "anEWB",
+                      "name": "tabDetach",
+                      "height": 30,
+                      "fill": "#1E1E1E",
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#7CFDB0"
+                      },
+                      "gap": 4,
+                      "padding": [
+                        0,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Y8VMS",
+                          "fill": "#7CFDB0",
+                          "content": "⤢",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "bold"
+                        },
+                        {
+                          "type": "text",
+                          "id": "dMtz3",
+                          "fill": "#7CFDB0",
+                          "content": "DETACH",
+                          "fontFamily": "Inter",
+                          "fontSize": 10,
+                          "fontWeight": "bold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
                       "id": "3Ahno",
                       "name": "tabPlus",
                       "height": 30,
@@ -753,7 +790,7 @@
               "id": "jNFPJ",
               "name": "stRight",
               "fill": "#08081A",
-              "content": "v0.1.4",
+              "content": "v0.3.1",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -1652,8 +1689,19 @@
                   "type": "frame",
                   "id": "O921B",
                   "name": "spClose",
-                  "width": 28,
-                  "height": 22,
+                  "width": 90,
+                  "height": 24,
+                  "fill": "#2A1320",
+                  "cornerRadius": 2,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#5A2540"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    8
+                  ],
                   "justifyContent": "center",
                   "alignItems": "center",
                   "children": [
@@ -1661,11 +1709,11 @@
                       "type": "text",
                       "id": "lRvsn",
                       "name": "spCloseT",
-                      "fill": "#888899",
-                      "content": "✕",
+                      "fill": "#FFB0C8",
+                      "content": "✕  CLOSE",
                       "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
+                      "fontSize": 10,
+                      "fontWeight": "bold"
                     }
                   ]
                 }
@@ -8095,6 +8143,342 @@
                   "fontWeight": "normal"
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "jgKOh",
+      "x": 1420,
+      "y": 4583,
+      "name": "label",
+      "fill": "#7CFDB0",
+      "content": "9 — Floating Terminal Window (after Detach)  · separate WPF Window with REDOCK strip travelling with LayoutDocument.Content",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "bold"
+    },
+    {
+      "type": "frame",
+      "id": "jW3Z4",
+      "x": 1420,
+      "y": 4611,
+      "name": "floatTermWin",
+      "width": 540,
+      "height": 400,
+      "fill": "#1E1E1E",
+      "stroke": {
+        "thickness": 1,
+        "fill": "#3E3E42"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "EOizP",
+          "name": "ftwTitleBar",
+          "width": "fill_container",
+          "height": 32,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 90,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#1E1E1E",
+                "position": 0
+              },
+              {
+                "color": "#2D2D30",
+                "position": 0.5
+              },
+              {
+                "color": "#1E1E1E",
+                "position": 1
+              }
+            ]
+          },
+          "gap": 8,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "lHzQa",
+              "fill": "#3794FF",
+              "content": "⬢",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "fNPxR",
+              "fill": "#D4D4D4",
+              "content": "Terminal · Claude  (Floating)",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold"
+            },
+            {
+              "type": "frame",
+              "id": "VSVpn",
+              "name": "ftwSpacer",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#00000000"
+            },
+            {
+              "type": "text",
+              "id": "VSKWs",
+              "fill": "#858585",
+              "content": "–",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "R6zVoB",
+              "fill": "#858585",
+              "content": "☐",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "T9RE4q",
+              "fill": "#858585",
+              "content": "✕",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "JJBnj",
+          "name": "ftwRedockStrip",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "#0A1A24",
+          "stroke": {
+            "thickness": {
+              "bottom": 1
+            },
+            "fill": "#006B80"
+          },
+          "gap": 8,
+          "padding": [
+            4,
+            10
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "U1XVcV",
+              "fill": "#00FFF0",
+              "content": "↩  Floating window — click to dock back to main",
+              "fontFamily": "Consolas",
+              "fontSize": 11,
+              "fontWeight": "bold"
+            },
+            {
+              "type": "frame",
+              "id": "QOj29",
+              "name": "ftwRsSpacer",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#00000000"
+            },
+            {
+              "type": "frame",
+              "id": "Zgnwb",
+              "name": "ftwDockBackBtn",
+              "height": 24,
+              "fill": "#142432",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#00FFF0"
+              },
+              "gap": 4,
+              "padding": [
+                4,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "vsOzx",
+                  "fill": "#00FFF0",
+                  "content": "↩ DOCK BACK",
+                  "fontFamily": "Consolas",
+                  "fontSize": 10,
+                  "fontWeight": "bold"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "kQ3bj",
+          "name": "ftwTabs",
+          "width": "fill_container",
+          "height": 30,
+          "fill": "#252526",
+          "stroke": {
+            "thickness": {
+              "bottom": 1
+            },
+            "fill": "#3E3E42"
+          },
+          "gap": 1,
+          "padding": [
+            0,
+            4,
+            0,
+            0
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "p0Vgx",
+              "name": "ftwTab",
+              "height": 30,
+              "fill": "#1E1E1E",
+              "stroke": {
+                "thickness": {
+                  "top": 2
+                },
+                "fill": "#3794FF"
+              },
+              "gap": 6,
+              "padding": [
+                0,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Kxfac",
+                  "fill": "#3794FF",
+                  "content": "⏵ Claude",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "bold"
+                },
+                {
+                  "type": "text",
+                  "id": "U32ST",
+                  "fill": "#858585",
+                  "content": "✕",
+                  "fontFamily": "Inter",
+                  "fontSize": 9,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "UDAID",
+              "name": "ftwTabSpacer",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#00000000"
+            },
+            {
+              "type": "text",
+              "id": "YXAkC",
+              "fill": "#556677",
+              "content": "▾",
+              "fontFamily": "Inter",
+              "fontSize": 10,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "TWLRO",
+          "name": "ftwTermArea",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#1E1E1E",
+          "layout": "vertical",
+          "gap": 4,
+          "padding": [
+            8,
+            12
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "jcNWz",
+              "fill": "#7CFDB0",
+              "content": "$ AgentZeroLite.exe  (floating window)",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "szzkg",
+              "fill": "#858585",
+              "content": "› Claude Code 1.x  ⎯  ConPTY session active (HWND moved with doc)",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "v70rgY",
+              "fill": "#D4D4D4",
+              "content": "  Detached from main — the LayoutDocument.Content travels here.",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "V8IyO",
+              "fill": "#DCDCAA",
+              "content": "  ✻ Click '↩ DOCK BACK' above to redock; window closes itself when empty.",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "sWH7r",
+              "fill": "#C586C0",
+              "content": "› cursor blinks here",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "hrn8x",
+              "name": "ftwTermCursor",
+              "width": 8,
+              "height": 14,
+              "fill": "#3794FF"
             }
           ]
         }
