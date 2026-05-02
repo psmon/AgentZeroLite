@@ -448,3 +448,138 @@
 .pagination .page.active { background: #2563EB; color: #FFFFFF; font-weight: 600; }
 .pagination .page:hover { background: #F3F4F6; }
 .pagination .page.active:hover { background: #1D4ED8; }
+
+/* ─── Missions — TODO-style checklist ─────────────────────────────────── */
+.todo-list {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 4px 0;
+}
+.todo-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-left: 3px solid #D1D5DB;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.todo-row:hover { background: #F9FAFB; transform: translateX(2px); }
+.todo-row.status-done       { border-left-color: #10B981; background: #F0FDF4; }
+.todo-row.status-done .todo-title { color: #065F46; text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: rgba(6,95,70,0.4); }
+.todo-row.status-progress   { border-left-color: #F59E0B; background: #FFFBEB; }
+.todo-row.status-inbox      { border-left-color: #6B7280; }
+.todo-row.status-partial    { border-left-color: #F59E0B; background: #FFFBEB; }
+.todo-row.status-blocked    { border-left-color: #EF4444; background: #FEF2F2; }
+.todo-row.status-cancelled  { border-left-color: #9CA3AF; background: #F3F4F6; opacity: 0.75; }
+.todo-row.status-cancelled .todo-title { text-decoration: line-through; color: #6B7280; }
+
+.todo-indicator {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: #F3F4F6;
+  color: #6B7280;
+}
+.todo-indicator.status-done       { background: #DCFCE7; color: #15803D; }
+.todo-indicator.status-progress   { background: #FEF3C7; color: #B45309; }
+.todo-indicator.status-inbox      { background: #F3F4F6; color: #6B7280; }
+.todo-indicator.status-partial    { background: #FEF3C7; color: #B45309; }
+.todo-indicator.status-blocked    { background: #FEE2E2; color: #B91C1C; }
+.todo-indicator.status-cancelled  { background: #F3F4F6; color: #9CA3AF; }
+
+.todo-body { min-width: 0; }
+.todo-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.todo-id {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px;
+  background: #1F2937; color: #F9FAFB;
+  letter-spacing: 0.02em;
+}
+.todo-title {
+  font-size: 14px; font-weight: 600; color: #111827;
+  line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.todo-meta-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 4px;
+  font-size: 11px; color: #6B7280;
+}
+.todo-meta { display: inline-flex; align-items: center; }
+.todo-meta.done { color: #15803D; font-weight: 600; }
+.todo-pri {
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px; border-radius: 10px;
+  background: #E5E7EB; color: #374151;
+}
+.todo-pri.pri-high   { background: #FEE2E2; color: #B91C1C; }
+.todo-pri.pri-medium { background: #FEF3C7; color: #B45309; }
+.todo-pri.pri-low    { background: #DBEAFE; color: #1D4ED8; }
+
+.todo-links { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.todo-status-text {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px;
+  background: #F3F4F6; color: #6B7280;
+}
+.todo-status-text.status-done       { background: #DCFCE7; color: #15803D; }
+.todo-status-text.status-progress   { background: #FEF3C7; color: #B45309; }
+.todo-status-text.status-inbox      { background: #F3F4F6; color: #6B7280; }
+.todo-status-text.status-partial    { background: #FEF3C7; color: #B45309; }
+.todo-status-text.status-blocked    { background: #FEE2E2; color: #B91C1C; }
+.todo-status-text.status-cancelled  { background: #F3F4F6; color: #9CA3AF; }
+.todo-tag {
+  font-size: 10px; font-weight: 500;
+  color: #6B7280;
+}
+.todo-tag.rec { color: #15803D; }
+.todo-tag.prd { color: #9CA3AF; }
+
+@media (max-width: 720px) {
+  .todo-row { grid-template-columns: 28px 1fr; }
+  .todo-links { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: flex-end; }
+  .todo-title { white-space: normal; }
+}
+
+/* ─── Missions detail — frontmatter card (PRD + Result) ──────────────── */
+.mission-spec { margin-bottom: 16px; }
+.mission-spec.skill-spec .mission-head {
+  align-items: center;
+}
+.mission-spec.skill-spec .spec-head .spec-name {
+  font-size: 16px;
+  line-height: 1.4;
+}
+.mission-strip {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px; color: #6B7280;
+  padding: 2px 0 4px;
+  border-bottom: 1px dashed #E5E7EB;
+  margin-bottom: 6px;
+}
+.mission-artifacts {
+  display: flex; flex-direction: column; gap: 4px;
+  flex: 1;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.mission-artifact {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px;
+}
+.mission-artifact code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #374151;
+  background: #F9FAFB;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #E5E7EB;
+  word-break: break-all;
+}

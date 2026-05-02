@@ -1,0 +1,71 @@
+{
+  "base": "harness/missions",
+  "recordsBase": "harness/logs/mission-records",
+  "statuses": [
+    "inbox",
+    "in_progress",
+    "done",
+    "partial",
+    "blocked",
+    "cancelled"
+  ],
+  "counts": {
+    "all": 3,
+    "inbox": 1,
+    "in_progress": 0,
+    "done": 2,
+    "partial": 0,
+    "blocked": 0,
+    "cancelled": 0
+  },
+  "items": [
+    {
+      "id": "M0002",
+      "file": "harness/missions/M0002-UI개선.md",
+      "title": "UI/UX 개선 — CLOSE 버튼, 다크테마 일관성, 탭 분리/복원",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-02",
+      "recordFile": "harness/logs/mission-records/M0002-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-02T11:00:00+09:00",
+      "recordFinished": "2026-05-02T11:35:00+09:00",
+      "modified": "2026-05-02",
+      "size": 3111
+    },
+    {
+      "id": "M001",
+      "file": "harness/missions/M001-하네스-미션구조생성.md",
+      "title": "M001-하네스-미션구조생성",
+      "operator": null,
+      "language": null,
+      "status": "inbox",
+      "priority": null,
+      "created": null,
+      "recordFile": null,
+      "recordStatus": null,
+      "recordStarted": null,
+      "recordFinished": null,
+      "modified": "2026-05-02",
+      "size": 1283
+    },
+    {
+      "id": "M0001",
+      "file": "harness/missions/M0001-add-missions-system.md",
+      "title": "미션(프롬프트요청) 관리 요청부 신설",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "high",
+      "created": "2026-05-02",
+      "recordFile": "harness/logs/mission-records/M0001-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-02T08:50:00+09:00",
+      "recordFinished": "2026-05-02T09:25:00+09:00",
+      "modified": "2026-05-02",
+      "size": 2665
+    }
+  ]
+}

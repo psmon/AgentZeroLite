@@ -1,18 +1,120 @@
 {
   "base": "harness/logs",
   "categories": [
+    "build-doctor",
     "code-coach",
+    "mission-records",
     "pre-commit-review",
+    "release-build-pipeline",
     "security-guard",
     "tamer"
   ],
   "counts": {
-    "code-coach": 13,
+    "build-doctor": 3,
+    "code-coach": 15,
+    "mission-records": 2,
     "pre-commit-review": 7,
-    "security-guard": 2,
-    "tamer": 15
+    "release-build-pipeline": 3,
+    "security-guard": 5,
+    "tamer": 16
   },
   "items": [
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-02-16-41-m0002-ui-improvements.md",
+      "date": "2026-05-02",
+      "time": "16:41",
+      "title": "m0002 ui improvements",
+      "size": 5771
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-05-02-08-43-unit-test-trigger-policy-rewrite.md",
+      "date": "2026-05-02",
+      "time": "08:43",
+      "title": "unit test trigger policy rewrite",
+      "size": 5134
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-01-22-49-pr-7-perf-and-exepath-quoting-review.md",
+      "date": "2026-05-01",
+      "time": "22:49",
+      "title": "pr 7 perf and exepath quoting review",
+      "size": 10998
+    },
+    {
+      "category": "build-doctor",
+      "file": "harness/logs/build-doctor/2026-05-01-1215-pre-v0.3.0-release.md",
+      "date": "2026-05-01",
+      "time": "12:15",
+      "title": "pre v0.3.0 release",
+      "size": 3558
+    },
+    {
+      "category": "release-build-pipeline",
+      "file": "harness/logs/release-build-pipeline/2026-05-01-1215-v0.3.0.md",
+      "date": "2026-05-01",
+      "time": "12:15",
+      "title": "v0.3.0",
+      "size": 2499
+    },
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-05-01-1200-pre-v0.3.0-release.md",
+      "date": "2026-05-01",
+      "time": "12:00",
+      "title": "pre v0.3.0 release",
+      "size": 17225
+    },
+    {
+      "category": "build-doctor",
+      "file": "harness/logs/build-doctor/2026-04-30-2210-pre-v0.2.1-release.md",
+      "date": "2026-04-30",
+      "time": "22:10",
+      "title": "pre v0.2.1 release",
+      "size": 3340
+    },
+    {
+      "category": "release-build-pipeline",
+      "file": "harness/logs/release-build-pipeline/2026-04-30-2210-v0.2.1.md",
+      "date": "2026-04-30",
+      "time": "22:10",
+      "title": "v0.2.1",
+      "size": 1340
+    },
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-04-30-2203-pre-v0.2.1-release.md",
+      "date": "2026-04-30",
+      "time": "22:03",
+      "title": "pre v0.2.1 release",
+      "size": 8571
+    },
+    {
+      "category": "build-doctor",
+      "file": "harness/logs/build-doctor/2026-04-30-0234-pre-v0.2.0-release.md",
+      "date": "2026-04-30",
+      "time": "02:34",
+      "title": "pre v0.2.0 release",
+      "size": 4192
+    },
+    {
+      "category": "release-build-pipeline",
+      "file": "harness/logs/release-build-pipeline/2026-04-30-0234-v0.2.0.md",
+      "date": "2026-04-30",
+      "time": "02:34",
+      "title": "v0.2.0",
+      "size": 2159
+    },
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-04-30-0234-pre-v0.2.0-release.md",
+      "date": "2026-04-30",
+      "time": "02:34",
+      "title": "pre v0.2.0 release",
+      "size": 8878
+    },
     {
       "category": "tamer",
       "file": "harness/logs/tamer/2026-04-29-18-15-voice-roundtrip-testing-knowledge.md",
@@ -308,6 +410,22 @@
       "time": "14:40",
       "title": "plant four specialists",
       "size": 4308
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0001-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0001-수행결과",
+      "size": 7454
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0002-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0002-수행결과",
+      "size": 22084
     }
   ]
 }

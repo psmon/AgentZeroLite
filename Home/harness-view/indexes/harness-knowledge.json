@@ -20,6 +20,15 @@
       "modified": "2026-04-25"
     },
     {
+      "id": "harness/knowledge/avalondock-float-redock-patterns.md",
+      "file": "harness/knowledge/avalondock-float-redock-patterns.md",
+      "name": "avalondock-float-redock-patterns.md",
+      "title": "avalondock-float-redock-patterns",
+      "heading": "AvalonDock — Multi-View Terminal Float / Redock Patterns",
+      "size": 10731,
+      "modified": "2026-05-02"
+    },
+    {
       "id": "harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
       "file": "harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
       "name": "2026-04-22-msys2-bash-crash-llamacpp-build.md",
@@ -56,6 +65,15 @@
       "modified": "2026-04-25"
     },
     {
+      "id": "harness/knowledge/missions-protocol.md",
+      "file": "harness/knowledge/missions-protocol.md",
+      "name": "missions-protocol.md",
+      "title": "missions-protocol",
+      "heading": "Missions protocol — file-based request management",
+      "size": 8621,
+      "modified": "2026-05-02"
+    },
+    {
       "id": "harness/knowledge/ondevice-tool-calling-survey.md",
       "file": "harness/knowledge/ondevice-tool-calling-survey.md",
       "name": "ondevice-tool-calling-survey.md",
@@ -72,6 +90,15 @@
       "heading": "Security Surface — Prompt Injection → OS Exec Map",
       "size": 4836,
       "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/unit-test-policy.md",
+      "file": "harness/knowledge/unit-test-policy.md",
+      "name": "unit-test-policy.md",
+      "title": "unit-test-policy",
+      "heading": "Unit-test trigger policy",
+      "size": 3763,
+      "modified": "2026-05-01"
     },
     {
       "id": "harness/knowledge/voice-roundtrip-testing.md",

@@ -36,6 +36,8 @@ const PATHS = {
   design:    'Docs/design',
   engine:    'harness/engine',
   cliTips:   'CLI-TIPS.md',
+  missions:        'harness/missions',
+  missionRecords:  'harness/logs/mission-records',
 };
 
 // Skills are sourced from the in-repo snapshot at Docs/harness/template/.
@@ -389,6 +391,112 @@ function buildLogs() {
   });
 }
 
+// ─── Missions: TODO-style PRD ↔ result pairing ───
+//      Sources:
+//        harness/missions/M{NNNN}-*.md         — operator request (PRD)
+//        harness/logs/mission-records/M{NNNN}-*.md — execution log (Result)
+//      Pairing key: the M{NNNN} prefix in the filename. The view renders a
+//      checklist where each row = one mission with status from the PRD's
+//      frontmatter and a link to the result file when one exists.
+//      Discovery is pattern-based — adding a new mission file requires only
+//      a re-run of this builder, no view code change.
+function parseSimpleFrontmatter(text) {
+  const m = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+  if (!m) return null;
+  const meta = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    // skip blank, comments, list-continuation, indented (array items)
+    if (!line.trim() || line.trim().startsWith('#') || /^\s/.test(line)) continue;
+    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*):\s*(.*)$/);
+    if (!kv) continue;
+    let val = kv[2].trim();
+    // strip wrapping quotes
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    // inline arrays "[a, b]" → pass through as raw — the view decides
+    meta[kv[1]] = val;
+  }
+  return meta;
+}
+
+function buildMissions() {
+  const missionsDir = path.join(ROOT, PATHS.missions);
+  const recordsDir  = path.join(ROOT, PATHS.missionRecords);
+
+  // Pre-scan completion logs by mission id (M{NNNN}).
+  const records = new Map();
+  if (fs.existsSync(recordsDir)) {
+    for (const f of listMd(recordsDir)) {
+      const idMatch = f.match(/^(M\d+)\b/);
+      if (!idMatch) continue;
+      const id  = idMatch[1];
+      const abs = path.join(recordsDir, f);
+      let fm = null;
+      try { fm = parseSimpleFrontmatter(fs.readFileSync(abs, 'utf8')); } catch { /* ignore */ }
+      const stat = fs.statSync(abs);
+      records.set(id, {
+        file: `${PATHS.missionRecords}/${f}`,
+        status:    fm?.status   || null,
+        started:   fm?.started  || null,
+        finished:  fm?.finished || null,
+        modified:  stat.mtime.toISOString().slice(0, 10),
+      });
+    }
+  }
+
+  // Scan PRDs.
+  const items = [];
+  if (fs.existsSync(missionsDir)) {
+    for (const f of listMd(missionsDir)) {
+      // skip README and any non-mission md
+      if (f.toLowerCase() === 'readme.md') continue;
+      const idMatch = f.match(/^(M\d+)\b/);
+      if (!idMatch) continue; // unknown layout, skip silently
+      const id  = idMatch[1];
+      const abs = path.join(missionsDir, f);
+      let raw = '';
+      try { raw = fs.readFileSync(abs, 'utf8'); } catch { /* ignore */ }
+      const fm    = parseSimpleFrontmatter(raw) || {};
+      const stat  = fs.statSync(abs);
+      const rec   = records.get(id) || null;
+
+      items.push({
+        id,
+        file:     `${PATHS.missions}/${f}`,
+        title:    fm.title    || f.replace(/\.md$/, ''),
+        operator: fm.operator || null,
+        language: fm.language || null,
+        status:   fm.status   || (rec ? 'done' : 'inbox'),
+        priority: fm.priority || null,
+        created:  fm.created  || null,
+        recordFile:     rec?.file     || null,
+        recordStatus:   rec?.status   || null,
+        recordStarted:  rec?.started  || null,
+        recordFinished: rec?.finished || null,
+        modified: stat.mtime.toISOString().slice(0, 10),
+        size:     stat.size,
+      });
+    }
+  }
+
+  // Newest mission ID first (M0099 above M0001).
+  items.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }));
+
+  // Group counts — keep all known statuses present (zero is fine).
+  const STATUSES = ['inbox', 'in_progress', 'done', 'partial', 'blocked', 'cancelled'];
+  const counts = { all: items.length };
+  for (const s of STATUSES) counts[s] = items.filter(i => i.status === s).length;
+
+  writeJson('harness-missions', {
+    base:        PATHS.missions,
+    recordsBase: PATHS.missionRecords,
+    statuses:    STATUSES,
+    counts,
+    items,
+  });
+}
+
 // ─── Onboarding: Docs/design/*.md (+ *.pen file metadata) ───
 function buildDesign() {
   const dir = path.join(ROOT, PATHS.design);
@@ -473,6 +581,8 @@ const SCANNED_PATHS = [
   PATHS.design,
   PATHS.engine,
   PATHS.cliTips,
+  PATHS.missions,
+  PATHS.missionRecords,
 ];
 function maxMtime(relPath) {
   const abs = path.join(ROOT, relPath);
@@ -519,6 +629,7 @@ buildSkills();
 buildKnowledge();
 buildDocument();
 buildLogs();
+buildMissions();
 buildDesign();
 buildEngine();
 buildClaudeTips();

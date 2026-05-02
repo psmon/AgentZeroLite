@@ -1,7 +1,7 @@
 {
-  "builtAt": "2026-04-29T11:06:14.158Z",
-  "builtAtMs": 1777460774158,
-  "durationMs": 534,
+  "builtAt": "2026-05-02T07:52:42.889Z",
+  "builtAtMs": 1777708362889,
+  "durationMs": 436,
   "trigger": "manual",
   "scannedPaths": [
     "harness/docs",
@@ -12,7 +12,9 @@
     "harness/logs",
     "Docs/design",
     "harness/engine",
-    "CLI-TIPS.md"
+    "CLI-TIPS.md",
+    "harness/missions",
+    "harness/logs/mission-records"
   ],
-  "sourceMaxMs": 1777454289779.973
+  "sourceMaxMs": 1777707714188.8662
 }

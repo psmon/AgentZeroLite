@@ -3,6 +3,36 @@
   "sort": "semver-desc",
   "items": [
     {
+      "file": "v1.3.1.md",
+      "title": "v1.3.1",
+      "heading": "Mission log directory renamed to English",
+      "path": "v1.3.1.md",
+      "size": 3320,
+      "modified": "2026-05-02",
+      "author": "psmon",
+      "committed": "2026-05-02"
+    },
+    {
+      "file": "v1.3.0.md",
+      "title": "v1.3.0",
+      "heading": "Missions subsystem (file-based request inbox)",
+      "path": "v1.3.0.md",
+      "size": 4949,
+      "modified": "2026-05-02",
+      "author": "psmon",
+      "committed": "2026-05-02"
+    },
+    {
+      "file": "v1.2.0.md",
+      "title": "v1.2.0",
+      "heading": "Unit-test trigger policy + dedicated test-runner agent",
+      "path": "v1.2.0.md",
+      "size": 3461,
+      "modified": "2026-05-01",
+      "author": "psmon",
+      "committed": "2026-05-02"
+    },
+    {
       "file": "v1.1.7.md",
       "title": "v1.1.7",
       "heading": "Voice round-trip testing methodology knowledge",
@@ -96,21 +126,21 @@
   "contributors": [
     {
       "name": "psmon",
-      "commits": 8,
+      "commits": 11,
       "percent": 100
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
-      "commits": 8,
+      "commits": 11,
       "percent": 100
     }
   ],
   "contributorsRecent": [
     {
       "name": "psmon",
-      "commits": 8,
+      "commits": 11,
       "percent": 100
     }
   ],
