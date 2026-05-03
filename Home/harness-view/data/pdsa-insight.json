@@ -12,7 +12,7 @@
   "tried": [
     "M0009 풀 구현 — Claude/Codex CLI 의 JSONL 트랜스크립트를 incremental(byte-offset + line-count) 으로 흡수하는 호스트 측 collector + 읽기 전용 대시보드 플러그인",
     "Project/Plugins/token-monitor — 벤더/계정/프로젝트(cwd 리프) 단위 카드+표+라인 차트, alias inline rename, Reset & Re-scan, 10분 주기 자동 갱신",
-    "멀티-profile 자동 탐색 도입 — 사용자의 PowerShell 매크로(claude/claude-qa/claude-pel3/claude-gou)가 CLAUDE_CONFIG_DIR 로 분기한 4개 home dir 를 한 번에 스캔",
+    "멀티-profile 자동 탐색 도입 — 사용자의 PowerShell 매크로(claude/claude-qa/claude-pel3)가 CLAUDE_CONFIG_DIR 로 분기한 4개 home dir 를 한 번에 스캔",
     "Install Plugin 다이얼로그 리뉴얼 — github Trees API 로 psmon/AgentZeroLite 의 Project/Plugins/* 를 런타임 탐색해 OFFICIAL 콤보에 노출, manual URL / zip 경로 보존",
     "다크테마 ComboBox 풀 재템플릿(Toggle / Item / Popup 3-piece) — system-color fallback 제거, 프로젝트 팔레트 토큰표 정의",
     "v0.5.1 release-build-pipeline 통과 → tag 푸시, 같은 사이클에 harness-view doc-v1.7.0 동시 publish"
@@ -30,7 +30,7 @@
     "v0.3.0 캐리포워드 보안 항목 3건이 세 사이클 연속 미해결 (BuildTerminalSummaryPrompt fence injection, cloud TTS 안내, voice transcript shell-escape)"
   ],
   "learned": {
-    "lead": "데이터 출처를 한 단계만 더 의심해도 누적의 절반이 보인다 — 첫 구현이 'official 경로 ~/.claude' 만 본 결과 ~/.claude-qa, ~/.claude-pel3, ~/.claude-gou 의 모든 사용량이 통째로 누락되어 있었다.",
+    "lead": "데이터 출처를 한 단계만 더 의심해도 누적의 절반이 보인다 — 첫 구현이 'official 경로 ~/.claude' 만 본 결과 ~/.claude-qa, ~/.claude-pel3 의 모든 사용량이 통째로 누락되어 있었다.",
     "body": "M0009 의 첫 collector 는 사용자 홈 디렉토리에서 단일 ~/.claude/projects 만 글로빙하고 끝낼 뻔했다. 사용자가 직접 'claude-qa, claude-pel3 같은 매크로도 쓴다' 고 가르쳐준 직후 PowerShell 프로필을 검사하자, CLAUDE_CONFIG_DIR 로 분기된 4개의 home dir 가 모두 활성 상태였고, 첫 DB 는 410 트랜스크립트 중 절반 이상을 'max' 한 라벨로 통째 묶어 누락하고 있었다. 교훈 두 갈래로 정리한다. (1) 도메인 매핑 단계에서 '공식 경로' 만 믿지 말고 사용자 환경의 실제 사용 패턴 — 셸 매크로, 환경변수 — 을 먼저 확인할 것. AgentZero 처럼 로컬 자원에 의존하는 collector 는 사용자 셸의 분기를 'optional 추가 조사' 가 아니라 사전조사 표준 항목으로 박아야 한다. (2) 라벨링은 ingest 시점에 pin 해서 이후 절대 재해결하지 않을 것 — orgUuid 같은 mutable 신호에 매번 의존하면 logout/login race 와 multi-account 가 즉시 누락 또는 오라벨로 이어진다. 다음 액션: 사용자 환경 사전조사 체크리스트를 harness/knowledge/ 에 정식화하고, 새 collector 류 미션 brief 단계에서 자동 invoke 되도록 한다."
   }
 }
