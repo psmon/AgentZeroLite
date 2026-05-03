@@ -8,6 +8,10 @@
     {
       "type": "pen",
       "file": "M0006-webdev-mainmenu.pen"
+    },
+    {
+      "type": "pen",
+      "file": "M0008-architecture.pen"
     }
   ]
 }
