@@ -222,6 +222,18 @@
   function renderRaw() {
     const n = activeNote();
     if (!n) return;
+
+    // The scrolling container is the .vn-body wrapper, not vn-raw itself
+    // (vn-raw is a column flex container with no overflow). Sticking
+    // scrollTop on the wrong element is why "auto-follow latest" never
+    // worked.
+    const scroller = refs.bodyRaw;
+    // Only auto-follow when the user is already pinned to the bottom
+    // (within a small slack). If they scrolled up to read history,
+    // don't yank them back down on every new transcript.
+    const slack = 24;
+    const wasAtBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < slack;
+
     if (!n.raw || !n.raw.length) {
       refs.raw.innerHTML = '<div class="vn-raw-empty">Press <strong>Start</strong> and speak. Each utterance lands here as a timestamped line.</div>';
       return;
@@ -239,7 +251,11 @@
       row.appendChild(ts); row.appendChild(text);
       return row;
     }));
-    refs.raw.scrollTop = refs.raw.scrollHeight;
+
+    if (wasAtBottom) {
+      // Defer one frame so the new rows are laid out before we measure.
+      requestAnimationFrame(() => { scroller.scrollTop = scroller.scrollHeight; });
+    }
   }
 
   function renderSummary() {
