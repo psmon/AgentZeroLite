@@ -1,34 +1,36 @@
 {
-  "analyzedAt": "2026-05-02",
+  "analyzedAt": "2026-05-03",
   "windowDays": 14,
+  "language": "ko",
   "sources": [
-    { "date": "2026-05-02", "time": "22:55", "category": "code-coach",            "file": "harness/logs/code-coach/2026-05-02-22-55-precommit-m0005-webdev-tab.md",            "title": "Pre-commit review — M0005 WebDev tab + IZeroBrowser bridge (1 Should-fix applied inline)" },
-    { "date": "2026-05-02", "time": "22:55", "category": "pre-commit-review",     "file": "harness/logs/pre-commit-review/2026-05-02-22-55-m0005-webdev-tab.md",                "title": "Pre-commit-review engine — M0005 (decision: reviewed-with-findings-fixed)" },
-    { "date": "2026-05-02", "time": "22:49", "category": "mission-records",       "file": "harness/logs/mission-records/2026-05-02-22-49-M0005-webdev-tab-wasm-bridge.md",     "title": "Mission M0005 — Settings WebDev tab + IZeroBrowser native bridge" },
-    { "date": "2026-05-02", "time": "17:50", "category": "build-doctor",          "file": "harness/logs/build-doctor/2026-05-02-17-50-release-gate-v0-3-1.md",                "title": "Build doctor — release gate v0.3.1 (PASS, 0 regressions, 6/6 validations clean)" },
-    { "date": "2026-05-02", "time": "17:50", "category": "release-build-pipeline", "file": "harness/logs/release-build-pipeline/2026-05-02-17-50-release-gate-v0-3-1.md",      "title": "Release pipeline gate — v0.3.1 (both security-guard + build-doctor PASS)" }
+    { "date": "2026-05-03", "time": "20:41", "category": "mission-records",          "file": "harness/logs/mission-records/M0009-수행결과.md",                                  "title": "Mission M0009 — Token Monitor 플러그인 + 멀티 프로필 collector" },
+    { "date": "2026-05-03", "time": "20:46", "category": "release-build-pipeline",   "file": "harness/logs/release-build-pipeline/2026-05-03-20-46-M0009-patch.md",            "title": "Release pipeline — v0.5.1 (security-guard + build-doctor PASS)" },
+    { "date": "2026-05-03", "time": "20:45", "category": "security-guard",           "file": "harness/logs/security-guard/2026-05-03-20-45-M0009-token-monitor.md",            "title": "Security guard — M0009 token-monitor 패치 릴리즈 게이트 (0 Critical / 0 High)" },
+    { "date": "2026-05-03", "time": "20:46", "category": "build-doctor",             "file": "harness/logs/build-doctor/2026-05-03-20-46-M0009-prerelease.md",                  "title": "Build doctor — v0.5.1 사전 점검 (dotnet build 0 errors)" },
+    { "date": "2026-05-03", "time": "01:23", "category": "release-build-pipeline",   "file": "harness/logs/release-build-pipeline/2026-05-03-01-23-v0-3-2.md",                  "title": "Release pipeline — v0.3.2 (직전 사이클)" }
   ],
   "tried": [
-    "Released v0.3.1 through the release-build-pipeline gate (security-guard → build-doctor) — small 9-commit delta dominated by XAML styling, harness docs, and JS viewer code",
-    "Shipped mission M0005 — WebDev tab in Settings hosting an in-app WebView2 browser that loads local web apps from Wasm/ via SetVirtualHostNameToFolderMapping",
-    "Wired IZeroBrowser as a native bridge contract: JS calls .NET through chrome.webview.postMessage JSON RPC ({id, op, args} → {id, ok, result, error}) — no HTTP, no network",
-    "Placed IZeroBrowser in ZeroCommon (WPF-free) so future .wasm plugins can compile against the contract without dragging in PresentationFramework",
-    "Reused VoiceRuntimeFactory + VoicePlaybackService for the first sandbox app (voice-test) instead of cloning the TTS pipeline — single source of truth with Settings/Voice",
-    "Auto-invoked code-coach Mode 2 on the M0005 staged diff per the pre-commit-review engine — 1 Should-fix (missing webDevView.Dispose() in OnUnloaded) surfaced and applied inline before commit"
+    "M0009 풀 구현 — Claude/Codex CLI 의 JSONL 트랜스크립트를 incremental(byte-offset + line-count) 으로 흡수하는 호스트 측 collector + 읽기 전용 대시보드 플러그인",
+    "Project/Plugins/token-monitor — 벤더/계정/프로젝트(cwd 리프) 단위 카드+표+라인 차트, alias inline rename, Reset & Re-scan, 10분 주기 자동 갱신",
+    "멀티-profile 자동 탐색 도입 — 사용자의 PowerShell 매크로(claude/claude-qa/claude-pel3/claude-gou)가 CLAUDE_CONFIG_DIR 로 분기한 4개 home dir 를 한 번에 스캔",
+    "Install Plugin 다이얼로그 리뉴얼 — github Trees API 로 psmon/AgentZeroLite 의 Project/Plugins/* 를 런타임 탐색해 OFFICIAL 콤보에 노출, manual URL / zip 경로 보존",
+    "다크테마 ComboBox 풀 재템플릿(Toggle / Item / Popup 3-piece) — system-color fallback 제거, 프로젝트 팔레트 토큰표 정의",
+    "v0.5.1 release-build-pipeline 통과 → tag 푸시, 같은 사이클에 harness-view doc-v1.7.0 동시 publish"
   ],
   "solved": [
-    "Sandbox-with-bridge pattern proven end-to-end: WebView2 virtual host mapping + postMessage round-trip works; the voice-test web UI calls SpeakAsync from one line of JS and hears native TTS play back",
-    "v0.3.1 release gate cleared with zero Critical/High findings; native DLL pinning, version pipeline, EF migrations, and -cli detection all verified unchanged",
-    "Pre-commit review → inline-fix loop closes the gap that 'Should-fix becomes deferred work' — applying the fix before commit means no GitHub issue handoff is needed and the audit log still shows the finding"
+    "텔레메트리 incremental 흡수 패턴 정착 — 파일별 (ByteOffset, LineCount) checkpoint 만으로 1초 미만 tick, 첫 부팅 bootstrap 만 410 JSONL 일괄 흡수",
+    "계정 식별 race 구조적 차단 — `.credentials.json` orgUuid 의존을 폐기하고 profile 디렉토리 이름을 ingest 시점에 AccountKey 로 stamp(`TokenSourceCheckpoint.AccountKey`), 한 파일 = 한 profile 불변",
+    "WPF 다크테마 표준화 — wpf-xaml-resource-and-window-pitfalls.md 에 Pitfall 6 + 캐노니컬 ComboBox 템플릿이 박히고, code-coach 사전 체크리스트가 P1~P5 → P1~P6 로 확장",
+    "Release 게이트 자동화 보강 — security-guard + build-doctor 가 매 패치 릴리즈마다 인라인 수행되고 release-build-pipeline 로그에 결합 흔적이 남도록"
   ],
   "remaining": [
-    "M0005 next stage: host→JS event channel for streaming (mic capture + partial transcripts) — bridge has the slot but no producer wired yet",
-    "Full STT → LLM → TTS loop inside the sandbox is still a WPF-hosted feature; sandbox parity is at 'Now' stage of the roadmap, not 'Plugin'",
-    "v0.3.0 carry-forward security items still open across three consecutive releases — BuildTerminalSummaryPrompt fence-injection (Low / OWASP LLM01), cloud TTS per-bubble warning (Info), voice transcript shell-escape (Medium)",
-    "Real .wasm modules not yet loadable; folder structure under Wasm/ is prepared but the plugin SDK contract beyond IZeroBrowser is undefined"
+    "토큰 budget guard 미구현 — 현재는 read-only 대시보드. 계정별 daily/monthly 한도 알림은 후속 미션",
+    "collector 의 timer tick 과 manual Refresh path 가 동일 `_ticking` 가드를 공유하지 않음 — 두 path 가 같은 파일을 동시에 스캔할 때 라인 중복 insert 가 이론적으로 가능(희박)",
+    "timeseries 쿼리가 매 호출마다 풀스캔 — row 수 100k+ 누적 시 일별 rollup 테이블이 필요",
+    "v0.3.0 캐리포워드 보안 항목 3건이 세 사이클 연속 미해결 (BuildTerminalSummaryPrompt fence injection, cloud TTS 안내, voice transcript shell-escape)"
   ],
   "learned": {
-    "lead": "Putting the bridge contract in the WPF-free common layer is the small upfront cost that unlocks every future portability move — the seam pattern that makes the rest of the architecture worth doing.",
-    "body": "M0005 could have shipped with IZeroBrowser sitting next to its WPF implementation in AgentZeroWpf and still functioned today. Pushing the interface down into ZeroCommon adds exactly one project boundary and zero runtime cost — but it means future .wasm plugins (compiled C# → WASI, or Rust via wasmtime), a hypothetical CefSharp-host swap, and unit tests of the bridge dispatcher can all target the contract without dragging in PresentationFramework. This is the same lesson the actor codebase already absorbed with ITerminalSession: keep logic seams independent of whichever concrete UI/runtime happens to host them today. Next action — when host→JS event push lands for the streaming stage, define the event payload contract in ZeroCommon too (not in the WPF host), so any future .wasm subscriber inherits the same surface."
+    "lead": "데이터 출처를 한 단계만 더 의심해도 누적의 절반이 보인다 — 첫 구현이 'official 경로 ~/.claude' 만 본 결과 ~/.claude-qa, ~/.claude-pel3, ~/.claude-gou 의 모든 사용량이 통째로 누락되어 있었다.",
+    "body": "M0009 의 첫 collector 는 사용자 홈 디렉토리에서 단일 ~/.claude/projects 만 글로빙하고 끝낼 뻔했다. 사용자가 직접 'claude-qa, claude-pel3 같은 매크로도 쓴다' 고 가르쳐준 직후 PowerShell 프로필을 검사하자, CLAUDE_CONFIG_DIR 로 분기된 4개의 home dir 가 모두 활성 상태였고, 첫 DB 는 410 트랜스크립트 중 절반 이상을 'max' 한 라벨로 통째 묶어 누락하고 있었다. 교훈 두 갈래로 정리한다. (1) 도메인 매핑 단계에서 '공식 경로' 만 믿지 말고 사용자 환경의 실제 사용 패턴 — 셸 매크로, 환경변수 — 을 먼저 확인할 것. AgentZero 처럼 로컬 자원에 의존하는 collector 는 사용자 셸의 분기를 'optional 추가 조사' 가 아니라 사전조사 표준 항목으로 박아야 한다. (2) 라벨링은 ingest 시점에 pin 해서 이후 절대 재해결하지 않을 것 — orgUuid 같은 mutable 신호에 매번 의존하면 logout/login race 와 multi-account 가 즉시 누락 또는 오라벨로 이어진다. 다음 액션: 사용자 환경 사전조사 체크리스트를 harness/knowledge/ 에 정식화하고, 새 collector 류 미션 brief 단계에서 자동 invoke 되도록 한다."
   }
 }

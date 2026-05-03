@@ -1,15 +1,15 @@
 {
-  "updatedAt": "2026-04-28",
-  "headline": "v0.1.5 — Voice subsystem scaffolded; multi-provider LLM expansion shipped",
-  "narrative": "AgentZero Lite reached v0.1.5 with two simultaneous expansions on the same foundation. The LLM layer went from a single local Gemma-4 to five backends (local Gemma, local Nemotron Nano 8B, Webnori, OpenAI, LM Studio, Ollama) behind one OpenAI-compatible interface. The modality layer grew a voice — STT/TTS scaffolded with a Voice tab, dual-VAD mic capture, mute-while-playing feedback suppression, and a default loop that runs end-to-end on Win11 OS-level voices for $0/month. Both expansions slot behind already-named interfaces (ILlmProvider, ISpeechToText, ITextToSpeech) — the agent grows by adding implementations, not new shells.",
+  "updatedAt": "2026-05-03",
+  "headline": "v0.5.1 — Token Monitor 플러그인과 멀티 프로필 텔레메트리",
+  "narrative": "WebDev 플러그인 플랫폼이 두 번째 공식 플러그인을 받아들였다. Token Monitor 는 Claude Code 와 Codex CLI 가 디스크에 남기는 JSONL 트랜스크립트를 호스트 측 collector 가 10분 주기로 incremental 흡수하고, 벤더/계정/프로젝트 단위 대시보드로 노출한다. 첫 구현이 ~/.claude/ 한 디렉토리만 본다는 사실을 사용자가 지적해 곧장 멀티-profile (CLAUDE_CONFIG_DIR 분기된 ~/.claude*) 자동 탐색 + AccountKey-per-file pinning 으로 보강 — 실제로는 절반의 데이터가 누락되어 있었다. 같은 사이클에 Install Plugin 다이얼로그가 GitHub Trees API 로 official 플러그인을 런타임 탐색하도록 바뀌었고, 다크테마 ComboBox 풀 재템플릿이 도입되면서 'Background/Foreground 만 으로 부족' 이라는 WPF 함정이 harness 의 Pitfall 6 으로 codify 됐다.",
   "highlights": [
-    { "label": "Multi-provider",  "text": "5 LLM backends behind one HTTP interface", "tone": "blue"   },
-    { "label": "Voice scaffold",  "text": "STT × 4 / TTS × 2, free Win11 OS-voice loop", "tone": "purple" },
-    { "label": "AIMODE dual",     "text": "Gemma 4 GBNF + Nemotron Nano (Llama-3.1)",   "tone": "green"  }
+    { "label": "Token Monitor", "text": "벤더/계정/프로젝트 분리 대시보드 + alias rename + Reset & Re-scan", "tone": "blue"   },
+    { "label": "멀티 프로필",   "text": "~/.claude*, profile 디렉토리명을 AccountKey 로 pin (race-free)",      "tone": "purple" },
+    { "label": "공식 콤보",     "text": "Install 다이얼로그가 Trees API 로 런타임 탐색 — 하드코딩 zero",         "tone": "green"  }
   ],
   "prompts": [
-    { "tag": "Multi-CLI",       "tone": "blue",   "text": "Open Claude and Codex side by side, then route a message between them" },
-    { "tag": "AIMODE handshake", "tone": "purple", "text": "Talk to the Claude tab — first-contact handshake, then start the conversation" },
-    { "tag": "Voice loop",      "tone": "green",  "text": "Voice in (Whisper.net) → local Gemma → voice out (Win11 SAPI Korean neural)" }
+    { "tag": "토큰 추적",     "tone": "blue",   "text": "WebDev → Token Monitor 에서 1주일치 사용량을 프로젝트(cwd 리프 폴더)별로 비교" },
+    { "tag": "프로필 라벨",   "tone": "purple", "text": "By account 표에서 각 계정 셀 클릭 → 별칭(a/b/c) 입력해 친화 이름 매핑" },
+    { "tag": "공식 플러그인", "tone": "green",  "text": "+ Install Plugin 다이얼로그의 OFFICIAL 콤보에서 voice-note / token-monitor 즉시 설치" }
   ]
 }
