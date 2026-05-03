@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Windows.Threading;
 using Agent.Common;
 using Agent.Common.Browser;
 using Microsoft.Web.WebView2.Core;
@@ -25,6 +26,13 @@ public sealed class WebDevBridge
 
     private readonly CoreWebView2 _core;
     private readonly IZeroBrowser _host;
+    // CoreWebView2 is STA-bound — every PostWebMessageAsJson must run on
+    // the UI thread that created the WebView2. Voice capture / Whisper /
+    // chat streaming all fire from background threads, so we marshal
+    // every outbound message through this dispatcher. Captured at
+    // construction so the bridge keeps working even if the UI thread's
+    // SynchronizationContext changes later.
+    private readonly Dispatcher _uiDispatcher;
 
     // Optional concrete handle so VAD-driven note events can be wired
     // back as JS events. Stays null when host is a different IZeroBrowser
@@ -37,6 +45,10 @@ public sealed class WebDevBridge
         _core = core;
         _host = host;
         _noteHost = host as WebDevHost;
+        // The bridge is constructed from the UI thread that owns the
+        // WebView2 host (WebDevPagePanel.InitAsync) — capture that
+        // dispatcher so background events can hop back here.
+        _uiDispatcher = Dispatcher.CurrentDispatcher;
         _core.WebMessageReceived += OnMessage;
 
         if (_noteHost is not null)
@@ -225,14 +237,34 @@ public sealed class WebDevBridge
     private void PostResponse(int id, bool ok, object? result, string? error)
     {
         var payload = new { id, ok, result, error };
-        try { _core.PostWebMessageAsJson(JsonSerializer.Serialize(payload, JsonOpts)); }
-        catch (Exception ex) { AppLogger.Log($"[WebDev] post failed: {ex.Message}"); }
+        var json = JsonSerializer.Serialize(payload, JsonOpts);
+        PostJsonOnUi(json, "response");
     }
 
     private void PostEvent(string channel, object data)
     {
         var payload = new { op = "event", channel, data };
-        try { _core.PostWebMessageAsJson(JsonSerializer.Serialize(payload, JsonOpts)); }
-        catch (Exception ex) { AppLogger.Log($"[WebDev] event post failed ({channel}): {ex.Message}"); }
+        var json = JsonSerializer.Serialize(payload, JsonOpts);
+        PostJsonOnUi(json, channel);
+    }
+
+    private void PostJsonOnUi(string json, string label)
+    {
+        // CoreWebView2 must be touched from the UI thread that hosts the
+        // WebView2. Most callers already are (the request dispatcher
+        // above runs from WebMessageReceived), but background work like
+        // VoiceCaptureService events or Task.Run STT continuations isn't
+        // — invoke on the captured dispatcher to make every path safe.
+        if (_uiDispatcher.CheckAccess())
+        {
+            try { _core.PostWebMessageAsJson(json); }
+            catch (Exception ex) { AppLogger.Log($"[WebDev] post failed ({label}): {ex.Message}"); }
+            return;
+        }
+        _uiDispatcher.BeginInvoke((Action)(() =>
+        {
+            try { _core.PostWebMessageAsJson(json); }
+            catch (Exception ex) { AppLogger.Log($"[WebDev] post failed ({label}): {ex.Message}"); }
+        }));
     }
 }
