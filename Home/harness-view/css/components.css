@@ -676,9 +676,11 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.sticky-tag.tag-rec  { color: #15803D; border-color: rgba(22, 163, 74, 0.35); }
-.sticky-tag.tag-prd  { color: #6B7280; border-color: rgba(107, 114, 128, 0.30); }
-.sticky-tag.tag-done { color: #15803D; border-color: rgba(22, 163, 74, 0.35); text-transform: none; letter-spacing: 0; }
+.sticky-tag.tag-rec    { color: #15803D; border-color: rgba(22, 163, 74, 0.35); }
+.sticky-tag.tag-prd    { color: #6B7280; border-color: rgba(107, 114, 128, 0.30); }
+.sticky-tag.tag-done   { color: #15803D; border-color: rgba(22, 163, 74, 0.35); text-transform: none; letter-spacing: 0; }
+/* Pencil .pen blueprint exists for this mission (Docs/design/{id}-*.pen). */
+.sticky-tag.tag-design { color: #7C3AED; border-color: rgba(124, 58, 237, 0.35); text-transform: none; letter-spacing: 0; }
 
 /* "+ pin a new mission" placeholder — never animates, dashed border. */
 .sticky-add-slot {

@@ -4,6 +4,10 @@
     {
       "type": "pen",
       "file": "design.pen"
+    },
+    {
+      "type": "pen",
+      "file": "M0006-webdev-mainmenu.pen"
     }
   ]
 }

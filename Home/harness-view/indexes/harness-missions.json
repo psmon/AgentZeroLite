@@ -10,15 +10,32 @@
     "cancelled"
   ],
   "counts": {
-    "all": 6,
+    "all": 7,
     "inbox": 1,
     "in_progress": 0,
-    "done": 5,
+    "done": 6,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0006",
+      "file": "harness/missions/M0006-WEBDEB-확장.md",
+      "title": "WebDev를 메인 윈도우 공식 메뉴로 승격 (시원한 풀 레이아웃)",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-03",
+      "recordFile": "harness/logs/mission-records/M0006-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-03T07:30:00+09:00",
+      "recordFinished": "2026-05-03T08:35:00+09:00",
+      "designFile": "Docs/design/M0006-webdev-mainmenu.pen",
+      "modified": "2026-05-02",
+      "size": 1837
+    },
     {
       "id": "M0005",
       "file": "harness/missions/M0005-어셈테스트웹뷰.md",
@@ -32,6 +49,7 @@
       "recordStatus": "done",
       "recordStarted": "2026-05-02T22:00:00+09:00",
       "recordFinished": "2026-05-02T22:49:00+09:00",
+      "designFile": null,
       "modified": "2026-05-02",
       "size": 1158
     },
@@ -48,6 +66,7 @@
       "recordStatus": "done",
       "recordStarted": "2026-05-02T10:50:00+09:00",
       "recordFinished": "2026-05-02T20:35:00+09:00",
+      "designFile": null,
       "modified": "2026-05-02",
       "size": 3435
     },
@@ -64,6 +83,7 @@
       "recordStatus": "done",
       "recordStarted": "2026-05-02T09:00:00+09:00",
       "recordFinished": "2026-05-02T10:45:00+09:00",
+      "designFile": null,
       "modified": "2026-05-02",
       "size": 1873
     },
@@ -80,6 +100,7 @@
       "recordStatus": "done",
       "recordStarted": "2026-05-02T11:00:00+09:00",
       "recordFinished": "2026-05-02T11:35:00+09:00",
+      "designFile": null,
       "modified": "2026-05-02",
       "size": 3111
     },
@@ -96,6 +117,7 @@
       "recordStatus": null,
       "recordStarted": null,
       "recordFinished": null,
+      "designFile": null,
       "modified": "2026-05-02",
       "size": 1283
     },
@@ -112,6 +134,7 @@
       "recordStatus": "done",
       "recordStarted": "2026-05-02T08:50:00+09:00",
       "recordFinished": "2026-05-02T09:25:00+09:00",
+      "designFile": null,
       "modified": "2026-05-02",
       "size": 2665
     }

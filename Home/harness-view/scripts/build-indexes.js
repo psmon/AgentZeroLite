@@ -423,6 +423,7 @@ function parseSimpleFrontmatter(text) {
 function buildMissions() {
   const missionsDir = path.join(ROOT, PATHS.missions);
   const recordsDir  = path.join(ROOT, PATHS.missionRecords);
+  const designDir   = path.join(ROOT, PATHS.design);
 
   // Pre-scan completion logs by mission id (M{NNNN}).
   const records = new Map();
@@ -445,6 +446,20 @@ function buildMissions() {
     }
   }
 
+  // Pre-scan Pencil design files keyed by mission id (M{NNNN}).
+  // Convention: Docs/design/M{NNNN}-{slug}.pen — mirrors the mission/log
+  // naming. Picked up automatically; no view code change needed when a
+  // mission ships a design.
+  const designs = new Map();
+  if (fs.existsSync(designDir)) {
+    for (const f of fs.readdirSync(designDir)) {
+      if (!f.endsWith('.pen')) continue;
+      const idMatch = f.match(/^(M\d+)\b/);
+      if (!idMatch) continue;
+      designs.set(idMatch[1], `${PATHS.design}/${f}`);
+    }
+  }
+
   // Scan PRDs.
   const items = [];
   if (fs.existsSync(missionsDir)) {
@@ -460,6 +475,7 @@ function buildMissions() {
       const fm    = parseSimpleFrontmatter(raw) || {};
       const stat  = fs.statSync(abs);
       const rec   = records.get(id) || null;
+      const design = designs.get(id) || null;
 
       items.push({
         id,
@@ -474,6 +490,7 @@ function buildMissions() {
         recordStatus:   rec?.status   || null,
         recordStarted:  rec?.started  || null,
         recordFinished: rec?.finished || null,
+        designFile:     design,
         modified: stat.mtime.toISOString().slice(0, 10),
         size:     stat.size,
       });

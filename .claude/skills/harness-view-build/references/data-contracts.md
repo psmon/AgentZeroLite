@@ -94,6 +94,45 @@ Files without frontmatter still get listed (status falls back to
 `inbox` if no record exists, `done` if a record is found), but
 `title / operator / priority / created` all stay `null`.
 
+## Rule 5 — Mission designs must start with `M{NNNN}`
+
+**Indexer code**: `Home/harness-view/scripts/build-indexes.js` —
+`buildMissions()` pre-scan of `Docs/design/*.pen`.
+
+```js
+for (const f of fs.readdirSync(designDir)) {
+  if (!f.endsWith('.pen')) continue;
+  const idMatch = f.match(/^(M\d+)\b/);
+  if (!idMatch) continue;
+  designs.set(idMatch[1], `${PATHS.design}/${f}`);
+}
+```
+
+When a mission ships a Pencil design, the file MUST live under:
+
+```
+Docs/design/M{NNNN}-{english-kebab-slug}.pen
+```
+
+The indexer attaches it to the matching mission as `designFile`. The
+Missions card then:
+- adds an `✎ design` chip on the sticky note (visual hint at the
+  fridge level)
+- enables a **Design (.pen)** tab inside the detail modal, rendered
+  inline by `js/components/pen-renderer.js` (no separate view).
+
+### Anti-patterns
+
+| Filename | Why it fails |
+|---|---|
+| `Docs/design/webdev-mainmenu.pen` | No `M{NNNN}` prefix — `^M\d+` doesn't match |
+| `Docs/design/2026-05-03-M0006-...pen` | Timestamp prefix — same issue as Rule 1 |
+| `Docs/design/M0006_design.pen` | Underscore separator — `\b` after digits doesn't catch underscore start |
+
+If multiple `.pen` files match the same `M{NNNN}`, the first one
+encountered wins (filesystem order). Ship one canonical design per
+mission to avoid surprise pairings.
+
 ## Rule 3 — Other indexer matchers (no special filename rule)
 
 | Source | Match rule |

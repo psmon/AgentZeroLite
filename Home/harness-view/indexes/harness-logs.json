@@ -10,15 +10,55 @@
     "tamer"
   ],
   "counts": {
-    "build-doctor": 4,
-    "code-coach": 16,
-    "mission-records": 5,
+    "build-doctor": 5,
+    "code-coach": 18,
+    "mission-records": 6,
     "pre-commit-review": 8,
-    "release-build-pipeline": 4,
-    "security-guard": 6,
+    "release-build-pipeline": 5,
+    "security-guard": 7,
     "tamer": 16
   },
   "items": [
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-03-02-01-webdev-chat-test-mode.md",
+      "date": "2026-05-03",
+      "time": "02:01",
+      "title": "webdev chat test mode",
+      "size": 3997
+    },
+    {
+      "category": "build-doctor",
+      "file": "harness/logs/build-doctor/2026-05-03-01-23-release-gate-v0-3-2.md",
+      "date": "2026-05-03",
+      "time": "01:23",
+      "title": "release gate v0 3 2",
+      "size": 2315
+    },
+    {
+      "category": "release-build-pipeline",
+      "file": "harness/logs/release-build-pipeline/2026-05-03-01-23-v0-3-2.md",
+      "date": "2026-05-03",
+      "time": "01:23",
+      "title": "v0 3 2",
+      "size": 1252
+    },
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-05-03-01-22-release-gate-v0-3-2.md",
+      "date": "2026-05-03",
+      "time": "01:22",
+      "title": "release gate v0 3 2",
+      "size": 2303
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-03-01-19-webdev-reload-disposal.md",
+      "date": "2026-05-03",
+      "time": "01:19",
+      "title": "webdev reload disposal",
+      "size": 2560
+    },
     {
       "category": "code-coach",
       "file": "harness/logs/code-coach/2026-05-02-22-55-precommit-m0005-webdev-tab.md",
@@ -490,6 +530,14 @@
       "time": null,
       "title": "M0005-수행결과",
       "size": 7190
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0006-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0006-수행결과",
+      "size": 19812
     }
   ]
 }

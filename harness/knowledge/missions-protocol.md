@@ -127,6 +127,39 @@ Rationale: the operator is the audience for completion logs. Matching their
 language reduces friction. Internal harness artifacts keep English so
 specialist agents and external tooling don't fragment.
 
+## Pencil design artifacts (optional)
+
+If a mission's brief asks for a Pencil (`.pen`) design step (operator
+phrases like "펜슬로 디자인 작업을 먼저 검토" or "draw the layout in
+Pencil first"), the design file MUST land at:
+
+```
+Docs/design/M{NNNN}-{english-kebab-slug}.pen
+```
+
+Filename rules mirror Rule 1: the `M{NNNN}` prefix at the start lets
+the harness-view indexer pair the design with the mission. The slug
+after the ID is English kebab-case for tooling safety (Pencil paths
+end up in URLs / PowerShell args).
+
+The viewer pairs the design automatically — no view change needed.
+Missions card adds an `✎ design` chip on the sticky note and a
+**Design (.pen)** tab inside the modal that renders the frames inline
+via `pen-renderer.js`. The full contract for indexer pairing lives at:
+
+> **`.claude/skills/harness-view-build/references/data-contracts.md`**
+> "Rule 5 — Mission designs must start with `M{NNNN}`"
+
+| Anti-pattern | Why it fails |
+|---|---|
+| `Docs/design/webdev-mainmenu.pen` | No `M{NNNN}` prefix — indexer can't pair it |
+| `Docs/design/M0006-webdev-확장.pen` | Korean slug works for filesystem but breaks PowerShell / URL escaping in some tools — prefer English |
+| `Docs/design/2026-05-03-M0006-...pen` | Timestamp prefix — `^M\d+` regex fails |
+
+Multiple `.pen` per mission is allowed (Rule 5 picks the first match
+deterministically); when in doubt, ship one canonical file per
+mission.
+
 ## Completion log contract
 
 Path: `harness/logs/mission-records/M{NNNN}-{slug}.md`

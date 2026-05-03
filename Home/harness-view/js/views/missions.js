@@ -21,9 +21,15 @@
 import { h, mount, humanize } from '../utils/dom.js';
 import { loadIndex, loadMd } from '../utils/loader.js';
 import { createMdViewer } from '../components/md-viewer.js';
+import { parsePen, renderFrame } from '../components/pen-renderer.js';
 import { parseFrontmatter } from '../components/spec-card.js';
 import { renderTopBar, emptyState, loadingState } from './_common.js';
 import { ICONS } from '../config/menu.js';
+
+// Pencil .pen + .md files outside Home/ are mirrored at build time so
+// GitHub Pages can serve them from a single Home/ artifact. Same prefix
+// the design.js view uses.
+const PROJECT_ROOT_PREFIX = '../_resources/';
 
 // Status → display metadata. Single source of truth.
 const STATUS_META = {
@@ -208,7 +214,13 @@ function renderSticky(it, menu) {
     ? h('span', { class: 'sticky-tag tag-done' }, '✓ ' + String(it.recordFinished).slice(0, 10))
     : null;
 
-  const tagRow = h('div', { class: 'sticky-tags' }, [tag, finishedNote]);
+  // Design indicator — Pencil .pen file present at Docs/design/{id}-*.pen.
+  // Hint at the fridge level so users know a visual blueprint exists.
+  const designNote = it.designFile
+    ? h('span', { class: 'sticky-tag tag-design', title: it.designFile }, '✎ design')
+    : null;
+
+  const tagRow = h('div', { class: 'sticky-tags' }, [tag, finishedNote, designNote]);
 
   // Tape — only on a few variants, decorative only.
   const tape = variant.startsWith('done') || variant.startsWith('inbox')
@@ -260,7 +272,8 @@ async function openMissionModal(index, params, menu) {
 
   const parts = String(params).split('/');
   const id = decodeURIComponent(parts[0] || '');
-  const tab = parts[1] === 'result' ? 'result' : 'prd';
+  const tabRaw = parts[1] || 'prd';
+  const tab = (tabRaw === 'result' || tabRaw === 'design') ? tabRaw : 'prd';
 
   const it = index?.items?.find(x => x.id === id);
   if (!it) {
@@ -291,7 +304,12 @@ async function openMissionModal(index, params, menu) {
     modalCloseBtn(menu),
   ]);
 
-  const sub = h('div', { class: 'mission-modal-sub' }, tab === 'result' ? (it.recordFile || '—') : it.file);
+  const subPath = tab === 'result'
+    ? (it.recordFile || '—')
+    : tab === 'design'
+      ? (it.designFile || '—')
+      : it.file;
+  const sub = h('div', { class: 'mission-modal-sub' }, subPath);
 
   const modal = h('div', { class: 'mission-modal' }, [head, sub, tabsEl, bodyEl]);
 
@@ -318,13 +336,34 @@ async function openMissionModal(index, params, menu) {
         location.hash = `#${menu.id}/${encodeURIComponent(it.id)}/result`;
       },
     },
+    {
+      id: 'design',
+      label: it.designFile ? 'Design (.pen)' : 'Design (none yet)',
+      active: tab === 'design',
+      disabled: !it.designFile,
+      onclick: () => {
+        if (!it.designFile) return;
+        location.hash = `#${menu.id}/${encodeURIComponent(it.id)}/design`;
+      },
+    },
   ];
   tabsEl.replaceChildren(...tabDefs.map(t => h('div', {
     class: 'mission-modal-tab' + (t.active ? ' active' : '') + (t.disabled ? ' disabled' : ''),
     onclick: t.disabled ? null : t.onclick,
   }, t.label)));
 
-  // Content
+  // Content — design tab branches into the Pencil renderer; prd/result
+  // use the regular markdown loader.
+  if (tab === 'design') {
+    if (!it.designFile) {
+      bodyEl.replaceChildren(emptyState(
+        `No Pencil design for ${it.id} yet. Convention: Docs/design/${it.id}-{slug}.pen`));
+      return;
+    }
+    await renderDesignTab(bodyEl, it);
+    return;
+  }
+
   const targetPath = tab === 'result' ? it.recordFile : it.file;
   if (!targetPath) {
     bodyEl.replaceChildren(emptyState('No execution log yet — only the PRD has been written.'));
@@ -347,6 +386,97 @@ async function openMissionModal(index, params, menu) {
     breadcrumb: targetPath.split('/'),
   }));
   bodyEl.replaceChildren(wrap);
+}
+
+/* ─── Design tab — embedded Pencil renderer ───────────────────────────── */
+
+async function renderDesignTab(bodyEl, it) {
+  bodyEl.replaceChildren(loadingState(`Loading ${it.designFile}…`));
+
+  let parsed;
+  try {
+    const url = `${PROJECT_ROOT_PREFIX}${it.designFile}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    parsed = parsePen(text);
+  } catch (e) {
+    bodyEl.replaceChildren(h('div', { class: 'empty' }, [
+      h('div', { style: { fontSize: '14px', color: '#6B7280', marginBottom: '8px' } },
+        'Could not parse the .pen file. It may be encrypted or not served by the dev server.'),
+      h('div', { style: { fontSize: '12px', color: '#9CA3AF' } }, `path: ${it.designFile}`),
+      h('div', { style: { fontSize: '12px', color: '#9CA3AF', marginTop: '8px' } },
+        'Workaround: export via Pencil MCP `batch_get` to plain JSON, then place next to the .pen.'),
+    ]));
+    return;
+  }
+
+  const frames = parsed.frames || [];
+  const vars = parsed.variables || {};
+  if (!frames.length) {
+    bodyEl.replaceChildren(emptyState('The .pen has no frames.'));
+    return;
+  }
+
+  const state = { idx: 0 };
+
+  // Compact layout fits inside the mission modal: thumbs left (180px)
+  // + canvas right. No file selector — one design per mission by convention.
+  const thumbList = h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } });
+  const canvas = h('div', { style: { background: '#FFFFFF', borderRadius: '6px', border: '1px solid #E5E7EB', margin: '0 auto' } });
+  const viewport = h('div', {
+    style: {
+      flex: '1 1 auto', overflow: 'auto',
+      padding: '16px', background: '#F9FAFB',
+      border: '1px solid #E5E7EB', borderRadius: '6px',
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      minHeight: '50vh',
+    },
+  }, [canvas]);
+
+  const left = h('div', {
+    style: {
+      width: '180px', flex: '0 0 180px', overflow: 'auto',
+      padding: '10px', background: '#FFFFFF',
+      border: '1px solid #E5E7EB', borderRadius: '6px',
+      maxHeight: '60vh',
+    },
+  }, [
+    h('div', {
+      style: { fontSize: '10px', fontWeight: 600, color: '#6B7280', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.04em' },
+    }, `Frames · ${frames.length}`),
+    thumbList,
+  ]);
+
+  const wrap = h('div', { style: { display: 'flex', gap: '12px', alignItems: 'stretch' } }, [left, h('div', { style: { flex: 1, minWidth: 0 } }, [viewport])]);
+  bodyEl.replaceChildren(wrap);
+
+  function paintThumbs() {
+    thumbList.replaceChildren(...frames.map((fr, i) => h('div', {
+      style: {
+        padding: '6px 8px', borderRadius: '4px', cursor: 'pointer',
+        background: i === state.idx ? '#EFF6FF' : '#F9FAFB',
+        border: i === state.idx ? '1px solid #2563EB' : '1px solid #E5E7EB',
+        fontSize: '11px',
+        color: i === state.idx ? '#2563EB' : '#374151',
+        fontWeight: i === state.idx ? 600 : 400,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      },
+      onclick: () => { state.idx = i; paintThumbs(); paintFrame(); },
+    }, `${i + 1}. ${fr.name || 'Frame ' + (i + 1)}`)));
+  }
+
+  function paintFrame() {
+    requestAnimationFrame(() => {
+      const fr = frames[state.idx];
+      if (!fr) { canvas.replaceChildren(h('div', { class: 'empty' }, 'No frame.')); return; }
+      const avail = Math.max(360, (viewport.clientWidth || 800) - 32);
+      renderFrame(fr, canvas, { maxWidth: avail, vars });
+    });
+  }
+
+  paintThumbs();
+  paintFrame();
 }
 
 function modalCloseBtn(menu) {

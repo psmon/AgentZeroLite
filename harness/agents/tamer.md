@@ -112,6 +112,24 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
    필요하면 순차 호출로 작은 sub-engine을 구성한다.
 6. specialist 자체 로그(`harness/logs/{agent}/*.md`) 는 그 agent의 contract대로
    기록되게 둔다 — 별도로 가로채지 않는다.
+6.5. **Pencil 디자인 산출물 (선택)** — mission brief 가 Pencil 디자인을
+   요구하면 (예: "펜슬로 디자인 작업을 먼저 검토", "draw the layout in Pencil
+   first"), 디자인 파일은 반드시 다음 경로 / 명명 규칙을 따른다:
+
+   ```
+   Docs/design/M{NNNN}-{english-kebab-slug}.pen
+   ```
+
+   - 파일명은 `M{NNNN}` 으로 시작해야 indexer 가 mission 과 pair 한다
+     (`harness-view` Missions 모달에 Design 탭 + sticky note 의 `✎ design`
+     chip 자동 노출). 자세히는
+     **`.claude/skills/harness-view-build/references/data-contracts.md`** 의
+     "Rule 5 — Mission designs must start with `M{NNNN}`" 참고.
+   - slug 는 영문 kebab-case (PowerShell / URL escaping 안전).
+   - 한 mission 당 canonical `.pen` 1 개를 권장 (multi-pen 도 허용되지만
+     첫 매치가 winner).
+   - `.pen` 파일은 encrypted — pencil MCP 도구로만 read/write.
+
 7. **[필수] 완료 로그 작성**:
    - **경로 규칙은 인덱서 contract 가 강제한다** — 자세히는
      **`.claude/skills/harness-view-build/references/data-contracts.md`** 의
