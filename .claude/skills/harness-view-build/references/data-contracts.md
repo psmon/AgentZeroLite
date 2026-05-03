@@ -47,7 +47,7 @@ filenames is fine), but the `M{NNNN}` prefix is non-negotiable.
 
 ### Frontmatter shape (canonical)
 
-`harness/knowledge/missions-protocol.md` "Completion log contract"
+`harness/knowledge/tamer/missions-protocol.md` "Completion log contract"
 defines this. Mirror here for the indexer's own consumption:
 
 ```yaml
@@ -164,7 +164,7 @@ contracts:
 - **harness-kakashi-creator** (plugin) — when its tamer agent
   dispatches a mission via "M{NNNN} 수행해", the completion log path
   is canonized by Rule 1. The skill reads `harness/agents/tamer.md`
-  and `harness/knowledge/missions-protocol.md` for execution; both
+  and `harness/knowledge/tamer/missions-protocol.md` for execution; both
   link back here so the rule has a single source of truth.
 - **agent-zero-build** — release artifacts in `harness/docs/v*.md`
   follow Rule 3's semver convention.
@@ -177,6 +177,6 @@ Update order to keep the system consistent:
 
 1. Edit `Home/harness-view/scripts/build-indexes.js` (the regex/source of truth)
 2. Edit this file to match the new behavior
-3. Update `harness/knowledge/missions-protocol.md` if mission-specific rules change
+3. Update `harness/knowledge/tamer/missions-protocol.md` if mission-specific rules change
 4. Update `harness/agents/tamer.md` step 7 if execution procedure changes
 5. Add a memory entry under `feedback_*.md` if the change is a guard against a past incident

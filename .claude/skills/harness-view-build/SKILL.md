@@ -59,13 +59,14 @@ DEV SERVER / PDSA UPDATE 는 본 파일 하단 인라인 절차를 바로 수행
 > - **언어**: 산출물 모두 **영문 전용** (UI 라벨, 빈 상태, PDSA 본문 등). 사용자 대화는 한국어.
 > - **GitHub Pages 배포 = `.github/workflows/pages.yml`** — **`doc-v*` 태그 푸시로만** 발동
 >   (2026-04-28 이후 tag-gated). 일반 main push 는 Pages 를 건드리지 않으므로
->   harness/logs 가 잦게 늘어나도 CI 가 돌지 않는다. CI 가 `node Home/harness-view/scripts/build-indexes.js`
->   로 매니페스트 + `Home/_resources/{Docs,harness}` 미러를 새로 만든 뒤 `Home/` 를 업로드.
->   **단일 진실 원천 = `harness/` + `Docs/` 원본.** `Home/_resources/` 는
->   gitignored (44e19d4 이후) — git 에 안 들어감, CI 가 매번 빌드.
+>   harness/logs 가 잦게 늘어나도 CI 가 돌지 않는다. CI 는 `node Home/harness-view/scripts/build-indexes.js`
+>   로 매니페스트만 갱신한 뒤 **repo 전체** (`path: .`) 를 artifact 로 업로드.
+>   뷰어는 `harness/`, `Docs/` 의 upstream MD 를 `../../<rel>` 로 직접 fetch —
+>   단일 진실 원천이고 미러 없음 (2026-05-04 이전엔 `Home/_resources/` 로
+>   복제했으나 dual-management 이슈로 폐기).
 >   **운영 게시 명령은 본 파일 하단 "Publish — doc version tag bump" 섹션 참조.**
-> - **`Home/.nojekyll` 필수** (이미 추가됨, 6822624). underscore-prefix
->   디렉토리 (`_resources/`) 를 Jekyll 이 제외하지 못하도록 함.
+> - **`.nojekyll` 필수** — repo root + `Home/` 양쪽에 둔다 (Jekyll 이 underscore-prefix
+>   디렉토리를 자동 제외하지 못하도록).
 > - **외부 절대경로 참조 안티패턴 금지** — 모든 데이터 소스는 in-repo.
 
 ## 데이터 소스 매핑 (canonical for this project)
@@ -115,7 +116,7 @@ mission dispatch) 가 `harness/missions/` · `harness/logs/mission-records/`
 timestamp prefix 를 붙이면 인덱서가 매칭에 실패해서 Missions 카드의
 `recordFile` 이 `null` 로 남는다.
 
-`harness/knowledge/missions-protocol.md` 와 `harness/agents/tamer.md` 의
+`harness/knowledge/tamer/missions-protocol.md` 와 `harness/agents/tamer.md` 의
 관련 단계가 이 파일을 backlink 한다.
 
 ## DEV SERVER 모드 — 로컬 dev 서버 기동 (인라인 절차)

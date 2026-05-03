@@ -3,19 +3,23 @@
 > 운영 모드. 이미 만들어진 하네스뷰의 데이터를 최신화한다.
 > 코드는 건드리지 않는다.
 
-## 목적 — 그리고 새 아키텍처 (44e19d4 이후)
+## 목적 — 그리고 현재 아키텍처 (2026-05-04 이후)
 
-`Home/harness-view/` 정적 페이지가 보여주는 카드/트리/게시판은 모두
-`Home/harness-view/indexes/*.json` 매니페스트 + `Home/_resources/{Docs,harness}`
-미러에서 데이터를 읽어온다.
+`Home/harness-view/` 정적 페이지가 보여주는 카드/트리/게시판은 두 종류의 데이터를 읽는다:
+- **매니페스트** (`Home/harness-view/indexes/*.json`) — 빌드 산출물, 디렉토리 스캔 결과 캐시
+- **upstream 원본** (`harness/**.md`, `Docs/**.md`) — `../../<rel>` 로 직접 fetch.
+  미러 없이 단일 진실 원천.
 
-**중요한 변화** — Pages 배포는 이제 CI 가 매번 새로 빌드한다:
-- `pages.yml` 의 `paths:` 가 `Home/** + harness/** + Docs/** + pages.yml` 매칭 시 발동
-- CI 잡이 `node Home/harness-view/scripts/build-indexes.js` 를 실행 →
-  매니페스트와 `Home/_resources/` 미러를 fresh 하게 만든 뒤 artifact 업로드
-- `Home/_resources/` 는 **gitignored** — 절대 커밋하지 않음
+옛날엔 `Home/_resources/` 에 `harness/` + `Docs/` 를 복제했지만 dual-management
+문제 (한 파일이 두 곳에 존재) 로 2026-05-04 폐기. 빌드 스크립트는 폐기 잔재
+디렉토리만 청소한다 (`cleanupLegacyMirror`).
 
-**즉, 사용자가 `harness/agents/foo.md` 같은 콘텐츠를 추가/수정한 뒤 그냥 push 만 해도
+**Pages 배포 (CI)**:
+- `pages.yml` 트리거 = `doc-v*` 태그 push
+- CI 가 `node Home/harness-view/scripts/build-indexes.js` 로 매니페스트만 갱신
+- `actions/upload-pages-artifact path: .` — repo 전체 업로드 (artifact ~12MB)
+
+**즉 사용자가 `harness/agents/foo.md` 같은 콘텐츠를 추가/수정한 뒤 그냥 push 만 해도
 Pages 는 최신을 서빙한다.** BUILDER 를 로컬에서 돌리는 것은 **push 전 로컬 서버에서
 미리 보고 싶을 때** 의 옵션이지, Pages 반영의 필수 단계가 아니다.
 
@@ -103,8 +107,8 @@ node Home/harness-view/scripts/serve.js
 
 | 시나리오 | 사용자가 push 할 것 | CI 가 하는 것 |
 |---|---|---|
-| 새 .md 추가 (`harness/agents/foo.md`) | 그 파일만 | `build-indexes.js` 로 indexes + `_resources/` 미러 새로 만듦, Home/ artifact 업로드 |
-| 기존 .md 본문만 수정 | 그 파일만 | 동일 |
+| 새 .md 추가 (`harness/agents/foo.md`) | 그 파일만 | `build-indexes.js` 로 indexes 갱신, repo 전체 artifact 업로드 |
+| 기존 .md 본문만 수정 | 그 파일만 | 동일 — viewer 는 upstream MD 를 직접 fetch 하므로 인덱스 업데이트조차 필요 없음 |
 | 인덱스 파일이 stale 한 채 push | 무관 | CI 가 인덱스 새로 덮어써 artifact 에 반영 (Pages 는 항상 신선) |
 
 push 후 ~1분 내 Pages 재배포 완료.

@@ -2,17 +2,8 @@
   "base": "harness/knowledge",
   "items": [
     {
-      "id": "harness/knowledge/agent-origin-reference.md",
-      "file": "harness/knowledge/agent-origin-reference.md",
-      "name": "agent-origin-reference.md",
-      "title": "agent-origin-reference",
-      "heading": "Agent Origin (AgentWin) Reference Protocol",
-      "size": 3616,
-      "modified": "2026-04-27"
-    },
-    {
-      "id": "harness/knowledge/agentzerolite-architecture.md",
-      "file": "harness/knowledge/agentzerolite-architecture.md",
+      "id": "harness/knowledge/_shared/agentzerolite-architecture.md",
+      "file": "harness/knowledge/_shared/agentzerolite-architecture.md",
       "name": "agentzerolite-architecture.md",
       "title": "agentzerolite-architecture",
       "heading": "AgentZero Lite — Architecture Map (for harness agents)",
@@ -20,8 +11,8 @@
       "modified": "2026-04-25"
     },
     {
-      "id": "harness/knowledge/avalondock-float-redock-patterns.md",
-      "file": "harness/knowledge/avalondock-float-redock-patterns.md",
+      "id": "harness/knowledge/code-coach/avalondock-float-redock-patterns.md",
+      "file": "harness/knowledge/code-coach/avalondock-float-redock-patterns.md",
       "name": "avalondock-float-redock-patterns.md",
       "title": "avalondock-float-redock-patterns",
       "heading": "AvalonDock — Multi-View Terminal Float / Redock Patterns",
@@ -29,8 +20,8 @@
       "modified": "2026-05-02"
     },
     {
-      "id": "harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
-      "file": "harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
+      "id": "harness/knowledge/code-coach/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
+      "file": "harness/knowledge/code-coach/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
       "name": "2026-04-22-msys2-bash-crash-llamacpp-build.md",
       "title": "2026-04-22-msys2-bash-crash-llamacpp-build",
       "heading": "2026-04-22 — MSYS2 `bash.exe` crash during llama.cpp / Gemma 4 build",
@@ -38,44 +29,17 @@
       "modified": "2026-04-25"
     },
     {
-      "id": "harness/knowledge/crash-dump-forensics.md",
-      "file": "harness/knowledge/crash-dump-forensics.md",
-      "name": "crash-dump-forensics.md",
-      "title": "crash-dump-forensics",
-      "heading": "Crash Dump Forensics — Playbook",
-      "size": 7205,
-      "modified": "2026-04-25"
-    },
-    {
-      "id": "harness/knowledge/dotnet-test-execution.md",
-      "file": "harness/knowledge/dotnet-test-execution.md",
-      "name": "dotnet-test-execution.md",
-      "title": "dotnet-test-execution",
-      "heading": "dotnet test 실행 규칙 — 정전(canon)",
-      "size": 4940,
-      "modified": "2026-04-27"
-    },
-    {
-      "id": "harness/knowledge/llm-prompt-conventions.md",
-      "file": "harness/knowledge/llm-prompt-conventions.md",
+      "id": "harness/knowledge/code-coach/llm-prompt-conventions.md",
+      "file": "harness/knowledge/code-coach/llm-prompt-conventions.md",
       "name": "llm-prompt-conventions.md",
       "title": "llm-prompt-conventions",
       "heading": "LLM Prompt Conventions",
-      "size": 4366,
-      "modified": "2026-04-25"
-    },
-    {
-      "id": "harness/knowledge/missions-protocol.md",
-      "file": "harness/knowledge/missions-protocol.md",
-      "name": "missions-protocol.md",
-      "title": "missions-protocol",
-      "heading": "Missions protocol — file-based request management",
-      "size": 10818,
+      "size": 4469,
       "modified": "2026-05-03"
     },
     {
-      "id": "harness/knowledge/ondevice-tool-calling-survey.md",
-      "file": "harness/knowledge/ondevice-tool-calling-survey.md",
+      "id": "harness/knowledge/code-coach/ondevice-tool-calling-survey.md",
+      "file": "harness/knowledge/code-coach/ondevice-tool-calling-survey.md",
       "name": "ondevice-tool-calling-survey.md",
       "title": "ondevice-tool-calling-survey",
       "heading": "On-Device Tool Calling — Gemma 4 vs Nemotron Nano (2026-04 survey)",
@@ -83,8 +47,35 @@
       "modified": "2026-04-25"
     },
     {
-      "id": "harness/knowledge/security-surface.md",
-      "file": "harness/knowledge/security-surface.md",
+      "id": "harness/knowledge/code-coach/wpf-xaml-resource-and-window-pitfalls.md",
+      "file": "harness/knowledge/code-coach/wpf-xaml-resource-and-window-pitfalls.md",
+      "name": "wpf-xaml-resource-and-window-pitfalls.md",
+      "title": "wpf-xaml-resource-and-window-pitfalls",
+      "heading": "WPF XAML Resource Scope & Window Lifecycle Pitfalls",
+      "size": 18507,
+      "modified": "2026-05-03"
+    },
+    {
+      "id": "harness/knowledge/README.md",
+      "file": "harness/knowledge/README.md",
+      "name": "README.md",
+      "title": "README",
+      "heading": "harness/knowledge — per-agent expert knowledge",
+      "size": 4077,
+      "modified": "2026-05-03"
+    },
+    {
+      "id": "harness/knowledge/security-guard/crash-dump-forensics.md",
+      "file": "harness/knowledge/security-guard/crash-dump-forensics.md",
+      "name": "crash-dump-forensics.md",
+      "title": "crash-dump-forensics",
+      "heading": "Crash Dump Forensics — Playbook",
+      "size": 7205,
+      "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/security-guard/security-surface.md",
+      "file": "harness/knowledge/security-guard/security-surface.md",
       "name": "security-surface.md",
       "title": "security-surface",
       "heading": "Security Surface — Prompt Injection → OS Exec Map",
@@ -92,31 +83,49 @@
       "modified": "2026-04-25"
     },
     {
-      "id": "harness/knowledge/unit-test-policy.md",
-      "file": "harness/knowledge/unit-test-policy.md",
-      "name": "unit-test-policy.md",
-      "title": "unit-test-policy",
-      "heading": "Unit-test trigger policy",
-      "size": 3763,
-      "modified": "2026-05-01"
+      "id": "harness/knowledge/tamer/agent-origin-reference.md",
+      "file": "harness/knowledge/tamer/agent-origin-reference.md",
+      "name": "agent-origin-reference.md",
+      "title": "agent-origin-reference",
+      "heading": "Agent Origin (AgentWin) Reference Protocol",
+      "size": 3700,
+      "modified": "2026-05-03"
     },
     {
-      "id": "harness/knowledge/voice-roundtrip-testing.md",
-      "file": "harness/knowledge/voice-roundtrip-testing.md",
+      "id": "harness/knowledge/tamer/missions-protocol.md",
+      "file": "harness/knowledge/tamer/missions-protocol.md",
+      "name": "missions-protocol.md",
+      "title": "missions-protocol",
+      "heading": "Missions protocol — file-based request management",
+      "size": 10749,
+      "modified": "2026-05-03"
+    },
+    {
+      "id": "harness/knowledge/test-runner/dotnet-test-execution.md",
+      "file": "harness/knowledge/test-runner/dotnet-test-execution.md",
+      "name": "dotnet-test-execution.md",
+      "title": "dotnet-test-execution",
+      "heading": "dotnet test 실행 규칙 — 정전(canon)",
+      "size": 4940,
+      "modified": "2026-04-27"
+    },
+    {
+      "id": "harness/knowledge/test-runner/unit-test-policy.md",
+      "file": "harness/knowledge/test-runner/unit-test-policy.md",
+      "name": "unit-test-policy.md",
+      "title": "unit-test-policy",
+      "heading": "Unit-test execution policy",
+      "size": 3562,
+      "modified": "2026-05-03"
+    },
+    {
+      "id": "harness/knowledge/test-sentinel/voice-roundtrip-testing.md",
+      "file": "harness/knowledge/test-sentinel/voice-roundtrip-testing.md",
       "name": "voice-roundtrip-testing.md",
       "title": "voice-roundtrip-testing",
       "heading": "Voice TTS↔STT Round-Trip Testing — Methodology",
       "size": 10034,
       "modified": "2026-04-29"
-    },
-    {
-      "id": "harness/knowledge/wpf-xaml-resource-and-window-pitfalls.md",
-      "file": "harness/knowledge/wpf-xaml-resource-and-window-pitfalls.md",
-      "name": "wpf-xaml-resource-and-window-pitfalls.md",
-      "title": "wpf-xaml-resource-and-window-pitfalls",
-      "heading": "WPF XAML Resource Scope & Window Lifecycle Pitfalls",
-      "size": 18507,
-      "modified": "2026-05-03"
     }
   ]
 }

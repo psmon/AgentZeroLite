@@ -22,7 +22,7 @@ description: Owns dotnet test execution. NEVER auto-runs — only fires on the e
 
 LLM-backed smoke tests (Whisper, Gemma, Webnori) are slow — a full
 `dotnet test` cycle can sit at 5+ minutes and saturate RAM with concurrent
-testhosts (see `harness/knowledge/dotnet-test-execution.md`'s 12 GB
+testhosts (see `harness/knowledge/test-runner/dotnet-test-execution.md`'s 12 GB
 incident). Running them after every code change is more friction than
 signal. The user has therefore chosen: **tests run only when the user
 asks, never as a side effect of another task.**
@@ -60,7 +60,7 @@ without paying the full LLM-smoke-test cost.
 3. Build the `--filter` expression. Prefer `FullyQualifiedName~Foo` over
    `FullyQualifiedName=...` so partial matches work. For multiple classes,
    join with `|` operator inside the filter.
-4. Single foreground call (per `harness/knowledge/dotnet-test-execution.md`
+4. Single foreground call (per `harness/knowledge/test-runner/dotnet-test-execution.md`
    R1) with the filter:
    ```bash
    dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj \
@@ -145,7 +145,7 @@ expected slowdown for LLM smoke, missing testhost cleanup, etc.}
 
 - Does **not** run after `git commit`, `git push`, code refactors, build
   successes, or release pipelines. Those used to auto-run tests; the
-  policy is now "explicit only" (`harness/knowledge/unit-test-policy.md`).
+  policy is now "explicit only" (`harness/knowledge/test-runner/unit-test-policy.md`).
 - Does **not** audit test landscape structure / boundary integrity /
   coverage gaps — that is `test-sentinel`'s job, and Sentinel does
   *not* execute tests. Two roles, separate concerns.

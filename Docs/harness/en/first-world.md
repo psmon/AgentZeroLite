@@ -175,7 +175,7 @@ convention version lets Claude skip when context makes clear the user wants spee
 
 Two knowledge docs were seeded — the highest-leverage ones for this project:
 
-### [agentzerolite-architecture.md](../../../harness/knowledge/agentzerolite-architecture.md)
+### [agentzerolite-architecture.md](../../../harness/knowledge/_shared/agentzerolite-architecture.md)
 
 Quick-reference map of the load-bearing pieces: two-project dependency rule,
 single-exe two-modes, actor topology, the Akka shutdown invariant (with its
@@ -183,7 +183,7 @@ deadlock history), CLI ↔ GUI IPC details, EF migration locations, native DLL
 pinning rules, the IDE debugging trap. Agents read this before every pass so that
 file:line findings stay anchored in the same vocabulary.
 
-### [security-surface.md](../../../harness/knowledge/security-surface.md)
+### [security-surface.md](../../../harness/knowledge/security-guard/security-surface.md)
 
 The injection-aware view: every path where untrusted text becomes an OS-visible
 action. The primary surface (AgentChatBot CHT/KEY modes), the secondary surface
@@ -267,8 +267,8 @@ meta-layer — it shapes the garden itself.
 | Agent | [`agents/code-coach.md`](../../../harness/agents/code-coach.md) | Cross-stack senior + tech writer + research consultant |
 | Engine | [`engine/release-build-pipeline.md`](../../../harness/engine/release-build-pipeline.md) | security-guard → gate → build-doctor |
 | Engine | [`engine/pre-commit-review.md`](../../../harness/engine/pre-commit-review.md) | Auto-invoke code-coach before `git commit` |
-| Knowledge | [`knowledge/agentzerolite-architecture.md`](../../../harness/knowledge/agentzerolite-architecture.md) | Project structure, dependency rule, actor topology, historical incidents |
-| Knowledge | [`knowledge/security-surface.md`](../../../harness/knowledge/security-surface.md) | Prompt-injection → OS-exec map; what `security-guard` reads first |
+| Knowledge | [`knowledge/agentzerolite-architecture.md`](../../../harness/knowledge/_shared/agentzerolite-architecture.md) | Project structure, dependency rule, actor topology, historical incidents |
+| Knowledge | [`knowledge/security-surface.md`](../../../harness/knowledge/security-guard/security-surface.md) | Prompt-injection → OS-exec map; what `security-guard` reads first |
 | Docs | [`docs/v1.1.0.md`](../../../harness/docs/v1.1.0.md) | Version 1.1.0 changelog |
 | Log | [`logs/tamer/2026-04-25-1440-plant-four-specialists.md`](../../../harness/logs/tamer/2026-04-25-1440-plant-four-specialists.md) | Creation log + 3-axis self-evaluation |
 

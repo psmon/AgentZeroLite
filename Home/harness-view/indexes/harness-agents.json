@@ -7,8 +7,8 @@
       "name": "build-doctor.md",
       "title": "build-doctor",
       "heading": "Build Doctor",
-      "size": 5208,
-      "modified": "2026-05-01"
+      "size": 5331,
+      "modified": "2026-05-03"
     },
     {
       "id": "harness/agents/code-coach.md",
@@ -16,7 +16,7 @@
       "name": "code-coach.md",
       "title": "code-coach",
       "heading": "Code Coach",
-      "size": 10949,
+      "size": 11214,
       "modified": "2026-05-03"
     },
     {
@@ -25,8 +25,8 @@
       "name": "security-guard.md",
       "title": "security-guard",
       "heading": "Security Guard",
-      "size": 4722,
-      "modified": "2026-04-25"
+      "size": 4840,
+      "modified": "2026-05-03"
     },
     {
       "id": "harness/agents/tamer.md",
@@ -34,7 +34,7 @@
       "name": "tamer.md",
       "title": "tamer",
       "heading": "정원지기 카카시 (Tamer)",
-      "size": 9990,
+      "size": 10014,
       "modified": "2026-05-03"
     },
     {
@@ -43,8 +43,8 @@
       "name": "test-runner.md",
       "title": "test-runner",
       "heading": "Test Runner",
-      "size": 7594,
-      "modified": "2026-05-01"
+      "size": 7804,
+      "modified": "2026-05-03"
     },
     {
       "id": "harness/agents/test-sentinel.md",
@@ -52,8 +52,8 @@
       "name": "test-sentinel.md",
       "title": "test-sentinel",
       "heading": "Test Sentinel",
-      "size": 6059,
-      "modified": "2026-05-01"
+      "size": 6234,
+      "modified": "2026-05-03"
     }
   ]
 }

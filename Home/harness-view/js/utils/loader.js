@@ -33,13 +33,13 @@ export async function loadData(name) {
 }
 
 /** Resource (MD) loader.
- *  External resources (Docs/, harness/) are mirrored into Home/_resources/
- *  by build-indexes.js so GitHub Pages (which uploads only Home/) can serve
- *  them. From Home/harness-view/, `../_resources/<rel>` reaches the mirror
- *  in both local dev and Pages runs. */
+ *  Pages now uploads the entire repo (artifact path `.`), so the viewer
+ *  fetches upstream MDs directly — no mirror, no duplication. From
+ *  Home/harness-view/, `../../<rel>` reaches the repo root in both local
+ *  dev and Pages runs. */
 export async function loadMd(relativePath) {
   try {
-    return await fetchText(`../_resources/${relativePath}`);
+    return await fetchText(`../../${relativePath}`);
   } catch (e) {
     console.warn(`[loadMd] ${relativePath}: ${e.message}`);
     return null;

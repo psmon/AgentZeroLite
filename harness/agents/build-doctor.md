@@ -48,7 +48,7 @@ because:
 7. **Build-environment correlation for crash dumps** — when `security-guard`
    surfaces a `*.stackdump` / `*.dmp` from the working tree, cross-check what
    build step was running at the time (per
-   `harness/knowledge/crash-dump-forensics.md`). Recurring fork-emulation crashes
+   `harness/knowledge/security-guard/crash-dump-forensics.md`). Recurring fork-emulation crashes
    (MSYS2 `bash.exe`) under build load mean the build environment itself needs
    hardening — see `harness/knowledge/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md`
    for the canonical example. Forensics ownership stays with `security-guard`;
@@ -56,7 +56,7 @@ because:
 
 ## Procedure
 
-> **Test execution is OUT OF SCOPE.** Per `harness/knowledge/unit-test-policy.md`,
+> **Test execution is OUT OF SCOPE.** Per `harness/knowledge/test-runner/unit-test-policy.md`,
 > unit tests run only on explicit user triggers owned by `test-runner`. Build-doctor
 > verifies the build pipeline only — `dotnet test` is no longer part of this procedure.
 

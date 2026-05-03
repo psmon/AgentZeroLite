@@ -571,33 +571,17 @@ function buildClaudeTips() {
   writeJson('claude-tips', { file: PATHS.cliTips, exists });
 }
 
-// ─── Resource mirror — copy site-external folders into Home/_resources/ so
-//      GitHub Pages can serve them. The Pages workflow uploads only `Home/`,
-//      which means anything outside (Docs/, harness/, …) returns 404 in
-//      production. The view fetches everything via `../_resources/<rel>`,
-//      which resolves to Home/_resources/<rel> in both local and Pages runs.
-//
-//      Only mirrors directories that the view actually reads. Cleans the
-//      target dir each build so deletes propagate. ───
-const MIRROR_DIRS = ['Docs', 'harness'];
-function mirrorResources() {
+// ─── Stale-mirror cleanup ───────────────────────────────────────────
+//      The Pages artifact now uploads the entire repo (artifact path `.`),
+//      so the viewer reaches upstream MDs at `../../<rel>` directly — no
+//      duplicated copy needed. Older builds produced `Home/_resources/`,
+//      which we now remove so it doesn't lurk in the working tree as a
+//      confusing second source.
+function cleanupLegacyMirror() {
   const dst = path.join(ROOT, 'Home', '_resources');
-  if (fs.existsSync(dst)) {
-    fs.rmSync(dst, { recursive: true, force: true });
-  }
-  fs.mkdirSync(dst, { recursive: true });
-  let fileCount = 0;
-  for (const dir of MIRROR_DIRS) {
-    const src = path.join(ROOT, dir);
-    if (!fs.existsSync(src)) continue;
-    const target = path.join(dst, dir);
-    fs.cpSync(src, target, {
-      recursive: true,
-      filter: (s) => !path.basename(s).startsWith('.'),  // skip dotfiles
-    });
-    fileCount += countFiles(target);
-  }
-  console.log(`✓ _resources mirror  (${MIRROR_DIRS.join(', ')} → Home/_resources, ${fileCount} files)`);
+  if (!fs.existsSync(dst)) return;
+  fs.rmSync(dst, { recursive: true, force: true });
+  console.log('✓ removed legacy Home/_resources mirror');
 }
 function countFiles(absDir) {
   let n = 0;
@@ -674,6 +658,6 @@ buildMissions();
 buildDesign();
 buildEngine();
 buildClaudeTips();
-mirrorResources();
+cleanupLegacyMirror();
 writeMeta(Date.now() - __t0, process.env.BUILD_TRIGGER || 'manual');
 console.log('done.');

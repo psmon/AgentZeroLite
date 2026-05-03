@@ -21,12 +21,14 @@ in `Docs/agent-origin/`.
 
 ## When to consult `Docs/agent-origin/`
 
-Trigger on any of:
+The **trigger phrases** (오리진 비교해 / 오리진 참고해 / AgentWin 비교 / 오리진
+스냅샷 갱신, etc.) are owned by `harness/agents/tamer.md` frontmatter. This
+file documents the *what* and *how* — the lookup procedure agents follow once
+they're activated.
 
-- Korean: "오리진", "조상 프로젝트", "AgentWin", "오리진이랑 비교", "오리진 참고", "오리진 가져와", "원본"
-- English: "the origin", "the ancestor", "AgentWin", "compare with origin"
-- Implicit signals: user asks "is there a better pattern", "did we have this
-  before", "what did AgentWin do here"
+Implicit signals that should also send the agent here:
+- User asks "is there a better pattern", "did we have this before", "what did
+  AgentWin do here"
 
 ## Lookup order
 

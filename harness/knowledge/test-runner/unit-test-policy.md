@@ -1,18 +1,15 @@
-# Unit-test trigger policy
+# Unit-test execution policy
 
 > Status: binding (project-wide). Pinned in `memory/project_unit_test_policy.md`.
-> Owner: `test-runner` agent.
+> Owner: `test-runner` agent — see that file for the **trigger phrases** that
+> activate this policy. Knowledge files document *what* and *why*; agents own
+> *when* (the triggers).
 
 ## Rule
 
-**Unit tests are never auto-triggered.** They run only when the user issues one of
-the explicit triggers owned by `test-runner`:
-
-| Trigger | Behavior |
-|---|---|
-| "연관된 유닛테스트 수행해" / "관련 유닛테스트 수행해" / "run related unit tests" | Scoped run — git-diff-driven `--filter` |
-| "전체 유닛테스트 수행해" / "run all unit tests" | Full headless suite (and AgentTest if desktop) |
-| "유닛테스트 이력" / "최근 유닛테스트 이력알려줘" / "test history" | Read-only — summarize recent test-runner logs |
+**Unit tests are never auto-triggered.** They run only when the user issues one
+of the explicit triggers listed in `harness/agents/test-runner.md` frontmatter
+(scoped / full / history modes).
 
 Any other interaction (code edits, refactors, fixes, builds, releases, commits)
 **does not** invoke `dotnet test`. The user asks; the agent runs. Period.
@@ -21,8 +18,9 @@ Any other interaction (code edits, refactors, fixes, builds, releases, commits)
 
 1. **LLM-backed smoke tests are slow.** Whisper / Gemma / Webnori roundtrip tests
    sit at minutes per run and saturate RAM with concurrent testhosts (see the
-   12 GB incident in `harness/knowledge/dotnet-test-execution.md`). Running them
-   reflexively after every change burns the user's machine for low marginal value.
+   12 GB incident in `harness/knowledge/test-runner/dotnet-test-execution.md`).
+   Running them reflexively after every change burns the user's machine for
+   low marginal value.
 
 2. **Compile errors are a separate problem from test regressions.** Build remains
    the auto-check after code changes — a fast, cheap signal that the code at

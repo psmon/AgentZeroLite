@@ -2,7 +2,7 @@
 
 This directory holds **mission files** — written briefs the operator (a human
 collaborator) hands to the harness for execution. The protocol lives in
-`harness/knowledge/missions-protocol.md`; this README is the quick reference.
+`harness/knowledge/tamer/missions-protocol.md`; this README is the quick reference.
 
 ## Filename format
 

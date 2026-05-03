@@ -166,7 +166,7 @@ proceeds without referencing it.
 The Coach enforces these convention documents during pre-commit review.
 Treat them as binding for the file types they cover:
 
-- **`harness/knowledge/llm-prompt-conventions.md`** — All LLM prompts (system
+- **`harness/knowledge/code-coach/llm-prompt-conventions.md`** — All LLM prompts (system
   prompts, tool catalogues, first-contact / introduction injections,
   few-shot examples, retry messages) MUST default to English (R-1) and stay
   within the per-prompt token budget (R-2). Audit checklist in R-3.
@@ -174,7 +174,7 @@ Treat them as binding for the file types they cover:
   `*Header*`, `*Instructions*` constants and `WorkspaceTerminalToolHost`'s
   prepended messages. New prompt added in non-English? Flag for rewrite.
 
-- **`harness/knowledge/agent-origin-reference.md`** — When the user mentions
+- **`harness/knowledge/tamer/agent-origin-reference.md`** — When the user mentions
   *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"compare with origin"*, or
   asks "did we have this before" / "is there a better pattern" — consult
   `Docs/agent-origin/` (snapshot) **before** crawling
@@ -182,7 +182,7 @@ Treat them as binding for the file types they cover:
   problem already has an Origin solution, cite the relevant
   `Docs/agent-origin/0[1-3]-*.md` section in the proposal options.
 
-- **`harness/knowledge/wpf-xaml-resource-and-window-pitfalls.md`** —
+- **`harness/knowledge/code-coach/wpf-xaml-resource-and-window-pitfalls.md`** —
   Whenever the staged diff touches `*.xaml` or a `Window` code-behind,
   walk the **P1–P6 checklist at the bottom of that file** before
   approving the commit. Six classes of failure that all pass
@@ -200,7 +200,7 @@ Treat them as binding for the file types they cover:
   pitfall has a one-grep verification — fail the review if any check
   doesn't pass.
 
-- **`harness/knowledge/voice-roundtrip-testing.md`** — Diffs that
+- **`harness/knowledge/test-sentinel/voice-roundtrip-testing.md`** — Diffs that
   touch any LLM-output comparison logic (STT, OCR, generation
   evaluators) must fold case + punctuation + whitespace via
   `char.IsPunctuation` + `ToLowerInvariant` before equality, *not*

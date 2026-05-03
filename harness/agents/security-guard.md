@@ -33,7 +33,7 @@ Domain expertise:
 - Local data at rest: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db` (EF Core / SQLite)
 - Single-instance enforcement and process-isolation assumptions
 
-Cross-reference: `harness/knowledge/security-surface.md` — this project's injection map.
+Cross-reference: `harness/knowledge/security-guard/security-surface.md` — this project's injection map.
 
 ## Scope (every pass touches all 6)
 
@@ -53,7 +53,7 @@ Cross-reference: `harness/knowledge/security-surface.md` — this project's inje
 6. **Dependency drift** — any dependency added to `*.csproj` since the last security log;
    call out unsigned, deprecated, or unmaintained packages.
 7. **Crash dump forensics** — any `*.stackdump`, `*.dmp`, `core`, or `crash-*.log`
-   present in the working tree. Cross-reference `harness/knowledge/crash-dump-forensics.md`
+   present in the working tree. Cross-reference `harness/knowledge/security-guard/crash-dump-forensics.md`
    for the playbook (triage flow, dump-type guidance, redaction rules) and
    `harness/knowledge/cases/` for prior incidents. If `git ls-files | grep`
    surfaces *any* dump pattern as tracked, that itself is a finding (the

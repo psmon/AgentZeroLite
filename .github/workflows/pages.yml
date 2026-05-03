@@ -4,9 +4,9 @@ on:
   # Tag-gated publish. Push a `doc-v*` tag (e.g. `doc-v1.0.0`) when the
   # docs/harness state is worth promoting to GitHub Pages. Routine
   # commits to main — including frequent harness/logs churn — no longer
-  # auto-deploy. The deploy reads source from Home/ (site shell) AND from
-  # harness/ + Docs/ (mirrored into Home/_resources/ at build time); the
-  # tag points at the commit whose tree CI checks out.
+  # auto-deploy. The deploy uploads the entire repo as the Pages
+  # artifact so the viewer can reach upstream MDs (harness/, Docs/)
+  # directly via `../../<rel>` — no duplicating mirror.
   push:
     tags:
       - 'doc-v*'
@@ -40,11 +40,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Build harness-view manifests + resource mirror
-        # Regenerates Home/harness-view/indexes/*.json AND populates
-        # Home/_resources/{Docs,harness} from the live source tree, so
-        # the deployed Home/ artifact is self-contained without committing
-        # duplicated content. Single source of truth = harness/ + Docs/.
+      - name: Build harness-view manifests
+        # Regenerates Home/harness-view/indexes/*.json from the live
+        # source tree. The mirror that used to sit at Home/_resources/
+        # was removed (2026-05-04) — the artifact now uploads the entire
+        # repo so the viewer reaches harness/, Docs/ directly.
         run: node Home/harness-view/scripts/build-indexes.js
 
       - name: Setup Pages
@@ -57,7 +57,9 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Home
+          # Upload the entire repo so the viewer can reach upstream
+          # files (harness/, Docs/) directly — no duplicating mirror.
+          path: .
 
       - name: Deploy to GitHub Pages
         id: deployment

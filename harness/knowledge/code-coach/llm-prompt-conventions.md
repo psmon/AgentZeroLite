@@ -84,7 +84,7 @@ Before merging any change that touches an LLM prompt, verify:
 
 ## Cross-references
 
-- `harness/knowledge/ondevice-tool-calling-survey.md` — backend choice that
+- `harness/knowledge/code-coach/ondevice-tool-calling-survey.md` — backend choice that
   motivated the GBNF + system-prompt design.
 - `harness/agents/code-coach.md` — owns enforcement of these conventions
   during pre-commit reviews of LLM-prompt-touching changes.

@@ -78,17 +78,13 @@ related: [M0000, …]                 # optional, prior missions this builds on
 - `language` field is the source of truth for output language. Default to
   the language the *brief body* is written in.
 
-## Trigger phrases
+## Activation
 
-| Trigger | Action |
-|---|---|
-| "M{NNNN} 수행해" / "M{NNNN} 진행해" / "run mission M{NNNN}" | Read mission, dispatch, write completion log |
-| "미션 목록" / "list missions" | Summarize `missions/` by status (inbox / in_progress / done) |
-| "M{NNNN} 마감" / "M{NNNN} done" / "M{NNNN} 완료" | Mark mission `status: done` (typically called automatically at end of execution) |
-| "M{NNNN} 취소" / "M{NNNN} cancel" | Mark `status: cancelled` and write a brief cancel note in the completion log |
-
-Tamer owns all of these — see `harness/agents/tamer.md` "Mission dispatch"
-section for the procedure.
+This protocol activates when tamer dispatches a mission. The **trigger
+phrases** themselves live with the agent (`harness/agents/tamer.md`
+frontmatter); knowledge files document the contract, not the
+invocation. The orchestration sequence is captured in
+`harness/engine/mission-dispatch.md`.
 
 ## Dispatch — how tamer picks the specialist
 
@@ -230,7 +226,7 @@ The file IS the audit trail.
 
 - Does not block missions on each other automatically. Operator orders.
 - Does not auto-run tests, even if the mission touched code (per
-  `harness/knowledge/unit-test-policy.md`). The mission must explicitly
+  `harness/knowledge/test-runner/unit-test-policy.md`). The mission must explicitly
   ask for tests via the test-runner triggers.
 - Does not create CI / hooks / cron — mission execution is on demand,
   triggered by the operator's spoken phrase.

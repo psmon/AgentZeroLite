@@ -87,7 +87,7 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 4. 요약 보고서 생성
 
 ### 오리진 비교 (오리진 비교해 / 오리진 참고해 / AgentWin 비교)
-1. **`harness/knowledge/agent-origin-reference.md`** 의 lookup 순서를 따른다.
+1. **`harness/knowledge/tamer/agent-origin-reference.md`** 의 lookup 순서를 따른다.
 2. `Docs/agent-origin/README.md` → 해당 토픽이 커버되면 그 문서를 인용해 답한다.
 3. 스냅샷에 없는 토픽이거나 6개월 경과 시 → `D:\Code\AI\AgentWin` 직접 조사 후 해당 `Docs/agent-origin/*.md` 갱신.
 4. 채택 결정 시 `Docs/agent-origin/03-adoption-recommendations.md`의 P0~P3 + REJECT 섹션을 참고한다.
@@ -95,7 +95,7 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 
 ### Mission dispatch (M{NNNN} 수행해 / 진행해 / 실행해 / run mission M{NNNN})
 
-전체 contract: `harness/knowledge/missions-protocol.md` (data shape).
+전체 contract: `harness/knowledge/tamer/missions-protocol.md` (data shape).
 오케스트레이션 다이어그램 + 평가 rubric: `harness/engine/mission-dispatch.md`.
 요약 절차:
 
@@ -107,7 +107,7 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
      "M{NNNN} 다시 수행해" 같이 명시 요청해야 한다.
 3. `status: in_progress` 로 즉시 갱신 (Edit). 시작 시각도 기록.
 4. Body의 `# 요청` 을 분석해 dispatch target 결정. 매핑 표는
-   `harness/knowledge/missions-protocol.md` "Dispatch — how tamer picks the
+   `harness/knowledge/tamer/missions-protocol.md` "Dispatch — how tamer picks the
    specialist" 표를 그대로 따른다. 모호하면 operator에게 1회만 묻는다.
 5. 선택된 specialist를 호출 (해당 agent의 트리거 절차를 그대로 수행) 또는
    tamer 자기 자신이 직접 작업 (Mode B 제안 후 적용 등). 여러 specialist가
@@ -143,7 +143,7 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
        (`harness/logs/tamer/{yyyy-MM-dd-HH-mm-title}.md`) 와 다른 규칙임에 주의.
    - 언어: mission의 `language` 필드를 따른다 (한국어 요청 → 한국어 결과,
      영문 요청 → 영문 결과). 이는 하네스 전체의 영어 우선 정책에 대한
-     **mission-scope override** — `harness/knowledge/missions-protocol.md`
+     **mission-scope override** — `harness/knowledge/tamer/missions-protocol.md`
      "Language policy" 섹션 참고.
    - Frontmatter: `mission / title / operator / language / dispatched_to /
      status / started / finished / artifacts` 9개 필드 모두. 임의 필드

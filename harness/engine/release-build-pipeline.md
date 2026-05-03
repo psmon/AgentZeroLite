@@ -33,7 +33,7 @@ mechanical instead of vibes.
    - Validates version pipeline, native DLL pinning, csproj configurations,
      EF migrations location, and `App.OnStartup` `-cli` detection.
    - Runs `dotnet build -c Debug` to confirm a clean compile.
-   - **Does NOT run `dotnet test`** — per `harness/knowledge/unit-test-policy.md`
+   - **Does NOT run `dotnet test`** — per `harness/knowledge/test-runner/unit-test-policy.md`
      the release pipeline no longer auto-executes the unit suite. If the user
      wants tests run before tagging, they invoke `test-runner` ("전체 유닛테스트
      수행해") explicitly before initiating the release.

@@ -54,7 +54,7 @@ flowchart TD
    "M{NNNN} 다시 수행해" to override).
 3. **Flip status** to `in_progress` with start timestamp via Edit.
 4. **Dispatch** based on the body's `# 요청`. Mapping table lives in
-   `harness/knowledge/missions-protocol.md` "Dispatch — how tamer picks
+   `harness/knowledge/tamer/missions-protocol.md` "Dispatch — how tamer picks
    the specialist". Multiple specialists in sequence allowed.
 5. **(Optional) Pencil step** — if the brief asks for a `.pen` design,
    write to `Docs/design/M{NNNN}-{slug}.pen`. Indexer pairs by `M{NNNN}`
@@ -99,7 +99,7 @@ Failures here surface in the harness-view Missions card as `recordFile: null`
 
 ## Cross-references
 
-- Data contract: `harness/knowledge/missions-protocol.md`
+- Data contract: `harness/knowledge/tamer/missions-protocol.md`
 - Filename rule: `.claude/skills/harness-view-build/references/data-contracts.md`
 - Agent procedure: `harness/agents/tamer.md` (this engine is the workflow
   view of the same procedure — agent file stays as the "what tamer does"

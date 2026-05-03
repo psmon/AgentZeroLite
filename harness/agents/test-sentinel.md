@@ -6,7 +6,7 @@ triggers:
   - "테스트 점검해"
   - "coverage check"
   - "커버리지 점검해"
-description: Structural audit of the test landscape — guards the headless-vs-WPF split, hunts WPF/Win32 leaks into ZeroCommon, and surfaces coverage gaps on paper. Does NOT execute dotnet test (that's test-runner's job per harness/knowledge/unit-test-policy.md).
+description: Structural audit of the test landscape — guards the headless-vs-WPF split, hunts WPF/Win32 leaks into ZeroCommon, and surfaces coverage gaps on paper. Does NOT execute dotnet test (that's test-runner's job per harness/knowledge/test-runner/unit-test-policy.md).
 ---
 
 # Test Sentinel
@@ -50,13 +50,13 @@ Domain expertise:
 
 ## Procedure
 
-> **Execution is out of scope.** Per `harness/knowledge/unit-test-policy.md`,
+> **Execution is out of scope.** Per `harness/knowledge/test-runner/unit-test-policy.md`,
 > the Sentinel does not invoke `dotnet test`. It audits the test landscape on
 > paper and may *cite* recent `harness/logs/test-runner/*.md` to argue current
 > suite health. If actual execution is needed, the user invokes `test-runner`
 > separately (the user, not the Sentinel).
 >
-> The Sentinel remains the canonical owner of `harness/knowledge/dotnet-test-execution.md`
+> The Sentinel remains the canonical owner of `harness/knowledge/test-runner/dotnet-test-execution.md`
 > — when the test-runner agent invokes dotnet test, it must obey that canon, and
 > the Sentinel flags violations.
 
@@ -86,12 +86,12 @@ Domain expertise:
 
 ## Owned convention sets
 
-- **`harness/knowledge/dotnet-test-execution.md`** — Single foreground
+- **`harness/knowledge/test-runner/dotnet-test-execution.md`** — Single foreground
   test call, no parallel backgrounds against the same project,
   testhost-orphan check before reporting. Already enforced in the
   Procedure section above.
 
-- **`harness/knowledge/voice-roundtrip-testing.md`** — When a diff
+- **`harness/knowledge/test-sentinel/voice-roundtrip-testing.md`** — When a diff
   touches `TtsSttRoundTripTests.cs` or any new voice-quality test:
   fixtures must mirror `TestToolsWindow`'s quick-phrase buttons
   verbatim; both `-tts.wav` and `-stt-input-16k.wav` evidence files
