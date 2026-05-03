@@ -312,17 +312,21 @@ function buildSkills() {
   });
 }
 
-// ─── Expert Knowledge: harness/knowledge/**/*.md (recurse — subfolders included) ───
+// ─── Expert Knowledge: harness/knowledge/**/*.md ───
+//   Emits BOTH a flat `items` list (for compatibility) AND a `tree` mirror
+//   of the per-agent subdir layout (since 2026-05-04). The viewer uses the
+//   tree to render Knowledge → Expert as a hierarchy that matches Tech /
+//   Domain — both tabs visually consistent.
 function buildKnowledge() {
   const root = path.join(ROOT, PATHS.knowledge);
   const items = [];
-  function walk(absDir) {
+  function walkFlat(absDir) {
     if (!fs.existsSync(absDir)) return;
     for (const ent of fs.readdirSync(absDir, { withFileTypes: true })) {
       if (ent.name.startsWith('.')) continue;
       const ch = path.join(absDir, ent.name);
       if (ent.isDirectory()) {
-        walk(ch);
+        walkFlat(ch);
       } else if (ent.name.endsWith('.md')) {
         const rel = path.relative(ROOT, ch).replace(/\\/g, '/');
         const stat = fs.statSync(ch);
@@ -338,9 +342,13 @@ function buildKnowledge() {
       }
     }
   }
-  walk(root);
+  walkFlat(root);
   items.sort((a, b) => a.file.localeCompare(b.file));
-  writeJson('harness-knowledge', { base: PATHS.knowledge, items });
+
+  // Reuse walkDir for the tree shape — paths are relative to PATHS.knowledge.
+  const tree = walkDir(root);
+
+  writeJson('harness-knowledge', { base: PATHS.knowledge, items, tree });
 }
 
 // ─── Domain knowledge tree: Docs/** ───

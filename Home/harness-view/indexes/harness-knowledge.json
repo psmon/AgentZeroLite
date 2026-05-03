@@ -127,5 +127,154 @@
       "size": 10034,
       "modified": "2026-04-29"
     }
+  ],
+  "tree": [
+    {
+      "type": "dir",
+      "name": "code-coach",
+      "path": "code-coach",
+      "children": [
+        {
+          "type": "file",
+          "name": "avalondock-float-redock-patterns.md",
+          "path": "code-coach/avalondock-float-redock-patterns.md",
+          "size": 10731,
+          "modified": "2026-05-02"
+        },
+        {
+          "type": "dir",
+          "name": "cases",
+          "path": "code-coach/cases",
+          "children": [
+            {
+              "type": "file",
+              "name": "2026-04-22-msys2-bash-crash-llamacpp-build.md",
+              "path": "code-coach/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
+              "size": 8640,
+              "modified": "2026-04-25"
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "llm-prompt-conventions.md",
+          "path": "code-coach/llm-prompt-conventions.md",
+          "size": 4469,
+          "modified": "2026-05-03"
+        },
+        {
+          "type": "file",
+          "name": "ondevice-tool-calling-survey.md",
+          "path": "code-coach/ondevice-tool-calling-survey.md",
+          "size": 8930,
+          "modified": "2026-04-25"
+        },
+        {
+          "type": "file",
+          "name": "wpf-xaml-resource-and-window-pitfalls.md",
+          "path": "code-coach/wpf-xaml-resource-and-window-pitfalls.md",
+          "size": 18507,
+          "modified": "2026-05-03"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "README.md",
+      "path": "README.md",
+      "size": 4077,
+      "modified": "2026-05-03"
+    },
+    {
+      "type": "dir",
+      "name": "security-guard",
+      "path": "security-guard",
+      "children": [
+        {
+          "type": "file",
+          "name": "crash-dump-forensics.md",
+          "path": "security-guard/crash-dump-forensics.md",
+          "size": 7205,
+          "modified": "2026-04-25"
+        },
+        {
+          "type": "file",
+          "name": "security-surface.md",
+          "path": "security-guard/security-surface.md",
+          "size": 4836,
+          "modified": "2026-04-25"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "name": "tamer",
+      "path": "tamer",
+      "children": [
+        {
+          "type": "file",
+          "name": "agent-origin-reference.md",
+          "path": "tamer/agent-origin-reference.md",
+          "size": 3700,
+          "modified": "2026-05-03"
+        },
+        {
+          "type": "file",
+          "name": "missions-protocol.md",
+          "path": "tamer/missions-protocol.md",
+          "size": 10749,
+          "modified": "2026-05-03"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "name": "test-runner",
+      "path": "test-runner",
+      "children": [
+        {
+          "type": "file",
+          "name": "dotnet-test-execution.md",
+          "path": "test-runner/dotnet-test-execution.md",
+          "size": 4940,
+          "modified": "2026-04-27"
+        },
+        {
+          "type": "file",
+          "name": "unit-test-policy.md",
+          "path": "test-runner/unit-test-policy.md",
+          "size": 3562,
+          "modified": "2026-05-03"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "name": "test-sentinel",
+      "path": "test-sentinel",
+      "children": [
+        {
+          "type": "file",
+          "name": "voice-roundtrip-testing.md",
+          "path": "test-sentinel/voice-roundtrip-testing.md",
+          "size": 10034,
+          "modified": "2026-04-29"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "name": "_shared",
+      "path": "_shared",
+      "children": [
+        {
+          "type": "file",
+          "name": "agentzerolite-architecture.md",
+          "path": "_shared/agentzerolite-architecture.md",
+          "size": 4583,
+          "modified": "2026-04-25"
+        }
+      ]
+    }
   ]
 }

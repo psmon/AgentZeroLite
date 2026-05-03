@@ -1,105 +1,119 @@
 /**
- * 지식 — 탭 2개 + 편집 가능 MD 뷰
- *  - 전문가 지식: harness/knowledge (카드뷰)
- *  - 도메인 지식: document/** (계층 트리 + preview)  (리소스참고)
+ * Knowledge — two tabs, both **hierarchy trees** with right-side MD preview.
  *
- * 클릭 후 MD 는 Read+Edit 모드. 저장은 브라우저 로컬 상태에서만 동작(저장 버튼이 서버 API
- * 없이 동작하려면 개발 서버 필요). 기본적으로 onSave 핸들러가 없으면 편집만 로컬에 머문다.
+ *   Expert (`harness/knowledge/**`)         per-agent subdirs:
+ *     _shared/, tamer/, code-coach/, security-guard/, test-runner/,
+ *     test-sentinel/. Each agent owns the docs under its subdir.
+ *   Tech / Domain (`Docs/**`)               full project documentation tree.
+ *
+ * Card-grid was retired (2026-05-04 with the per-agent reorg) — the tree
+ * is the better fit once knowledge has hierarchy. Both tabs share the same
+ * left-tree / right-preview component so navigation feels consistent.
+ *
+ * URL params:
+ *   #knowledge                    → defaults to expert tab, no file
+ *   #knowledge/expert             → expert tab, no file selected
+ *   #knowledge/expert/<rel>       → expert tab, file open (rel = path under harness/knowledge/)
+ *   #knowledge/domain             → domain tab
+ *   #knowledge/domain/<rel>       → domain tab, file open (rel = path under Docs/)
+ *
+ * Legacy `#knowledge/knowledge/<full-path>` (flat-card era) is mapped to
+ * the expert tab + corresponding rel path.
  */
-import { h, mount, humanize } from '../utils/dom.js';
+import { h, mount } from '../utils/dom.js';
 import { loadIndex, loadMd } from '../utils/loader.js';
 import { createMdViewer } from '../components/md-viewer.js';
 import { renderTopBar, renderSubBar, emptyState, loadingState } from './_common.js';
 import { ICONS } from '../config/menu.js';
 
 export async function render(ctx) {
-  const { viewEl, topbarEl, subbarEl, menu, params } = ctx;
+  const { viewEl, topbarEl, subbarEl, params } = ctx;
 
-  // params 형태:  ""  /  "knowledge/<filename>"  /  "domain/<relpath>"
-  const [tab = 'knowledge', ...rest] = (params || '').split('/');
-  const filePath = rest.length ? rest.join('/') : null;
+  const [tabRaw = 'expert', ...rest] = (params || '').split('/');
+  let tab = tabRaw;
+  let filePath = rest.length ? rest.join('/') : null;
 
-  const kIdx = await loadIndex('harness-knowledge');
-  const dIdx = await loadIndex('document-tree');
+  // Migrate legacy `#knowledge/knowledge/<full-path>` URLs (cards era).
+  if (tab === 'knowledge') {
+    tab = 'expert';
+    if (filePath) filePath = filePath.replace(/^harness\/knowledge\//, '');
+  }
+
+  const [kIdx, dIdx] = await Promise.all([
+    loadIndex('harness-knowledge'),
+    loadIndex('document-tree'),
+  ]);
 
   renderTopBar(topbarEl, {
     title: 'Knowledge',
-    subtitle: 'Expert Knowledge · Tech / Domain Knowledge (read + edit)',
+    subtitle: 'Expert (per-agent) · Tech / Domain — both as hierarchy trees',
     badge: { kind: 'edit', text: 'Read + Edit' },
   });
 
   renderSubBar(subbarEl, [
-    { label: 'Expert Knowledge', count: kIdx?.items?.length || 0, active: tab === 'knowledge', onclick: () => { location.hash = '#knowledge/knowledge'; } },
-    { label: 'Tech / Domain', count: countFiles(dIdx?.tree || []), active: tab === 'domain', onclick: () => { location.hash = '#knowledge/domain'; } },
+    {
+      label: 'Expert Knowledge',
+      count: countTree(kIdx?.tree || []),
+      active: tab === 'expert',
+      onclick: () => { location.hash = '#knowledge/expert'; },
+    },
+    {
+      label: 'Tech / Domain',
+      count: countTree(dIdx?.tree || []),
+      active: tab === 'domain',
+      onclick: () => { location.hash = '#knowledge/domain'; },
+    },
   ]);
 
-  if (tab === 'knowledge') {
-    if (filePath) return renderKnowledgeDetail(ctx, kIdx, filePath);
-    return renderKnowledgeList(ctx, kIdx);
+  if (tab === 'expert') {
+    return renderTreeAndPreview(ctx, {
+      tabId: 'expert',
+      base: kIdx?.base || 'harness/knowledge',
+      tree: kIdx?.tree || [],
+      currentRel: filePath,
+      emptyMessage: 'No knowledge docs yet — add .md files under harness/knowledge/<agent>/.',
+    });
   }
-  return renderDomain(ctx, dIdx, filePath);
+
+  return renderTreeAndPreview(ctx, {
+    tabId: 'domain',
+    base: dIdx?.base || 'Docs',
+    tree: dIdx?.tree || [],
+    currentRel: filePath,
+    emptyMessage: 'No domain docs yet — add .md files under Docs/.',
+  });
 }
 
-function countFiles(tree) {
+function countTree(tree) {
   let n = 0;
-  (function walk(nodes) { for (const x of nodes) { if (x.type === 'file') n++; else if (x.children) walk(x.children); } })(tree);
+  (function walk(nodes) {
+    for (const x of nodes) {
+      if (x.type === 'file') n++;
+      else if (x.children) walk(x.children);
+    }
+  })(tree);
   return n;
 }
 
-/* ─── Expert Knowledge — card grid ─── */
-function renderKnowledgeList(ctx, index) {
+/* ─── Shared tree + preview component ─────────────────────────────────── */
+function renderTreeAndPreview(ctx, { tabId, base, tree, currentRel, emptyMessage }) {
   const { viewEl } = ctx;
-  if (!index || !index.items?.length) {
-    const path = (index?.base || 'Docs/harness/knowledge').replace(/^Docs\//, '');
-    mount(viewEl, h('div', { class: 'empty' }, [
-      h('div', { style: { fontWeight: '600', marginBottom: '6px' } }, `${path} — no entries yet`),
-      h('div', { style: { color: '#6B7280' } }, 'Add .md files under this folder to populate Expert Knowledge cards.'),
-    ]));
+
+  if (!tree.length) {
+    mount(viewEl, emptyState(emptyMessage));
     return;
   }
-  const grid = h('div', { class: 'card-grid' });
-  for (const it of index.items) {
-    grid.appendChild(h('div', {
-      class: 'card',
-      onclick: () => { location.hash = `#knowledge/knowledge/${encodeURIComponent(it.file)}`; },
-    }, [
-      h('span', { class: 'card-icon', html: ICONS.bulb }),
-      h('div', { class: 'card-title' }, humanize(it.title)),
-      h('div', { class: 'card-desc' }, `${it.modified}`),
-    ]));
-  }
-  mount(viewEl, grid);
-}
 
-async function renderKnowledgeDetail(ctx, index, filename) {
-  const { viewEl } = ctx;
-  const fullPath = decodeURIComponent(filename);   // ROOT-relative
-  mount(viewEl, loadingState());
-  const content = await loadMd(fullPath);
-  if (content == null) { mount(viewEl, emptyState('Could not load file.')); return; }
-  const back = h('button', { class: 'btn', style: { marginBottom: '12px' }, onclick: () => { location.hash = '#knowledge/knowledge'; } }, '← Back to Expert Knowledge');
-  mount(viewEl, back, createMdViewer({
-    content,
-    breadcrumb: fullPath.split('/'),
-    onSave: async (newContent) => {
-      // Local-only save (no server API). Persisted in sessionStorage.
-      sessionStorage.setItem(`md:${fullPath}`, newContent);
-    },
-  }));
-}
-
-/* ─── 도메인 지식 — 계층 트리 + preview ─── */
-function renderDomain(ctx, dIdx, filePath) {
-  const { viewEl } = ctx;
-  if (!dIdx || !dIdx.tree) { mount(viewEl, emptyState('No Tech / Domain index. Add .md files under Docs/.')); return; }
-
-  const state = { current: filePath };
+  const state = { current: currentRel };
 
   const container = h('div', { class: 'split' });
   const lp = h('div', { class: 'pane pane-l' });
   const rp = h('div', { class: 'pane pane-r' });
   container.append(lp, rp);
   mount(viewEl, container);
+
+  // Path under base (no leading base/) — the value the URL fragment carries.
+  const relOf = (node) => node.path;
 
   function treeNode(node, depth = 0) {
     if (node.type === 'dir') {
@@ -128,11 +142,10 @@ function renderDomain(ctx, dIdx, filePath) {
       redraw();
       return wrapper;
     }
-    // file
     return h('div', {
-      class: 'tree-node leaf' + (state.current === node.path ? ' active' : ''),
+      class: 'tree-node leaf' + (state.current === relOf(node) ? ' active' : ''),
       style: { paddingLeft: `${22 + depth * 14}px` },
-      onclick: () => { location.hash = `#knowledge/domain/${encodeURIComponent(node.path)}`; },
+      onclick: () => { location.hash = `#knowledge/${tabId}/${encodeURIComponent(relOf(node))}`; },
     }, [
       h('span', { html: ICONS.file }),
       h('span', {}, node.name),
@@ -150,41 +163,54 @@ function renderDomain(ctx, dIdx, filePath) {
     return n;
   }
 
-  // 좌측: 검색 + 트리
+  // Left: search + tree
+  const treeBox = h('div', { class: 'tree' });
+  for (const n of tree) treeBox.appendChild(treeNode(n));
+
   const searchBox = h('div', {
-    style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '8px 10px', marginBottom: '8px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '6px' },
+    style: {
+      display: 'flex', gap: '6px', alignItems: 'center',
+      padding: '8px 10px', marginBottom: '8px',
+      background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '6px',
+    },
   }, [
     h('span', { html: ICONS.search }),
     h('input', {
       type: 'search',
       placeholder: 'Search path',
       style: { border: 'none', outline: 'none', background: 'transparent', fontSize: '12px', flex: 1 },
-      oninput: e => filterTree(e.target.value),
+      oninput: (e) => filterTree(e.target.value),
     }),
   ]);
-  const tree = h('div', { class: 'tree' });
-  for (const n of dIdx.tree) tree.appendChild(treeNode(n));
-  mount(lp, searchBox, tree);
 
   function filterTree(q) {
     q = (q || '').toLowerCase();
-    tree.querySelectorAll('.tree-node').forEach(node => {
+    treeBox.querySelectorAll('.tree-node').forEach((node) => {
       const t = node.textContent.toLowerCase();
       node.style.display = !q || t.includes(q) ? '' : 'none';
     });
   }
 
-  // 우측: 선택된 md preview
+  mount(lp, searchBox, treeBox);
+
+  // Right: selected MD preview (or hint)
   async function renderRight() {
-    if (!state.current) { mount(rp, h('div', { class: 'empty' }, 'Select a file from the tree on the left.')); return; }
+    if (!state.current) {
+      mount(rp, h('div', { class: 'empty' }, 'Select a file from the tree on the left.'));
+      return;
+    }
     mount(rp, loadingState());
-    const content = await loadMd(`${dIdx.base}/${state.current}`);
-    if (content == null) { mount(rp, emptyState('Could not load file.')); return; }
+    const fullPath = `${base}/${state.current}`;
+    const content = await loadMd(fullPath);
+    if (content == null) {
+      mount(rp, emptyState(`Could not load ${fullPath}.`));
+      return;
+    }
     mount(rp, createMdViewer({
       content,
-      breadcrumb: [dIdx.base || 'Docs', ...state.current.split('/')],
+      breadcrumb: fullPath.split('/'),
       onSave: async (newContent) => {
-        sessionStorage.setItem(`md:${dIdx.base}/${state.current}`, newContent);
+        sessionStorage.setItem(`md:${fullPath}`, newContent);
       },
     }));
   }
