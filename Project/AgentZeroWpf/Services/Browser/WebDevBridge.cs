@@ -46,6 +46,7 @@ public sealed class WebDevBridge
             _noteHost.NoteUtteranceEnded    += OnNoteUtteranceEnded;
             _noteHost.NoteError             += OnNoteError;
             _noteHost.NoteAmplitude         += OnNoteAmplitude;
+            _noteHost.NoteSpeaking          += OnNoteSpeaking;
         }
     }
 
@@ -59,6 +60,7 @@ public sealed class WebDevBridge
             try { _noteHost.NoteUtteranceEnded   -= OnNoteUtteranceEnded;  } catch { }
             try { _noteHost.NoteError            -= OnNoteError;           } catch { }
             try { _noteHost.NoteAmplitude        -= OnNoteAmplitude;       } catch { }
+            try { _noteHost.NoteSpeaking         -= OnNoteSpeaking;        } catch { }
         }
     }
 
@@ -66,7 +68,11 @@ public sealed class WebDevBridge
     private void OnNoteUtteranceStarted()             => PostEvent("note.utterance-start", new { });
     private void OnNoteUtteranceEnded()               => PostEvent("note.utterance-end", new { });
     private void OnNoteError(string message)          => PostEvent("note.error", new { message });
-    private void OnNoteAmplitude(float rms)           => PostEvent("note.amplitude", new { rms });
+    private void OnNoteSpeaking(bool isSpeaking)      => PostEvent("note.speaking", new { speaking = isSpeaking });
+    // Threshold rides every amplitude tick so JS can draw a "needed RMS"
+    // marker on the meter — the user can immediately see whether their
+    // voice is above/below the line and adjust the slider accordingly.
+    private void OnNoteAmplitude(float rms)           => PostEvent("note.amplitude", new { rms, threshold = _noteHost?.CurrentVadThreshold ?? 0f });
 
     private async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
@@ -149,8 +155,11 @@ public sealed class WebDevBridge
                 EnsureNoteHost();
                 int? sens = args?.TryGetProperty("sensitivity", out var sv) == true && sv.TryGetInt32(out var si)
                     ? si : (int?)null;
-                var ok = await _noteHost!.StartNoteCaptureAsync(sens);
-                return new { ok, capturing = _noteHost.IsNoteCapturing };
+                // Returns { ok, capturing, sensitivity, threshold } so JS
+                // can sync its slider to the effective value (especially
+                // important when sens=null and host falls back to
+                // Settings/Voice's stored VadThreshold).
+                return await _noteHost!.StartNoteCaptureAsync(sens);
             }
             case "note.stop":
             {
@@ -172,7 +181,7 @@ public sealed class WebDevBridge
                 int v = args?.TryGetProperty("value", out var sv) == true && sv.TryGetInt32(out var si)
                     ? si : 50;
                 _noteHost!.SetNoteSensitivity(v);
-                return new { sensitivity = v };
+                return new { sensitivity = v, threshold = _noteHost.CurrentVadThreshold };
             }
             case "note.status":
                 EnsureNoteHost();

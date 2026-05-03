@@ -105,7 +105,8 @@
     activeId: null,
     capturing: false,
     paused: false,
-    sensitivity: 50,
+    sensitivity: 75,           // matches Settings/Voice's origin-proven default
+    threshold: 0.0625,         // populated from host on start; for marker
     captureStartedMs: 0,
     activeTab: 'raw',
     busy: false,
@@ -118,6 +119,7 @@
   let unsubUttEnd = null;
   let unsubError = null;
   let unsubAmp = null;
+  let unsubSpeaking = null;
 
   // ─── DOM refs ──────────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
@@ -153,6 +155,7 @@
 
     vu: $('vn-vu'),
     vuFill: $('vn-vu-fill'),
+    vuMarker: $('vn-vu-marker'),
     vuState: $('vn-vu-state'),
   };
 
@@ -366,18 +369,35 @@
       setStatus(d?.message || 'capture error', true);
     });
     unsubAmp = window.zero.note.onAmplitude((d) => {
-      // RMS 0..1; clamp + mild gamma so quiet voice still moves the bar.
-      let v = Math.max(0, Math.min(1, (d?.rms || 0)));
-      v = Math.pow(v, 0.6);
-      const pct = Math.min(100, Math.round(v * 220)); // ~45% RMS reads as "loud"
-      refs.vuFill.style.width = pct + '%';
+      // The bar uses the same gamma + scale on both axes so the
+      // threshold marker is comparable to the live fill.
+      const rmsPct = rmsToPct(d?.rms || 0);
+      refs.vuFill.style.width = rmsPct + '%';
+      if (typeof d?.threshold === 'number') {
+        state.threshold = d.threshold;
+        refs.vuMarker.style.left = rmsToPct(d.threshold) + '%';
+      }
+    });
+    unsubSpeaking = window.zero.note.onSpeaking((d) => {
+      // Frame-level VAD decision. Faster than utterance-start, so the
+      // bar flashes the moment we cross threshold even if the utterance
+      // boundary hasn't closed yet.
+      setVuSpeaking(!!d?.speaking);
     });
   }
 
+  // RMS → meter percent. Same gamma curve in both directions so the
+  // threshold marker visually corresponds to "voice must reach this
+  // bar height to register".
+  function rmsToPct(v) {
+    v = Math.max(0, Math.min(1, v));
+    return Math.min(100, Math.round(Math.pow(v, 0.6) * 220));
+  }
+
   function unbindBridge() {
-    [unsubTranscript, unsubUttStart, unsubUttEnd, unsubError, unsubAmp]
+    [unsubTranscript, unsubUttStart, unsubUttEnd, unsubError, unsubAmp, unsubSpeaking]
       .forEach(fn => { try { fn && fn(); } catch (_) {} });
-    unsubTranscript = unsubUttStart = unsubUttEnd = unsubError = unsubAmp = null;
+    unsubTranscript = unsubUttStart = unsubUttEnd = unsubError = unsubAmp = unsubSpeaking = null;
   }
 
   function showVu(visible) { refs.vu.hidden = !visible; }
@@ -396,23 +416,45 @@
     showVu(true); setVuState('starting'); refs.vuFill.style.width = '0%';
     setStatus('starting capture…');
     try {
-      const r = await window.zero.note.start(state.sensitivity);
+      // Pass null on the very first start so host can fall back to
+      // Settings/Voice's stored VadThreshold — that's the value the user
+      // already tuned for their mic. Subsequent starts pass the current
+      // slider position.
+      const sendSens = state.sensitivity === 75 ? null : state.sensitivity;
+      const r = await window.zero.note.start(sendSens);
       if (!r || !r.ok) {
         setVuState('error');
-        setStatus('capture rejected', true);
+        const msg = r?.error === 'stt-off' ? 'STT provider is Off — open Settings → Voice'
+                  : r?.error === 'stt-not-ready' ? 'STT model not ready — open Settings → Voice'
+                  : ('capture rejected: ' + (r?.error || 'unknown'));
+        setStatus(msg, true);
         unbindBridge();
         showVu(false);
         return;
       }
+      // Sync slider to the effective value the host actually applied —
+      // important when we sent null and host fell back to the user's
+      // Settings/Voice value.
+      if (typeof r.sensitivity === 'number') {
+        state.sensitivity = r.sensitivity;
+        refs.sense.value = String(r.sensitivity);
+        refs.senseVal.textContent = String(r.sensitivity);
+      }
+      if (typeof r.threshold === 'number') state.threshold = r.threshold;
+
       state.capturing = true;
       state.paused = false;
       state.captureStartedMs = Date.now();
-      n.meta = { ...(n.meta || {}), startedAt: nowIso(), sensitivity: state.sensitivity };
+      n.meta = { ...(n.meta || {}),
+        startedAt: nowIso(),
+        sensitivity: state.sensitivity,
+        threshold: state.threshold,
+      };
       persist(n);
       renderRecButton();
       renderList();
       setVuState('capturing');
-      setStatus('capturing');
+      setStatus(`capturing · sens=${state.sensitivity}`);
     } catch (e) {
       unbindBridge();
       setVuState('error');

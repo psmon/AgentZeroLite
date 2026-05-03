@@ -34,7 +34,10 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     public event Action?         NoteUtteranceStarted;
     public event Action?         NoteUtteranceEnded;
     public event Action<string>? NoteError;          // (message)
-    public event Action<float>?  NoteAmplitude;      // (rms 0..1) — fires every ~50ms
+    public event Action<float>?  NoteAmplitude;      // (rms 0..1) — throttled ~10 Hz
+    public event Action<bool>?   NoteSpeaking;       // frame-level VAD decision (faster than utterance)
+
+    public float CurrentVadThreshold => _noteCapture?.VadThreshold ?? 0f;
 
     public string GetAppVersion()
     {
@@ -187,53 +190,90 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     /// Begin VAD-gated capture. Each utterance (~2s of trailing silence
     /// closes a segment) is auto-transcribed and pushed via
     /// <see cref="NoteTranscript"/>. Idempotent — a second call while
-    /// already running returns ok without restarting capture.
+    /// already running returns the same payload without restarting capture.
+    ///
+    /// Returns the effective sensitivity / threshold so JS can sync its
+    /// slider — important when sensitivityPercent is null and we fall
+    /// back to the user's Settings/Voice VadThreshold.
     /// </summary>
-    public async Task<bool> StartNoteCaptureAsync(int? sensitivityPercent = null)
+    public async Task<object> StartNoteCaptureAsync(int? sensitivityPercent = null)
     {
         await _noteLock.WaitAsync();
         try
         {
-            if (_noteCapture is not null) return true; // already running
-
             var v = VoiceSettingsStore.Load();
+
+            // Effective sensitivity:
+            //   • caller passed one → respect it (slider)
+            //   • else use Settings/Voice's stored VadThreshold (origin
+            //     proven default 25 → sensitivity 75) so the plugin
+            //     inherits the value the user has already tuned for
+            //     their mic.
+            int effectiveSens = sensitivityPercent.HasValue
+                ? Math.Clamp(sensitivityPercent.Value, 0, 100)
+                : Math.Clamp(100 - v.VadThreshold, 0, 100);
+            float threshold = VoiceRuntimeFactory.SensitivityToThreshold(effectiveSens);
+
+            if (_noteCapture is not null)
+            {
+                // Already running — let the caller know the live values.
+                return new { ok = true, capturing = true, sensitivity = effectiveSens, threshold };
+            }
+
             _noteStt = VoiceRuntimeFactory.BuildStt(v);
             if (_noteStt is null)
             {
+                AppLogger.Log("[WebDev:Note] start aborted — STT provider is Off");
                 NoteError?.Invoke("STT provider is Off — pick one in Settings/Voice first");
-                return false;
+                return new { ok = false, error = "stt-off" };
             }
-            try { await _noteStt.EnsureReadyAsync(); }
+            try
+            {
+                AppLogger.Log($"[WebDev:Note] STT preload | provider={v.SttProvider} model={v.SttWhisperModel} gpu={v.SttUseGpu}");
+                var ready = await _noteStt.EnsureReadyAsync();
+                if (!ready)
+                {
+                    NoteError?.Invoke("STT model not ready — open Settings → Voice and complete model setup");
+                    _noteStt = null;
+                    return new { ok = false, error = "stt-not-ready" };
+                }
+            }
             catch (Exception ex)
             {
+                AppLogger.Log($"[WebDev:Note] STT preload failed: {ex.GetType().Name}: {ex.Message}");
                 NoteError?.Invoke("STT init failed: " + ex.Message);
                 _noteStt = null;
-                return false;
+                return new { ok = false, error = ex.Message };
             }
 
             var cap = new VoiceCaptureService
             {
                 BufferPcm = true,
-                Muted = v.MicMuted,  // honor the global mic-mute switch (Settings/Voice)
+                Muted = v.MicMuted,
+                VadThreshold = threshold,
             };
-            if (sensitivityPercent is int p)
-                cap.VadThreshold = VoiceRuntimeFactory.SensitivityToThreshold(p);
 
             cap.UtteranceStarted += OnNoteUtteranceStarted;
             cap.UtteranceEnded   += OnNoteUtteranceEnded;
             cap.AmplitudeChanged += OnNoteAmplitude;
-            try { cap.Start(); }
+            cap.SpeakingStateChanged += OnNoteSpeaking;
+            try
+            {
+                var deviceNumber = VoiceRuntimeFactory.ParseDeviceNumber(v.InputDeviceId);
+                cap.Start(deviceNumber);
+            }
             catch (Exception ex)
             {
                 cap.Dispose();
+                AppLogger.Log($"[WebDev:Note] mic capture failed: {ex.GetType().Name}: {ex.Message}");
                 NoteError?.Invoke("Mic capture failed: " + ex.Message);
-                return false;
+                return new { ok = false, error = ex.Message };
             }
 
             _noteCts = new CancellationTokenSource();
             _noteCapture = cap;
-            AppLogger.Log($"[WebDev:Note] capture started | threshold={cap.VadThreshold:F3} muted={cap.Muted}");
-            return true;
+            AppLogger.Log($"[WebDev:Note] capture started | sens={effectiveSens} threshold={threshold:F4} muted={cap.Muted} device={v.InputDeviceId}");
+            return new { ok = true, capturing = true, sensitivity = effectiveSens, threshold };
         }
         finally { _noteLock.Release(); }
     }
@@ -270,7 +310,13 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
         // step Settings/Voice does, missing it here was why short
         // utterances were producing empty STT results.
         _noteCapture?.SeedBufferWithPreRoll();
+        AppLogger.Log("[WebDev:Note] utterance started");
         NoteUtteranceStarted?.Invoke();
+    }
+
+    private void OnNoteSpeaking(bool isSpeaking)
+    {
+        NoteSpeaking?.Invoke(isSpeaking);
     }
 
     private void OnNoteUtteranceEnded()
@@ -329,6 +375,7 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
             cap.UtteranceStarted -= OnNoteUtteranceStarted;
             cap.UtteranceEnded   -= OnNoteUtteranceEnded;
             cap.AmplitudeChanged -= OnNoteAmplitude;
+            cap.SpeakingStateChanged -= OnNoteSpeaking;
             try { cap.Stop(); } catch { }
             try { cap.Dispose(); } catch { }
         }

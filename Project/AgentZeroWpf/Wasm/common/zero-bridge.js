@@ -113,10 +113,15 @@
       onUtteranceStart:   (handler) => on('note.utterance-start', handler),
       onUtteranceEnd:     (handler) => on('note.utterance-end', handler),
       onError:            (handler) => on('note.error', handler),
-      // RMS amplitude 0..1, ~10 Hz throttled host-side. Use to drive
-      // a level meter so the user sees the mic responding even when
-      // the VAD hasn't yet decided an utterance is happening.
+      // RMS amplitude 0..1, ~10 Hz throttled host-side. Payload also
+      // carries the current VAD threshold so a meter can draw the
+      // "voice-must-be-this-loud" line. { rms, threshold }.
       onAmplitude:        (handler) => on('note.amplitude', handler),
+      // Frame-level VAD decision (faster than utterance-start/end).
+      // Payload: { speaking: bool }. Use to flash the meter green the
+      // instant the user crosses threshold, before the utterance
+      // boundary closes (which still requires ~2s of trailing silence).
+      onSpeaking:         (handler) => on('note.speaking', handler),
     },
 
     // LLM-backed text summarization. maxChars defaults to 6000 host-side;

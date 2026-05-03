@@ -46,8 +46,8 @@
           <button id="vn-pause" class="vn-btn" type="button" disabled>Pause</button>
           <div class="vn-sense">
             <label for="vn-sense-range">Sensitivity</label>
-            <input id="vn-sense-range" type="range" min="0" max="100" value="50" />
-            <span id="vn-sense-val" class="vn-sense-val">50</span>
+            <input id="vn-sense-range" type="range" min="0" max="100" value="75" />
+            <span id="vn-sense-val" class="vn-sense-val">75</span>
           </div>
           <div class="vn-spacer"></div>
           <button id="vn-summarize" class="vn-btn" type="button" disabled>Summarize</button>
@@ -61,8 +61,9 @@
           <div class="vn-vu-bars" id="vn-vu-bars">
             <span></span><span></span><span></span><span></span>
           </div>
-          <div class="vn-vu-meter">
+          <div class="vn-vu-meter" title="The dashed line is the VAD threshold. Speak louder than the line — or raise sensitivity — to make the recorder cut a transcript.">
             <div id="vn-vu-fill" class="vn-vu-fill"></div>
+            <div id="vn-vu-marker" class="vn-vu-marker"></div>
           </div>
           <span id="vn-vu-state" class="vn-vu-state">idle</span>
         </div>

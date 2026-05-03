@@ -199,15 +199,28 @@ body { font-size: 13px; }
   50%      { height: 22px; }
 }
 .vn-vu-meter {
-  flex: 1; height: 6px;
+  flex: 1; height: 8px; position: relative;
   background: rgba(42, 42, 94, 0.4);
-  border-radius: 3px; overflow: hidden;
+  border-radius: 4px; overflow: hidden;
 }
 .vn-vu-fill {
-  height: 100%; width: 0%;
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0%;
   background: linear-gradient(90deg, var(--ok) 0%, var(--accent) 60%, var(--rec) 100%);
-  border-radius: 3px;
+  border-radius: 4px;
   transition: width .08s ease-out;
+}
+/* Threshold marker — vertical dashed line; voice has to clear it to
+   register as an utterance. */
+.vn-vu-marker {
+  position: absolute; top: -2px; bottom: -2px;
+  width: 2px;
+  left: 0%;
+  background: repeating-linear-gradient(
+    to bottom, var(--text-dim) 0, var(--text-dim) 2px,
+    transparent 2px, transparent 4px);
+  pointer-events: none;
+  transition: left .12s ease-out;
 }
 .vn-vu-state {
   min-width: 88px;
