@@ -97,5 +97,27 @@
       stream: chatStream,
       reset: () => invoke('chat.reset'),
     },
+
+    // Voice-note plugin surface (M0007). VAD-gated mic capture; each
+    // utterance auto-transcribes via the active STT provider and pushes
+    // a `note.transcript` event. Plugins subscribe with `zero.on(...)`.
+    note: {
+      // sensitivity: 0..100 percent (0 = least sensitive, 100 = most).
+      start: (sensitivity) => invoke('note.start', sensitivity == null ? {} : { sensitivity }),
+      stop:  () => invoke('note.stop'),
+      pause: () => invoke('note.pause'),
+      resume: () => invoke('note.resume'),
+      setSensitivity: (value) => invoke('note.set-sensitivity', { value }),
+      status: () => invoke('note.status'),
+      onTranscript:       (handler) => on('note.transcript', handler),
+      onUtteranceStart:   (handler) => on('note.utterance-start', handler),
+      onUtteranceEnd:     (handler) => on('note.utterance-end', handler),
+      onError:            (handler) => on('note.error', handler),
+    },
+
+    // LLM-backed text summarization. maxChars defaults to 6000 host-side;
+    // longer inputs are halved on a sentence boundary, summarized
+    // recursively, then merged. Returns { ok, summary, inputChars, chunks, error }.
+    summarize: (text, maxChars) => invoke('summarize', { text, maxChars }),
   };
 })();

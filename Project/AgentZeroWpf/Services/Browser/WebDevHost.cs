@@ -6,6 +6,8 @@ using AgentZeroWpf.Services.Voice;
 
 namespace AgentZeroWpf.Services.Browser;
 
+public sealed record SummarizeResult(bool Ok, string? Summary, int InputChars, int Chunks, string? Error);
+
 /// <summary>
 /// Default <see cref="IZeroBrowser"/> implementation. Reuses the existing
 /// VoiceRuntimeFactory + VoicePlaybackService so the WebDev sandbox shares
@@ -17,6 +19,21 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
 
     private readonly SemaphoreSlim _chatLock = new(1, 1);
     private ILocalChatSession? _chatSession;
+
+    // ─── Voice-note (VAD-gated STT) state ───────────────────────────────
+    // The plugin facade: Start → VoiceCaptureService runs with PCM buffering;
+    // each UtteranceEnded auto-transcribes via the active STT provider and
+    // raises NoteTranscript. Pause/Resume just toggles Muted (capture stays
+    // alive so the level meter on the plugin side keeps reading).
+    private readonly SemaphoreSlim _noteLock = new(1, 1);
+    private VoiceCaptureService? _noteCapture;
+    private ISpeechToText?       _noteStt;
+    private CancellationTokenSource? _noteCts;
+
+    public event Action<string>? NoteTranscript;     // (text)
+    public event Action?         NoteUtteranceStarted;
+    public event Action?         NoteUtteranceEnded;
+    public event Action<string>? NoteError;          // (message)
 
     public string GetAppVersion()
     {
@@ -161,8 +178,218 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
         return _chatSession ??= LlmGateway.OpenSession();
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    //  Voice-note plugin surface
+    // ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Begin VAD-gated capture. Each utterance (~2s of trailing silence
+    /// closes a segment) is auto-transcribed and pushed via
+    /// <see cref="NoteTranscript"/>. Idempotent — a second call while
+    /// already running returns ok without restarting capture.
+    /// </summary>
+    public async Task<bool> StartNoteCaptureAsync(int? sensitivityPercent = null)
+    {
+        await _noteLock.WaitAsync();
+        try
+        {
+            if (_noteCapture is not null) return true; // already running
+
+            var v = VoiceSettingsStore.Load();
+            _noteStt = VoiceRuntimeFactory.BuildStt(v);
+            if (_noteStt is null)
+            {
+                NoteError?.Invoke("STT provider is Off — pick one in Settings/Voice first");
+                return false;
+            }
+            try { await _noteStt.EnsureReadyAsync(); }
+            catch (Exception ex)
+            {
+                NoteError?.Invoke("STT init failed: " + ex.Message);
+                _noteStt = null;
+                return false;
+            }
+
+            var cap = new VoiceCaptureService { BufferPcm = true };
+            if (sensitivityPercent is int p)
+                cap.VadThreshold = VoiceRuntimeFactory.SensitivityToThreshold(p);
+
+            cap.UtteranceStarted += OnNoteUtteranceStarted;
+            cap.UtteranceEnded   += OnNoteUtteranceEnded;
+            try { cap.Start(); }
+            catch (Exception ex)
+            {
+                cap.Dispose();
+                NoteError?.Invoke("Mic capture failed: " + ex.Message);
+                return false;
+            }
+
+            _noteCts = new CancellationTokenSource();
+            _noteCapture = cap;
+            AppLogger.Log($"[WebDev:Note] capture started | threshold={cap.VadThreshold:F3}");
+            return true;
+        }
+        finally { _noteLock.Release(); }
+    }
+
+    public async Task StopNoteCaptureAsync()
+    {
+        await _noteLock.WaitAsync();
+        try { TearDownNoteCaptureLocked(); }
+        finally { _noteLock.Release(); }
+    }
+
+    public void PauseNoteCapture()
+    {
+        var c = _noteCapture; if (c is not null) c.Muted = true;
+    }
+
+    public void ResumeNoteCapture()
+    {
+        var c = _noteCapture; if (c is not null) c.Muted = false;
+    }
+
+    public void SetNoteSensitivity(int percent)
+    {
+        var c = _noteCapture; if (c is null) return;
+        c.VadThreshold = VoiceRuntimeFactory.SensitivityToThreshold(percent);
+    }
+
+    public bool IsNoteCapturing => _noteCapture is { IsCapturing: true };
+
+    private void OnNoteUtteranceStarted()
+    {
+        NoteUtteranceStarted?.Invoke();
+    }
+
+    private void OnNoteUtteranceEnded()
+    {
+        NoteUtteranceEnded?.Invoke();
+        var cap = _noteCapture; var stt = _noteStt; var ctsToken = _noteCts?.Token ?? CancellationToken.None;
+        if (cap is null || stt is null) return;
+        var pcm = cap.ConsumePcmBuffer();
+        if (pcm.Length == 0) return;
+        // Fire-and-forget transcription — don't block the capture thread.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var text = await stt.TranscribeAsync(pcm);
+                if (string.IsNullOrWhiteSpace(text)) return;
+                if (ctsToken.IsCancellationRequested) return;
+                NoteTranscript?.Invoke(text.Trim());
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Log($"[WebDev:Note] STT transcribe failed: {ex.GetType().Name}: {ex.Message}");
+                NoteError?.Invoke("Transcribe failed: " + ex.Message);
+            }
+        });
+    }
+
+    private void TearDownNoteCaptureLocked()
+    {
+        var cap = _noteCapture; _noteCapture = null;
+        if (cap is not null)
+        {
+            cap.UtteranceStarted -= OnNoteUtteranceStarted;
+            cap.UtteranceEnded   -= OnNoteUtteranceEnded;
+            try { cap.Stop(); } catch { }
+            try { cap.Dispose(); } catch { }
+        }
+        try { _noteCts?.Cancel(); } catch { }
+        _noteCts?.Dispose();
+        _noteCts = null;
+        _noteStt = null;
+        AppLogger.Log("[WebDev:Note] capture stopped");
+    }
+
+    /// <summary>
+    /// LLM-backed text summarization. No tokenizer in <see cref="LlmGateway"/>,
+    /// so chunking uses character length as a proxy: text longer than
+    /// <paramref name="maxChars"/> is split in half (on a sentence boundary
+    /// when possible), each half summarized recursively, then the partial
+    /// summaries are joined and summarized one more time. Default
+    /// <paramref name="maxChars"/> is 6000 — well below the 8k-token range
+    /// most local backends expose.
+    /// </summary>
+    public async Task<SummarizeResult> SummarizeAsync(string text, int maxChars = 6000, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return new SummarizeResult(false, null, 0, 0, "empty input");
+        if (!LlmGateway.IsActiveAvailable())
+            return new SummarizeResult(false, null, text.Length, 0, "Active LLM backend not ready — open Settings → LLM.");
+
+        try
+        {
+            int chunks = 0;
+            var summary = await SummarizeRecursiveAsync(text.Trim(), maxChars, depth: 0, chunkCounter: c => chunks = c, ct);
+            AppLogger.Log($"[WebDev:Note] summarize ok | inputChars={text.Length} chunks={chunks} outChars={summary?.Length ?? 0}");
+            return new SummarizeResult(true, summary, text.Length, chunks, null);
+        }
+        catch (OperationCanceledException) { return new SummarizeResult(false, null, text.Length, 0, "cancelled"); }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[WebDev:Note] summarize failed: {ex.GetType().Name}: {ex.Message}");
+            return new SummarizeResult(false, null, text.Length, 0, ex.Message);
+        }
+    }
+
+    private async Task<string> SummarizeRecursiveAsync(string text, int maxChars, int depth, Action<int> chunkCounter, CancellationToken ct)
+    {
+        if (depth > 6) return text; // hard recursion ceiling
+        if (text.Length <= maxChars)
+        {
+            chunkCounter(1);
+            return await SummarizeChunkAsync(text, ct);
+        }
+        // Split in halves on the closest sentence boundary to the midpoint.
+        int mid = text.Length / 2;
+        int split = FindSentenceBoundary(text, mid);
+        var left  = text.Substring(0, split).Trim();
+        var right = text.Substring(split).Trim();
+
+        var sLeft  = await SummarizeRecursiveAsync(left,  maxChars, depth + 1, chunkCounter, ct);
+        var sRight = await SummarizeRecursiveAsync(right, maxChars, depth + 1, chunkCounter, ct);
+        var merged = sLeft + "\n\n" + sRight;
+
+        // One more pass to consolidate.
+        return await SummarizeChunkAsync(merged, ct);
+    }
+
+    private async Task<string> SummarizeChunkAsync(string chunk, CancellationToken ct)
+    {
+        await _chatLock.WaitAsync(ct);
+        try
+        {
+            // Use a one-shot session so prior chat history doesn't pollute
+            // the summary. Disposing it here also prevents the cached
+            // _chatSession (used by chat.send) from being mutated.
+            await using var session = LlmGateway.OpenSession();
+            var prompt = "다음 음성노트 텍스트를 핵심만 간결하게 한국어로 요약해줘. 글머리 기호 또는 짧은 단락으로:\n\n" + chunk;
+            return (await session.SendAsync(prompt, ct)).Trim();
+        }
+        finally { _chatLock.Release(); }
+    }
+
+    private static int FindSentenceBoundary(string text, int around)
+    {
+        // Look ±200 chars from `around` for a sentence terminator. Falls
+        // back to `around` when the window has no clean break.
+        int radius = Math.Min(200, text.Length / 4);
+        int lo = Math.Max(0, around - radius);
+        int hi = Math.Min(text.Length - 1, around + radius);
+        for (int i = around; i <= hi; i++)
+            if (text[i] == '.' || text[i] == '!' || text[i] == '?' || text[i] == '\n') return i + 1;
+        for (int i = around - 1; i >= lo; i--)
+            if (text[i] == '.' || text[i] == '!' || text[i] == '?' || text[i] == '\n') return i + 1;
+        return around;
+    }
+
     public void Dispose()
     {
+        try { TearDownNoteCaptureLocked(); } catch { }
+        _noteLock.Dispose();
         _playback.Dispose();
         try { _chatSession?.DisposeAsync().AsTask().GetAwaiter().GetResult(); } catch { }
         _chatSession = null;

@@ -27,11 +27,33 @@ panel's `EntryPath` at `<name>/index.html`, done.
 
 ## JS API (`window.zero`)
 
+Core surface:
+
 ```js
-await window.zero.version();             // { version: "v0.3.1" }
+await window.zero.version();             // { version: "v0.4.x" }
 await window.zero.voice.providers();     // { stt, tts, llmBackend }
 await window.zero.voice.speak("hello");  // { ok, provider, bytes, format, error }
 await window.zero.voice.stop();          // { stopped: true }
+
+await window.zero.chat.status();         // { available, backend, model, detail }
+await window.zero.chat.send("…");        // { ok, reply, turn, error }
+await window.zero.chat.stream("…", t => …); // resolves on done; rejects on error
+await window.zero.chat.reset();          // { reset: true }
+```
+
+Voice-note plugin surface (M0007 — VAD-gated STT + LLM summary):
+
+```js
+await window.zero.note.start(50);                  // 0..100 sensitivity
+const off = window.zero.note.onTranscript(d => …); // d.text — one utterance
+window.zero.note.onUtteranceStart(() => …);        // optional UI cue
+window.zero.note.onError(d => console.warn(d.message));
+window.zero.note.setSensitivity(70);
+await window.zero.note.pause();
+await window.zero.note.resume();
+await window.zero.note.stop();
+
+await window.zero.summarize(rawTimeline, 6000);    // { ok, summary, inputChars, chunks }
 ```
 
 All calls return Promises. Errors thrown on the .NET side surface as a

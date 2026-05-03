@@ -253,21 +253,46 @@ public partial class WebDevPagePanel : UserControl
         _activeView?.CoreWebView2?.OpenDevToolsWindow();
     }
 
-    private void OnInstallPluginClick(object sender, RoutedEventArgs e)
+    private async void OnInstallPluginClick(object sender, RoutedEventArgs e)
     {
-        var dlg = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Install WebDev Plugin",
-            Filter = "Plugin package (*.zip)|*.zip|All files (*.*)|*.*",
-            CheckFileExists = true,
-        };
-        if (dlg.ShowDialog(Window.GetWindow(this)) != true) return;
+        var owner = Window.GetWindow(this);
+        var picker = new InstallPluginPickerDialog { Owner = owner };
+        if (picker.ShowDialog() != true) return;
 
-        var result = WebDevPluginInstaller.InstallFromZip(dlg.FileName);
+        InstallResult? result = null;
+        if (picker.Mode == InstallPluginPickerDialog.InstallMode.Zip)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Install WebDev Plugin — pick a .zip",
+                Filter = "Plugin package (*.zip)|*.zip|All files (*.*)|*.*",
+                CheckFileExists = true,
+            };
+            if (dlg.ShowDialog(owner) != true) return;
+            result = WebDevPluginInstaller.InstallFromZip(dlg.FileName);
+        }
+        else if (picker.Mode == InstallPluginPickerDialog.InstallMode.Git)
+        {
+            var url = picker.GitUrl?.Trim();
+            if (string.IsNullOrWhiteSpace(url)) return;
+            ShowLoading("Installing from " + url);
+            try
+            {
+                result = await WebDevPluginInstaller.InstallFromGitUrlAsync(url);
+            }
+            finally
+            {
+                if (_activeView is null || _viewsBySampleId.Values.All(s => !s.FirstLoadCompleted))
+                    HideLoading();
+                else if (_activeView is { } av && _viewsBySampleId.Values.FirstOrDefault(s => ReferenceEquals(s.View, av)) is { FirstLoadCompleted: true })
+                    HideLoading();
+            }
+        }
+        if (result is null) return;
+
         if (result.Ok)
         {
-            MessageBox.Show(
-                Window.GetWindow(this),
+            MessageBox.Show(owner,
                 $"Installed: {result.Name} ({result.PluginId})",
                 "WebDev plugin",
                 MessageBoxButton.OK, MessageBoxImage.Information);
@@ -276,8 +301,7 @@ public partial class WebDevPagePanel : UserControl
         }
         else
         {
-            MessageBox.Show(
-                Window.GetWindow(this),
+            MessageBox.Show(owner,
                 "Install failed:\n\n" + result.Error,
                 "WebDev plugin",
                 MessageBoxButton.OK, MessageBoxImage.Warning);

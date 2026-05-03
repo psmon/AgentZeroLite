@@ -26,17 +26,44 @@ public sealed class WebDevBridge
     private readonly CoreWebView2 _core;
     private readonly IZeroBrowser _host;
 
+    // Optional concrete handle so VAD-driven note events can be wired
+    // back as JS events. Stays null when host is a different IZeroBrowser
+    // implementation (tests, etc.) — the note.* ops then fail with a clear
+    // "voice-note surface unavailable" error.
+    private readonly WebDevHost? _noteHost;
+
     public WebDevBridge(CoreWebView2 core, IZeroBrowser host)
     {
         _core = core;
         _host = host;
+        _noteHost = host as WebDevHost;
         _core.WebMessageReceived += OnMessage;
+
+        if (_noteHost is not null)
+        {
+            _noteHost.NoteTranscript        += OnNoteTranscript;
+            _noteHost.NoteUtteranceStarted  += OnNoteUtteranceStarted;
+            _noteHost.NoteUtteranceEnded    += OnNoteUtteranceEnded;
+            _noteHost.NoteError             += OnNoteError;
+        }
     }
 
     public void Detach()
     {
         try { _core.WebMessageReceived -= OnMessage; } catch { }
+        if (_noteHost is not null)
+        {
+            try { _noteHost.NoteTranscript       -= OnNoteTranscript;      } catch { }
+            try { _noteHost.NoteUtteranceStarted -= OnNoteUtteranceStarted;} catch { }
+            try { _noteHost.NoteUtteranceEnded   -= OnNoteUtteranceEnded;  } catch { }
+            try { _noteHost.NoteError            -= OnNoteError;           } catch { }
+        }
     }
+
+    private void OnNoteTranscript(string text)        => PostEvent("note.transcript", new { text });
+    private void OnNoteUtteranceStarted()             => PostEvent("note.utterance-start", new { });
+    private void OnNoteUtteranceEnded()               => PostEvent("note.utterance-end", new { });
+    private void OnNoteError(string message)          => PostEvent("note.error", new { message });
 
     private async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
@@ -113,9 +140,58 @@ public sealed class WebDevBridge
                 await _host.ResetChatAsync();
                 return new { reset = true };
 
+            // ─── Voice-note plugin surface ─────────────────────────────
+            case "note.start":
+            {
+                EnsureNoteHost();
+                int? sens = args?.TryGetProperty("sensitivity", out var sv) == true && sv.TryGetInt32(out var si)
+                    ? si : (int?)null;
+                var ok = await _noteHost!.StartNoteCaptureAsync(sens);
+                return new { ok, capturing = _noteHost.IsNoteCapturing };
+            }
+            case "note.stop":
+            {
+                EnsureNoteHost();
+                await _noteHost!.StopNoteCaptureAsync();
+                return new { ok = true };
+            }
+            case "note.pause":
+                EnsureNoteHost();
+                _noteHost!.PauseNoteCapture();
+                return new { paused = true };
+            case "note.resume":
+                EnsureNoteHost();
+                _noteHost!.ResumeNoteCapture();
+                return new { paused = false };
+            case "note.set-sensitivity":
+            {
+                EnsureNoteHost();
+                int v = args?.TryGetProperty("value", out var sv) == true && sv.TryGetInt32(out var si)
+                    ? si : 50;
+                _noteHost!.SetNoteSensitivity(v);
+                return new { sensitivity = v };
+            }
+            case "note.status":
+                EnsureNoteHost();
+                return new { capturing = _noteHost!.IsNoteCapturing };
+            case "summarize":
+            {
+                EnsureNoteHost();
+                var text = args?.TryGetProperty("text", out var t) == true ? t.GetString() ?? "" : "";
+                int maxChars = args?.TryGetProperty("maxChars", out var mc) == true && mc.TryGetInt32(out var mci) && mci > 0
+                    ? mci : 6000;
+                return await _noteHost!.SummarizeAsync(text, maxChars);
+            }
+
             default:
                 throw new InvalidOperationException($"unknown op '{op}'");
         }
+    }
+
+    private void EnsureNoteHost()
+    {
+        if (_noteHost is null)
+            throw new InvalidOperationException("voice-note surface unavailable on this host");
     }
 
     private async Task StreamChatAsync(string text, string streamId)
