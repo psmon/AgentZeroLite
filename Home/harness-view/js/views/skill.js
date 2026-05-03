@@ -1,5 +1,7 @@
 /**
- * Skills — Docs/harness/template/<skill>/SKILL.md card view.
+ * Skills — `.claude/skills/<skill>/SKILL.md` card view (in-repo plugins)
+ * plus hardcoded external entries (e.g. harness-kakashi-creator) that
+ * open the upstream URL on click instead of routing to a detail page.
  * Resource-Reference mode (read-only).
  *
  * Detail page parses Skills 2.0 frontmatter (name / description / allowed-tools
@@ -20,13 +22,13 @@ export async function render(ctx) {
 
   renderTopBar(topbarEl, {
     title: 'Skills',
-    subtitle: `${index?.base || 'Docs/harness/template'} — ${index?.items?.length || 0} available skills (read-only)`,
+    subtitle: `${index?.base || '.claude/skills'} — ${index?.items?.length || 0} available skills (read-only)`,
     badge: { kind: 'readonly', text: 'Reference' },
     search: { placeholder: 'Search skills...', oninput: e => applyFilter(e.target.value) },
   });
 
   if (!index || !index.items?.length) {
-    mount(viewEl, emptyState('No skills snapshot found at Docs/harness/template/.'));
+    mount(viewEl, emptyState('No skills found under .claude/skills/.'));
     return;
   }
 
@@ -39,15 +41,30 @@ export async function render(ctx) {
   }
 
   for (const it of index.items) {
+    const isExternal = !!it.external;
     const card = h('div', {
-      class: 'card',
-      dataset: { search: it.name.toLowerCase() },
-      onclick: () => { location.hash = `#${menu.id}/${encodeURIComponent(it.id)}`; },
+      class: 'card' + (isExternal ? ' card-external' : ''),
+      dataset: { search: (it.name + ' ' + (it.description || '') + ' ' + (it.source || '')).toLowerCase() },
+      onclick: isExternal
+        ? () => { window.open(it.url, '_blank', 'noopener,noreferrer'); }
+        : () => { location.hash = `#${menu.id}/${encodeURIComponent(it.id)}`; },
     }, [
       h('span', { class: 'card-icon', html: ICONS.zap }),
-      h('div', { class: 'card-title' }, it.name),
-      h('div', { class: 'card-desc' }, `${it.file}`),
-      h('div', { class: 'card-meta' }, `${it.modified}`),
+      h('div', { class: 'card-title' }, [
+        h('span', {}, it.name),
+        isExternal ? h('span', {
+          style: { marginLeft: '6px', fontSize: '11px', color: '#6B7280' },
+          title: 'External — opens in a new tab',
+        }, '↗') : null,
+      ].filter(Boolean)),
+      h('div', { class: 'card-desc' },
+        isExternal
+          ? (it.description || it.source || it.url)
+          : `${it.file}`),
+      h('div', { class: 'card-meta' },
+        isExternal
+          ? `external · ${it.source || 'upstream'}`
+          : `${it.modified}`),
     ]);
     grid.appendChild(card);
   }
@@ -60,6 +77,14 @@ async function renderDetail(ctx, index, skillId) {
   const id = decodeURIComponent(skillId);
   const item = index?.items?.find(i => i.id === id);
   if (!item) { mount(viewEl, emptyState('Skill not found.')); return; }
+
+  // External skill deep-link landed here (e.g. user typed the hash). The
+  // SKILL.md body isn't in this repo — bounce them to the upstream URL.
+  if (item.external && item.url) {
+    window.open(item.url, '_blank', 'noopener,noreferrer');
+    location.hash = '#skill';
+    return;
+  }
 
   renderTopBar(topbarEl, {
     title: item.name,

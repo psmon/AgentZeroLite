@@ -279,6 +279,21 @@ function buildAgents() {
 const SKILL_EXCLUDE = new Set([
   'psmon-doc-writer',  // personal-only — operator's external publishing workflow
 ]);
+
+// External skills — plugins that live in another repo (not under
+// .claude/skills/) but that we want surfaced in the viewer with a click
+// that opens the upstream URL. Each entry is hardcoded here because the
+// content is not in this repo.
+const EXTERNAL_SKILLS = [
+  {
+    id:          'harness-kakashi-creator',
+    name:        'harness-kakashi-creator',
+    description: '깡통 모드 카카시 하네스 — 새 프로젝트의 비어있는 4-layer (knowledge / agents / engine + logs) 정원을 부트스트랩하는 시작점. 이 AgentZero 하네스도 여기서 fork 되어 자라났다.',
+    source:      'github.com/psmon/harness-kakashi',
+    url:         'https://github.com/psmon/harness-kakashi/blob/main/plugins/harness-kakashi/skills/harness-kakashi-creator/SKILL.md',
+    external:    true,
+  },
+];
 function buildSkills() {
   const dir = SKILLS_DIR;
   if (!fs.existsSync(dir)) {
@@ -307,10 +322,14 @@ function buildSkills() {
       modified: stat.mtime.toISOString().slice(0, 10),
     });
   }
+  // Append hardcoded external-skill entries — viewer renders these as
+  // cards with an "external ↗" indicator and opens the URL on click.
+  for (const ext of EXTERNAL_SKILLS) items.push({ ...ext });
+
   items.sort((a, b) => a.name.localeCompare(b.name));
   writeJson('claude-skills', {
     base: PATHS.skills,
-    note: 'SKILL.md bodies are embedded inline at build time (in-repo snapshot).',
+    note: 'In-repo SKILL.md bodies embedded at build time; external entries link out.',
     items,
   });
 }

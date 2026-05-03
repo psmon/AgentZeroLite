@@ -37,6 +37,11 @@
 .card .card-desc  { font-size: 13px; color: #6B7280; line-height: 1.5; }
 .card .card-meta  { font-size: 11px; color: #9CA3AF; margin-top: auto; }
 
+/* External-skill card variant — links out to upstream repo */
+.card.card-external { border-style: dashed; border-color: #C7D2FE; background: #F8FAFF; }
+.card.card-external .card-icon { color: #6366F1; }
+.card.card-external .card-meta { color: #6366F1; font-weight: 500; }
+
 /* Section label */
 .section { display: flex; flex-direction: column; gap: 10px; }
 .section-title { font-size: 14px; font-weight: 600; color: #111827; }
