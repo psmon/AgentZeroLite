@@ -73,7 +73,27 @@ No local `git` CLI required — the installer talks plain HTTP.
 
 | Plugin | Status | Description |
 |---|---|---|
-| `voice-note/` | planned (M0008) | STT-driven voice journal with VAD-gated capture, sensitivity slider, pause/resume, LLM summary, 3-tier storage (raw timeline / summary / meta) |
+| `voice-note/` | shipped (M0008) | STT-driven voice journal. VAD-gated capture, sensitivity slider, pause/resume, LLM summary (length-chunked recursion). 3-tier IndexedDB storage: raw timeline / summary / meta. |
+
+## Self-install test (this repo)
+
+After this repo's `main` carries a plugin folder you can install it
+back into a running AgentZero Lite — the plugin folder under
+`Project/Plugins/<id>/` is a real, self-contained zero-install
+deployable. Two channels:
+
+```
+# ZIP channel — package the folder, then pick the .zip in WebDev → + Install Plugin
+cd Project/Plugins/voice-note
+zip -r ../voice-note.zip .
+
+# Git URL channel — paste this in WebDev → + Install Plugin → From Git URL…
+https://github.com/psmon/AgentZeroLite/tree/main/Project/Plugins/voice-note
+```
+
+The Git URL channel hits the public GitHub raw + Trees API so the
+running app pulls the same files you just pushed — no local relink
+needed.
 
 (Add new rows here as plugins land in this folder.)
 

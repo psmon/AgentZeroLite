@@ -40,6 +40,42 @@ public static class WebDevPluginInstaller
         return c;
     }
 
+    /// <summary>
+    /// Remove an installed plugin's mounted folder. Built-in samples
+    /// (under <c>{exeDir}/Wasm/</c>) are out of scope here — they're
+    /// part of the shipped exe and not deletable from the UI.
+    /// </summary>
+    public static InstallResult Uninstall(string pluginId)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId))
+            return new InstallResult(false, null, null, "missing plugin id");
+
+        var pluginsRoot = WebDevSampleCatalog.PluginsRoot;
+        var target = Path.GetFullPath(Path.Combine(pluginsRoot, pluginId));
+        var rootFull = Path.GetFullPath(pluginsRoot + Path.DirectorySeparatorChar);
+
+        // Hard guard against ../ escapes — the id should only ever be a single
+        // path segment from the catalog, but assert the resolved path stays
+        // under the plugins root before any filesystem write.
+        if (!target.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+            return new InstallResult(false, pluginId, null, "unsafe plugin id");
+
+        if (!Directory.Exists(target))
+            return new InstallResult(false, pluginId, null, "plugin not installed");
+
+        try
+        {
+            Directory.Delete(target, recursive: true);
+            AppLogger.Log($"[WebDev] plugin uninstalled | id={pluginId}");
+            return new InstallResult(true, pluginId, null, null);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[WebDev] plugin uninstall failed: {ex.GetType().Name}: {ex.Message}");
+            return new InstallResult(false, pluginId, null, ex.Message);
+        }
+    }
+
     public static InstallResult InstallFromZip(string zipPath, bool allowOverwrite = true)
     {
         if (!File.Exists(zipPath))

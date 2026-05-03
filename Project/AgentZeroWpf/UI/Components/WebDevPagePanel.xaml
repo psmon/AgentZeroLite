@@ -136,11 +136,40 @@
                      SelectionChanged="OnSampleSelected">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel>
-                            <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding Description}" FontSize="10" Opacity="0.7"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Description}" FontSize="10" Opacity="0.7"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <!-- Uninstall affordance — only on installed plugins,
+                                 hidden until the row is hovered, swallows the
+                                 click so the parent ListBoxItem doesn't navigate. -->
+                            <Button Grid.Column="1"
+                                    x:Name="btnUninstall"
+                                    Content="&#x2715;"
+                                    ToolTip="Uninstall this plugin"
+                                    Cursor="Hand" Padding="6,2"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="#9D9D9D" FontSize="12"
+                                    Visibility="Collapsed"
+                                    Click="OnUninstallClick">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBuiltIn}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>

@@ -3,7 +3,7 @@ id: M0008
 title: 음성노트 WebDev 플러그인 본체 (Project/Plugins/voice-note/)
 operator: psmon
 language: ko
-status: inbox
+status: done
 priority: medium
 created: 2026-05-03
 related: [M0006, M0007]

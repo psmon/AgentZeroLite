@@ -1,0 +1,231 @@
+/* Voice Note plugin — dark theme matching the WebDev canvas. */
+
+:root {
+  --bg:            #0A0A14;
+  --surface:       #14143A;
+  --surface-hi:    #1F1F5A;
+  --border:        #2A2A5E;
+  --text:          #E5E5E5;
+  --text-dim:      #9DB1D8;
+  --text-muted:    #6E6E73;
+  --accent:        #3DA0FF;
+  --accent-hi:     #5FB3FF;
+  --rec:           #FF4D4D;
+  --rec-hi:        #FF6B6B;
+  --ok:            #7ED9A0;
+  --warn:          #FFB454;
+  --danger:        #E66465;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif; }
+body { font-size: 13px; }
+
+.vn-app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+}
+
+/* ─── Sidebar (notes list) ───────────────────────────────────────── */
+
+.vn-side {
+  background: #0F0F22;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.vn-side-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+.vn-side-title {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  color: var(--text-dim); font-family: Consolas, monospace;
+}
+.vn-side-count {
+  font-size: 10px; color: var(--text-muted); font-family: Consolas, monospace;
+}
+.vn-new {
+  margin: 6px 12px 8px;
+  background: linear-gradient(180deg, #1F1F5A 0%, #14143A 100%);
+  color: var(--accent);
+  border: 1px dashed rgba(61, 160, 255, 0.45);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.vn-new:hover { border-color: var(--accent); background: var(--surface-hi); }
+.vn-new-icon { font-size: 16px; line-height: 1; }
+.vn-list {
+  flex: 1; overflow-y: auto;
+  padding: 0 6px 12px;
+}
+.vn-list-empty {
+  padding: 14px 18px;
+  font-size: 11px; color: var(--text-muted); line-height: 1.5;
+}
+.vn-item {
+  padding: 10px 12px;
+  margin: 2px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.vn-item:hover { background: rgba(31, 31, 90, 0.35); }
+.vn-item.active { background: var(--accent); color: #FFFFFF; border-color: var(--accent-hi); }
+.vn-item.active .vn-item-meta { color: rgba(255, 255, 255, 0.85); }
+.vn-item.active .vn-item-tag-rec { background: rgba(255, 255, 255, 0.25); color: #FFFFFF; }
+.vn-item-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vn-item-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; color: var(--text-muted);
+  margin-top: 2px;
+}
+.vn-item-tag-rec {
+  background: var(--rec); color: #FFFFFF;
+  padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; letter-spacing: .05em;
+}
+
+/* ─── Main (active note) ─────────────────────────────────────────── */
+
+.vn-main { display: flex; flex-direction: column; min-height: 0; }
+
+.vn-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-muted); padding: 40px;
+  text-align: center;
+}
+.vn-empty-icon { font-size: 56px; opacity: .35; margin-bottom: 18px; }
+.vn-empty-title { font-size: 16px; color: var(--text-dim); margin-bottom: 6px; }
+.vn-empty-sub { font-size: 12px; color: var(--text-muted); max-width: 360px; line-height: 1.5; }
+
+.vn-note { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+
+.vn-note-head {
+  padding: 16px 20px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+}
+.vn-title {
+  flex: 1;
+  background: transparent; border: 0; outline: 0;
+  color: var(--text); font-size: 18px; font-weight: 700;
+  font-family: inherit;
+  padding: 0;
+}
+.vn-title:focus { color: var(--accent-hi); }
+.vn-meta {
+  font-size: 10px; color: var(--text-muted);
+  font-family: Consolas, monospace;
+}
+
+.vn-controls {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #0F0F22;
+}
+.vn-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .12s ease;
+}
+.vn-btn:hover:not([disabled]) { background: var(--surface-hi); border-color: var(--accent); }
+.vn-btn[disabled] { opacity: .4; cursor: not-allowed; }
+.vn-btn-rec {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--rec); border-color: var(--rec); color: #FFFFFF; font-weight: 600;
+}
+.vn-btn-rec.recording { background: #2A2A2D; border-color: var(--rec); color: var(--rec); }
+.vn-btn-rec.recording .vn-rec-dot { background: var(--rec); animation: vn-pulse 1.2s ease-in-out infinite; }
+.vn-rec-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+}
+@keyframes vn-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .35; transform: scale(0.7); }
+}
+.vn-btn-danger { color: var(--danger); border-color: rgba(230, 100, 101, 0.4); background: transparent; }
+.vn-btn-danger:hover:not([disabled]) { background: rgba(230, 100, 101, 0.12); border-color: var(--danger); }
+.vn-spacer { flex: 1; }
+.vn-sense {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text-dim);
+}
+.vn-sense input[type="range"] {
+  width: 120px; accent-color: var(--accent);
+}
+.vn-sense-val {
+  display: inline-block; min-width: 22px; text-align: right;
+  font-family: Consolas, monospace; color: var(--text);
+}
+
+.vn-tabs {
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  background: #0F0F22;
+}
+.vn-tab {
+  background: transparent;
+  color: var(--text-muted);
+  border: 0; border-bottom: 2px solid transparent;
+  padding: 10px 14px;
+  font-size: 12px; font-family: inherit;
+  cursor: pointer;
+}
+.vn-tab:hover { color: var(--text); }
+.vn-tab-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.vn-status {
+  margin-left: auto;
+  font-size: 11px; color: var(--text-muted);
+  font-family: Consolas, monospace;
+  padding-right: 8px;
+}
+.vn-status.error { color: var(--warn); }
+
+.vn-body {
+  flex: 1; overflow-y: auto;
+  padding: 18px 22px;
+  background: var(--bg);
+}
+
+.vn-raw { display: flex; flex-direction: column; gap: 8px; }
+.vn-raw-empty { color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+.vn-line {
+  display: grid; grid-template-columns: 64px 1fr;
+  gap: 12px; padding: 6px 0;
+  border-bottom: 1px solid rgba(42, 42, 94, 0.4);
+}
+.vn-line-ts {
+  font-family: Consolas, monospace; font-size: 11px; color: var(--text-muted);
+  padding-top: 2px;
+}
+.vn-line-text {
+  font-size: 13px; line-height: 1.55; color: var(--text);
+  word-break: break-word;
+}
+.vn-line.live .vn-line-text { color: var(--accent-hi); }
+
+.vn-summary, .vn-meta-json {
+  margin: 0; padding: 0;
+  background: transparent; color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px; line-height: 1.7;
+  white-space: pre-wrap; word-wrap: break-word;
+}
+.vn-meta-json {
+  font-family: Consolas, monospace; font-size: 11px; color: var(--text-dim); line-height: 1.5;
+}

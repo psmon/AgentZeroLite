@@ -242,6 +242,53 @@ public partial class WebDevPagePanel : UserControl
     private void OnReloadListClick(object sender, RoutedEventArgs e)
         => RefreshSampleList(preserveSelection: true);
 
+    /// <summary>
+    /// Uninstall handler wired from the per-row × button. Confirms with
+    /// the user, deletes the mounted folder, evicts the cached WebView2
+    /// for that sample (so the next visit reads fresh state), then
+    /// refreshes the list. Built-in samples are filtered out at the
+    /// XAML level so they never reach this handler.
+    /// </summary>
+    private void OnUninstallClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.DataContext is not WebDevSample s) return;
+        if (s.IsBuiltIn) return; // belt + braces — XAML hides the button too
+
+        var owner = Window.GetWindow(this);
+        var confirm = MessageBox.Show(owner,
+            $"Uninstall plugin '{s.DisplayName}'?\n\nThis deletes the folder under %LOCALAPPDATA%\\AgentZeroLite\\Wasm\\plugins\\{s.Id}\\.",
+            "Uninstall Plugin",
+            MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        // Tear down the cached WebView2 first so the file handles release
+        // before Directory.Delete tries to remove the plugin folder.
+        if (_viewsBySampleId.TryGetValue(s.Id, out var slot))
+        {
+            try { slot.Bridge.Detach(); } catch { }
+            try { slot.View.Dispose(); } catch { }
+            try { viewHost.Children.Remove(slot.View); } catch { }
+            _viewsBySampleId.Remove(s.Id);
+            if (ReferenceEquals(_activeView, slot.View)) _activeView = null;
+        }
+
+        var result = WebDevPluginInstaller.Uninstall(s.Id);
+        if (!result.Ok)
+        {
+            MessageBox.Show(owner,
+                "Uninstall failed:\n\n" + result.Error,
+                "Uninstall Plugin",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        RefreshSampleList(preserveSelection: false);
+
+        // Stop the click from bubbling — without this the parent ListBoxItem
+        // would also fire SelectionChanged for the row we just removed.
+        e.Handled = true;
+    }
+
     private void OnReloadClick(object sender, RoutedEventArgs e)
     {
         // Reload only the active sample. Cached siblings stay as-is.

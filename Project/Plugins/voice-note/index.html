@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Voice Note · AgentZero WebDev</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="voice-note.css" />
+  <!-- The host mounts every installed plugin under https://plugin.local/{id}/.
+       The shared bridge ships with the app at https://zero.local/common/. -->
+  <script src="https://zero.local/common/zero-bridge.js"></script>
+</head>
+<body>
+  <div id="app" class="vn-app">
+    <!-- Left: notes list -->
+    <aside class="vn-side">
+      <header class="vn-side-head">
+        <span class="vn-side-title">NOTES</span>
+        <span id="vn-count" class="vn-side-count">0</span>
+      </header>
+      <button id="vn-new" class="vn-new" type="button">
+        <span class="vn-new-icon">＋</span>
+        <span>New Note</span>
+      </button>
+      <div id="vn-list" class="vn-list"></div>
+    </aside>
+
+    <!-- Right: active note -->
+    <main id="vn-main" class="vn-main">
+      <section id="vn-empty" class="vn-empty">
+        <div class="vn-empty-icon">🎙</div>
+        <div class="vn-empty-title">No note selected</div>
+        <div class="vn-empty-sub">Pick a note on the left, or hit <strong>+ New Note</strong> to start a fresh recording.</div>
+      </section>
+
+      <section id="vn-note" class="vn-note" hidden>
+        <header class="vn-note-head">
+          <input id="vn-title" class="vn-title" type="text" placeholder="Untitled note" maxlength="120" />
+          <span id="vn-meta" class="vn-meta"></span>
+        </header>
+
+        <div class="vn-controls">
+          <button id="vn-rec" class="vn-btn vn-btn-rec" type="button">
+            <span class="vn-rec-dot"></span>
+            <span id="vn-rec-label">Start</span>
+          </button>
+          <button id="vn-pause" class="vn-btn" type="button" disabled>Pause</button>
+          <div class="vn-sense">
+            <label for="vn-sense-range">Sensitivity</label>
+            <input id="vn-sense-range" type="range" min="0" max="100" value="50" />
+            <span id="vn-sense-val" class="vn-sense-val">50</span>
+          </div>
+          <div class="vn-spacer"></div>
+          <button id="vn-summarize" class="vn-btn" type="button" disabled>Summarize</button>
+          <button id="vn-delete" class="vn-btn vn-btn-danger" type="button">Delete</button>
+        </div>
+
+        <nav class="vn-tabs">
+          <button id="vn-tab-raw" class="vn-tab vn-tab-active" type="button">Raw timeline</button>
+          <button id="vn-tab-summary" class="vn-tab" type="button">Summary</button>
+          <button id="vn-tab-meta" class="vn-tab" type="button">Meta</button>
+          <span id="vn-status" class="vn-status"></span>
+        </nav>
+
+        <div id="vn-tab-raw-body" class="vn-body">
+          <div id="vn-raw" class="vn-raw">
+            <div class="vn-raw-empty">Press <strong>Start</strong> and speak. Each utterance lands here as a timestamped line.</div>
+          </div>
+        </div>
+        <div id="vn-tab-summary-body" class="vn-body" hidden>
+          <pre id="vn-summary" class="vn-summary">No summary yet. Press <em>Summarize</em> after you've captured some text.</pre>
+        </div>
+        <div id="vn-tab-meta-body" class="vn-body" hidden>
+          <pre id="vn-meta-json" class="vn-meta-json">{}</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="voice-note.js"></script>
+</body>
+</html>

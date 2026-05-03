@@ -1,0 +1,8 @@
+{
+  "id": "voice-note",
+  "name": "Voice Note",
+  "entry": "index.html",
+  "version": "0.1.0",
+  "icon": "🎙",
+  "description": "STT-driven voice journal with VAD-gated capture, sensitivity slider, pause/resume, and LLM summary"
+}
