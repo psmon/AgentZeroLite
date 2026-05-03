@@ -59,6 +59,11 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 
 ## 실행 절차
 
+> **모든 수정 모드 (업데이트 / 개선 / 새 에이전트 / 새 지식 / 새 엔진)
+> 의 첫 단계는 `harness/creator-rule.md` 를 Read** 하는 것이다 — 4-layer
+> 규칙 (knowledge 비-트리거, agent 단독책임, engine 이 멀티-agent 조율, 지식
+> per-agent 소유) 이 working memory 에 들어간 뒤에야 변경을 제안한다.
+
 ### 설명 (하네스를 설명해)
 1. harness/ 디렉토리 전체 스캔
 2. 레이어별 파일 목록 및 요약
@@ -67,18 +72,32 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 5. 구조화된 보고 제공
 
 ### 업데이트 (하네스를 업데이트해)
-1. 현재 상태 스캔
-2. 프로젝트 변경사항 확인 (git log)
-3. knowledge/agents/engine 업데이트 제안
-4. 사용자 승인 후 적용
-5. config 버전 갱신 + 평가 + 로그 기록
+1. **`harness/creator-rule.md` Read** — 규칙 내재화
+2. 현재 상태 스캔
+3. 프로젝트 변경사항 확인 (git log)
+4. knowledge/agents/engine 업데이트 제안 — Rule 1~6 위반 자체 검사
+5. 사용자 승인 후 적용
+6. config 버전 갱신 + 평가 + 로그 기록
 
 ### 개선 (하네스를 개선해)
-1. 3축 평가 실행
-2. 약점 식별
-3. 개선안 3개 이내 도출
-4. 사용자 승인 후 적용
-5. 재평가 + 로그 기록
+1. **`harness/creator-rule.md` Read** — 규칙 내재화
+2. 3축 평가 실행
+3. 약점 식별 — 단, "agent A 가 agent B 를 호출하게 묶자" 같은 제안은
+   Rule 1/2 위반 → 곧장 reject 하고 engine 신설로 reframe
+4. 개선안 3개 이내 도출
+5. 사용자 승인 후 적용
+6. 재평가 + 로그 기록
+
+### 위반 자체 검사 (Mode B 포함)
+
+수정안 제출 전 다음 5개 질문에 모두 OK 가 나오지 않으면 다시 작성한다:
+
+- [ ] 추가/수정한 knowledge 파일에 트리거 표현이 없나? (Rule 3)
+- [ ] 추가/수정한 agent 파일이 다른 agent 를 inline 호출하지 않나? (Rule 1)
+- [ ] 멀티-agent 시퀀스가 생긴다면 engine 으로 표현했나? (Rule 2)
+- [ ] 새 knowledge 가 올바른 per-agent 서브디렉토리에 있나? (Rule 4)
+- [ ] backlink 5종 (agent / engine / cross-knowledge / first-world / memory)
+      체크리스트 통과했나? (Rule 5)
 
 ### 로그 점검 (평가로그를 점검해)
 1. harness/logs/ 전체 스캔
