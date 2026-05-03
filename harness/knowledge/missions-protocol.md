@@ -2,6 +2,7 @@
 
 > Status: binding. Pinned in `memory/project_missions_protocol.md`.
 > Owner: tamer agent. Quick reference: `harness/missions/README.md`.
+> Workflow diagram + evaluation rubric: `harness/engine/mission-dispatch.md`.
 
 ## Why this exists
 

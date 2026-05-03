@@ -17,12 +17,27 @@ if (window.mermaid) {
   mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
 }
 
-/** Marked 설정 — 커스텀 렌더러로 mermaid 블록 추출 */
+/** Marked 설정 — 커스텀 렌더러로 mermaid 블록 추출
+ *
+ * IMPORTANT: marked v4+ HTML-escapes fenced-code contents by default —
+ * a `-->` arrow becomes `--&gt;` in the resulting innerHTML. mermaid.run
+ * happens to read innerHTML rather than textContent, so the entity-
+ * encoded source breaks the lexer ("Unrecognized text … B --&gt; C").
+ * Decode the common entities before injecting into the .mermaid div so
+ * the diagram source survives intact. */
+function decodeMermaidEntities(s) {
+  return String(s)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
 if (window.marked) {
   const renderer = new marked.Renderer();
   const origCode = renderer.code.bind(renderer);
   renderer.code = function(code, lang) {
-    if (lang === 'mermaid') return `<div class="mermaid">${code}</div>`;
+    if (lang === 'mermaid') return `<div class="mermaid">${decodeMermaidEntities(code)}</div>`;
     return origCode(code, lang);
   };
   marked.setOptions({ renderer, gfm: true, breaks: false, headerIds: true });

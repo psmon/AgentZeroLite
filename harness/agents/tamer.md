@@ -95,7 +95,9 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 
 ### Mission dispatch (M{NNNN} 수행해 / 진행해 / 실행해 / run mission M{NNNN})
 
-전체 contract: `harness/knowledge/missions-protocol.md`. 요약 절차:
+전체 contract: `harness/knowledge/missions-protocol.md` (data shape).
+오케스트레이션 다이어그램 + 평가 rubric: `harness/engine/mission-dispatch.md`.
+요약 절차:
 
 1. `harness/missions/M{NNNN}-*.md` 를 Glob 또는 직접 path 매칭으로 찾아 Read.
    - 파일이 없으면 operator에게 mission 파일을 먼저 작성하라고 안내한다.
