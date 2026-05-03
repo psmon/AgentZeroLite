@@ -28,6 +28,7 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     private readonly SemaphoreSlim _noteLock = new(1, 1);
     private VoiceCaptureService? _noteCapture;
     private ISpeechToText?       _noteStt;
+    private string               _noteLanguage = "auto";
     private CancellationTokenSource? _noteCts;
 
     public event Action<string>? NoteTranscript;     // (text)
@@ -272,7 +273,14 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
 
             _noteCts = new CancellationTokenSource();
             _noteCapture = cap;
-            AppLogger.Log($"[WebDev:Note] capture started | sens={effectiveSens} threshold={threshold:F4} muted={cap.Muted} device={v.InputDeviceId}");
+            // Cache the user's chosen STT language so every utterance
+            // transcribes the same way Settings/Voice does. Whisper's
+            // "auto" detector is unreliable on short utterances —
+            // omitting it was why transcripts came back empty even
+            // though Settings/Voice (which always passes v.SttLanguage)
+            // was working on the same mic.
+            _noteLanguage = string.IsNullOrWhiteSpace(v.SttLanguage) ? "auto" : v.SttLanguage;
+            AppLogger.Log($"[WebDev:Note] capture started | sens={effectiveSens} threshold={threshold:F4} lang={_noteLanguage} muted={cap.Muted} device={v.InputDeviceId}");
             return new { ok = true, capturing = true, sensitivity = effectiveSens, threshold };
         }
         finally { _noteLock.Release(); }
@@ -323,6 +331,7 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     {
         NoteUtteranceEnded?.Invoke();
         var cap = _noteCapture; var stt = _noteStt; var ctsToken = _noteCts?.Token ?? CancellationToken.None;
+        var lang = _noteLanguage;
         if (cap is null || stt is null) return;
         var pcm = cap.ConsumePcmBuffer();
         // Filter sub-half-second utterances — 16 kHz mono 16-bit = 32 KB/s,
@@ -333,18 +342,19 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
             AppLogger.Log($"[WebDev:Note] utterance dropped — too short ({pcm.Length} bytes)");
             return;
         }
-        AppLogger.Log($"[WebDev:Note] utterance → STT | bytes={pcm.Length}");
+        AppLogger.Log($"[WebDev:Note] utterance → STT | bytes={pcm.Length} lang={lang}");
         _ = Task.Run(async () =>
         {
             try
             {
-                var text = await stt.TranscribeAsync(pcm);
+                var text = await stt.TranscribeAsync(pcm, lang, ctsToken);
                 if (ctsToken.IsCancellationRequested) return;
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    AppLogger.Log("[WebDev:Note] STT returned empty");
+                    AppLogger.Log($"[WebDev:Note] STT returned empty | bytes={pcm.Length} lang={lang}");
                     return;
                 }
+                AppLogger.Log($"[WebDev:Note] STT ok | chars={text.Length}");
                 NoteTranscript?.Invoke(text.Trim());
             }
             catch (Exception ex)
