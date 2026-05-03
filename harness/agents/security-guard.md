@@ -34,6 +34,7 @@ Domain expertise:
 - Single-instance enforcement and process-isolation assumptions
 
 Cross-reference: `harness/knowledge/security-guard/security-surface.md` — this project's injection map.
+Multi-agent crash workflow: `harness/engine/crash-dump-triage.md` — security-guard primary, build-doctor secondary when the dump is build-context.
 
 ## Scope (every pass touches all 6)
 

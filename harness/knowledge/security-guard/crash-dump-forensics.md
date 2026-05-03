@@ -4,6 +4,11 @@
 > with potential credential/path leak risk and can also be exploit signals.
 > Cross-reference: **`build-doctor`** (secondary) — when a dump appears in a build
 > context, the build-environment correlation matters.
+>
+> **Workflow** — multi-agent orchestration codified in
+> `harness/engine/crash-dump-triage.md`. This file is the playbook
+> (*what / how to analyze*); the engine is the sequence (*who runs
+> when, gating logic, evaluation rubric*).
 
 This playbook covers the dump types most likely to appear in this repo's working tree.
 

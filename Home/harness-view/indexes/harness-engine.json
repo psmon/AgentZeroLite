@@ -2,6 +2,13 @@
   "base": "harness/engine",
   "items": [
     {
+      "file": "crash-dump-triage.md",
+      "title": "crash-dump-triage",
+      "path": "crash-dump-triage.md",
+      "size": 5018,
+      "modified": "2026-05-03"
+    },
+    {
       "file": "harness-view-publish.md",
       "title": "harness-view-publish",
       "path": "harness-view-publish.md",

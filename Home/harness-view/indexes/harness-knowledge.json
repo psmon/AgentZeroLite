@@ -70,8 +70,8 @@
       "name": "crash-dump-forensics.md",
       "title": "crash-dump-forensics",
       "heading": "Crash Dump Forensics — Playbook",
-      "size": 7205,
-      "modified": "2026-04-25"
+      "size": 7441,
+      "modified": "2026-05-03"
     },
     {
       "id": "harness/knowledge/security-guard/security-surface.md",
@@ -194,8 +194,8 @@
           "type": "file",
           "name": "crash-dump-forensics.md",
           "path": "security-guard/crash-dump-forensics.md",
-          "size": 7205,
-          "modified": "2026-04-25"
+          "size": 7441,
+          "modified": "2026-05-03"
         },
         {
           "type": "file",
