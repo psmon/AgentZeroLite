@@ -146,9 +146,16 @@
                                 <TextBlock Text="{Binding Description}" FontSize="10" Opacity="0.7"
                                            TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
-                            <!-- Uninstall affordance — only on installed plugins,
-                                 hidden until the row is hovered, swallows the
-                                 click so the parent ListBoxItem doesn't navigate. -->
+                            <!-- Uninstall affordance — only on installed
+                                 plugins (IsBuiltIn=false). Click is marked
+                                 Handled in code-behind so the ListBoxItem
+                                 selection doesn't fire on the doomed row.
+                                 NOTE: do NOT set Visibility as an inline
+                                 attribute here — local values beat Style
+                                 setters in WPF, so a hard-coded Collapsed
+                                 would block the DataTrigger from ever
+                                 flipping it to Visible. The Style provides
+                                 the default. -->
                             <Button Grid.Column="1"
                                     x:Name="btnUninstall"
                                     Content="&#x2715;"
@@ -156,7 +163,6 @@
                                     Cursor="Hand" Padding="6,2"
                                     Background="Transparent" BorderThickness="0"
                                     Foreground="#9D9D9D" FontSize="12"
-                                    Visibility="Collapsed"
                                     Click="OnUninstallClick">
                                 <Button.Style>
                                     <Style TargetType="Button">
