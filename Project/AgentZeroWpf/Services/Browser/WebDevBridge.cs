@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Windows.Threading;
 using Agent.Common;
 using Agent.Common.Browser;
+using Agent.Common.Telemetry;
 using Microsoft.Web.WebView2.Core;
 
 namespace AgentZeroWpf.Services.Browser;
@@ -60,6 +61,8 @@ public sealed class WebDevBridge
             _noteHost.NoteAmplitude         += OnNoteAmplitude;
             _noteHost.NoteSpeaking          += OnNoteSpeaking;
         }
+
+        TokenUsageCollector.Instance.TickCompleted += OnTokenTick;
     }
 
     public void Detach()
@@ -74,7 +77,19 @@ public sealed class WebDevBridge
             try { _noteHost.NoteAmplitude        -= OnNoteAmplitude;       } catch { }
             try { _noteHost.NoteSpeaking         -= OnNoteSpeaking;        } catch { }
         }
+        try { TokenUsageCollector.Instance.TickCompleted -= OnTokenTick; } catch { }
     }
+
+    private void OnTokenTick(TokenUsageCollector.TickSummary s)
+        => PostEvent("tokens.tick", new
+        {
+            filesScanned = s.FilesScanned,
+            rowsInserted = s.RowsInserted,
+            claudeRows   = s.ClaudeRows,
+            codexRows    = s.CodexRows,
+            finishedAt   = s.FinishedAt,
+            error        = s.Error,
+        });
 
     private void OnNoteTranscript(string text)        => PostEvent("note.transcript", new { text });
     private void OnNoteUtteranceStarted()             => PostEvent("note.utterance-start", new { });
@@ -207,9 +222,108 @@ public sealed class WebDevBridge
                 return await _noteHost!.SummarizeAsync(text, maxChars);
             }
 
+            // ─── Token-monitor plugin surface (read-only) ───────────────
+            case "tokens.summary":
+            {
+                var since = ParseSinceUtc(args);
+                var totals  = TokenUsageQueryService.GetTotals(since);
+                var byVendor = TokenUsageQueryService.GetByVendor(since);
+                var state   = TokenUsageQueryService.GetCollectorState();
+                return new {
+                    range      = DescribeSince(since),
+                    totals,
+                    byVendor,
+                    collector  = state,
+                };
+            }
+            case "tokens.byVendor":
+                return TokenUsageQueryService.GetByVendor(ParseSinceUtc(args));
+            case "tokens.byAccount":
+                return TokenUsageQueryService.GetByAccount(ParseSinceUtc(args));
+            case "tokens.byProject":
+            {
+                var since = ParseSinceUtc(args);
+                var limit = TryGetInt(args, "limit") ?? 50;
+                return TokenUsageQueryService.GetByProject(since, limit);
+            }
+            case "tokens.timeseries":
+            {
+                int rangeHours    = TryGetInt(args, "rangeHours")    ?? 24;
+                int bucketMinutes = TryGetInt(args, "bucketMinutes") ?? 60;
+                return TokenUsageQueryService.GetTimeSeries(rangeHours, bucketMinutes);
+            }
+            case "tokens.sessions":
+            {
+                var since = ParseSinceUtc(args);
+                var limit = TryGetInt(args, "limit") ?? 20;
+                return TokenUsageQueryService.GetActiveSessions(since, limit);
+            }
+            case "tokens.recent":
+            {
+                var limit = TryGetInt(args, "limit") ?? 50;
+                return TokenUsageQueryService.GetRecent(limit);
+            }
+            case "tokens.refresh":
+            {
+                var summary = await TokenUsageCollector.Instance.TickNowAsync();
+                return new {
+                    filesScanned = summary.FilesScanned,
+                    rowsInserted = summary.RowsInserted,
+                    claudeRows   = summary.ClaudeRows,
+                    codexRows    = summary.CodexRows,
+                    finishedAt   = summary.FinishedAt,
+                    error        = summary.Error,
+                };
+            }
+            case "tokens.status":
+                return TokenUsageQueryService.GetCollectorState();
+            case "tokens.profiles":
+                return TokenUsageQueryService.GetProfiles();
+            case "tokens.aliases":
+                return TokenUsageQueryService.ListAliases();
+            case "tokens.aliases.set":
+            {
+                var vendor = args?.TryGetProperty("vendor", out var ven) == true ? (ven.GetString() ?? "") : "";
+                var key    = args?.TryGetProperty("accountKey", out var ak) == true ? (ak.GetString() ?? "") : "";
+                var alias  = args?.TryGetProperty("alias", out var al) == true ? (al.GetString() ?? "") : "";
+                return TokenUsageQueryService.SetAlias(vendor, key, alias);
+            }
+            case "tokens.aliases.remove":
+            {
+                var vendor = args?.TryGetProperty("vendor", out var ven) == true ? (ven.GetString() ?? "") : "";
+                var key    = args?.TryGetProperty("accountKey", out var ak) == true ? (ak.GetString() ?? "") : "";
+                return new { removed = TokenUsageQueryService.RemoveAlias(vendor, key) };
+            }
+            case "tokens.reset":
+            {
+                var summary = TokenUsageCollector.Instance.ResetData();
+                return new { rowsDeleted = summary.RowsDeleted, checkpointsDeleted = summary.CheckpointsDeleted };
+            }
+
             default:
                 throw new InvalidOperationException($"unknown op '{op}'");
         }
+    }
+
+    private static DateTime? ParseSinceUtc(JsonElement? args)
+    {
+        if (args is null) return null;
+        if (args.Value.TryGetProperty("sinceHours", out var sh) && sh.TryGetInt32(out var hours) && hours > 0)
+            return DateTime.UtcNow.AddHours(-hours);
+        if (args.Value.TryGetProperty("sinceMinutes", out var sm) && sm.TryGetInt32(out var min) && min > 0)
+            return DateTime.UtcNow.AddMinutes(-min);
+        return null;
+    }
+
+    private static string DescribeSince(DateTime? sinceUtc)
+        => sinceUtc is null ? "all-time" : $"since {sinceUtc.Value:O}";
+
+    private static int? TryGetInt(JsonElement? args, string name)
+    {
+        if (args is null) return null;
+        if (args.Value.TryGetProperty(name, out var el) && el.ValueKind == JsonValueKind.Number && el.TryGetInt32(out var v))
+            return v;
+        return null;
     }
 
     private void EnsureNoteHost()

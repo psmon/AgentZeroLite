@@ -236,6 +236,150 @@ covers it. Compiler error: `using 별칭 'Brushes'을(를) 이전에 이
 
 ---
 
+## Pitfall 6 — Default WPF controls bypass `Background` / `Foreground` in dark mode
+
+**Symptom**
+
+You set `Background="#0F0F22"` and `Foreground="#E5E5E5"` on a `<ComboBox>` /
+`<ListBox>` / `<TabControl>` / `<ScrollBar>` inside an otherwise-dark window
+and the result still has system-color chrome — a white dropdown popup, a
+white-on-white selected item, gray ToggleButton chevron blocks. No XAML
+warning. The window looks broken on first open.
+
+**Why**
+
+Default WPF control templates wrap multiple inner parts (`ToggleButton`,
+`Popup`, `ContentPresenter`, `ScrollViewer`, item containers). Most of those
+parts read from `SystemColors` (e.g. `Window`, `WindowText`, `Highlight`,
+`HighlightText`) — *not* the host control's `Background` / `Foreground`.
+Setting one color on the outer control reaches the outermost border only.
+
+This bites repeatedly on this project because every dialog ships its own
+dark palette and we keep writing `<ComboBox Background="..." Foreground="..."/>`
+without remembering it doesn't work.
+
+**Fix — ship a full re-template, not just colors**
+
+Required parts when re-templating a `ComboBox`:
+
+```xml
+<!-- 1) ComboBoxItem template — controls highlight + selected colors -->
+<Style x:Key="DarkComboBoxItem" TargetType="ComboBoxItem">
+    <Setter Property="Background" Value="#1B1B1C"/>
+    <Setter Property="Foreground" Value="#E5E5E5"/>
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="ComboBoxItem">
+                <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="10,6">
+                    <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsHighlighted" Value="True">
+                        <Setter TargetName="Bd" Property="Background" Value="#1A2A4D"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter TargetName="Bd" Property="Background" Value="#0A84FF"/>
+                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+
+<!-- 2) ToggleButton template — the closed-state chevron + border -->
+<Style x:Key="DarkComboBoxToggleStyle" TargetType="ToggleButton">
+    <Setter Property="OverridesDefaultStyle" Value="True"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="ClickMode" Value="Press"/>
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="ToggleButton">
+                <Border x:Name="Bd" Background="#0F0F22" BorderBrush="#2A2A5E" BorderThickness="1" CornerRadius="4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/><ColumnDefinition Width="24"/>
+                        </Grid.ColumnDefinitions>
+                        <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M 0 0 L 4 4 L 8 0 Z" Fill="#9D9D9D"/>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+
+<!-- 3) ComboBox template — wires ToggleButton, ContentPresenter (selection), Popup -->
+<Style x:Key="DarkComboBox" TargetType="ComboBox">
+    <Setter Property="Foreground" Value="#E5E5E5"/>
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}"/>
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="ComboBox">
+                <Grid>
+                    <ToggleButton x:Name="ToggleButton"
+                                  Style="{StaticResource DarkComboBoxToggleStyle}"
+                                  IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                              RelativeSource={RelativeSource TemplatedParent}}"/>
+                    <ContentPresenter IsHitTestVisible="False"
+                                      Content="{TemplateBinding SelectionBoxItem}"
+                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                      Margin="10,0,28,0" VerticalAlignment="Center"
+                                      TextElement.Foreground="#E5E5E5"/>
+                    <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                           AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                        <Border Background="#1B1B1C" BorderBrush="#2A2A5E" BorderThickness="1" CornerRadius="4"
+                                MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                            <ScrollViewer><StackPanel IsItemsHost="True"
+                                            KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+```
+
+The same shape applies to `ListBox` (item template + ScrollViewer in
+template), `TabControl` (TabItem template), and `ScrollBar` (Track + Thumb
+templates). **Setting Background/Foreground only is never enough — always
+re-template.**
+
+**Project palette (use these exact tokens)**
+
+| Role | Hex |
+|---|---|
+| Window background | `#1B1B1C` |
+| Card / panel background | `#171718` |
+| Input background | `#0F0F22` |
+| Border (idle) | `#2A2A5E` (input) / `#2A2A2D` (panel) / `#3F3F46` (button) |
+| Border (hover/focus) | `#0A84FF` |
+| Foreground (primary) | `#E5E5E5` |
+| Foreground (muted) | `#9D9D9D` |
+| Foreground (very muted) | `#6E6E73` |
+| Item highlight (hover) | `#1A2A4D` |
+| Item selected | `#0A84FF` (bg) + `#FFFFFF` (fg) |
+| Accent (primary button) | `#0A84FF` |
+
+When in doubt, copy from `InstallPluginPickerDialog.xaml` — it has the
+canonical re-templates for ComboBox, primary/ghost button, and choice
+button.
+
+**Pre-commit check**
+
+`grep -nE '<(ComboBox|ListBox|TabControl|ScrollBar|TreeView|DataGrid)\s' <new-xaml>`.
+For each match, verify a `Style="{StaticResource Dark*}"` is set OR the
+control sits in a Window resource scope that defines a TargetType-only
+default style. **Plain `Background="..." Foreground="..."` on these
+controls is a bug** — the dropdown / item highlight / chevron will all
+revert to system colors.
+
+---
+
 ## Cross-cutting: how these surface
 
 All five share one operational pattern: **the user runs the app, clicks
@@ -292,3 +436,10 @@ When a staged diff touches `*.xaml` or a Window code-behind, run these:
 - [ ] **P5**: every new code-behind with `Brush` / `Brushes` — confirm
       no duplicate `using Brushes = ...` (already global) and add a
       `using Brush = System.Windows.Media.Brush;` if needed.
+- [ ] **P6**: every new / modified `<ComboBox>`, `<ListBox>`, `<TabControl>`,
+      `<ScrollBar>`, `<TreeView>`, `<DataGrid>` in a dark-themed Window —
+      confirm a full re-template (Style targeting the control AND its item
+      container) is applied. Plain `Background="..." Foreground="..."` is
+      not enough; the popup/chrome/highlight stay on system colors. Use
+      the canonical templates in `InstallPluginPickerDialog.xaml` or copy
+      from this pitfall section.

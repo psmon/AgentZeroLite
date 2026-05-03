@@ -74,6 +74,7 @@ No local `git` CLI required — the installer talks plain HTTP.
 | Plugin | Status | Description |
 |---|---|---|
 | `voice-note/` | shipped (M0008) | STT-driven voice journal. VAD-gated capture, sensitivity slider, pause/resume, LLM summary (length-chunked recursion). 3-tier IndexedDB storage: raw timeline / summary / meta. |
+| `token-monitor/` | shipped (M0009) | Read-only dashboard for per-vendor / per-account token usage. Host collector polls Claude Code (`~/.claude/projects/**/*.jsonl`) and Codex CLI (`~/.codex/sessions/**/rollout-*.jsonl`) every minute and persists rows to the AgentZero SQLite DB. Plugin renders cards + line chart + by-account / by-session tables. |
 
 ## Self-install test (this repo)
 

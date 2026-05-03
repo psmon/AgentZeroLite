@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Windows;
 
+using Agent.Common.Telemetry;
 using AgentZeroWpf.Actors;
 using AgentZeroWpf.UI.APP;
 
@@ -95,6 +96,18 @@ public partial class App : Application
         ActorSystemManager.Initialize();
         AppLogger.Log("[Akka] ActorSystem initialized");
 
+        // Token usage telemetry collector — polls Claude Code / Codex CLI
+        // JSONL transcripts every minute. Read-only on the source files;
+        // safe to run alongside the producing CLIs.
+        try
+        {
+            TokenUsageCollector.Instance.Start();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[TokenCollector] start failed", ex);
+        }
+
         if (cliDebug || vsDebug)
         {
             AppLogger.Log("=== Debug mode active ===");
@@ -120,6 +133,9 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try { TokenUsageCollector.Instance.Stop(); }
+        catch (Exception ex) { AppLogger.LogError("[TokenCollector] stop error", ex); }
+
         // CoordinatedShutdown — fire-and-forget. UI 스레드를 블로킹하지 않고,
         // Akka가 exit-clr=on 설정에 따라 단계 완료 후 Environment.Exit(0)을 호출한다.
         // 과거 버그: ShutdownAsync().GetAwaiter().GetResult()가 UI 스레드를 블로킹 →

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Token Monitor · AgentZero WebDev</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="token-monitor.css" />
+  <script src="https://zero.local/common/zero-bridge.js"></script>
+</head>
+<body>
+  <div id="app" class="tm-app">
+    <header class="tm-head">
+      <div class="tm-head-left">
+        <span class="tm-icon">📊</span>
+        <span class="tm-title">Token Monitor</span>
+        <span id="tm-range-label" class="tm-range-label">last 24h</span>
+      </div>
+      <div class="tm-head-right">
+        <select id="tm-range" class="tm-select" title="Time range">
+          <option value="1">1 hour</option>
+          <option value="6">6 hours</option>
+          <option value="24" selected>24 hours</option>
+          <option value="168">7 days</option>
+          <option value="720">30 days</option>
+          <option value="0">All time</option>
+        </select>
+        <button id="tm-refresh" class="tm-btn" type="button" title="Force collector tick + reload data">
+          <span class="tm-refresh-icon">⟳</span>
+          <span>Refresh</span>
+        </button>
+        <button id="tm-reset" class="tm-btn tm-btn-danger" type="button" title="Wipe all collected rows + checkpoints, then re-scan from scratch">
+          <span>Reset &amp; Re-scan</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="tm-cards">
+      <div class="tm-card">
+        <div class="tm-card-label">Total tokens</div>
+        <div id="tm-card-total" class="tm-card-value">—</div>
+        <div id="tm-card-records" class="tm-card-sub">0 records</div>
+      </div>
+      <div class="tm-card">
+        <div class="tm-card-label">Anthropic (Claude)</div>
+        <div id="tm-card-claude" class="tm-card-value">—</div>
+        <div id="tm-card-claude-sub" class="tm-card-sub">0 turns</div>
+      </div>
+      <div class="tm-card">
+        <div class="tm-card-label">OpenAI (Codex)</div>
+        <div id="tm-card-codex" class="tm-card-value">—</div>
+        <div id="tm-card-codex-sub" class="tm-card-sub">0 turns</div>
+      </div>
+      <div class="tm-card">
+        <div class="tm-card-label">Collector</div>
+        <div id="tm-card-collector" class="tm-card-value">—</div>
+        <div id="tm-card-collector-sub" class="tm-card-sub">no scans yet</div>
+      </div>
+    </section>
+
+    <section class="tm-section">
+      <header class="tm-section-head">
+        <h2>Activity over time</h2>
+        <span id="tm-chart-empty" class="tm-empty-hint" hidden>No data in this range yet — let the collector run for a while.</span>
+      </header>
+      <div class="tm-chart-wrap">
+        <canvas id="tm-chart" width="900" height="220"></canvas>
+        <div class="tm-chart-legend">
+          <span class="tm-legend-dot tm-legend-anthropic"></span> Anthropic
+          <span class="tm-legend-dot tm-legend-openai"></span> OpenAI
+        </div>
+      </div>
+    </section>
+
+    <section class="tm-section">
+      <header class="tm-section-head">
+        <h2>By vendor / account</h2>
+        <span class="tm-empty-hint">Click an account to assign a friendly alias.</span>
+      </header>
+      <div class="tm-table-wrap">
+        <table class="tm-table">
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>Account</th>
+              <th class="tm-num">Input</th>
+              <th class="tm-num">Output</th>
+              <th class="tm-num">Cache R</th>
+              <th class="tm-num">Cache W</th>
+              <th class="tm-num">Reasoning</th>
+              <th class="tm-num">Total</th>
+              <th class="tm-num">Turns</th>
+            </tr>
+          </thead>
+          <tbody id="tm-account-body">
+            <tr><td colspan="9" class="tm-empty">No usage recorded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tm-section">
+      <header class="tm-section-head">
+        <h2>By project</h2>
+        <span class="tm-empty-hint">Grouped by working-directory leaf folder. Hover the project name for the full path.</span>
+      </header>
+      <div class="tm-table-wrap">
+        <table class="tm-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Vendors</th>
+              <th class="tm-num">Input</th>
+              <th class="tm-num">Output</th>
+              <th class="tm-num">Cache R</th>
+              <th class="tm-num">Total</th>
+              <th class="tm-num">Sessions</th>
+              <th>Last seen (UTC)</th>
+            </tr>
+          </thead>
+          <tbody id="tm-project-body">
+            <tr><td colspan="8" class="tm-empty">No projects yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tm-section">
+      <header class="tm-section-head">
+        <h2>Recent sessions</h2>
+      </header>
+      <div class="tm-table-wrap">
+        <table class="tm-table">
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>Session</th>
+              <th>Cwd</th>
+              <th>Model</th>
+              <th>Last seen (UTC)</th>
+              <th class="tm-num">Input</th>
+              <th class="tm-num">Output</th>
+              <th class="tm-num">Total</th>
+              <th class="tm-num">Turns</th>
+            </tr>
+          </thead>
+          <tbody id="tm-session-body">
+            <tr><td colspan="9" class="tm-empty">No sessions yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="tm-foot">
+      <span id="tm-status" class="tm-status">idle</span>
+      <span class="tm-foot-sep">·</span>
+      <span id="tm-tick-info" class="tm-tick-info">last tick: —</span>
+    </footer>
+  </div>
+  <script src="token-monitor.js"></script>
+</body>
+</html>

@@ -184,14 +184,19 @@ Treat them as binding for the file types they cover:
 
 - **`harness/knowledge/wpf-xaml-resource-and-window-pitfalls.md`** —
   Whenever the staged diff touches `*.xaml` or a `Window` code-behind,
-  walk the **P1–P5 checklist at the bottom of that file** before
-  approving the commit. Five classes of crash-on-first-click that all
-  pass `dotnet build` but blow up in DispatcherUnhandled — XAML
-  resource scope (sibling-`<Resources>` invisibility), undefined
-  resource keys, `Window.Resources` not inheriting from `Owner`,
-  `Owner` setter requiring an HWND (AgentBot's embedded vs floating
-  modes), and the `System.Drawing` ↔ `System.Windows.Media` `Brush`
-  ambiguity caused by `<UseWPF>` + `<UseWindowsForms>` together. Each
+  walk the **P1–P6 checklist at the bottom of that file** before
+  approving the commit. Six classes of failure that all pass
+  `dotnet build` — five blow up at first click in DispatcherUnhandled
+  (XAML resource scope, undefined resource keys, `Window.Resources`
+  not inheriting from `Owner`, `Owner` setter requiring an HWND, and
+  the `System.Drawing` ↔ `System.Windows.Media` `Brush` ambiguity
+  caused by `<UseWPF>` + `<UseWindowsForms>` together). The sixth is
+  silent visual rot — default WPF `ComboBox` / `ListBox` / `TabControl`
+  / `ScrollBar` / `TreeView` / `DataGrid` ignore `Background` /
+  `Foreground` for their inner parts (Popup chrome, item highlight,
+  ToggleButton chevron) and leak system colors onto a dark window;
+  Pitfall 6 in the same file ships canonical re-template snippets for
+  this project's palette. Each
   pitfall has a one-grep verification — fail the review if any check
   doesn't pass.
 

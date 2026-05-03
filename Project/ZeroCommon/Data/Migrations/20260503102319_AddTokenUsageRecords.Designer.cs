@@ -3,6 +3,7 @@ using System;
 using Agent.Common.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Agent.Common.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260503102319_AddTokenUsageRecords")]
+    partial class AddTokenUsageRecords
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0-preview.3.25171.6");
@@ -197,44 +200,11 @@ namespace Agent.Common.Data.Migrations
                     b.ToTable("ClipboardEntries");
                 });
 
-            modelBuilder.Entity("Agent.Common.Data.Entities.TokenAccountAlias", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("AccountKey")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Alias")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Vendor")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Vendor", "AccountKey")
-                        .IsUnique();
-
-                    b.ToTable("TokenAccountAliases");
-                });
-
             modelBuilder.Entity("Agent.Common.Data.Entities.TokenSourceCheckpoint", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("AccountKey")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
 
                     b.Property<long>("ByteOffset")
                         .HasColumnType("INTEGER");

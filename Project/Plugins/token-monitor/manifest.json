@@ -1,0 +1,8 @@
+{
+  "id": "token-monitor",
+  "name": "Token Monitor",
+  "entry": "index.html",
+  "version": "0.1.0",
+  "icon": "📊",
+  "description": "Per-vendor / per-account token usage dashboard. Reads telemetry collected from Claude Code and Codex CLI transcripts."
+}

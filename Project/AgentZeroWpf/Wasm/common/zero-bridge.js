@@ -128,5 +128,37 @@
     // longer inputs are halved on a sentence boundary, summarized
     // recursively, then merged. Returns { ok, summary, inputChars, chunks, error }.
     summarize: (text, maxChars) => invoke('summarize', { text, maxChars }),
+
+    // Token-monitor plugin surface (M0009). Read-only — the host runs an
+    // internal collector that polls Claude Code / Codex CLI JSONL files
+    // every minute and persists rows. Plugins query via these methods
+    // and subscribe to `tokens.tick` for live refresh.
+    tokens: {
+      summary:    (sinceHours) => invoke('tokens.summary',    sinceHours == null ? {} : { sinceHours }),
+      byVendor:   (sinceHours) => invoke('tokens.byVendor',   sinceHours == null ? {} : { sinceHours }),
+      byAccount:  (sinceHours) => invoke('tokens.byAccount',  sinceHours == null ? {} : { sinceHours }),
+      byProject:  (sinceHours, limit) => invoke('tokens.byProject', {
+        ...(sinceHours == null ? {} : { sinceHours }),
+        ...(limit == null ? {} : { limit }),
+      }),
+      timeseries: (rangeHours, bucketMinutes) =>
+        invoke('tokens.timeseries', { rangeHours, bucketMinutes }),
+      sessions:   (sinceHours, limit) =>
+        invoke('tokens.sessions', {
+          ...(sinceHours == null ? {} : { sinceHours }),
+          ...(limit == null ? {} : { limit }),
+        }),
+      recent:     (limit)      => invoke('tokens.recent', limit == null ? {} : { limit }),
+      refresh:    ()           => invoke('tokens.refresh'),
+      status:     ()           => invoke('tokens.status'),
+      profiles:   ()           => invoke('tokens.profiles'),
+      aliases:    ()           => invoke('tokens.aliases'),
+      setAlias:   (vendor, accountKey, alias) =>
+        invoke('tokens.aliases.set', { vendor, accountKey, alias }),
+      removeAlias: (vendor, accountKey) =>
+        invoke('tokens.aliases.remove', { vendor, accountKey }),
+      reset:      ()           => invoke('tokens.reset'),
+      onTick:     (handler)    => on('tokens.tick', handler),
+    },
   };
 })();

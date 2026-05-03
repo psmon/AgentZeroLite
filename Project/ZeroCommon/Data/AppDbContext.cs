@@ -12,6 +12,9 @@ public class AppDbContext : DbContext
     public DbSet<CliGroup> CliGroups => Set<CliGroup>();
     public DbSet<CliTab> CliTabs => Set<CliTab>();
     public DbSet<ClipboardEntry> ClipboardEntries => Set<ClipboardEntry>();
+    public DbSet<TokenUsageRecord> TokenUsageRecords => Set<TokenUsageRecord>();
+    public DbSet<TokenSourceCheckpoint> TokenSourceCheckpoints => Set<TokenSourceCheckpoint>();
+    public DbSet<TokenAccountAlias> TokenAccountAliases => Set<TokenAccountAlias>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -45,6 +48,21 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(t => t.CliDefinitionId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        mb.Entity<TokenUsageRecord>()
+            .HasIndex(r => new { r.Vendor, r.RecordedAt });
+        mb.Entity<TokenUsageRecord>()
+            .HasIndex(r => new { r.Vendor, r.RawRequestId });
+        mb.Entity<TokenUsageRecord>()
+            .HasIndex(r => new { r.SourceFile, r.SourceLine });
+
+        mb.Entity<TokenSourceCheckpoint>()
+            .HasIndex(c => c.SourceFile)
+            .IsUnique();
+
+        mb.Entity<TokenAccountAlias>()
+            .HasIndex(a => new { a.Vendor, a.AccountKey })
+            .IsUnique();
     }
 
     public static void InitializeDatabase()

@@ -10,15 +10,32 @@
     "cancelled"
   ],
   "counts": {
-    "all": 9,
+    "all": 10,
     "inbox": 1,
     "in_progress": 0,
-    "done": 8,
+    "done": 9,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0009",
+      "file": "harness/missions/M0009-토큰모니터링-플러그인.md",
+      "title": "토큰 모니터링 플러그인 — Claude/Codex CLI 텔레메트리 수집 + 대시보드",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-03",
+      "recordFile": "harness/logs/mission-records/M0009-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-03T19:30:00+09:00",
+      "recordFinished": "2026-05-03T20:41:28+09:00",
+      "designFile": null,
+      "modified": "2026-05-03",
+      "size": 1204
+    },
     {
       "id": "M0008",
       "file": "harness/missions/M0008-voice-note-plugin.md",
