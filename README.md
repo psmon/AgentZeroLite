@@ -89,6 +89,16 @@ macros to whichever terminal is in focus — nothing more, nothing less.
     out of its own `/skills` view and turns it into a slash-command menu in the
     chat box. Type `/`, pick a skill, Enter — the macro text is fired at the
     terminal. No LLM round-trip.
+- **🌐 WebDev — in-app browser sandbox + plugin system (v0.4)** — top-level menu
+  next to AgentBot. Embeds a WebView2 with a `window.zero.*` JavaScript bridge
+  to AgentZero's native services (LLM chat / streaming, TTS, STT-with-VAD,
+  summarize). Two install channels: a local `.zip`, or a public GitHub folder
+  URL (no `git` CLI required — the installer talks raw HTTP + Trees API).
+  First reference plugin is **voice-note** under
+  [`Project/Plugins/voice-note/`](Project/Plugins/voice-note/) — a STT-driven
+  voice journal with VAD-gated capture, sensitivity slider, pause/resume, LLM
+  summary (length-chunked recursive), and IndexedDB note storage. See the
+  [WebDev section](#-webdev--in-app-sandbox--plugin-system) below.
 - **Notes with live rendering** — a second bottom panel with a Markdown viewer that
   also renders Mermaid diagrams and Pencil files, scoped to the active workspace
   folder.
@@ -475,6 +485,119 @@ extends here into tiki-taka between **your own two input modalities**.
 
 ---
 
+## 🌐 WebDev — in-app sandbox + plugin system
+
+**Top-level menu** (globe icon next to AgentBot). Promoted from a
+cramped Settings tab in v0.4 to a full-window workspace with a
+sample list on the left and a WebView2 canvas on the right. The
+Settings → WebDev tab now hosts a tutorial / plugin-author guide.
+
+The point of WebDev is to **let you build small AI tools without
+touching C#.** AgentZero exposes its native capabilities (LLM,
+TTS / STT, voice-note pipeline, summary) as a JavaScript bridge
+mounted into the embedded WebView2; web tools call those through
+a `window.zero.*` surface and ship as plain HTML / JS folders.
+
+```
+┌──────────────────────────┐  ┌──────────────────────────────┐
+│  .NET Native             │  │  WebView2 (Browser)          │
+│                          │  │                              │
+│  NAudio → VAD → Whisper ─────→ note.transcript event       │
+│  LlmGateway streaming   ──────→ chat.token / chat.done     │
+│  VoicePlaybackService   ──────  (TTS results)              │
+│                          │  │  ↑                           │
+│  WebDevHost  ←───────────────  invoke('chat.send', …)      │
+│  WebDevBridge (JSON RPC) │  │  invoke('summarize', …)      │
+│                          │  │  invoke('note.start', …)     │
+└──────────────────────────┘  └──────────────────────────────┘
+   single Whisper model    one window.zero in every plugin
+   single LLM session      same bridge for built-ins + plugins
+```
+
+The bridge lives at:
+- JS wrapper — `Project/AgentZeroWpf/Wasm/common/zero-bridge.js`
+- .NET dispatcher — `Project/AgentZeroWpf/Services/Browser/WebDevBridge.cs`
+- Implementations — `Project/AgentZeroWpf/Services/Browser/WebDevHost.cs`
+
+### `window.zero.*` surface (today)
+
+```js
+// Core
+await window.zero.version()                       // { version }
+await window.zero.voice.providers()               // { stt, tts, llmBackend }
+await window.zero.voice.speak("hello")            // SAPI / OpenAI TTS
+await window.zero.chat.status()                   // { available, backend, model }
+await window.zero.chat.send("…")                  // { ok, reply, turn }
+await window.zero.chat.stream("…", t => …)        // streaming tokens
+await window.zero.chat.reset()
+
+// Voice-note plugin surface (M0007)
+await window.zero.note.start(75)                  // 0..100 sensitivity
+window.zero.note.onTranscript(d => …)             // VAD-gated utterance
+window.zero.note.onAmplitude(d => …)              // RMS + threshold for VU
+window.zero.note.onSpeaking(d => …)               // frame-level VAD
+window.zero.note.setSensitivity(70)               // live tuning
+await window.zero.note.pause() / .resume() / .stop()
+
+await window.zero.summarize(longText, 6000)       // length-chunked recursive
+```
+
+### Installing a plugin — two channels
+
+A plugin is a folder with `manifest.json` at the root:
+
+```json
+{ "id": "voice-note", "name": "Voice Note",
+  "entry": "index.html", "version": "0.1.0", "icon": "🎙" }
+```
+
+**1. Local `.zip`** — WebDev → `+ Install Plugin` → *From .zip…* → pick
+the file. Auto-unwraps a single top-level folder. Strict manifest
+validation; nothing partial-writes.
+
+**2. Public Git URL** — WebDev → `+ Install Plugin` → *From Git URL…* →
+paste a folder URL like
+`https://github.com/owner/repo/tree/main/Project/Plugins/my-plugin`.
+The installer fetches `manifest.json` raw, walks the GitHub Trees API
+to enumerate the folder, downloads every file. **No local `git`
+required.**
+
+Both extract to `%LOCALAPPDATA%\AgentZeroLite\Wasm\plugins\<id>\`.
+The sample list refreshes automatically. Each plugin row gets a `×`
+uninstall button (built-ins are exempt).
+
+### voice-note — first reference plugin
+
+Lives under [`Project/Plugins/voice-note/`](Project/Plugins/voice-note/)
+— **outside the build** (`AgentZeroWpf.csproj` only sees its own
+folder), so plugin code never breaks a release. After the repo's
+`main` carries it, you can self-install:
+
+```
+WebDev → + Install Plugin → From Git URL →
+  https://github.com/psmon/AgentZeroLite/tree/main/Project/Plugins/voice-note
+```
+
+Features:
+- Notes list (left) — new / select / delete; IndexedDB persistence
+  with debounced writes (400 ms), so rapid title typing doesn't
+  thrash disk.
+- Capture row — REC toggle, Pause/Resume, Sensitivity slider, live
+  VU meter with threshold marker (drag the slider until the
+  marker sits below your normal voice).
+- Three tabs — *Raw timeline* (one timestamped line per utterance,
+  auto-follow latest when pinned to bottom), *Summary*
+  (length-chunked recursive LLM summary on demand), *Meta* (model
+  / token / start-end metadata).
+- Inherits the user's `Settings → Voice` STT provider, language,
+  device, mute switch — no separate setup.
+
+The plugin is the existence proof that the surface is enough to
+build something useful. M0008 builds the next ones (transcription
+export, multi-note search) on top of the same bridge.
+
+---
+
 ## 🧪 Harness — making the function-call chain self-improve
 
 Wiring an LLM into a useful tool chain is **hard**, and it is honestly
@@ -527,24 +650,34 @@ the **memory of those attempts** so the same mistake doesn't recur.
 
 ## Settings
 
-Two tabs only:
+A short tabbed pane (full-window overlay since v0.4 — same airspace
+treatment as WebDev so ConPTY native windows can't bleed through):
 
 - **CLI Definitions** — register shells AgentZero can spawn (`cmd`, `pwsh`, `claude …`,
   custom entries). Built-ins cannot be deleted. New definitions appear in the `+` menu
   of every workspace.
+- **LLM** — local model picker (Gemma 4 / Nemotron) + external backend
+  (OpenAI-compatible) toggle.
+- **Voice** — STT provider (WhisperLocal CPU/Vulkan, OpenAI Whisper, etc.) +
+  language + GPU device picker + VAD sensitivity. The same values voice-note
+  inherits.
+- **WebDev** — tutorial / plugin-author guide. The actual sandbox lives at
+  the top-level globe icon (see [WebDev section](#-webdev--in-app-sandbox--plugin-system)).
 - **AgentZero CLI** — one-click button to register the app directory in the user
   `PATH` so `AgentZeroLite.ps1` and `AgentZeroLite.exe -cli …` resolve from any shell.
 
 Persistence lives in `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db` (SQLite, migrated by
-EF Core on first run).
+EF Core on first run). User-installed WebDev plugins live next door under
+`%LOCALAPPDATA%\AgentZeroLite\Wasm\plugins\<id>\`.
 
 ---
 
 ## Status
 
-**Alpha.** The 12-test headless suite is green; the WPF integration suite is opt-in
-and requires a desktop session. API surface inside `ZeroCommon` is considered unstable
-until v1.0.
+**Alpha — current release v0.4.x.** Headless suite green; the WPF integration
+suite is opt-in and requires a desktop session. API surface inside
+`ZeroCommon` is considered unstable until v1.0; the WebDev `window.zero.*`
+bridge is additive-only since v0.4 — new ops added, none removed.
 
 ---
 

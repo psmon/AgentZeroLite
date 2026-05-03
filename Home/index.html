@@ -189,6 +189,7 @@ footer a:hover{color:var(--mint)}
     <a class="btn" href="#live-demo"><span class="ko">▶ 웹에서 만져보기</span><span class="en">▶ Try the live demo</span></a>
     <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
     <a class="btn" href="#voice"><span class="ko">🎙 음성으로 듀얼 멀티태스크</span><span class="en">🎙 Voice — dual multitask</span></a>
+    <a class="btn" href="#webdev"><span class="ko">🌐 WebDev + 플러그인 <span style="color:var(--mint)">NEW</span></span><span class="en">🌐 WebDev + Plugins <span style="color:var(--mint)">NEW</span></span></a>
     <a class="btn" href="#install"><span class="ko">🛠 설치 옵션</span><span class="en">🛠 Install options</span></a>
     <a class="btn" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">GitHub</span><span class="en">GitHub</span></a>
   </div>
@@ -438,6 +439,109 @@ footer a:hover{color:var(--mint)}
       <p class="en">Off / Windows SAPI / OpenAI tts-1 settings are wired up, but the response-streaming pipeline that pipes terminal AI output into the speaker is still under development. <strong>Today voice is input-only.</strong></p>
     </div>
   </div>
+</section>
+
+<!-- ═════════════════════ WebDev — sandbox + plugins (v0.4) ═════════════════════ -->
+<section class="section" id="webdev">
+  <h2 class="ko">🌐 WebDev — 인앱 샌드박스 + 플러그인 시스템 <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.4</span></h2>
+  <h2 class="en">🌐 WebDev — in-app sandbox + plugin system <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.4</span></h2>
+
+  <p class="ko" style="color:var(--text-soft);max-width:820px">
+    AgentBot 옆 <strong>지구본 아이콘</strong>을 누르면 풀스크린 WebDev 작업공간이 열립니다. v0.4 부터는 좁은 Settings 탭이 아니라, 좌측 샘플 리스트 + 우측 풀폭 WebView2 캔버스. 핵심: <strong style="color:var(--mint)">C# 안 건드리고 작은 AI 도구를 만들 수 있다</strong>는 것. AgentZero 의 네이티브 능력(LLM · TTS / STT · 음성노트 · 요약)을 <code>window.zero.*</code> JS 브리지로 노출하고, 웹 도구는 그걸 호출하는 평범한 HTML/JS 폴더로 배포됩니다.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px">
+    Click the <strong>globe icon</strong> next to AgentBot — full-window WebDev workspace opens. Promoted from a cramped Settings tab in v0.4 to a sample list on the left + full-width WebView2 canvas on the right. The point: <strong style="color:var(--mint)">build small AI tools without touching C#.</strong> AgentZero exposes its native capabilities (LLM, TTS / STT, voice-note pipeline, summary) as a <code>window.zero.*</code> JS bridge; web tools call those through it and ship as plain HTML / JS folders.
+  </p>
+
+  <div class="ascii">
+<span class="src">┌─ .NET Native ──────────┐  ┌─ WebView2 (Browser) ────────┐</span>
+│                        │  │                             │
+│  NAudio → VAD → Whisper ─────→ <span class="cmd">note.transcript</span> event
+│  LlmGateway streaming ───────→ <span class="cmd">chat.token</span> / <span class="cmd">chat.done</span>
+│                        │  │  ↑                          │
+│  WebDevHost  ←──────────────  invoke(<span class="dst">'chat.send'</span>, …)
+│  WebDevBridge (JSON)   │  │  invoke(<span class="dst">'summarize'</span>, …)
+│                        │  │  invoke(<span class="dst">'note.start'</span>, …)
+<span class="src">└────────────────────────┘  └─────────────────────────────┘</span>
+   <span class="arrow">single Whisper / single LLM session — same bridge for built-ins + plugins</span>
+  </div>
+
+  <div class="grid" style="margin-top:18px">
+    <div class="card accent-cyan">
+      <span class="tag">BRIDGE</span>
+      <h4 class="ko"><code>window.zero.*</code> 표면</h4>
+      <h4 class="en"><code>window.zero.*</code> surface</h4>
+      <p class="ko"><code>chat.send/stream</code>, <code>voice.speak/providers</code>, VAD-게이트 <code>note.start/pause/resume/setSensitivity</code>, RMS 미터를 위한 <code>onAmplitude/onSpeaking</code>, 길이 분할 재귀 <code>summarize</code>. 모든 호출은 Promise. STA 위반 없이 백그라운드 이벤트도 UI 디스패처 통과.</p>
+      <p class="en"><code>chat.send/stream</code>, <code>voice.speak/providers</code>, VAD-gated <code>note.start/pause/resume/setSensitivity</code>, <code>onAmplitude/onSpeaking</code> for RMS meters, length-chunked recursive <code>summarize</code>. All Promise-based. Background events marshal through the UI dispatcher — no STA violations.</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">.ZIP</span>
+      <h4 class="ko">로컬 ZIP 설치</h4>
+      <h4 class="en">Local ZIP install</h4>
+      <p class="ko">WebDev → <code>+ Install Plugin</code> → <em>From .zip…</em>. 단일 top-folder 자동 언래핑. 엄격한 manifest 검증. 실패는 staging-dir 만 정리, 부분 쓰기 X.</p>
+      <p class="en">WebDev → <code>+ Install Plugin</code> → <em>From .zip…</em>. Auto-unwraps a single top-level folder. Strict manifest validation. Failure cleans the staging dir — never partial-writes.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">GIT URL</span>
+      <h4 class="ko">공개 GitHub URL 설치</h4>
+      <h4 class="en">Public GitHub URL install</h4>
+      <p class="ko"><code>github.com/owner/repo/tree/main/path/to/plugin</code> 같은 폴더 URL 붙여넣기. raw 로 manifest fetch → Trees API 로 폴더 enum → 파일 다운로드. <strong style="color:var(--mint)">로컬 git CLI 의존 없음.</strong></p>
+      <p class="en">Paste a folder URL like <code>github.com/owner/repo/tree/main/path/to/plugin</code>. Raw-fetch the manifest, walk the Trees API for the folder, download every file. <strong style="color:var(--mint)">No local git CLI required.</strong></p>
+    </div>
+
+    <div class="card">
+      <span class="tag">UNINSTALL</span>
+      <h4 class="ko">한 클릭 제거</h4>
+      <h4 class="en">One-click uninstall</h4>
+      <p class="ko">샘플 리스트의 플러그인 행 우측에 <code>×</code> 버튼. 클릭 → 확인 → 마운트 폴더 삭제 + 메뉴 자동 갱신. 빌트인은 보호.</p>
+      <p class="en">Each plugin row carries a <code>×</code> button on the right. Click → confirm → mounted folder removed + menu refreshes. Built-ins are protected.</p>
+    </div>
+  </div>
+
+  <h3 class="ko" style="margin-top:32px">🎙 voice-note — 첫 reference 플러그인</h3>
+  <h3 class="en" style="margin-top:32px">🎙 voice-note — first reference plugin</h3>
+
+  <p class="ko" style="color:var(--text-soft);max-width:820px">
+    <a href="https://github.com/psmon/AgentZeroLite/tree/main/Project/Plugins/voice-note">Project/Plugins/voice-note</a> 에 본체. 4 파일 (manifest + html + css + js) 만 있으면 STT 음성 저널이 동작합니다. 컴파일에 포함되지 않는 외부 폴더 — 플러그인 코드가 릴리스 빌드를 망가뜨릴 수 없는 구조. <strong style="color:var(--mint)">자기 설치 가능</strong>: GitHub URL 그대로 WebDev 에 붙여넣으면 같은 레포가 자기 자신을 설치합니다.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px">
+    Body lives at <a href="https://github.com/psmon/AgentZeroLite/tree/main/Project/Plugins/voice-note">Project/Plugins/voice-note</a>. Four files (manifest + html + css + js) and the STT voice journal works. Outside the build — plugin code can't break a release. <strong style="color:var(--mint)">Self-installable</strong>: paste the GitHub folder URL into WebDev and the same repo installs itself back.
+  </p>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="card accent-cyan">
+      <span class="tag">CAPTURE</span>
+      <h4 class="ko">VAD 게이트 STT</h4>
+      <h4 class="en">VAD-gated STT</h4>
+      <p class="ko">전체 녹음 X. 발화 단위로만 Whisper 호출, 단어 사이의 침묵은 자동 폐기. 라이브 VU 미터 + threshold 마커 — 자기 음성이 임계값 위인지 한눈에. Settings/Voice 의 STT 언어/디바이스/뮤트 자동 상속.</p>
+      <p class="en">No full recording. Whisper fires per utterance only; gaps are dropped. Live VU meter + threshold marker — see at a glance whether your voice clears the bar. Inherits STT language / device / mute switch from Settings/Voice automatically.</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">SUMMARY</span>
+      <h4 class="ko">길이 분할 재귀 요약</h4>
+      <h4 class="en">Length-chunked recursive summary</h4>
+      <p class="ko">Max-token 초과를 두려워 말 것. 6000자 이상이면 sentence boundary 에서 절반 분할 → 재귀 요약 → 합쳐서 한 번 더 통합. <code>chat.send</code> 와 별도 일회성 세션이라 채팅 컨텍스트 오염 X.</p>
+      <p class="en">Don't fear max-token overflows. Past 6000 chars, split on a sentence boundary → summarize halves recursively → merge + one consolidating pass. Uses a one-shot LLM session so the cached chat session isn't polluted.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">STORAGE</span>
+      <h4 class="ko">3-계층 IndexedDB</h4>
+      <h4 class="en">3-tier IndexedDB</h4>
+      <p class="ko">raw 타임라인 (시간대별 발화 텍스트) · summary · meta (모델/토큰/요약시각). debounced 400ms 쓰기 — 빠른 제목 타이핑이 디스크 폭주 X. export/import 는 후속.</p>
+      <p class="en">Raw timeline (timestamped utterances) · summary · meta (model / token / summarized-at). Debounced 400 ms writes — rapid title typing won't thrash disk. Export / import is a future drop.</p>
+    </div>
+  </div>
+
+  <p class="ko" style="color:var(--text-dim);font-size:13px;max-width:820px;margin-top:14px">
+    voice-note 는 <strong>이 표면이 충분하다는 존재 증명</strong> — 다음 플러그인(트랜스크립트 export, 멀티노트 검색, …)은 같은 브리지 위에 빌드합니다. 직접 만들어 보고 싶다면 <a href="https://github.com/psmon/AgentZeroLite/tree/main/Project/Plugins">Project/Plugins/README.md</a> 의 manifest 계약 + 양 채널 설치 가이드를 출발점으로.
+  </p>
+  <p class="en" style="color:var(--text-dim);font-size:13px;max-width:820px;margin-top:14px">
+    voice-note is the <strong>existence proof that the surface is enough</strong> — the next plugins (transcript export, multi-note search, …) build on the same bridge. To roll your own, start from the manifest contract + dual-channel install guide in <a href="https://github.com/psmon/AgentZeroLite/tree/main/Project/Plugins">Project/Plugins/README.md</a>.
+  </p>
 </section>
 
 <!-- ═════════════════════ How it works ═════════════════════ -->
