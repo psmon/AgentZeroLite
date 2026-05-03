@@ -35,6 +35,9 @@ description: |
   - harness-view 를 Playwright 로 검증하기 직전 로컬 서버가 필요하면 무조건 트리거
 
   PDSA UPDATE 모드 트리거 (콘텐츠 — 최근 로그 분석→인사이트 갱신):
+  **operator 가 명시적으로 부를 때만** 발동 — publish / 일반 콘텐츠 갱신 시
+  자동으로 따라가지 않는다. 의미 있는 활동(미션 묶음 마감, 릴리즈 게이트
+  통과, 큰 인사이트 발생) 이 쌓였다고 operator 가 판단할 때만 트리거.
   - "하네스뷰 PDSA 업데이트", "하네스뷰 PDSA 업데이트해", "하네스뷰 PDSA 갱신"
   - "PDSA 학습 다시 뽑아", "PDSA 인사이트 새로 정리", "PDSA 다시 분석"
   - "대시보드 PDSA 최신화", "harness-view PDSA refresh"
@@ -71,8 +74,8 @@ DEV SERVER / PDSA UPDATE 는 본 파일 하단 인라인 절차를 바로 수행
 |---|---|---|
 | Dashboard "Build Log" 섹션 | `harness/docs/*.md` | semver-desc 정렬 (vN.N.N 카드) |
 | Dashboard "Recent Updates" | `Home/harness-view/data/news.json` | **정적**. 수동 갱신 |
-| Dashboard "PDSA Learning" | `Home/harness-view/data/pdsa-insight.json` | **정적**. PDSA UPDATE 모드로 재생성 |
-| Dashboard "Contributors" | git log on `harness/docs` | 자동 |
+| Dashboard "PDSA Learning" | `Home/harness-view/data/pdsa-insight.json` | **정적**. PDSA UPDATE 모드로 **operator 가 명시 호출할 때만** 재생성. publish 시 자동 갱신 금지 — 의미 있는 활동(미션 묶음 마감 / 릴리즈 통과 / 큰 인사이트) 이 쌓였다고 operator 가 판단할 때만 트리거. |
+| Dashboard "Contributors" | git log on `harness/`, `Docs/`, `Home/harness-view/` (union, dedup by SHA) | **자동**. 매 build 마다 재계산 — CI 가 doc-v* push 마다 build 를 다시 돌리므로 publish 시 항상 최신. 별도 손작업 불필요. |
 | Workflow | `Home/harness-view/data/workflow-graph.json` | **정적**. mermaid 그래프 7개 (스킬 시스템 노드는 의도적 제외) |
 | Roles | `harness/agents/*.md` | 동적. 상세 페이지에 spec card |
 | Skills | `Docs/harness/template/<skill>/SKILL.md` | **in-repo 스냅샷**. SKILL.md 본문은 인덱스에 인라인 임베드. 사용자 수동 동기화 |

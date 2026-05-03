@@ -125,17 +125,37 @@ function gitMetaBatch(relDirPosix) {
   return map;
 }
 
-function gitContributors(relDirPosix, since /* optional, e.g. "14 days ago" */) {
+// Accepts one path or many; counts unique commits across the union so a
+// single commit touching two paths isn't double-counted.
+//
+// Why this widened (2026-05-03): the dashboard's "Build-up Contributors
+// (Docs commits)" was scoped to `harness/docs/` only, which is the
+// release-note folder — touched once per release by exactly one author,
+// so the donut was permanently "1 contributor / 11 commits". Real doc
+// activity lives across the whole `harness/` and `Docs/` trees plus the
+// dashboard itself (`Home/harness-view/`); broaden the union to those.
+function gitContributors(relPaths, since /* optional, e.g. "14 days ago" */) {
   try {
+    const paths = Array.isArray(relPaths) ? relPaths : [relPaths];
     const sinceArg = since ? ` --since="${since}"` : '';
+    const pathArgs = paths.map(p => `"${p}"`).join(' ');
+    // `git log` with multiple paths emits one line per matching commit;
+    // %H+%an lets us dedupe across paths cleanly.
     const out = execSync(
-      `git log --format=%an${sinceArg} -- "${relDirPosix}"`,
+      `git log --format=%H%x09%an${sinceArg} -- ${pathArgs}`,
       { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
     ).trim();
     if (!out) return [];
+    const seen = new Set();
     const counts = Object.create(null);
-    for (const name of out.split(/\r?\n/)) {
-      if (!name) continue;
+    for (const line of out.split(/\r?\n/)) {
+      if (!line) continue;
+      const tab = line.indexOf('\t');
+      if (tab < 0) continue;
+      const sha = line.slice(0, tab);
+      const name = line.slice(tab + 1);
+      if (seen.has(sha)) continue;
+      seen.add(sha);
       counts[name] = (counts[name] || 0) + 1;
     }
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -181,8 +201,12 @@ function buildDocs() {
     };
   });
   files.sort((a, b) => b.title.localeCompare(a.title, undefined, { numeric: true, sensitivity: 'base' }));
-  const contributorsAll = gitContributors(PATHS.docs);
-  const contributorsRecent = gitContributors(PATHS.docs, '14 days ago');
+  // Broader scope than `harness/docs/` alone — captures real doc activity
+  // across harness (agents/knowledge/engine/missions/logs) + Docs/ (project
+  // architecture & design) + the dashboard itself (Home/harness-view/).
+  const CONTRIB_PATHS = ['harness', 'Docs', 'Home/harness-view'];
+  const contributorsAll = gitContributors(CONTRIB_PATHS);
+  const contributorsRecent = gitContributors(CONTRIB_PATHS, '14 days ago');
   writeJson('harness-docs', {
     base: PATHS.docs,
     sort: 'semver-desc',

@@ -10,15 +10,39 @@
     "tamer"
   ],
   "counts": {
-    "build-doctor": 5,
+    "build-doctor": 6,
     "code-coach": 18,
     "mission-records": 9,
     "pre-commit-review": 8,
-    "release-build-pipeline": 5,
-    "security-guard": 7,
+    "release-build-pipeline": 6,
+    "security-guard": 8,
     "tamer": 16
   },
   "items": [
+    {
+      "category": "build-doctor",
+      "file": "harness/logs/build-doctor/2026-05-03-20-46-M0009-prerelease.md",
+      "date": "2026-05-03",
+      "time": "20:46",
+      "title": "M0009 prerelease",
+      "size": 1649
+    },
+    {
+      "category": "release-build-pipeline",
+      "file": "harness/logs/release-build-pipeline/2026-05-03-20-46-M0009-patch.md",
+      "date": "2026-05-03",
+      "time": "20:46",
+      "title": "M0009 patch",
+      "size": 831
+    },
+    {
+      "category": "security-guard",
+      "file": "harness/logs/security-guard/2026-05-03-20-45-M0009-token-monitor.md",
+      "date": "2026-05-03",
+      "time": "20:45",
+      "title": "M0009 token monitor",
+      "size": 5531
+    },
     {
       "category": "code-coach",
       "file": "harness/logs/code-coach/2026-05-03-02-01-webdev-chat-test-mode.md",

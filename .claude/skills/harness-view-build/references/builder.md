@@ -46,10 +46,22 @@ node Home/harness-view/scripts/build-indexes.js
 다음 파일들은 매니페스트가 아니라 **수동 갱신**:
 
 - `Home/harness-view/data/news.json` — Dashboard "Recent Updates"
-- `Home/harness-view/data/pdsa-insight.json` — Dashboard "PDSA Learning" (PDSA UPDATE 모드로 재생성)
+- `Home/harness-view/data/pdsa-insight.json` — Dashboard "PDSA Learning" (PDSA UPDATE 모드로 재생성).
+  **자동 트리거 금지** — operator 가 의미 있는 활동(미션 묶음 마감, 릴리즈 게이트 통과 등)이
+  쌓였다고 판단하고 명시적으로 호출할 때만 갱신한다. publish 시 자동 재합성하지 않음.
 - `Home/harness-view/data/workflow-graph.json` — Workflow 메뉴의 mermaid 그래프 7개
 
 이 파일들은 콘텐츠가 손으로 결정되는 영역이라 빌드 인덱스에 안 들어간다.
+
+### 1-B. Contributors 통계는 자동 갱신
+
+`harness-docs.json` 의 `contributorsAll` / `contributorsRecent` 는
+빌드 스크립트가 매번 git log 로 다시 계산한다 (`gitContributors()`).
+Scope 는 `harness/`, `Docs/`, `Home/harness-view/` union — release-note
+디렉토리 한 곳만 보던 옛 동작이 도큐 활동 전반을 놓쳐서 항상 1명으로
+보이던 문제를 해결 (2026-05-03). CI 가 doc-v* 태그 push 마다 build 를
+다시 돌리므로 **publish 할 때마다 contributor 수치는 자동으로 최신**이
+된다. 별도 손작업 필요 없음.
 
 ### 2. 결과 확인
 
