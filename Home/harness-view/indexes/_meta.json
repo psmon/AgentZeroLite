@@ -1,12 +1,12 @@
 {
-  "builtAt": "2026-05-03T15:54:59.626Z",
-  "builtAtMs": 1777823699626,
-  "durationMs": 352,
+  "builtAt": "2026-05-03T17:00:05.123Z",
+  "builtAtMs": 1777827605123,
+  "durationMs": 323,
   "trigger": "manual",
   "scannedPaths": [
     "harness/docs",
     "harness/agents",
-    "Docs/harness/template",
+    ".claude/skills",
     "harness/knowledge",
     "Docs",
     "harness/logs",

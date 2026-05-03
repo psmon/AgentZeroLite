@@ -26,10 +26,9 @@ import { parseFrontmatter } from '../components/spec-card.js';
 import { renderTopBar, emptyState, loadingState } from './_common.js';
 import { ICONS } from '../config/menu.js';
 
-// Pencil .pen + .md files outside Home/ are mirrored at build time so
-// GitHub Pages can serve them from a single Home/ artifact. Same prefix
-// the design.js view uses.
-const PROJECT_ROOT_PREFIX = '../_resources/';
+// Repo-root relative since 2026-05-04 — Pages artifact is the whole repo
+// (Home/_resources/ mirror retired). Same prefix design.js uses.
+const PROJECT_ROOT_PREFIX = '../../';
 
 // Status → display metadata. Single source of truth.
 const STATUS_META = {

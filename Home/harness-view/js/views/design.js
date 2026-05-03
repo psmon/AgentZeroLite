@@ -13,10 +13,10 @@ import { parsePen, renderFrame } from '../components/pen-renderer.js';
 import { renderTopBar, emptyState, loadingState } from './_common.js';
 import { ICONS } from '../config/menu.js';
 
-// External resources are mirrored under Home/_resources/ at build time so
-// GitHub Pages (Home-only publish) can serve them. ../_resources/<rel>
-// resolves to Home/_resources/<rel> in both local and Pages runs.
-const PROJECT_ROOT_PREFIX = '../_resources/';
+// Pages now uploads the entire repo as the artifact (since 2026-05-04 —
+// the Home/_resources/ mirror was retired). From Home/harness-view/,
+// `../../<rel>` reaches the repo root in both local dev and Pages runs.
+const PROJECT_ROOT_PREFIX = '../../';
 
 export async function render(ctx) {
   const { viewEl, topbarEl } = ctx;

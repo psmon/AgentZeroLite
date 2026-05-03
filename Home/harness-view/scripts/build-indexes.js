@@ -29,7 +29,7 @@ const OUT  = path.resolve(__dirname, '..', 'indexes');
 const PATHS = {
   docs:      'harness/docs',
   agents:    'harness/agents',
-  skills:    'Docs/harness/template', // in-repo snapshot of harness plugin skills
+  skills:    '.claude/skills',       // installed Claude Code skills, in-repo
   knowledge: 'harness/knowledge',
   document:  'Docs',
   logs:      'harness/logs',
@@ -40,11 +40,13 @@ const PATHS = {
   missionRecords:  'harness/logs/mission-records',
 };
 
-// Skills are sourced from the in-repo snapshot at Docs/harness/template/.
-// The user manually syncs this from the harness-kakashi plugin repo when needed.
-// Reading from outside the repo is an anti-pattern — keep it strictly in-tree.
-// SKILL.md bodies are still embedded inline at build time so the view doesn't
-// need to fetch from the resource folder at runtime (matches reference design).
+// Skills are sourced from the in-repo `.claude/skills/` directory — the
+// actual installed Claude Code skill plugins (each has a SKILL.md). Since
+// 2026-05-04 the older Docs/harness/template/ snapshot was retired (it
+// could leak template content into the production harness). Reading
+// directly from .claude/skills/ stays in-repo and reflects what the
+// operator actually has installed. SKILL.md bodies are still embedded
+// inline at build time so view rendering doesn't need a runtime fetch.
 const SKILLS_DIR = path.join(ROOT, PATHS.skills);
 
 function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
@@ -266,15 +268,16 @@ function buildAgents() {
   writeJson('harness-agents', { base: PATHS.agents, items });
 }
 
-// ─── Skills: in-repo snapshot at Docs/harness/template/ ───
-// User manually syncs this folder from the harness plugin repo. SKILL.md body
-// is still embedded inline so view rendering stays consistent with the original
-// design (no per-skill fetch at runtime).
+// ─── Skills: installed Claude Code skill plugins under .claude/skills/ ───
+// Each subdir of .claude/skills/ is one skill; each has a SKILL.md that
+// becomes the canonical card body in the viewer.
 //
 // SKILL_EXCLUDE: any skill listed here is filtered out. Reserved for personal
 // or private skills that must never appear in the public-facing view.
+// Skills excluded from the public viewer. Add private/personal-only
+// skills here so they never leak into the published Pages site.
 const SKILL_EXCLUDE = new Set([
-  // (currently empty — all template skills are intended for display)
+  'psmon-doc-writer',  // personal-only — operator's external publishing workflow
 ]);
 function buildSkills() {
   const dir = SKILLS_DIR;
