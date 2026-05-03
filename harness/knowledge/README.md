@@ -55,8 +55,8 @@ itself + `harness/engine/release-build-pipeline.md`).
 
 4. **Don't move docs casually.** `git mv` preserves history; if you do
    move, fix every backlink in `agents/`, `engine/`, the skills under
-   `.claude/skills/`, and the `Docs/harness/en/first-world.md` welcome
-   page.
+   `.claude/skills/`, and `harness/first-world.md` (the harness-internal
+   welcome pointer).
 
 5. **The viewer reads recursively.** `harness/knowledge/**/*.md` is
    scanned by `Home/harness-view/scripts/build-indexes.js`, so new
@@ -81,8 +81,8 @@ When you add or rename a knowledge file, update:
 - [ ] Any engine that references it
       (`harness/engine/<name>.md` "Cross-references")
 - [ ] Other knowledge files with cross-refs
-- [ ] `Docs/harness/en/first-world.md` welcome page (public-facing
-      tour)
+- [ ] `harness/first-world.md` welcome pointer if the addition is
+      load-bearing enough to surface there
 - [ ] Memory files under `~/.claude/projects/.../memory/` if the
       knowledge enforces a binding rule
 
