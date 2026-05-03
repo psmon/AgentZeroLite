@@ -589,6 +589,13 @@
                                         Content="&#xE99A;" ToolTip="Agent Bot"
                                         Click="OnActivityBotClick"/>
 
+                                <!-- WebDev Icon (Globe) — opens the WebDev workspace
+                                     (sample list + full-window WebView2). Same panel
+                                     used to live cramped in Settings → WebDev tab. -->
+                                <Button x:Name="btnActivityWebDev" Style="{StaticResource ActivityBarIcon}"
+                                        Content="&#xE774;" ToolTip="WebDev — plugin sandbox"
+                                        Click="OnActivityWebDevClick"/>
+
                             </StackPanel>
                         </DockPanel>
                     </Border>
@@ -716,9 +723,6 @@
 
                         </Grid> <!-- /CliPanel -->
 
-                        <!-- ===== Settings Panel ===== -->
-                        <components:SettingsPanel x:Name="SettingsPanel" Visibility="Collapsed"/>
-
                     </Grid> <!-- /Content Area -->
 
                     <!-- ===== Bot Dock Splitter (spans SidePanel through Content) ===== -->
@@ -814,6 +818,28 @@
                             <ContentControl x:Name="NoteHost" Visibility="Collapsed"/>
                         </Grid>
                     </Grid>
+
+                    <!-- ===== Settings Panel (full overlay) =====
+                         Same span as WebDev: covers SidePanel + topSplitter +
+                         Content + botDockSplitter + BotDockArea. Only
+                         ActivityBar (Column 0) stays visible. Toggled from
+                         OnSidebarSettingsClick. -->
+                    <components:SettingsPanel x:Name="SettingsPanel"
+                                              Grid.Column="1" Grid.ColumnSpan="3"
+                                              Grid.Row="0" Grid.RowSpan="3"
+                                              Visibility="Collapsed"/>
+
+                    <!-- ===== WebDev Page (full overlay) =====
+                         Spans Column 1-3 and all 3 rows so it covers
+                         SidePanel + topSplitter + Content + botDockSplitter +
+                         BotDockArea. Only ActivityBar (Column 0) stays visible.
+                         Z-order: declared after Settings so it renders on top
+                         when both happen to be visible (transient state).
+                         Toggled from OnActivityWebDevClick. -->
+                    <components:WebDevPagePanel x:Name="WebDevPage"
+                                                Grid.Column="1" Grid.ColumnSpan="3"
+                                                Grid.Row="0" Grid.RowSpan="3"
+                                                Visibility="Collapsed"/>
 
                 </Grid> <!-- /Sidebar + Content Row 1 -->
 

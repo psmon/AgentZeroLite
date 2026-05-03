@@ -1256,9 +1256,14 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- WebDev Tab — in-app browser sandbox (Wasm plugin-host preview) -->
+            <!-- WebDev Tab — moved to MainWindow activity bar (M0006).
+                 What used to be a cramped 480-px-wide WebView2 tab now lives
+                 as a top-level main menu (globe icon next to Agent Bot).
+                 This tab keeps a tutorial / plugin-author guide so people who
+                 land in Settings looking for "WebDev" still find the bridge
+                 surface and the .zip plugin install workflow. -->
             <TabItem x:Name="tabWebDev" Header="&#x1F310; WebDev" Style="{StaticResource SettingsTabItem}">
-                <components:WebDevPanel x:Name="webDevPanel"/>
+                <components:WebDevTutorialPanel/>
             </TabItem>
 
             <!-- AgentZero CLI Tab -->

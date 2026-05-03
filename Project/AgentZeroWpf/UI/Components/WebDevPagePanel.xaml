@@ -1,0 +1,270 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.WebDevPagePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             Background="#1B1B1C">
+    <UserControl.Resources>
+        <Storyboard x:Key="LoadingSpinStoryboard" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="loadingArcRotate"
+                             Storyboard.TargetProperty="Angle"
+                             From="0" To="360" Duration="0:0:1.1"/>
+        </Storyboard>
+        <Storyboard x:Key="LoadingDotsStoryboard" RepeatBehavior="Forever">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="loadingDot1"
+                                           Storyboard.TargetProperty="Opacity">
+                <LinearDoubleKeyFrame KeyTime="0:0:0"   Value="1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:0.4" Value="0.2"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.2" Value="0.2"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.6" Value="1.0"/>
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="loadingDot2"
+                                           Storyboard.TargetProperty="Opacity">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.2" Value="1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:0.6" Value="0.2"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.4" Value="0.2"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.6" Value="1.0"/>
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="loadingDot3"
+                                           Storyboard.TargetProperty="Opacity">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.4" Value="1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:0.8" Value="0.2"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.6" Value="1.0"/>
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
+        <Style x:Key="SampleListItem" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E5E5E5"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2A2A2D"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0A84FF"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ToolbarButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#9D9D9D"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}" CornerRadius="3">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2A2A2D"/>
+                                <Setter Property="Foreground" Value="#E5E5E5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="1"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===== Sample list (2nd-depth menu) ===== -->
+        <Grid Grid.Column="0" Background="#252526">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="1"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="#2A2A2D" Padding="14,0">
+                <DockPanel LastChildFill="False">
+                    <TextBlock Text="WEB DEV  ·  Samples" FontSize="11" FontWeight="Bold"
+                               Foreground="#9D9D9D" FontFamily="Consolas"
+                               VerticalAlignment="Center" DockPanel.Dock="Left"/>
+                    <Button x:Name="btnReloadList" Content="&#x21BB;"
+                            DockPanel.Dock="Right" Background="Transparent"
+                            BorderThickness="0" Foreground="#9D9D9D"
+                            FontSize="14" Cursor="Hand" Padding="6,0"
+                            ToolTip="Refresh sample list"
+                            Click="OnReloadListClick"/>
+                </DockPanel>
+            </Border>
+
+            <!-- Sub-bar -->
+            <Border Grid.Row="1" Background="#252526" Padding="14,0">
+                <TextBlock x:Name="lblCounts" FontSize="10" Foreground="#6E6E73"
+                           VerticalAlignment="Center" FontFamily="Consolas"
+                           Text="loading…"/>
+            </Border>
+
+            <Border Grid.Row="2" Background="#3F3F46"/>
+
+            <!-- List -->
+            <ListBox x:Name="lstSamples" Grid.Row="3"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ItemContainerStyle="{StaticResource SampleListItem}"
+                     SelectionChanged="OnSampleSelected">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel>
+                            <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Description}" FontSize="10" Opacity="0.7"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Install plugin -->
+            <Border Grid.Row="4" BorderBrush="#3F3F46" BorderThickness="0,1,0,0"
+                    Background="#1F1F22">
+                <Button x:Name="btnInstallPlugin" Cursor="Hand"
+                        Background="Transparent" BorderThickness="0"
+                        Padding="14,12" HorizontalContentAlignment="Stretch"
+                        Click="OnInstallPluginClick">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#2A2A2D"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <StackPanel>
+                        <TextBlock Text="+ Install Plugin" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#7ED9A0"/>
+                        <TextBlock Text="select a .zip — extends WebDev menu at runtime"
+                                   FontSize="10" Foreground="#9D9D9D"/>
+                    </StackPanel>
+                </Button>
+            </Border>
+        </Grid>
+
+        <Border Grid.Column="1" Background="#3F3F46"/>
+
+        <!-- ===== Content (WebView2 full) ===== -->
+        <Grid Grid.Column="2" Background="#0A0A14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Toolbar -->
+            <Border Grid.Row="0" Background="#252526"
+                    BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
+                <DockPanel LastChildFill="True" Margin="14,0">
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                        <Button x:Name="btnReload" Content="&#x21BB;  Reload"
+                                Style="{StaticResource ToolbarButton}"
+                                Click="OnReloadClick"/>
+                        <Button x:Name="btnDevTools" Content="&#x2699;  DevTools"
+                                Style="{StaticResource ToolbarButton}"
+                                Click="OnDevToolsClick"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="WebDev" FontSize="11" Foreground="#9D9D9D"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="  ›  " FontSize="11" Foreground="#5F5F66"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock x:Name="lblBreadcrumbSample" Text="—"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#E5E5E5" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <!-- One WebView2 per sample, cached so re-selecting a sample
+                     is instant (Visibility toggle only). Children added on
+                     first navigate. Reload button forces a fresh load. -->
+                <Grid x:Name="viewHost"/>
+
+                <!-- Loading overlay — sits on top of viewHost. Background
+                     matches the dark theme so the WebView2 white-flash on
+                     first paint is hidden behind this layer until
+                     NavigationCompleted fires. -->
+                <Border x:Name="loadingOverlay" Background="#0A0A14"
+                        Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Grid Width="56" Height="56">
+                            <Ellipse Stroke="#1F2A4A" StrokeThickness="3"/>
+                            <Ellipse Stroke="#3DA0FF" StrokeThickness="3"
+                                     StrokeDashArray="3,2.5"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <RotateTransform x:Name="loadingArcRotate" Angle="0"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="Loading"
+                                       Foreground="#9DB1D8" FontSize="11"
+                                       FontFamily="Consolas"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="loadingDot1" Text="."
+                                       Foreground="#9DB1D8" FontSize="11"
+                                       FontFamily="Consolas"
+                                       VerticalAlignment="Center" Margin="2,0,0,0"/>
+                            <TextBlock x:Name="loadingDot2" Text="."
+                                       Foreground="#9DB1D8" FontSize="11"
+                                       FontFamily="Consolas"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="loadingDot3" Text="."
+                                       Foreground="#9DB1D8" FontSize="11"
+                                       FontFamily="Consolas"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="lblLoadingDetail"
+                                   Text="" Margin="0,8,0,0"
+                                   Foreground="#5F6F8E" FontSize="10"
+                                   FontFamily="Consolas"
+                                   HorizontalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="420"/>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock x:Name="lblStatus" Text="Initializing WebView2…"
+                           FontFamily="Consolas" FontSize="11" Foreground="#556677"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

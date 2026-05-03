@@ -1341,28 +1341,23 @@ public partial class MainWindow : Window
 
     private void OnSidebarSettingsClick(object sender, RoutedEventArgs e)
     {
-        // Toggle: re-clicking the settings icon returns to the CLI panel.
-        // We deliberately *do not* call ActivateGroup() on return — settings
-        // never changed the active group, and ActivateGroup → RebuildDocumentPane
-        // calls terminalDocPane.Children.Clear() which destroys whatever
-        // split / multi-pane layout the user had built via drag-drop.
-        //
-        // Hide CliPanel with Visibility.Hidden (not Collapsed). Collapsed
-        // removes the panel from the layout pass, so the AvalonDock
-        // DockingManager's measurements stop running while settings is up;
-        // Hidden keeps the layout pass alive while making the panel
-        // invisible. SettingsPanel sits at a higher Z-order in the same
-        // grid cell with an opaque background, so it overlays cleanly.
+        // Toggle. Settings is now a full overlay (Grid.Column 1, RowSpan 3,
+        // ColumnSpan 3) just like WebDev — the airspace fix applies to it
+        // for the same reason: ConPTY native HwndHost would otherwise punch
+        // through. EnterOverlayMode collapses CliPanel + BotDockArea so the
+        // underlying HWNDs get SW_HIDE'd, ExitOverlayMode (called from
+        // CloseSettings) restores them.
         if (SettingsPanel.Visibility == Visibility.Visible)
         {
             DumpDockLayout("settings-close-before");
-            SwitchToCliPanel();
+            CloseSettings();
             DumpDockLayout("settings-close-after");
             return;
         }
 
         DumpDockLayout("settings-open-before");
-        CliPanel.Visibility = Visibility.Hidden;
+        CloseWebDev();
+        EnterOverlayMode();
         SettingsPanel.Visibility = Visibility.Visible;
         DumpDockLayout("settings-open-after");
     }
@@ -1677,8 +1672,8 @@ public partial class MainWindow : Window
 
     private void SwitchToCliPanel()
     {
-        CliPanel.Visibility = Visibility.Visible;
-        SettingsPanel.Visibility = Visibility.Collapsed;
+        CloseWebDev();
+        CloseSettings();
     }
 
     private NoteWindow? _noteWindow;
@@ -2815,11 +2810,94 @@ public partial class MainWindow : Window
     // =========================================================================
 
     private void OnActivityBotClick(object sender, RoutedEventArgs e)
-        => OnSidebarBotClick(sender, e);
+    {
+        // Bot icon must take over from any active overlay (WebDev / Settings).
+        // Both overlays collapse CliPanel + BotDockArea, and a bot toggle
+        // would otherwise be invisible until the overlay closes.
+        CloseWebDev();
+        CloseSettings();
+        OnSidebarBotClick(sender, e);
+    }
 
 
     private void OnActivitySettingsClick(object sender, RoutedEventArgs e)
         => OnSidebarSettingsClick(sender, e);
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Full-overlay panels (WebDev, Settings)
+    // ─────────────────────────────────────────────────────────────────────
+    //
+    // Both WebDev and Settings render as Grid.Column="1" ColumnSpan="3"
+    // RowSpan="3" — they fully cover SidePanel + Splitter + Content +
+    // BotDockArea. Only the ActivityBar (Column 0) stays visible.
+    //
+    // **Airspace fix**: ConPTY terminals (and the bot panel's WebView2)
+    // are native HwndHost children. They paint on top of WPF content and
+    // would punch through the overlay if their parent stayed Visible.
+    // Setting CliPanel and BotDockArea to Visibility.Collapsed yanks them
+    // out of the measure pass, which causes WPF's HwndHost to call
+    // ShowWindow(SW_HIDE) on the underlying HWND. Restored on close.
+    //
+    // Cached so the bot dock returns to whatever the user had before the
+    // first overlay opened. Single cache shared across both overlays —
+    // CliPanel.Visibility serves as the "are we in overlay mode" flag.
+    private Visibility? _botDockVisBeforeOverlay;
+
+    /// <summary>Hide CLI + bot dock so a full overlay can take their place.</summary>
+    private void EnterOverlayMode()
+    {
+        if (CliPanel.Visibility == Visibility.Collapsed) return; // already in overlay
+        _botDockVisBeforeOverlay = BotDockArea?.Visibility;
+        if (BotDockArea is not null) BotDockArea.Visibility = Visibility.Collapsed;
+        CliPanel.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Restore CLI + bot dock after the last overlay closed.</summary>
+    private void ExitOverlayMode()
+    {
+        if (CliPanel.Visibility == Visibility.Visible) return;
+        CliPanel.Visibility = Visibility.Visible;
+        if (BotDockArea is not null && _botDockVisBeforeOverlay.HasValue)
+            BotDockArea.Visibility = _botDockVisBeforeOverlay.Value;
+        _botDockVisBeforeOverlay = null;
+    }
+
+    private void OnActivityWebDevClick(object sender, RoutedEventArgs e)
+    {
+        if (WebDevPage.Visibility == Visibility.Visible)
+        {
+            CloseWebDev();
+            return;
+        }
+        CloseSettings();
+        EnterOverlayMode();
+        WebDevPage.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Tear down the WebDev overlay. Idempotent. Restores CLI + bot only
+    /// when no other overlay is also active (so closing WebDev while
+    /// Settings is up doesn't accidentally re-show the CLI).
+    /// </summary>
+    private void CloseWebDev()
+    {
+        if (WebDevPage.Visibility != Visibility.Visible) return;
+        WebDevPage.Visibility = Visibility.Collapsed;
+        if (SettingsPanel.Visibility != Visibility.Visible)
+            ExitOverlayMode();
+    }
+
+    /// <summary>
+    /// Tear down the Settings overlay. Idempotent. Restores CLI + bot only
+    /// when no other overlay is also active.
+    /// </summary>
+    private void CloseSettings()
+    {
+        if (SettingsPanel.Visibility != Visibility.Visible) return;
+        SettingsPanel.Visibility = Visibility.Collapsed;
+        if (WebDevPage.Visibility != Visibility.Visible)
+            ExitOverlayMode();
+    }
 
     // =========================================================================
     //  Sessions panel (Phase 2 redesign)

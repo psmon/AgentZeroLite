@@ -1,0 +1,975 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "text",
+      "id": "qaVuw",
+      "x": 48,
+      "y": 32,
+      "name": "title",
+      "fill": "#E5E5E5",
+      "content": "M0006 — WebDev → MainWindow Promotion (BEFORE / AFTER)",
+      "fontFamily": "Inter",
+      "fontSize": 24,
+      "fontWeight": "700"
+    },
+    {
+      "type": "text",
+      "id": "MvpCG",
+      "x": 48,
+      "y": 68,
+      "name": "subtitle",
+      "fill": "#9D9D9D",
+      "textGrowth": "fixed-width",
+      "width": 1280,
+      "content": "Move WebDev out of cramped Settings tab into a top-level main menu with a 3-column layout: ActivityBar · Sample list · Full-width WebView2 content.",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "normal"
+    },
+    {
+      "type": "frame",
+      "id": "WMBIl",
+      "x": 48,
+      "y": 120,
+      "name": "BEFORE — Settings tab",
+      "clip": true,
+      "width": 560,
+      "height": 440,
+      "fill": "#1B1B1C",
+      "cornerRadius": 8,
+      "stroke": {
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "Sv6UV",
+          "name": "bTitleBar",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "#2D2D30",
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "drAMC",
+              "name": "bTitle",
+              "fill": "#E5E5E5",
+              "content": "Settings",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "Mxb1Y",
+              "name": "bClose",
+              "fill": "#9D9D9D",
+              "content": "×",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "PAvV2",
+          "name": "bTabs",
+          "width": "fill_container",
+          "height": 36,
+          "fill": "#252526",
+          "gap": 18,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "BhCRR",
+              "name": "bTab1",
+              "fill": "#9D9D9D",
+              "content": "General",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "dS4BM",
+              "name": "bTab2",
+              "fill": "#9D9D9D",
+              "content": "CLI",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "mUT0i",
+              "name": "bTab3",
+              "fill": "#0A84FF",
+              "content": "WebDev",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "FmM72",
+              "name": "bTab4",
+              "fill": "#9D9D9D",
+              "content": "Voice",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "N27gl3",
+              "name": "bTab5",
+              "fill": "#9D9D9D",
+              "content": "About",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "wqkZF",
+          "name": "bDivider",
+          "fill": "#3F3F46",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "frame",
+          "id": "DmMPV",
+          "name": "bBody",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#1B1B1C",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 16,
+          "children": [
+            {
+              "type": "frame",
+              "id": "CynOE",
+              "name": "bRow1",
+              "width": "fill_container",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "j7SVZW",
+                  "name": "bRow1Label",
+                  "fill": "#9D9D9D",
+                  "content": "App:",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "sO2HL",
+                  "name": "bRow1Combo",
+                  "width": 240,
+                  "height": 26,
+                  "fill": "#2D2D30",
+                  "cornerRadius": 3,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#3F3F46"
+                  },
+                  "padding": [
+                    0,
+                    8
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "zZ0JW",
+                      "name": "bRow1Text",
+                      "fill": "#E5E5E5",
+                      "content": "voice-test/index.html  ▾",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ypSKk",
+              "name": "bWebHost",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#0E0E10",
+              "cornerRadius": 4,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "i4RiJ",
+                  "name": "bWebHostLbl",
+                  "fill": "#5F5F66",
+                  "content": "WebView2  (cramped ~480 × 240)",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "V5A2f",
+              "name": "bPainNote",
+              "fill": "#FF8A65",
+              "content": "⚠  너무 좁아 WebDev 샘플이 답답하게 보임",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "HQaN6",
+      "x": 48,
+      "y": 600,
+      "name": "AFTER — MainWindow promotion",
+      "clip": true,
+      "width": 1280,
+      "height": 760,
+      "fill": "#1B1B1C",
+      "cornerRadius": 8,
+      "stroke": {
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "xLxrA",
+          "name": "aTitleBar",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "#2D2D30",
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "Vycxl",
+              "name": "aTitle",
+              "fill": "#E5E5E5",
+              "content": "AgentZero Lite — MainWindow",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "As3Fd",
+              "name": "aWindowCtl",
+              "fill": "#9D9D9D",
+              "content": "—  ☐  ×",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ARt0t",
+          "name": "aBody",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#1B1B1C",
+          "children": [
+            {
+              "type": "frame",
+              "id": "y9OTv",
+              "name": "ActivityBar (48px)",
+              "width": 48,
+              "height": "fill_container",
+              "fill": "#1B1B1C",
+              "stroke": {
+                "thickness": {
+                  "right": 1
+                },
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "padding": [
+                8,
+                0
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "v97sz",
+                  "name": "abTop",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "TMucR",
+                      "name": "abBot",
+                      "width": 40,
+                      "height": 40,
+                      "fill": "#1B1B1C",
+                      "cornerRadius": 6,
+                      "layout": "vertical",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "fsHfM",
+                          "name": "abBotIcon",
+                          "fill": "#E5E5E5",
+                          "content": "🤖",
+                          "fontFamily": "Inter",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "R9pX0",
+                      "name": "WebDev (NEW)",
+                      "width": 40,
+                      "height": 40,
+                      "fill": "#0A84FF",
+                      "cornerRadius": 6,
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#3DA0FF"
+                      },
+                      "layout": "vertical",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "nL13u",
+                          "name": "abWebDevIcon",
+                          "fill": "#FFFFFF",
+                          "content": "🌐",
+                          "fontFamily": "Inter",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kEmA5",
+                      "name": "abExtra1",
+                      "width": 40,
+                      "height": 40,
+                      "fill": "#1B1B1C",
+                      "cornerRadius": 6,
+                      "layout": "vertical",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "E53DK5",
+                          "name": "abExtra1Icon",
+                          "fill": "#9D9D9D",
+                          "content": "📁",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Cqhbm",
+                  "name": "abBottom",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    0,
+                    8,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "W6jJV",
+                      "name": "abSettings",
+                      "width": 40,
+                      "height": 40,
+                      "fill": "#1B1B1C",
+                      "cornerRadius": 6,
+                      "layout": "vertical",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "z60EiZ",
+                          "name": "abSettingsIcon",
+                          "fill": "#9D9D9D",
+                          "content": "⚙",
+                          "fontFamily": "Inter",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "q30Ea",
+              "name": "Sample list (240px)",
+              "width": 240,
+              "height": "fill_container",
+              "fill": "#252526",
+              "stroke": {
+                "thickness": {
+                  "right": 1
+                },
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "w2enZN",
+                  "name": "spHeader",
+                  "width": "fill_container",
+                  "height": 40,
+                  "fill": "#2A2A2D",
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "tePxb",
+                      "name": "spTitle",
+                      "fill": "#9D9D9D",
+                      "content": "WEB DEV  ·  Samples",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "700",
+                      "letterSpacing": 0.5
+                    },
+                    {
+                      "type": "text",
+                      "id": "F3STn",
+                      "name": "spReload",
+                      "fill": "#9D9D9D",
+                      "content": "⟳",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "GkFKO",
+                  "name": "spSubBar",
+                  "width": "fill_container",
+                  "height": 28,
+                  "fill": "#252526",
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "N1bSq",
+                      "name": "spSubBarText",
+                      "fill": "#6E6E73",
+                      "content": "Wasm/  ·  3 entries",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "c0SfT",
+                  "name": "spDivider",
+                  "fill": "#3F3F46",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "zjYRN",
+                  "name": "spList",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "padding": [
+                    6,
+                    0
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "ZelOX",
+                      "name": "spItem1",
+                      "width": "fill_container",
+                      "fill": "#0A84FF",
+                      "layout": "vertical",
+                      "padding": [
+                        10,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "dabf5",
+                          "name": "spItem1Title",
+                          "fill": "#FFFFFF",
+                          "content": "voice-test",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "C5jLj",
+                          "name": "spItem1Sub",
+                          "fill": "#CFE3FF",
+                          "content": "voice-test/index.html",
+                          "fontFamily": "Inter",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "b3GgDK",
+                      "name": "spItem2",
+                      "width": "fill_container",
+                      "fill": "#252526",
+                      "layout": "vertical",
+                      "padding": [
+                        10,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "yBxZZ",
+                          "name": "spItem2Title",
+                          "fill": "#E5E5E5",
+                          "content": "chat-test",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ICghB",
+                          "name": "spItem2Sub",
+                          "fill": "#9D9D9D",
+                          "content": "chat-test/index.html",
+                          "fontFamily": "Inter",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "cHZlQ",
+                      "name": "spItem3",
+                      "width": "fill_container",
+                      "fill": "#252526",
+                      "layout": "vertical",
+                      "padding": [
+                        10,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "L2l6g",
+                          "name": "spItem3Title",
+                          "fill": "#6E6E73",
+                          "content": "+ add sample",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "YLcn9",
+                          "name": "spItem3Sub",
+                          "fill": "#5F5F66",
+                          "content": "drop a folder into Wasm/ to register",
+                          "fontFamily": "Inter",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "UklIA",
+              "name": "Content (WebView2 full)",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#1B1B1C",
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ePLmg",
+                  "name": "cToolbar",
+                  "width": "fill_container",
+                  "height": 40,
+                  "fill": "#252526",
+                  "stroke": {
+                    "thickness": {
+                      "bottom": 1
+                    },
+                    "fill": "#3F3F46"
+                  },
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "iZIEL",
+                      "name": "cBreadcrumb",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "E219s",
+                          "name": "cCrumb1",
+                          "fill": "#9D9D9D",
+                          "content": "WebDev",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "GplxA",
+                          "name": "cCrumbSep",
+                          "fill": "#5F5F66",
+                          "content": "›",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "dlody",
+                          "name": "cCrumb2",
+                          "fill": "#E5E5E5",
+                          "content": "voice-test",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EPRNm",
+                      "name": "cActions",
+                      "gap": 14,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "taMrZ",
+                          "name": "cActionReload",
+                          "fill": "#9D9D9D",
+                          "content": "⟳ Reload",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "J4UEzn",
+                          "name": "cActionDevTools",
+                          "fill": "#9D9D9D",
+                          "content": "⌥ DevTools",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ULTSm",
+                          "name": "cActionPop",
+                          "fill": "#9D9D9D",
+                          "content": "⧉ Pop out",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Tav5k",
+                  "name": "WebView2 host",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "#0E0E10",
+                  "layout": "vertical",
+                  "gap": 14,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "kgWux",
+                      "name": "cWebMain",
+                      "fill": "#3DA0FF",
+                      "content": "WebView2",
+                      "fontFamily": "Inter",
+                      "fontSize": 32,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "iVaek",
+                      "name": "cWebSub",
+                      "fill": "#7A7A82",
+                      "content": "voice-test/index.html  ·  full-window canvas (~952 × 680)",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "CuEV0",
+                      "name": "cWebHint",
+                      "fill": "#5F5F66",
+                      "content": "동일한 WebDevHost / WebDevBridge 재사용 — Window.Closed 기반 라이프사이클 유지",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "TkIc6",
+      "x": 48,
+      "y": 96,
+      "name": "beforeLabel",
+      "fill": "#FF8A65",
+      "content": "BEFORE  ·  Settings → WebDev tab (cramped, ~520px wide)",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "600"
+    },
+    {
+      "type": "text",
+      "id": "VYRHV",
+      "x": 48,
+      "y": 576,
+      "name": "afterLabel",
+      "fill": "#7ED9A0",
+      "content": "AFTER  ·  MainWindow top-level menu (full window, sample list + full content)",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "F3bK6Y",
+      "x": 680,
+      "y": 120,
+      "name": "Implementation notes",
+      "width": 600,
+      "height": 440,
+      "fill": "#22222A",
+      "cornerRadius": 8,
+      "stroke": {
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "gap": 14,
+      "padding": 20,
+      "children": [
+        {
+          "type": "text",
+          "id": "GkdIH",
+          "name": "nTitle",
+          "fill": "#E5E5E5",
+          "content": "What changes in code",
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "id": "RIPY9",
+          "name": "nDivider",
+          "fill": "#3F3F46",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "qBcKM",
+          "name": "n1",
+          "fill": "#CFD0D5",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "① MainWindow.xaml ActivityBar (line 588) — new btnActivityWebDev right after btnActivityBot (icon: 🌐 / Segoe MDL2). Reuses ActivityBarIcon style.",
+          "lineHeight": 1.5,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "O5i3tD",
+          "name": "n2",
+          "fill": "#CFD0D5",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "② New WebDevPagePanel UserControl wraps the existing WebDevPanel (Project/AgentZeroWpf/UI/Components/WebDevPanel.xaml.cs, 165 LOC) — same WebView2, same WebDevHost, same WebDevBridge. No duplication.",
+          "lineHeight": 1.5,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "kn1AJ",
+          "name": "n3",
+          "fill": "#CFD0D5",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "③ Layout: 240px sample list (ListBox over Wasm/ entries) + WebView2 fills the rest. Selecting an item flips EntryPath via the existing SwitchEntryAsync path.",
+          "lineHeight": 1.5,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "RlObl",
+          "name": "n4",
+          "fill": "#CFD0D5",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "④ Settings → SettingsPanel.xaml line 1260: remove tabWebDev (or replace with a redirect note pointing at the new main menu). No more cramped tab.",
+          "lineHeight": 1.5,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "bcy55",
+          "name": "n5",
+          "fill": "#CFD0D5",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "⑤ Visibility toggle pattern (CliPanel ↔ SettingsPanel) extends to WebDevPagePanel — Hidden, not Collapsed, so WebView2 stays alive across menu switches (87cbe34).",
+          "lineHeight": 1.5,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "Lxmk0",
+          "name": "n6",
+          "fill": "#CFD0D5",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "⑥ Sample list seeds from existing static entries (voice-test, chat-test) and enumerates additional Wasm/* folders that contain index.html.",
+          "lineHeight": 1.5,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        }
+      ]
+    }
+  ]
+}
