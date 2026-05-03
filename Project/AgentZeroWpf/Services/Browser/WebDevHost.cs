@@ -34,6 +34,7 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     public event Action?         NoteUtteranceStarted;
     public event Action?         NoteUtteranceEnded;
     public event Action<string>? NoteError;          // (message)
+    public event Action<float>?  NoteAmplitude;      // (rms 0..1) — fires every ~50ms
 
     public string GetAppVersion()
     {
@@ -210,12 +211,17 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
                 return false;
             }
 
-            var cap = new VoiceCaptureService { BufferPcm = true };
+            var cap = new VoiceCaptureService
+            {
+                BufferPcm = true,
+                Muted = v.MicMuted,  // honor the global mic-mute switch (Settings/Voice)
+            };
             if (sensitivityPercent is int p)
                 cap.VadThreshold = VoiceRuntimeFactory.SensitivityToThreshold(p);
 
             cap.UtteranceStarted += OnNoteUtteranceStarted;
             cap.UtteranceEnded   += OnNoteUtteranceEnded;
+            cap.AmplitudeChanged += OnNoteAmplitude;
             try { cap.Start(); }
             catch (Exception ex)
             {
@@ -226,7 +232,7 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
 
             _noteCts = new CancellationTokenSource();
             _noteCapture = cap;
-            AppLogger.Log($"[WebDev:Note] capture started | threshold={cap.VadThreshold:F3}");
+            AppLogger.Log($"[WebDev:Note] capture started | threshold={cap.VadThreshold:F3} muted={cap.Muted}");
             return true;
         }
         finally { _noteLock.Release(); }
@@ -259,6 +265,11 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
 
     private void OnNoteUtteranceStarted()
     {
+        // Seed the buffer with the pre-roll ring (~1s) so the first
+        // consonant of the utterance isn't clipped — this is the same
+        // step Settings/Voice does, missing it here was why short
+        // utterances were producing empty STT results.
+        _noteCapture?.SeedBufferWithPreRoll();
         NoteUtteranceStarted?.Invoke();
     }
 
@@ -268,15 +279,26 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
         var cap = _noteCapture; var stt = _noteStt; var ctsToken = _noteCts?.Token ?? CancellationToken.None;
         if (cap is null || stt is null) return;
         var pcm = cap.ConsumePcmBuffer();
-        if (pcm.Length == 0) return;
-        // Fire-and-forget transcription — don't block the capture thread.
+        // Filter sub-half-second utterances — 16 kHz mono 16-bit = 32 KB/s,
+        // so < 8000 bytes ≈ < 250 ms. Whisper just returns junk on those
+        // and we'd surface noise lines in the timeline.
+        if (pcm.Length < 8000)
+        {
+            AppLogger.Log($"[WebDev:Note] utterance dropped — too short ({pcm.Length} bytes)");
+            return;
+        }
+        AppLogger.Log($"[WebDev:Note] utterance → STT | bytes={pcm.Length}");
         _ = Task.Run(async () =>
         {
             try
             {
                 var text = await stt.TranscribeAsync(pcm);
-                if (string.IsNullOrWhiteSpace(text)) return;
                 if (ctsToken.IsCancellationRequested) return;
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    AppLogger.Log("[WebDev:Note] STT returned empty");
+                    return;
+                }
                 NoteTranscript?.Invoke(text.Trim());
             }
             catch (Exception ex)
@@ -287,6 +309,18 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
         });
     }
 
+    // Throttled amplitude relay — VoiceCaptureService fires ~20 Hz which
+    // is more than the JS UI needs. Coalesce to ~10 Hz to keep WebView2
+    // event traffic light without sacrificing meter responsiveness.
+    private long _lastAmpTick;
+    private void OnNoteAmplitude(float rms)
+    {
+        var now = Environment.TickCount64;
+        if (now - _lastAmpTick < 90) return;
+        _lastAmpTick = now;
+        NoteAmplitude?.Invoke(rms);
+    }
+
     private void TearDownNoteCaptureLocked()
     {
         var cap = _noteCapture; _noteCapture = null;
@@ -294,6 +328,7 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
         {
             cap.UtteranceStarted -= OnNoteUtteranceStarted;
             cap.UtteranceEnded   -= OnNoteUtteranceEnded;
+            cap.AmplitudeChanged -= OnNoteAmplitude;
             try { cap.Stop(); } catch { }
             try { cap.Dispose(); } catch { }
         }

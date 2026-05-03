@@ -45,6 +45,7 @@ public sealed class WebDevBridge
             _noteHost.NoteUtteranceStarted  += OnNoteUtteranceStarted;
             _noteHost.NoteUtteranceEnded    += OnNoteUtteranceEnded;
             _noteHost.NoteError             += OnNoteError;
+            _noteHost.NoteAmplitude         += OnNoteAmplitude;
         }
     }
 
@@ -57,6 +58,7 @@ public sealed class WebDevBridge
             try { _noteHost.NoteUtteranceStarted -= OnNoteUtteranceStarted;} catch { }
             try { _noteHost.NoteUtteranceEnded   -= OnNoteUtteranceEnded;  } catch { }
             try { _noteHost.NoteError            -= OnNoteError;           } catch { }
+            try { _noteHost.NoteAmplitude        -= OnNoteAmplitude;       } catch { }
         }
     }
 
@@ -64,6 +66,7 @@ public sealed class WebDevBridge
     private void OnNoteUtteranceStarted()             => PostEvent("note.utterance-start", new { });
     private void OnNoteUtteranceEnded()               => PostEvent("note.utterance-end", new { });
     private void OnNoteError(string message)          => PostEvent("note.error", new { message });
+    private void OnNoteAmplitude(float rms)           => PostEvent("note.amplitude", new { rms });
 
     private async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {

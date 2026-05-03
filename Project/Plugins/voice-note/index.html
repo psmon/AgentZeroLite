@@ -54,6 +54,19 @@
           <button id="vn-delete" class="vn-btn vn-btn-danger" type="button">Delete</button>
         </div>
 
+        <!-- Live level meter — RMS bar + 4 pulsing bars while utterance
+             is in progress. Mirrors the AgentBot voice indicator so the
+             user can tell at a glance whether the mic is being heard. -->
+        <div id="vn-vu" class="vn-vu" hidden>
+          <div class="vn-vu-bars" id="vn-vu-bars">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="vn-vu-meter">
+            <div id="vn-vu-fill" class="vn-vu-fill"></div>
+          </div>
+          <span id="vn-vu-state" class="vn-vu-state">idle</span>
+        </div>
+
         <nav class="vn-tabs">
           <button id="vn-tab-raw" class="vn-tab vn-tab-active" type="button">Raw timeline</button>
           <button id="vn-tab-summary" class="vn-tab" type="button">Summary</button>

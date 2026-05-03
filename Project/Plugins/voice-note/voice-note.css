@@ -172,6 +172,53 @@ body { font-size: 13px; }
   font-family: Consolas, monospace; color: var(--text);
 }
 
+/* Live mic level + speaking pulse — visible only while capture is on. */
+.vn-vu {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 20px;
+  background: #0F0F22;
+  border-bottom: 1px solid var(--border);
+}
+.vn-vu-bars { display: flex; align-items: flex-end; gap: 3px; height: 22px; }
+.vn-vu-bars span {
+  display: inline-block; width: 4px;
+  background: var(--text-muted); border-radius: 2px;
+  height: 6px;
+  transition: height .1s ease, background .12s ease;
+}
+.vn-vu.speaking .vn-vu-bars span {
+  background: var(--accent);
+  animation: vn-bar 1.05s ease-in-out infinite;
+}
+.vn-vu.speaking .vn-vu-bars span:nth-child(1) { animation-delay: 0s; }
+.vn-vu.speaking .vn-vu-bars span:nth-child(2) { animation-delay: .12s; }
+.vn-vu.speaking .vn-vu-bars span:nth-child(3) { animation-delay: .24s; }
+.vn-vu.speaking .vn-vu-bars span:nth-child(4) { animation-delay: .36s; }
+@keyframes vn-bar {
+  0%, 100% { height: 6px; }
+  50%      { height: 22px; }
+}
+.vn-vu-meter {
+  flex: 1; height: 6px;
+  background: rgba(42, 42, 94, 0.4);
+  border-radius: 3px; overflow: hidden;
+}
+.vn-vu-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--ok) 0%, var(--accent) 60%, var(--rec) 100%);
+  border-radius: 3px;
+  transition: width .08s ease-out;
+}
+.vn-vu-state {
+  min-width: 88px;
+  font-size: 11px; font-family: Consolas, monospace;
+  color: var(--text-muted);
+  text-align: right;
+}
+.vn-vu.speaking .vn-vu-state    { color: var(--accent); }
+.vn-vu.transcribing .vn-vu-state { color: var(--warn); }
+.vn-vu.error .vn-vu-state        { color: var(--danger); }
+
 .vn-tabs {
   display: flex; align-items: center; gap: 4px;
   padding: 0 14px;

@@ -117,6 +117,7 @@
   let unsubUttStart = null;
   let unsubUttEnd = null;
   let unsubError = null;
+  let unsubAmp = null;
 
   // ─── DOM refs ──────────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
@@ -149,6 +150,10 @@
     summary: $('vn-summary'),
     metaJson: $('vn-meta-json'),
     status: $('vn-status'),
+
+    vu: $('vn-vu'),
+    vuFill: $('vn-vu-fill'),
+    vuState: $('vn-vu-state'),
   };
 
   // ─── Rendering ─────────────────────────────────────────────────────
@@ -342,33 +347,63 @@
       renderList(); // line count update
       refs.btnSummarize.disabled = false;
       state.transcribing = false;
+      setVuState('captured');
       setStatus(`captured · ${n.raw.length} ${n.raw.length === 1 ? 'line' : 'lines'}`);
     });
     unsubUttStart = window.zero.note.onUtteranceStart(() => {
       state.transcribing = true;
+      setVuSpeaking(true);
+      setVuState('listening');
       setStatus('listening…');
     });
     unsubUttEnd = window.zero.note.onUtteranceEnd(() => {
+      setVuSpeaking(false);
+      setVuState('transcribing');
       setStatus('transcribing…');
     });
     unsubError = window.zero.note.onError((d) => {
+      setVuState('error');
       setStatus(d?.message || 'capture error', true);
+    });
+    unsubAmp = window.zero.note.onAmplitude((d) => {
+      // RMS 0..1; clamp + mild gamma so quiet voice still moves the bar.
+      let v = Math.max(0, Math.min(1, (d?.rms || 0)));
+      v = Math.pow(v, 0.6);
+      const pct = Math.min(100, Math.round(v * 220)); // ~45% RMS reads as "loud"
+      refs.vuFill.style.width = pct + '%';
     });
   }
 
   function unbindBridge() {
-    [unsubTranscript, unsubUttStart, unsubUttEnd, unsubError].forEach(fn => { try { fn && fn(); } catch (_) {} });
-    unsubTranscript = unsubUttStart = unsubUttEnd = unsubError = null;
+    [unsubTranscript, unsubUttStart, unsubUttEnd, unsubError, unsubAmp]
+      .forEach(fn => { try { fn && fn(); } catch (_) {} });
+    unsubTranscript = unsubUttStart = unsubUttEnd = unsubError = unsubAmp = null;
+  }
+
+  function showVu(visible) { refs.vu.hidden = !visible; }
+  function setVuSpeaking(on) { refs.vu.classList.toggle('speaking', !!on); }
+  function setVuState(s) {
+    refs.vu.classList.remove('transcribing', 'error');
+    if (s === 'transcribing') refs.vu.classList.add('transcribing');
+    if (s === 'error')        refs.vu.classList.add('error');
+    refs.vuState.textContent = s;
   }
 
   async function startCapture() {
     const n = activeNote();
     if (!n) return;
     bindBridge();
+    showVu(true); setVuState('starting'); refs.vuFill.style.width = '0%';
     setStatus('starting capture…');
     try {
       const r = await window.zero.note.start(state.sensitivity);
-      if (!r || !r.ok) { setStatus('capture rejected', true); unbindBridge(); return; }
+      if (!r || !r.ok) {
+        setVuState('error');
+        setStatus('capture rejected', true);
+        unbindBridge();
+        showVu(false);
+        return;
+      }
       state.capturing = true;
       state.paused = false;
       state.captureStartedMs = Date.now();
@@ -376,9 +411,12 @@
       persist(n);
       renderRecButton();
       renderList();
+      setVuState('capturing');
       setStatus('capturing');
     } catch (e) {
       unbindBridge();
+      setVuState('error');
+      showVu(false);
       setStatus('start failed: ' + e.message, true);
     }
   }
@@ -395,6 +433,9 @@
     }
     renderRecButton();
     renderList();
+    showVu(false);
+    setVuSpeaking(false);
+    refs.vuFill.style.width = '0%';
     setStatus('stopped');
   }
 

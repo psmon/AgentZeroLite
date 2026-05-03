@@ -113,6 +113,10 @@
       onUtteranceStart:   (handler) => on('note.utterance-start', handler),
       onUtteranceEnd:     (handler) => on('note.utterance-end', handler),
       onError:            (handler) => on('note.error', handler),
+      // RMS amplitude 0..1, ~10 Hz throttled host-side. Use to drive
+      // a level meter so the user sees the mic responding even when
+      // the VAD hasn't yet decided an utterance is happening.
+      onAmplitude:        (handler) => on('note.amplitude', handler),
     },
 
     // LLM-backed text summarization. maxChars defaults to 6000 host-side;
