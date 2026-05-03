@@ -10,15 +10,49 @@
     "cancelled"
   ],
   "counts": {
-    "all": 7,
+    "all": 9,
     "inbox": 1,
     "in_progress": 0,
-    "done": 6,
+    "done": 8,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0008",
+      "file": "harness/missions/M0008-voice-note-plugin.md",
+      "title": "음성노트 WebDev 플러그인 본체 (Project/Plugins/voice-note/)",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-03",
+      "recordFile": "harness/logs/mission-records/M0008-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-03T11:45:00+09:00",
+      "recordFinished": "2026-05-03T12:57:47+09:00",
+      "designFile": "Docs/design/M0008-architecture.pen",
+      "modified": "2026-05-03",
+      "size": 2301
+    },
+    {
+      "id": "M0007",
+      "file": "harness/missions/M0007-음성노트-플러그인.md",
+      "title": "WebDev 플러그인 인프라 — git URL 설치 채널 + 음성노트 native API",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-03",
+      "recordFile": "harness/logs/mission-records/M0007-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-03T10:30:00+09:00",
+      "recordFinished": "2026-05-03T11:17:38+09:00",
+      "designFile": null,
+      "modified": "2026-05-03",
+      "size": 3395
+    },
     {
       "id": "M0006",
       "file": "harness/missions/M0006-WEBDEB-확장.md",
