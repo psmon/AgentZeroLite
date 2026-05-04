@@ -1,7 +1,7 @@
 {
-  "builtAt": "2026-05-04T06:46:22.398Z",
-  "builtAtMs": 1777877182398,
-  "durationMs": 360,
+  "builtAt": "2026-05-04T08:16:24.846Z",
+  "builtAtMs": 1777882584846,
+  "durationMs": 424,
   "trigger": "manual",
   "scannedPaths": [
     "harness/docs",

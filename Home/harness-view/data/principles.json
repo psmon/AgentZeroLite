@@ -1,0 +1,293 @@
+{
+  "_description": "PDSA tutorial — Deming → Toyota → harness application. Static EN/KO content rendered by js/views/principles.js. Update when the harness's iterative-fix-loop contract evolves.",
+  "title":    { "en": "Principles", "ko": "원칙" },
+  "subtitle": {
+    "en": "PDSA — the engine behind this harness",
+    "ko": "PDSA — 이 하네스의 작동 원리"
+  },
+  "sections": [
+    {
+      "id": "hero",
+      "kind": "hero",
+      "icon": "bulb",
+      "title": {
+        "en": "Plan · Do · Study · Act",
+        "ko": "Plan · Do · Study · Act"
+      },
+      "lead": {
+        "en": "An AI development harness needs more than scripts. It needs a learning loop — one that turns each chat session into institutional memory, each regression into a recorded lesson, and each design choice into an as-built artifact. PDSA is that loop, and the principle behind every contract this harness enforces.",
+        "ko": "AI 개발 하네스는 단순한 스크립트 모음으로는 부족하다. 매 대화 세션을 조직의 기억으로, 매 회귀를 기록된 교훈으로, 매 설계 결정을 \"실제 구현(as-built)\" 아티팩트로 전환시키는 학습 루프가 필요하다. PDSA 가 바로 그 루프이며, 이 하네스가 강제하는 모든 contract 의 근간이다."
+      },
+      "callout": {
+        "en": "PDSA is recurring — every mission, every fix, every publish runs through it.",
+        "ko": "PDSA 는 반복 사이클 — 모든 미션, 수정, 배포가 이 흐름을 통과한다."
+      }
+    },
+
+    {
+      "id": "deming",
+      "kind": "section",
+      "tone": "blue",
+      "tagline": "1948",
+      "title": {
+        "en": "Edwards Deming and post-war Japan",
+        "ko": "에드워즈 데밍과 전후 일본"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "W. Edwards Deming was an American statistician invited to Japan in 1947 by the Allied occupation to help conduct the postwar census. He stayed to teach Japanese engineers something more transformative: statistical quality control + a humanist view of the worker as the ultimate quality sensor. Within fifteen years \"Made in Japan\" went from a punchline to a guarantee.",
+            "ko": "W. 에드워즈 데밍은 미국의 통계학자로, 1947년 연합군 점령기에 전후 인구 조사 자문을 위해 일본에 초청되었다. 그는 일본에 머물며 일본 엔지니어들에게 훨씬 더 변혁적인 것을 가르쳤다 — 통계적 품질 관리 + \"작업자야말로 궁극의 품질 센서\"라는 휴머니즘적 시각. 15년이 채 안 되어 \"Made in Japan\"은 조롱의 대상에서 신뢰의 보증으로 바뀌었다."
+          }
+        },
+        {
+          "kind": "quote",
+          "by": "W. Edwards Deming",
+          "text": {
+            "en": "It is not enough to do your best; you must know what to do, and then do your best.",
+            "ko": "최선을 다하는 것만으론 부족하다. 무엇을 해야 하는지 먼저 알아야 한다 — 그리고 나서 최선을 다해야 한다."
+          }
+        },
+        {
+          "kind": "p",
+          "text": {
+            "en": "Japan's highest industrial honor — the Deming Prize, established in 1951 — still bears his name. The cycle he taught (Shewhart's PDCA, refined into PDSA) became the spine of the Toyota Production System, Six Sigma, modern Lean, and every continuous-improvement framework that followed.",
+            "ko": "일본의 최고 권위 산업상인 데밍상(Deming Prize, 1951년 제정)은 지금까지도 그의 이름을 이어받고 있다. 그가 가르친 사이클(슈하트의 PDCA 를 다듬은 PDSA)은 도요타 생산 방식, 식스 시그마, 현대 린(Lean), 그리고 그 뒤를 이은 모든 지속적 개선 프레임워크의 척추가 되었다."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "pdca-vs-pdsa",
+      "kind": "section",
+      "tone": "purple",
+      "tagline": "Why \"Study\" matters",
+      "title": {
+        "en": "PDCA was good. Deming insisted on PDSA.",
+        "ko": "PDCA 는 훌륭했다. 데밍은 PDSA 를 고집했다."
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "Walter Shewhart, Deming's mentor at Bell Labs, sketched the original Plan-Do-Check-Act cycle in 1939. Late in his career, Deming explicitly renamed the third step — from CHECK to STUDY — and was emphatic that the change was substantive, not cosmetic.",
+            "ko": "벨 연구소에서 데밍의 멘토였던 월터 슈하트(Walter Shewhart)는 1939년 원래의 Plan-Do-Check-Act 사이클을 스케치했다. 데밍은 만년에 세 번째 단계를 명시적으로 \"CHECK\" 에서 \"STUDY\" 로 개명하면서, 이 변화가 표면적인 것이 아니라 본질적인 것임을 분명히 했다."
+          }
+        },
+        {
+          "kind": "quote",
+          "by": "W. Edwards Deming",
+          "text": {
+            "en": "Check implies inspection, finding the defect. Study implies understanding, finding the cause.",
+            "ko": "Check 는 \"검사\" — 결함을 찾는 행위다. Study 는 \"이해\" — 원인을 찾는 행위다."
+          }
+        },
+        {
+          "kind": "compare",
+          "left": {
+            "label": { "en": "PDCA — surface check", "ko": "PDCA — 표면적 검사" },
+            "tone": "amber",
+            "items": [
+              { "en": "\"Did the build pass?\"", "ko": "\"빌드가 통과했나?\"" },
+              { "en": "Pass / Fail gate", "ko": "Pass / Fail 게이트" },
+              { "en": "Acts on this run only", "ko": "이번 실행에만 작용" },
+              { "en": "Forgets after the next cycle", "ko": "다음 사이클이 시작되면 잊혀짐" }
+            ]
+          },
+          "right": {
+            "label": { "en": "PDSA — deep study", "ko": "PDSA — 깊은 연구" },
+            "tone": "green",
+            "items": [
+              { "en": "\"What pattern of regressions are recurring?\"", "ko": "\"어떤 회귀 패턴이 반복되고 있나?\"" },
+              { "en": "Captures cause + context", "ko": "원인 + 맥락을 함께 포착" },
+              { "en": "Acts across the system", "ko": "시스템 전체에 작용" },
+              { "en": "Compounds into knowledge", "ko": "지식으로 누적됨" }
+            ]
+          }
+        },
+        {
+          "kind": "mermaid",
+          "code": "flowchart LR\n  P[Plan] --> D[Do]\n  D --> S[Study]\n  S --> A[Act]\n  A --> P\n  S -. captures lessons .-> K[(Knowledge)]\n  K -. informs .-> P"
+        }
+      ]
+    },
+
+    {
+      "id": "toyota",
+      "kind": "section",
+      "tone": "amber",
+      "tagline": "Toyota Production System",
+      "title": {
+        "en": "Toyota took PDSA to the factory floor",
+        "ko": "도요타는 PDSA 를 공장 현장으로 가져갔다"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "Taiichi Ohno absorbed Deming's PDSA into the Toyota Production System (TPS) in the 1950s. The genius wasn't in renaming or formalizing the cycle — it was in making STUDY a daily, embodied practice rather than a quarterly review.",
+            "ko": "오노 다이이치(Taiichi Ohno)는 1950년대에 데밍의 PDSA 를 도요타 생산 방식(TPS)에 흡수했다. 그의 천재성은 사이클을 개명하거나 형식화한 것이 아니라 — STUDY 를 분기 리뷰 같은 행사가 아닌, 매일의 체화된 실천으로 만들었다는 데 있다."
+          }
+        },
+        {
+          "kind": "feature-list",
+          "items": [
+            {
+              "name": { "en": "Genchi genbutsu (現地現物)", "ko": "현지현물 (現地現物)" },
+              "translit": { "en": "\"Go and see\"", "ko": "\"가서 직접 본다\"" },
+              "text": {
+                "en": "Managers visit the assembly line, not the meeting room. A problem is studied where it happens, with the people who saw it. Reports and dashboards are inputs to study, never substitutes for it.",
+                "ko": "관리자는 회의실이 아니라 조립 라인으로 간다. 문제는 그것이 발생한 자리에서, 그것을 본 사람들과 함께 연구된다. 리포트와 대시보드는 study 의 입력이지, 결코 그 대체물이 아니다."
+              }
+            },
+            {
+              "name": { "en": "Andon (アンドン)", "ko": "안돈 (アンドン)" },
+              "translit": { "en": "\"The lantern that says stop\"", "ko": "\"멈춤을 알리는 등\"" },
+              "text": {
+                "en": "Any worker can pull a cord that stops the entire production line when something looks off. Stopping the line IS studying — the cost of not stopping (defect compounds downstream) is always higher than the cost of pausing.",
+                "ko": "어떤 작업자든 무언가 이상하다 싶으면 줄을 당겨 전체 생산 라인을 멈출 수 있다. 라인을 멈추는 것 자체가 study 다 — 멈추지 않았을 때의 비용(하류로 결함이 증폭됨)은 멈춤의 비용보다 항상 크다."
+              }
+            },
+            {
+              "name": { "en": "Hoshin Kanri (方針管理)", "ko": "방침관리 (方針管理)" },
+              "translit": { "en": "\"Compass management\"", "ko": "\"나침반 관리\"" },
+              "text": {
+                "en": "Annual strategy is broken down into PDSA cycles at every layer of the org — from CEO to team lead to operator. Each layer plans, does, studies, and acts on its own scope while staying aligned with the layer above.",
+                "ko": "연간 전략이 조직의 모든 계층 — CEO → 팀 리드 → 작업자 — 에서 PDSA 사이클로 분해된다. 각 계층은 자신의 범위 안에서 계획하고, 실행하고, 연구하고, 행동하면서, 동시에 위 계층과의 정합성을 유지한다."
+              }
+            }
+          ]
+        },
+        {
+          "kind": "quote",
+          "by": "Taiichi Ohno",
+          "text": {
+            "en": "Without standards, there can be no kaizen.",
+            "ko": "표준이 없으면 카이젠(개선)도 없다."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "harness-mapping",
+      "kind": "section",
+      "tone": "green",
+      "tagline": "Applied",
+      "title": {
+        "en": "How this harness applies PDSA",
+        "ko": "이 하네스가 PDSA 를 적용한 방식"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "The harness directory (`harness/`) is not a CI pipeline or a QA framework. It is PDSA codified for AI-collaborative coding — a contract that turns the operator's chat-level intent into auditable mission records, and turns each round of operator feedback into an appended lesson rather than a forgotten Slack message.",
+            "ko": "하네스 디렉토리(`harness/`)는 CI 파이프라인도, QA 프레임워크도 아니다. AI 협업 코딩을 위한 PDSA 의 코드화 — operator 의 대화 수준 의도를 감사 가능한 미션 기록으로 전환하고, operator 피드백의 매 라운드를 잊혀지는 슬랙 메시지가 아닌 누적되는 교훈으로 만드는 contract 다."
+          }
+        },
+        {
+          "kind": "phase-table",
+          "phases": [
+            {
+              "phase": "Plan",
+              "color": "blue",
+              "harness": { "en": "Mission file at harness/missions/M{NNNN}-*.md — operator writes a brief (informal OK) with Acceptance checklist", "ko": "harness/missions/M{NNNN}-*.md 의 미션 파일 — operator 가 자유로운 형식으로 brief 작성 + Acceptance 체크리스트" }
+            },
+            {
+              "phase": "Do",
+              "color": "purple",
+              "harness": { "en": "Tamer dispatches to specialist agent (build-doctor / code-coach / security-guard / etc.); specialist runs and writes its own log under harness/logs/{agent}/", "ko": "Tamer 가 specialist 에이전트(build-doctor / code-coach / security-guard 등)에 dispatch; specialist 가 실행하고 harness/logs/{agent}/ 아래 자체 로그 작성" }
+            },
+            {
+              "phase": "Study",
+              "color": "green",
+              "harness": { "en": "Completion log harness/logs/mission-records/M{NNNN}-수행결과.md captures dispatch + acceptance + 3-axis evaluation; operator smoke-tests on desktop and reports regressions", "ko": "완료 로그 harness/logs/mission-records/M{NNNN}-수행결과.md 가 dispatch + acceptance + 3축 평가를 기록; operator 가 데스크톱에서 smoke test 수행하고 회귀 보고" }
+            },
+            {
+              "phase": "Act",
+              "color": "amber",
+              "harness": { "en": "Each regression becomes an appended ## 후속 수정 #N section in the SAME completion log; design contract changes are synced to the same .pen file with \"as-built\" subtitle; recurring patterns get codified into harness/knowledge/", "ko": "각 회귀가 같은 완료 로그에 ## 후속 수정 #N 섹션으로 누적; 디자인 contract 변경은 같은 .pen 파일에 \"as-built\" subtitle 로 동기화; 반복 패턴은 harness/knowledge/ 에 codify" }
+            }
+          ]
+        },
+        {
+          "kind": "p",
+          "text": {
+            "en": "The orchestration view of this loop lives in `harness/engine/mission-dispatch.md` step 10, with three explicit evaluation axes: Iteration capture / Diagnose-before-patch / As-built design sync. The skill `harness-kakashi-creator` enforces it as a binding contract — operators don't have to remember it; the harness does.",
+            "ko": "이 루프의 오케스트레이션 뷰는 `harness/engine/mission-dispatch.md` step 10 에 있으며, 세 개의 명시적 평가 축을 가진다: Iteration capture / Diagnose-before-patch / As-built design sync. 스킬 `harness-kakashi-creator` 가 이를 binding contract 로 강제한다 — operator 가 외울 필요가 없다, 하네스가 외운다."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "vs-ci-qa",
+      "kind": "section",
+      "tone": "blue",
+      "tagline": "Beyond automation",
+      "title": {
+        "en": "Why PDSA, not just CI/QA",
+        "ko": "왜 단순 CI/QA 가 아니라 PDSA 인가"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "A CI pipeline runs on every push. A QA suite checks acceptance criteria. Both are valuable — but neither STUDIES. They run, they pass or fail, and the build moves on without learning anything that survives the next clean clone.",
+            "ko": "CI 파이프라인은 모든 push 마다 돌고, QA 스위트는 인수 기준을 체크한다. 둘 다 가치 있다 — 그러나 어느 것도 STUDY 하지 않는다. 그것들은 실행되고, 통과하거나 실패하고, 다음 clean clone 이후에는 아무것도 살아남지 않는 채 빌드가 이어진다."
+          }
+        },
+        {
+          "kind": "compare-three",
+          "rows": [
+            {
+              "tool": "CI",
+              "asks": { "en": "\"Did the build pass?\"", "ko": "\"빌드가 통과했나?\"" },
+              "study": { "en": "\"Which file paths flake repeatedly?\"", "ko": "\"어떤 파일 경로가 반복적으로 깨지나?\"" }
+            },
+            {
+              "tool": "QA",
+              "asks": { "en": "\"Do the tests pass?\"", "ko": "\"테스트가 통과했나?\"" },
+              "study": { "en": "\"Which tests should exist that don't?\"", "ko": "\"존재해야 하지만 없는 테스트는 무엇인가?\"" }
+            },
+            {
+              "tool": "Lint",
+              "asks": { "en": "\"Is the syntax clean?\"", "ko": "\"문법이 깨끗한가?\"" },
+              "study": { "en": "\"Is the design clean? What pattern keeps emerging in PR reviews?\"", "ko": "\"설계가 깨끗한가? PR 리뷰에서 반복되는 패턴은 무엇인가?\"" }
+            }
+          ]
+        },
+        {
+          "kind": "p",
+          "text": {
+            "en": "The harness's iterative-fix-loop policy (5-rule contract) is PDSA operationalized: diagnose before patching (Study before Act), append don't overwrite (Act preserves the Study trail), sync the design when behavior changes (Plan, Do, Study, Act all reflect the same source of truth), don't re-flip status (the lifecycle records the loop, not just the final state), and commit only after operator confirms (closing the loop is the operator's call, not the assistant's).",
+            "ko": "하네스의 반복 수정 루프 정책(5-rule contract)은 PDSA 의 운영화다 — 패치 전에 진단 (Act 전에 Study), append 만 하고 overwrite 금지 (Act 가 Study 흔적을 보존), 동작 변경 시 디자인 동기화 (Plan, Do, Study, Act 가 모두 같은 source of truth 를 반영), status 재토글 금지 (라이프사이클이 최종 상태가 아닌 루프를 기록), operator 확인 후에만 commit (루프 종결은 assistant 가 아닌 operator 의 결정)."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "closing",
+      "kind": "section",
+      "tone": "purple",
+      "tagline": "tldr",
+      "title": {
+        "en": "If you remember one thing",
+        "ko": "한 가지만 기억한다면"
+      },
+      "body": [
+        {
+          "kind": "callout-large",
+          "text": {
+            "en": "CHECK asks \"did it pass?\" STUDY asks \"what did we learn?\" The harness exists to make sure we always answer the second question — and that the answer survives the chat session that produced it.",
+            "ko": "CHECK 는 \"통과했나?\" 를 묻고, STUDY 는 \"무엇을 배웠나?\" 를 묻는다. 이 하네스의 존재 이유는 우리가 항상 두 번째 질문에 답하도록 — 그리고 그 답이 그것을 만든 대화 세션을 넘어 살아남도록 — 보장하기 위함이다."
+          }
+        }
+      ]
+    }
+  ]
+}

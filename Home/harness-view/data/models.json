@@ -1,0 +1,235 @@
+{
+  "_description": "Static — LLM / STT / TTS models actually integrated in AgentZeroLite. Refresh when csproj packages change or when LlmProviderFactory adds/removes a backend. Bilingual EN/KO content rendered by js/views/models.js.",
+  "title":    { "en": "Models", "ko": "모델" },
+  "subtitle": {
+    "en": "Models adopted in AgentZero Lite — on-device, hosted, voice",
+    "ko": "AgentZero Lite 에 채택된 모델 — 온디바이스, 호스티드, 보이스"
+  },
+  "intro": {
+    "en": "AgentZero Lite is a multi-CLI shell that talks to several LLM, STT, and TTS backends. The architecture leans on-device-first (LLamaSharp + Whisper.net) so the assistant runs without an internet connection, with hosted vendors as opt-in upgrades. The cards below describe each model that ships with the app — variant, size, on-device vs hosted, and what role it plays.",
+    "ko": "AgentZero Lite 는 여러 LLM / STT / TTS 백엔드와 대화하는 멀티-CLI 셸이다. 아키텍처는 온디바이스 우선(LLamaSharp + Whisper.net)이라 인터넷 없이도 어시스턴트가 동작하며, 호스티드 벤더는 opt-in 업그레이드로 제공된다. 아래 카드들은 앱에 함께 들어있는 모델들을 변형(variant), 용량, 온디바이스 vs 호스티드, 그리고 역할 관점에서 설명한다."
+  },
+
+  "categories": [
+    {
+      "id": "local-llm",
+      "tone": "blue",
+      "label": { "en": "On-Device LLMs", "ko": "온디바이스 LLM" },
+      "lead": {
+        "en": "Run inside the app via LLamaSharp + a self-built llama.cpp DLL (commit 3f7c29d). Backends pick CPU or Vulkan GPU at startup. Models live as GGUF files under %USERPROFILE%/.ollama/models/agentzero/.",
+        "ko": "LLamaSharp + 자체 빌드한 llama.cpp DLL(commit 3f7c29d)을 통해 앱 안에서 실행. 시작 시 CPU 또는 Vulkan GPU 백엔드를 자동 선택. 모델은 GGUF 파일로 %USERPROFILE%/.ollama/models/agentzero/ 아래에 위치."
+      },
+      "models": [
+        {
+          "name": "Gemma 4 E4B",
+          "variant": "UD-Q4_K_XL",
+          "vendor": "Google",
+          "size": "≈ 5.1 GB",
+          "params": "9B effective",
+          "badges": ["on-device", "default"],
+          "tone": "purple",
+          "summary": {
+            "en": "Default production model. The \"E4\" variant of Gemma 4's 9B-parameter family — Google's higher-quality efficiency tier (vs E2). Uses the Gemma chat template; tool-calling is via in-context JSON enforced by a GBNF grammar sampler.",
+            "ko": "기본 운용 모델. Gemma 4 9B-파라미터 패밀리의 \"E4\" 변형 — Google 의 고품질 효율 등급(vs E2). Gemma 챗 템플릿을 사용하며, tool-calling 은 GBNF 문법 샘플러로 강제되는 in-context JSON 으로 처리."
+          },
+          "details": {
+            "en": "Quantized via Unsloth (Dynamic 4-bit Q4_K_XL). Runs on a 16 GB RAM laptop on CPU; Vulkan GPU acceleration is automatic when a discrete GPU is present.",
+            "ko": "Unsloth Dynamic 4-bit Q4_K_XL 로 양자화. 16 GB RAM 노트북의 CPU 에서 실행되며, dGPU 가 있으면 Vulkan 가속이 자동으로 켜진다."
+          }
+        },
+        {
+          "name": "Gemma 4 E2B",
+          "variant": "UD-Q4_K_XL",
+          "vendor": "Google",
+          "size": "≈ 3.2 GB",
+          "params": "9B effective",
+          "badges": ["on-device", "lightweight"],
+          "tone": "blue",
+          "summary": {
+            "en": "Lightweight alternative to E4. Same 9B parameter family, different efficiency tier — \"E2\" trades some response quality for ~40% smaller footprint and faster token throughput. Use this when battery / 8 GB RAM is the constraint.",
+            "ko": "E4 의 경량 대안. 동일한 9B 파라미터 패밀리에 효율 등급만 다름 — \"E2\" 는 응답 품질을 약간 양보하는 대신 약 40% 작은 용량과 빠른 토큰 처리량을 제공. 배터리나 8 GB RAM 이 제약일 때 사용."
+          },
+          "details": {
+            "en": "Distinction from E4: \"E2\" / \"E4\" are Google's efficiency variants within the same parameter count, not different architectures. Both run with identical chat template + GBNF grammar.",
+            "ko": "E4 와의 차이: \"E2\" / \"E4\" 는 동일 파라미터 수 내에서의 Google 효율 변형이며, 다른 아키텍처가 아니다. 둘 다 동일한 챗 템플릿 + GBNF 문법으로 실행."
+          }
+        },
+        {
+          "name": "Nemotron Nano 8B v1",
+          "variant": "UD-Q4_K_XL",
+          "vendor": "NVIDIA",
+          "size": "≈ 5.0 GB",
+          "params": "8B",
+          "badges": ["on-device", "tool-native"],
+          "tone": "green",
+          "summary": {
+            "en": "Llama-3.1-based model from NVIDIA. Native Llama-3.1 chat template means tool-calling uses the model's built-in tool channel rather than a grammar-enforced JSON wrapper — closer to OpenAI-style function calling.",
+            "ko": "NVIDIA 의 Llama-3.1 기반 모델. 네이티브 Llama-3.1 챗 템플릿으로 tool-calling 이 문법 강제 JSON 래퍼가 아닌 모델 내장 tool 채널을 사용 — OpenAI 스타일 function calling 에 가깝다."
+          },
+          "details": {
+            "en": "Catalog entry — alternative path to the Gemma default. Same Q4_K_XL Unsloth quantization. Choose this when the workflow leans heavily on multi-tool chains.",
+            "ko": "카탈로그 항목 — Gemma 기본 경로의 대안. 동일한 Q4_K_XL Unsloth 양자화. 멀티 툴 체인이 많은 워크플로우에서 선택."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "hosted-llm",
+      "tone": "purple",
+      "label": { "en": "Hosted LLMs (OpenAI-compatible)", "ko": "호스티드 LLM (OpenAI 호환)" },
+      "lead": {
+        "en": "All four hosted backends speak the same OpenAI Chat Completions schema — AgentZero Lite hits them through a single OpenAiCompatibleProvider. The user picks the backend in the LLM settings tab; the factory wires the rest.",
+        "ko": "네 개의 호스티드 백엔드 모두 동일한 OpenAI Chat Completions 스키마를 사용 — AgentZero Lite 는 단일 OpenAiCompatibleProvider 로 접근. 사용자가 LLM 설정 탭에서 백엔드를 선택하면 팩토리가 나머지를 연결한다."
+      },
+      "models": [
+        {
+          "name": "Webnori Gemma",
+          "variant": "google/gemma-4-e4b · gemma-4-26b-a4b",
+          "vendor": "Webnori",
+          "size": "—",
+          "params": "9B / 26B",
+          "badges": ["hosted", "free-tier"],
+          "tone": "amber",
+          "summary": {
+            "en": "Webnori-hosted LM-Studio gateway. Free contributor tier — best-effort SLA, API key rotates without notice. Useful when local inference is unavailable but the user wants to stay in the Gemma toolchain.",
+            "ko": "Webnori 가 호스팅하는 LM-Studio 게이트웨이. 무료 컨트리뷰터 등급 — best-effort SLA, API 키는 사전 통지 없이 회전. 로컬 추론이 불가능하지만 Gemma 툴체인을 유지하고 싶을 때 유용."
+          }
+        },
+        {
+          "name": "OpenAI",
+          "variant": "user-selected (gpt-4 · gpt-4o · etc.)",
+          "vendor": "OpenAI",
+          "size": "—",
+          "params": "vendor-managed",
+          "badges": ["hosted", "premium", "byok"],
+          "tone": "green",
+          "summary": {
+            "en": "Premium cloud option — user provides their own API key. Standard /v1/chat/completions endpoint. The model picker is open-ended, so anything OpenAI exposes is reachable.",
+            "ko": "프리미엄 클라우드 옵션 — 사용자가 직접 API 키 제공. 표준 /v1/chat/completions 엔드포인트. 모델 선택은 열려 있어 OpenAI 가 제공하는 모든 모델에 접근 가능."
+          }
+        },
+        {
+          "name": "LM Studio",
+          "variant": "user-loaded GGUF",
+          "vendor": "LM Studio (self-hosted)",
+          "size": "—",
+          "params": "any GGUF the user loads",
+          "badges": ["hosted", "self-hosted"],
+          "tone": "blue",
+          "summary": {
+            "en": "User-hosted OpenAI-compatible server (typical localhost:1234). The user loads any GGUF in LM Studio's UI; AgentZero just talks to its REST endpoint. Optional API key.",
+            "ko": "사용자가 호스팅하는 OpenAI 호환 서버(보통 localhost:1234). LM Studio UI 에서 임의의 GGUF 를 로드하면 AgentZero 는 REST 엔드포인트만 호출. API 키는 선택 사항."
+          }
+        },
+        {
+          "name": "Ollama",
+          "variant": "user-pulled tag (e.g. llama3, mistral)",
+          "vendor": "Ollama (self-hosted)",
+          "size": "—",
+          "params": "any Ollama tag",
+          "badges": ["hosted", "self-hosted"],
+          "tone": "blue",
+          "summary": {
+            "en": "User-hosted Ollama instance (default localhost:11434). Lightweight self-hosted inference; uses Ollama's model registry. No API key required.",
+            "ko": "사용자가 호스팅하는 Ollama 인스턴스(기본 localhost:11434). 가벼운 셀프 호스팅 추론; Ollama 의 모델 레지스트리를 사용. API 키 불필요."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "stt",
+      "tone": "green",
+      "label": { "en": "Speech-to-Text (STT)", "ko": "음성 인식 (STT)" },
+      "lead": {
+        "en": "VAD-segmented utterances feed an ISpeechToText. Whisper.net runs the on-device path; the OpenAI Whisper API is the cloud opt-in. Webnori Gemma exposes audio input on its multimodal endpoint.",
+        "ko": "VAD 로 분절된 발화가 ISpeechToText 로 흘러간다. Whisper.net 가 온디바이스 경로를 담당하고, OpenAI Whisper API 는 클라우드 opt-in. Webnori Gemma 는 멀티모달 엔드포인트에서 오디오 입력을 노출."
+      },
+      "models": [
+        {
+          "name": "Whisper Local",
+          "variant": "tiny · small (default) · medium",
+          "vendor": "OpenAI Whisper",
+          "size": "75 MB / 466 MB / 1.5 GB",
+          "params": "—",
+          "badges": ["on-device", "default"],
+          "tone": "purple",
+          "summary": {
+            "en": "Whisper.net 1.9 + bundled CPU & Vulkan runtimes. Auto-downloads GGML files from OpenAI's CDN on first use. Three sizes — tiny is fastest, small is the default sweet spot, medium is best for noisy mics. Built-in filter strips multilingual YouTube creator outros to suppress transcription hallucinations.",
+            "ko": "Whisper.net 1.9 + 번들된 CPU/Vulkan 런타임. 첫 사용 시 OpenAI CDN 에서 GGML 파일 자동 다운로드. 세 가지 크기 — tiny 가 가장 빠르고, small 이 기본 sweet spot, medium 은 노이즈 환경에서 가장 정확. 다국어 YouTube 크리에이터 outro 필터로 환각 전사를 억제."
+          }
+        },
+        {
+          "name": "OpenAI Whisper API",
+          "variant": "whisper-1",
+          "vendor": "OpenAI",
+          "size": "—",
+          "params": "vendor-managed",
+          "badges": ["hosted", "byok"],
+          "tone": "green",
+          "summary": {
+            "en": "Cloud Whisper. Fixed model = whisper-1. temperature=0 to suppress stochastic hallucination. User-provided API key.",
+            "ko": "클라우드 Whisper. 모델 고정 = whisper-1. 확률적 환각 억제를 위해 temperature=0. 사용자가 API 키 제공."
+          }
+        },
+        {
+          "name": "Webnori Gemma Audio",
+          "variant": "google/gemma-4-e4b multimodal",
+          "vendor": "Webnori",
+          "size": "—",
+          "params": "9B",
+          "badges": ["hosted", "experimental"],
+          "tone": "amber",
+          "summary": {
+            "en": "OpenAI-compatible chat with input_audio content blocks. Gemma transcribes the audio in-context. Useful when the conversation already runs through the Webnori Gemma host.",
+            "ko": "input_audio 콘텐츠 블록을 사용하는 OpenAI 호환 챗. Gemma 가 컨텍스트 안에서 오디오를 전사. 대화가 이미 Webnori Gemma 호스트를 통해 흐를 때 유용."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "tts",
+      "tone": "amber",
+      "label": { "en": "Text-to-Speech (TTS)", "ko": "음성 합성 (TTS)" },
+      "lead": {
+        "en": "TtsTextCleaner first sanitizes the LLM reply (strips markdown, emoji, code fences) before sending to the TTS engine. NAudio handles playback; mute-while-playing prevents the loop talking to itself.",
+        "ko": "TtsTextCleaner 가 먼저 LLM 응답을 정제(마크다운/이모지/코드 펜스 제거)한 뒤 TTS 엔진으로 전달. 재생은 NAudio 가 담당하며, mute-while-playing 으로 루프가 자기 자신에게 말하는 것을 방지."
+      },
+      "models": [
+        {
+          "name": "Windows SAPI",
+          "variant": "system voices (e.g. Heami, Sun-Hi)",
+          "vendor": "Microsoft",
+          "size": "OS-installed",
+          "params": "—",
+          "badges": ["on-device", "default"],
+          "tone": "purple",
+          "summary": {
+            "en": "Windows built-in SAPI synthesis. Voice quality depends on installed language packs — Win 11 ships neural Korean + English voices by default. Free, offline, instant.",
+            "ko": "Windows 내장 SAPI 합성. 음질은 설치된 언어 팩에 따라 다름 — Win 11 은 기본적으로 한국어/영어 신경망 보이스를 포함. 무료, 오프라인, 즉시 응답."
+          }
+        },
+        {
+          "name": "OpenAI TTS",
+          "variant": "tts-1 · 11 voices (alloy / echo / fable / onyx / nova / shimmer / ash / ballad / coral / sage / verse)",
+          "vendor": "OpenAI",
+          "size": "—",
+          "params": "vendor-managed",
+          "badges": ["hosted", "byok"],
+          "tone": "green",
+          "summary": {
+            "en": "Cloud TTS. Eleven voice options ranging from neutral (alloy) to expressive (fable, nova). Speed controllable 0.25–4.0× (default 1.0). User-provided API key.",
+            "ko": "클라우드 TTS. 중립적인 alloy 부터 표현력 있는 fable, nova 까지 11 가지 보이스. 속도 0.25–4.0× 조절 가능(기본 1.0). 사용자가 API 키 제공."
+          }
+        }
+      ]
+    }
+  ],
+
+  "footnote": {
+    "en": "Verify against Project/AgentZeroWpf/AgentZeroWpf.csproj package versions if anything below looks out of date — that file is the single source of truth for runtime deps.",
+    "ko": "아래 정보가 오래되어 보이면 Project/AgentZeroWpf/AgentZeroWpf.csproj 의 패키지 버전과 대조 — 그 파일이 런타임 의존성의 단일 source of truth."
+  }
+}
