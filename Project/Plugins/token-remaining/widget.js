@@ -73,14 +73,14 @@
   // ─── Persistent settings (per origin) ─────────────────────────
   const STORAGE_KEY = 'token-remaining.v1';
   const defaults = {
-    activeAccount: null,
     theme: 'dark',
     syncMin: 1,
     textColor: '#FDE68A',
     textBgColor: '#0F1115',
     textOpacity: 55,
-    hiddenModels: {},
-    // M0012 — Active Session panel
+    hiddenModels: {},          // legacy (M0011) — ignored, kept for back-compat
+    // M0012 — multi-account widget + active session panel
+    disabledAccounts:  [],     // account keys hidden from the widget
     showActivePanel:   true,
     activeWindowMin:   5,
   };
@@ -208,95 +208,83 @@
     return Array.from(seen.values());
   }
 
-  // ─── Render the picker ────────────────────────────────────────
-  async function rebuildAcctPicker() {
-    const accts = await loadAccounts();
-    log('accounts', accts);
-    const sel = $('acctPicker');
-    sel.innerHTML = '';
-    for (const a of accts) {
-      const opt = document.createElement('option');
-      opt.value = a.accountKey;
-      opt.textContent = a.accountKey + '  —  ' + (a.ourWrapperInstalled ? 'installed' : 'not installed');
-      sel.appendChild(opt);
-    }
-    if (!prefs.activeAccount || !accts.some(a => a.accountKey === prefs.activeAccount)) {
-      const best = accts.find(a => a.ourWrapperInstalled && a.observations > 0)
-        || accts.find(a => a.observations > 0)
-        || accts[0];
-      prefs.activeAccount = best ? best.accountKey : null;
-      savePrefs(prefs);
-    }
-    if (prefs.activeAccount) sel.value = prefs.activeAccount;
-    updateAcctSub(accts);
-  }
-
-  function updateAcctSub(accts) {
-    const a = accts.find(x => x.accountKey === prefs.activeAccount);
-    if (!a) { $('acctSub').textContent = '—'; return; }
-    $('acctSub').textContent = a.ourWrapperInstalled ? 'wrapper installed' : 'wrapper NOT installed';
-  }
-
-  // ─── Render the widget body ───────────────────────────────────
+  // ─── Render the widget body — multi-account stacked ───────────
   async function renderWidget() {
     const w = $('widget');
-    if (!prefs.activeAccount) {
-      w.innerHTML = '';
-      $('emptyHint').hidden = false;
-      return;
-    }
-    const data = await safe('latest()', () => window.zero.tokens.remaining.latest(prefs.activeAccount),
-      { models: [], collector: { totalRows: 0, lastTickUtc: null, lastError: null } });
-    applyThemeClass(w);
+    w.innerHTML = '';
 
-    const models = data.models || [];
-    if (!models.length) {
-      w.innerHTML = '';
+    const accts = await loadAccounts();
+    const disabled = new Set(prefs.disabledAccounts || []);
+    // Show every account that the user hasn't toggled off and that has
+    // at least one observation. Empty-but-installed accounts don't earn
+    // a widget block — they'd render as 0%/0% with no real data.
+    const visible = accts
+      .filter(a => !disabled.has(a.accountKey) && a.observations > 0)
+      // Most recently active account on top.
+      .sort((a, b) => new Date(b.lastSeenUtc || 0) - new Date(a.lastSeenUtc || 0));
+
+    if (!visible.length) {
       $('emptyHint').hidden = false;
       return;
     }
     $('emptyHint').hidden = true;
 
-    // rate_limits are account-scoped (M0011 empirical finding) — collapse
-    // every observed model into a single account-level row. The query
-    // service orders by ObservedAtUtc desc, so models[0] is the freshest
-    // snapshot.
-    const m = models[0];
-    const isText = (effectiveTheme() === 'text');
-    const rows = [];
-    rows.push('<div class="w__hdr">'
-      + '<div class="w__acct">acct: ' + escapeHtml(prefs.activeAccount) + '</div>'
-      + '<div class="w__sub">last sync ' + fmtAge(data.collector && data.collector.lastTickUtc) + '</div>'
-      + '</div>');
-    if (!isText) rows.push('<div class="w__sep"></div>');
+    // Fetch every visible account's latest snapshot in parallel.
+    const latests = await Promise.all(visible.map(a =>
+      safe('latest(' + a.accountKey + ')',
+        () => window.zero.tokens.remaining.latest(a.accountKey),
+        { models: [], collector: { totalRows: 0, lastTickUtc: null, lastError: null } })));
 
-    const fhClass = thresholdClass(m.fiveHourPercent);
-    const sdClass = thresholdClass(m.sevenDayPercent);
-    const fhReset = fmtReset(m.fiveHourResetsAtUtc);
-    const sdReset = fmtReset(m.sevenDayResetsAtUtc);
-    if (isText) {
-      rows.push(
-        '<div class="w__row"><span class="w__lbl">Usage</span>'
-        + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
-      rows.push(
-        '<div class="w__row"><span class="w__lbl">Weekly</span>'
-        + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
-    } else {
-      rows.push(
-        '<div class="w__row"><span class="w__lbl">Usage</span>'
-        + '<span class="w__bar ' + fhClass + '">' + asciiBar(m.fiveHourPercent, 10) + '</span>'
-        + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
-      rows.push(
-        '<div class="w__row"><span class="w__lbl">Weekly</span>'
-        + '<span class="w__bar ' + sdClass + '">' + asciiBar(m.sevenDayPercent, 10) + '</span>'
-        + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
-    }
-    const c = data.collector || {};
-    rows.push('<div class="w__foot">'
-      + '<span>DB rows: ' + (c.totalRows || 0) + ' · collector tick ' + fmtAge(c.lastTickUtc) + '</span>'
-      + '<span>' + (c.lastError ? '⚠ ' + escapeHtml(c.lastError) : 'ok') + '</span>'
-      + '</div>');
-    w.innerHTML = rows.join('');
+    const isText = (effectiveTheme() === 'text');
+
+    visible.forEach((a, idx) => {
+      const data = latests[idx];
+      const models = data.models || [];
+      if (!models.length) return; // silently skip — race between observation count + latest()
+
+      // rate_limits are account-scoped (M0011 empirical finding) — one
+      // row per account, freshest snapshot only.
+      const m = models[0];
+
+      const block = document.createElement('section');
+      applyThemeClass(block);
+
+      const fhClass = thresholdClass(m.fiveHourPercent);
+      const sdClass = thresholdClass(m.sevenDayPercent);
+      const fhReset = fmtReset(m.fiveHourResetsAtUtc);
+      const sdReset = fmtReset(m.sevenDayResetsAtUtc);
+      const c = data.collector || {};
+
+      const parts = [];
+      parts.push('<div class="w__hdr">'
+        + '<div class="w__acct">' + escapeHtml(a.accountKey) + '</div>'
+        + '</div>');
+      if (!isText) parts.push('<div class="w__sep"></div>');
+      if (isText) {
+        parts.push(
+          '<div class="w__row"><span class="w__lbl">Usage</span>'
+          + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
+        parts.push(
+          '<div class="w__row"><span class="w__lbl">Weekly</span>'
+          + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
+      } else {
+        parts.push(
+          '<div class="w__row"><span class="w__lbl">Usage</span>'
+          + '<span class="w__bar ' + fhClass + '">' + asciiBar(m.fiveHourPercent, 10) + '</span>'
+          + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
+        parts.push(
+          '<div class="w__row"><span class="w__lbl">Weekly</span>'
+          + '<span class="w__bar ' + sdClass + '">' + asciiBar(m.sevenDayPercent, 10) + '</span>'
+          + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
+      }
+      parts.push('<div class="w__foot">'
+        + '<span>tick ' + fmtAge(c.lastTickUtc) + '</span>'
+        + '<span>' + (c.lastError ? '⚠ ' + escapeHtml(c.lastError) : 'ok') + '</span>'
+        + '</div>');
+
+      block.innerHTML = parts.join('');
+      w.appendChild(block);
+    });
   }
 
   function effectiveTheme() {
@@ -405,6 +393,7 @@
   async function openSettings() {
     $('settings').hidden = false;
     syncSettingsControls();
+    await renderAcctVisibleList();
     await renderProfilesList();
   }
   function closeSettings() {
@@ -425,6 +414,41 @@
     $('textBgHex').value = prefs.textBgColor;
     $('textOpacity').value = prefs.textOpacity;
     $('syncMin').value = prefs.syncMin;
+  }
+
+  async function renderAcctVisibleList() {
+    const list = $('acctVisibleList');
+    if (!list) return;
+    const accts = await loadAccounts();
+    if (!accts.length) {
+      list.innerHTML = '<div class="hint">No Claude accounts discovered yet.</div>';
+      return;
+    }
+    const disabled = new Set(prefs.disabledAccounts || []);
+    list.innerHTML = accts.map(a => {
+      const on = !disabled.has(a.accountKey);
+      const sub = (a.observations > 0)
+        ? a.observations + ' obs · last seen ' + fmtAge(a.lastSeenUtc)
+        : (a.ourWrapperInstalled ? 'wrapper installed · no observations yet' : 'no wrapper · no observations');
+      return '<div class="mrow">'
+        + '<div>'
+        + '  <div class="mrow__title">' + escapeHtml(a.accountKey) + '</div>'
+        + '  <div class="mrow__meta">' + sub + '</div>'
+        + '</div>'
+        + '<div class="toggle ' + (on ? 'on' : '') + '" data-acct="' + escapeHtml(a.accountKey) + '"></div>'
+        + '</div>';
+    }).join('');
+    list.querySelectorAll('.toggle').forEach(el => {
+      el.onclick = () => {
+        const name = el.dataset.acct;
+        const set = new Set(prefs.disabledAccounts || []);
+        if (set.has(name)) set.delete(name); else set.add(name);
+        prefs.disabledAccounts = Array.from(set);
+        savePrefs(prefs);
+        el.classList.toggle('on');
+        renderWidget().catch(e => warn('acct toggle render', e));
+      };
+    });
   }
 
   async function renderProfilesList() {
@@ -473,8 +497,8 @@
         const r = await window.zero.tokens.remaining.install(acct);
         if (!r || !r.ok) { banner('ERR', 'Install failed: ' + ((r && r.error) || 'unknown')); return; }
         banner('INFO', 'Installed for "' + acct + '" — start a new Claude Code session to begin capture');
-        await rebuildAcctPicker();
         await renderProfilesList();
+        await renderAcctVisibleList();
         await renderWidget();
       } else if (action === 'uninstall') {
         const r = await window.zero.tokens.remaining.uninstall(acct, false);
@@ -487,16 +511,16 @@
             const r2 = await window.zero.tokens.remaining.uninstall(acct, true);
             if (!r2 || !r2.ok) { banner('ERR', 'Uninstall failed: ' + ((r2 && r2.error) || 'unknown')); return; }
             banner('INFO', 'Uninstalled for "' + acct + '"');
-            await rebuildAcctPicker();
             await renderProfilesList();
+            await renderAcctVisibleList();
             await renderWidget();
           });
           return;
         }
         if (!r || !r.ok) { banner('ERR', 'Uninstall failed: ' + ((r && r.error) || 'unknown')); return; }
         banner('INFO', 'Uninstalled for "' + acct + '"');
-        await rebuildAcctPicker();
         await renderProfilesList();
+        await renderAcctVisibleList();
         await renderWidget();
       }
     } catch (e) {
@@ -517,11 +541,6 @@
   }
 
   // ─── Wire UI events ───────────────────────────────────────────
-  $('acctPicker').onchange = (e) => {
-    prefs.activeAccount = e.target.value;
-    savePrefs(prefs);
-    renderWidget().catch(err => warn('renderWidget after picker', err));
-  };
   $('btnRefresh').onclick = async () => {
     await safe('refresh()', () => window.zero.tokens.remaining.refresh(), null);
     await safe('activeSessionsRefresh()', () => window.zero.tokens.remaining.activeSessionsRefresh(), null);
@@ -584,7 +603,6 @@
       log('timer fire');
       renderWidget().catch(e => warn('timer renderWidget', e));
       renderActivePanel().catch(e => warn('timer renderActivePanel', e));
-      rebuildAcctPicker().catch(e => warn('timer rebuildAcctPicker', e));
     }, ms);
   }
 
@@ -592,7 +610,6 @@
     window.zero.tokens.remaining.onTick((s) => {
       log('host tick event', s);
       renderWidget().catch(e => warn('tick renderWidget', e));
-      rebuildAcctPicker().catch(e => warn('tick rebuildAcctPicker', e));
     });
     log('onTick subscribed');
   } catch (e) { warn('onTick subscribe failed', e); }
@@ -607,7 +624,6 @@
   // ─── Initial load ─────────────────────────────────────────────
   (async function boot() {
     try {
-      await rebuildAcctPicker();
       await renderWidget();
       await renderActivePanel();
       restartTimer();

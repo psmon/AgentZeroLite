@@ -34,6 +34,7 @@ main { padding:14px 16px; flex:1; overflow:auto; }
 .hint { color:var(--fg-dim); font-size:11px; max-width:520px; line-height:1.5; }
 
 /* ---- Widget — HUD bar layout (Dark / Light) ---- */
+#widget { display:flex; flex-direction:column; gap:10px; }
 .w { font-family:var(--mono); font-size:12px; line-height:1.35; padding:14px 18px; border-radius:10px; box-sizing:border-box; max-width:480px; }
 .w--dark  { background:#0F1115; color:#E5E7EB; border:1px solid #27272A; }
 .w--light { background:#FFFFFF; color:#18181B; border:1px solid #D4D4D8; }

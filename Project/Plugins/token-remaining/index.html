@@ -22,22 +22,21 @@
 <main id="app" hidden>
   <div id="banner" class="banner" hidden></div>
   <div class="bar">
-    <select id="acctPicker" class="bar__sel" title="Active account"></select>
-    <span class="bar__sub" id="acctSub">—</span>
     <span class="bar__spacer"></span>
     <button class="bar__toggle on" id="btnTogglePanel" title="Toggle Active Sessions panel">▦ sessions</button>
     <button class="bar__btn" id="btnRefresh" title="Force a collector tick">⟳</button>
     <button class="bar__btn" id="btnSettings" title="Settings">⚙</button>
   </div>
 
-  <section id="widget" class="w w--dark"></section>
+  <div id="widget"></div>
 
   <section id="activePanel" class="as as--dark"></section>
 
   <p id="emptyHint" class="hint" hidden>
-    No observations yet for this account. The wrapper writes a snapshot every Claude
-    Code statusline tick (~300ms); the collector imports state-changes every 30 s.
-    If you've never installed the wrapper, open Settings → Install.
+    No observations yet (or all accounts are toggled off in Settings). The wrapper
+    writes a snapshot every Claude Code statusline tick (~300ms); the collector
+    imports state-changes every 30 s. If you've never installed the wrapper for
+    any account, open Settings → Wrapper installation.
   </p>
 </main>
 
@@ -100,6 +99,15 @@
           <div class="sp__hint">Default 1. Snapshots are written every Claude tick (300 ms); this is just how often the widget re-reads the DB.</div>
         </div>
         <input type="number" id="syncMin" class="sp__num" min="1" max="60" />
+      </div>
+    </section>
+
+    <section class="sp__sec">
+      <h3>Visible accounts (in widget)</h3>
+      <div id="acctVisibleList"></div>
+      <div class="sp__hint" style="margin-top:6px;">
+        Toggle which accounts appear in the token-remaining widget. Newly
+        discovered accounts default to ON.
       </div>
     </section>
 
