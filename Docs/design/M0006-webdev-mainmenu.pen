@@ -22,7 +22,7 @@
       "fill": "#9D9D9D",
       "textGrowth": "fixed-width",
       "width": 1280,
-      "content": "Move WebDev out of cramped Settings tab into a top-level main menu with a 3-column layout: ActivityBar · Sample list · Full-width WebView2 content.",
+      "content": "WebDev becomes a top-level main menu. Settings keeps a tutorial entry. Samples are plugins — drop a .zip and the menu grows.",
       "fontFamily": "Inter",
       "fontSize": 14,
       "fontWeight": "normal"
@@ -650,18 +650,18 @@
                           "type": "text",
                           "id": "L2l6g",
                           "name": "spItem3Title",
-                          "fill": "#6E6E73",
-                          "content": "+ add sample",
+                          "fill": "#7ED9A0",
+                          "content": "+ Install Plugin",
                           "fontFamily": "Inter",
                           "fontSize": 13,
-                          "fontWeight": "500"
+                          "fontWeight": "600"
                         },
                         {
                           "type": "text",
                           "id": "YLcn9",
                           "name": "spItem3Sub",
-                          "fill": "#5F5F66",
-                          "content": "drop a folder into Wasm/ to register",
+                          "fill": "#9D9D9D",
+                          "content": "select a .zip — extends WebDev menu at runtime",
                           "fontFamily": "Inter",
                           "fontSize": 10,
                           "fontWeight": "normal"
@@ -970,6 +970,1126 @@
           "fontWeight": "normal"
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "MEvTX",
+      "x": 1360,
+      "y": 120,
+      "name": "Settings → WebDev Tutorial (replaces old tab)",
+      "clip": true,
+      "width": 620,
+      "height": 560,
+      "fill": "#1B1B1C",
+      "cornerRadius": 8,
+      "stroke": {
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "B2Gzx",
+          "name": "tTitle",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "#2D2D30",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "GaniG",
+              "name": "tTitleText",
+              "fill": "#E5E5E5",
+              "content": "Settings",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "k0LuUH",
+          "name": "tTabs",
+          "width": "fill_container",
+          "height": 36,
+          "fill": "#252526",
+          "gap": 18,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "nuMY7",
+              "name": "tTab1",
+              "fill": "#9D9D9D",
+              "content": "General",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "Dw5mA",
+              "name": "tTab2",
+              "fill": "#9D9D9D",
+              "content": "CLI",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "HyPrj",
+              "name": "tTab3",
+              "fill": "#0A84FF",
+              "content": "WebDev",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "hSnPU",
+              "name": "tTab4",
+              "fill": "#9D9D9D",
+              "content": "Voice",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "NFJJ7",
+              "name": "tTab5",
+              "fill": "#9D9D9D",
+              "content": "About",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "qlfYP",
+          "name": "tDiv",
+          "fill": "#3F3F46",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "frame",
+          "id": "q5Z2bv",
+          "name": "tBody",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#1B1B1C",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            20,
+            24
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "Qyf9r",
+              "name": "tHeroBox",
+              "width": "fill_container",
+              "fill": "#0E1A2A",
+              "cornerRadius": 6,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#1E3A5F"
+              },
+              "gap": 12,
+              "padding": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "v9uDp",
+                  "name": "tHeroIcon",
+                  "fill": "#3DA0FF",
+                  "content": "🌐",
+                  "fontFamily": "Inter",
+                  "fontSize": 24,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "jXvnq",
+                  "name": "tHeroTextWrap",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "qPkZt",
+                      "name": "tHeroTitle",
+                      "fill": "#E5E5E5",
+                      "content": "WebDev moved to the main menu",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "EZ4ur",
+                      "name": "tHeroSub",
+                      "fill": "#9D9D9D",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Click the 🌐 icon on the left activity bar (right after Bot) to open WebDev with full window canvas.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "uhsK4",
+              "name": "tWhatTitle",
+              "fill": "#E5E5E5",
+              "content": "What is WebDev?",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "E2dOgH",
+              "name": "tWhatBody",
+              "fill": "#CFD0D5",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "AgentZero exposes its native capabilities (LLM, TTS/STT, file system, terminal) as a JS bridge. Web tools (HTML+JS, optionally compiled WASM) plug in to use them — letting you build small AI utilities without touching C#.",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "AkVXm",
+              "name": "tDocsTitle",
+              "fill": "#E5E5E5",
+              "content": "Build your own plugin",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "vYkPF",
+              "name": "tDocsList",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pjoxY",
+                  "name": "tDocs1",
+                  "fill": "#CFD0D5",
+                  "content": "📄  manifest.json — id, name, icon, entry (index.html)",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "itF2Y",
+                  "name": "tDocs2",
+                  "fill": "#CFD0D5",
+                  "content": "🌐  index.html — UI surface, calls window.agentZero.* bridge",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "gNRNW",
+                  "name": "tDocs3",
+                  "fill": "#CFD0D5",
+                  "content": "⚙  optional plugin.wasm — heavy compute (rust/zig/c) via JS-WASM glue",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "tUVEE",
+                  "name": "tDocs4",
+                  "fill": "#CFD0D5",
+                  "content": "📦  zip the folder → drop into Install Plugin → menu picks it up",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "AjcFV",
+      "x": 1360,
+      "y": 96,
+      "name": "tutLabel",
+      "fill": "#7ED9A0",
+      "content": "Settings → WebDev tab  ·  now a TUTORIAL & plugin-author guide",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "D4GdgB",
+      "x": 1360,
+      "y": 700,
+      "name": "Install Plugin dialog flow",
+      "clip": true,
+      "width": 620,
+      "height": 560,
+      "fill": "#1B1B1C",
+      "cornerRadius": 8,
+      "stroke": {
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "g0BAhF",
+          "name": "iTitleBar",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "#2D2D30",
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "ZRlve",
+              "name": "iTitle",
+              "fill": "#E5E5E5",
+              "content": "Install Plugin",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "DwMAW",
+              "name": "iClose",
+              "fill": "#9D9D9D",
+              "content": "×",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "zlzMB",
+          "name": "iBody",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#1B1B1C",
+          "layout": "vertical",
+          "gap": 18,
+          "padding": 20,
+          "children": [
+            {
+              "type": "frame",
+              "id": "tImZt",
+              "name": "iStep1",
+              "width": "fill_container",
+              "fill": "#252526",
+              "cornerRadius": 6,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "vqgMH",
+                  "name": "iStep1Head",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "FJy6u",
+                      "name": "iStep1Num",
+                      "width": 24,
+                      "height": 24,
+                      "fill": "#0A84FF",
+                      "cornerRadius": 12,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "NZVNA",
+                          "name": "iStep1NumT",
+                          "fill": "#FFFFFF",
+                          "content": "1",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "eADqY",
+                      "name": "iStep1Title",
+                      "fill": "#E5E5E5",
+                      "content": "Choose plugin (.zip)",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "IVKUl",
+                  "name": "iDrop",
+                  "width": "fill_container",
+                  "height": 90,
+                  "fill": "#1A1A1D",
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#3F3F46"
+                  },
+                  "layout": "vertical",
+                  "gap": 6,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "H5Smhg",
+                      "name": "iDropIcon",
+                      "fill": "#5F5F66",
+                      "content": "📦",
+                      "fontFamily": "Inter",
+                      "fontSize": 24,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "l7gvC",
+                      "name": "iDropText",
+                      "fill": "#9D9D9D",
+                      "content": "Drag a .zip here  ·  or click Browse",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "x8JjP",
+              "name": "iStep2",
+              "width": "fill_container",
+              "fill": "#252526",
+              "cornerRadius": 6,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "zzZ1G",
+                  "name": "iStep2Head",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "kXXKJ",
+                      "name": "iStep2Num",
+                      "width": 24,
+                      "height": 24,
+                      "fill": "#0A84FF",
+                      "cornerRadius": 12,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ZUaaT",
+                          "name": "iStep2NumT",
+                          "fill": "#FFFFFF",
+                          "content": "2",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "T7w9zW",
+                      "name": "iStep2Title",
+                      "fill": "#E5E5E5",
+                      "content": "Validate manifest.json",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "lYl6d",
+                  "name": "iStep2Body",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Required fields: id, name, icon, entry  ·  optional: wasm, version, permissions",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "AzfuX",
+              "name": "iStep3",
+              "width": "fill_container",
+              "fill": "#252526",
+              "cornerRadius": 6,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "v8D96",
+                  "name": "iStep3Head",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "y4GGhz",
+                      "name": "iStep3Num",
+                      "width": 24,
+                      "height": 24,
+                      "fill": "#0A84FF",
+                      "cornerRadius": 12,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Cc7HQ",
+                          "name": "iStep3NumT",
+                          "fill": "#FFFFFF",
+                          "content": "3",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "TkOmO",
+                      "name": "iStep3Title",
+                      "fill": "#E5E5E5",
+                      "content": "Mount → menu grows",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "b2Qz0",
+                  "name": "iStep3Body",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Extract to %LOCALAPPDATA%/AgentZeroLite/Wasm/plugins/{id}/  ·  Sample list refreshes automatically",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "lqfdU",
+              "name": "iButtons",
+              "width": "fill_container",
+              "gap": 10,
+              "justifyContent": "end",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "l6gh6",
+                  "name": "iCancel",
+                  "fill": "#2D2D30",
+                  "cornerRadius": 4,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#3F3F46"
+                  },
+                  "padding": [
+                    8,
+                    18
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "NOocJ",
+                      "name": "iCancelT",
+                      "fill": "#E5E5E5",
+                      "content": "Cancel",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "T1A6X",
+                  "name": "iInstall",
+                  "fill": "#0A84FF",
+                  "cornerRadius": 4,
+                  "padding": [
+                    8,
+                    18
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "zXquM",
+                      "name": "iInstallT",
+                      "fill": "#FFFFFF",
+                      "content": "Install",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "bRCSU",
+      "x": 1360,
+      "y": 676,
+      "name": "installLabel",
+      "fill": "#7ED9A0",
+      "content": "Install Plugin  ·  ZIP → validate → mount → menu grows",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "K8tbX",
+      "x": 48,
+      "y": 1400,
+      "name": "WASM plugin architecture & bridge surface",
+      "clip": true,
+      "width": 1272,
+      "height": 520,
+      "fill": "#1B1B1C",
+      "cornerRadius": 8,
+      "stroke": {
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "k8LSHd",
+          "name": "archBody",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#1B1B1C",
+          "gap": 18,
+          "padding": 24,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "GDXkg",
+              "name": "archCol1",
+              "width": 300,
+              "height": "fill_container",
+              "fill": "#161B22",
+              "cornerRadius": 8,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "HfG3D",
+                  "name": "ac1Title",
+                  "fill": "#7ED9A0",
+                  "content": "Plugin Package (.zip)",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "Bjhxq",
+                  "name": "ac1Sub",
+                  "fill": "#6E6E73",
+                  "content": "author surface — pure web",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "rectangle",
+                  "id": "Ltoc3",
+                  "name": "ac1d",
+                  "fill": "#3F3F46",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "text",
+                  "id": "rVYVS",
+                  "name": "ac1f1",
+                  "fill": "#CFD0D5",
+                  "content": "📄  manifest.json",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "m7THt",
+                  "name": "ac1f1c",
+                  "fill": "#9D9D9D",
+                  "content": "  { id, name, icon, entry, wasm? }",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "UOpJ1",
+                  "name": "ac1f2",
+                  "fill": "#CFD0D5",
+                  "content": "🌐  index.html",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "SxDIo",
+                  "name": "ac1f2c",
+                  "fill": "#9D9D9D",
+                  "content": "  UI surface, calls bridge",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "y8dy3",
+                  "name": "ac1f3",
+                  "fill": "#CFD0D5",
+                  "content": "📜  app.js",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "DorcY",
+                  "name": "ac1f3c",
+                  "fill": "#9D9D9D",
+                  "content": "  glue + window.agentZero.* calls",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "O3qgaa",
+                  "name": "ac1f4",
+                  "fill": "#CFD0D5",
+                  "content": "⚙  plugin.wasm  (optional)",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "o9ahc4",
+                  "name": "ac1f4c",
+                  "fill": "#9D9D9D",
+                  "content": "  rust/zig/c heavy compute",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "zlomd",
+              "name": "arrow1",
+              "width": 60,
+              "height": "fill_container",
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "jPYll",
+                  "name": "arrow1T",
+                  "fill": "#0A84FF",
+                  "content": "→",
+                  "fontFamily": "Inter",
+                  "fontSize": 32,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "RulT8",
+                  "name": "arrow1L",
+                  "fill": "#5F5F66",
+                  "content": "WebView2",
+                  "fontFamily": "Inter",
+                  "fontSize": 9,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "JbGjw",
+              "name": "archCol2",
+              "width": 300,
+              "height": "fill_container",
+              "fill": "#161B22",
+              "cornerRadius": 8,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "GPG6i",
+                  "name": "ac2Title",
+                  "fill": "#3DA0FF",
+                  "content": "window.agentZero  bridge",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "A6EVxM",
+                  "name": "ac2Sub",
+                  "fill": "#6E6E73",
+                  "content": "WebDevBridge.cs JSON-RPC",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "rectangle",
+                  "id": "KOX7U",
+                  "name": "ac2d",
+                  "fill": "#3F3F46",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "text",
+                  "id": "C0F3mG",
+                  "name": "ac2m1",
+                  "fill": "#CFD0D5",
+                  "content": "agentZero.llm.chat({ model, messages })",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "Jk4yZ",
+                  "name": "ac2m2",
+                  "fill": "#CFD0D5",
+                  "content": "agentZero.llm.stream({ ... })",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "mMGAE",
+                  "name": "ac2m3",
+                  "fill": "#CFD0D5",
+                  "content": "agentZero.voice.speak({ text, voice })",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "mEMel",
+                  "name": "ac2m4",
+                  "fill": "#CFD0D5",
+                  "content": "agentZero.voice.providers()",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "c33gU",
+                  "name": "ac2m5",
+                  "fill": "#CFD0D5",
+                  "content": "agentZero.fs.read / write   (sandboxed)",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "cwKrT",
+                  "name": "ac2m6",
+                  "fill": "#CFD0D5",
+                  "content": "agentZero.terminal.spawn  (permission)",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "evKpX",
+                  "name": "ac2m7",
+                  "fill": "#CFD0D5",
+                  "content": "agentZero.app.version()",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "USd8f",
+              "name": "arrow2",
+              "width": 60,
+              "height": "fill_container",
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "V6ucx",
+                  "name": "arrow2T",
+                  "fill": "#0A84FF",
+                  "content": "→",
+                  "fontFamily": "Inter",
+                  "fontSize": 32,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "twYF1",
+                  "name": "arrow2L",
+                  "fill": "#5F5F66",
+                  "content": "WebMessage",
+                  "fontFamily": "Inter",
+                  "fontSize": 9,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KJNKR",
+              "name": "archCol3",
+              "width": 300,
+              "height": "fill_container",
+              "fill": "#161B22",
+              "cornerRadius": 8,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "I0zjIE",
+                  "name": "ac3Title",
+                  "fill": "#FF9F66",
+                  "content": "AgentZero Native (.NET 10 / WPF)",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "nkeVR",
+                  "name": "ac3Sub",
+                  "fill": "#6E6E73",
+                  "content": "WebDevHost wires actor system",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "rectangle",
+                  "id": "UhdV5",
+                  "name": "ac3d",
+                  "fill": "#3F3F46",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "text",
+                  "id": "atbRc",
+                  "name": "ac3n1",
+                  "fill": "#CFD0D5",
+                  "content": "🧠  LlmGateway  ·  on-device + remote",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "aj04w",
+                  "name": "ac3n2",
+                  "fill": "#CFD0D5",
+                  "content": "🔊  VoicePlaybackService  ·  TTS / STT",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "B1WJXG",
+                  "name": "ac3n3",
+                  "fill": "#CFD0D5",
+                  "content": "💾  AppDbContext  ·  SQLite store",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "WIjJd",
+                  "name": "ac3n4",
+                  "fill": "#CFD0D5",
+                  "content": "🖥  ConPtyTerminalSession  ·  shell",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "xuaCk",
+                  "name": "ac3n5",
+                  "fill": "#CFD0D5",
+                  "content": "🎭  Akka actor system  ·  /user/stage",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "T54mSJ",
+      "x": 48,
+      "y": 1376,
+      "name": "archLabel",
+      "fill": "#7ED9A0",
+      "content": "Plugin architecture  ·  HTML/JS surface bridges into AgentZero native (LLM, voice, FS, terminal)",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "600"
     }
   ]
 }
