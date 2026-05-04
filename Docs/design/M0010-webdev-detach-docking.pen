@@ -1,0 +1,2164 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "text",
+      "id": "J33Kv",
+      "x": 0,
+      "y": -90,
+      "name": "title",
+      "fill": "#E5E5E5",
+      "content": "M0010 — WebDev Plugin Detach / Dock Floating Window",
+      "fontFamily": "Segoe UI",
+      "fontSize": 28,
+      "fontWeight": "700"
+    },
+    {
+      "type": "text",
+      "id": "mPGTX",
+      "x": 0,
+      "y": -50,
+      "name": "subtitle",
+      "fill": "#9D9D9D",
+      "textGrowth": "fixed-width",
+      "width": 1500,
+      "content": "Operator brief: WebDev 가 새창으로 분리될 수 있어야 하고 (개별 sample 단위, 일괄 X), 메인은 멀티-CLI 제어에 집중. WebView2 인스턴스는 reparent (재로딩 X) 되며, 창의 위치/크기/pin/opacity/chrome 은 sample 별로 영구 기억.",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "normal"
+    },
+    {
+      "type": "text",
+      "id": "RoEN1",
+      "x": 0,
+      "y": -12,
+      "name": "f1Label",
+      "fill": "#7ED9A0",
+      "content": "F1 — BEFORE: current WebDev page (M0006 baseline)",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "R7qfPB",
+      "x": 0,
+      "y": 10,
+      "name": "f1",
+      "clip": true,
+      "width": 760,
+      "height": 460,
+      "fill": "#1B1B1C",
+      "cornerRadius": 6,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "children": [
+        {
+          "type": "frame",
+          "id": "CfAoe",
+          "name": "f1Sidebar",
+          "width": 240,
+          "height": 460,
+          "fill": "#252526",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "rLBuB",
+              "name": "f1SidebarHeader",
+              "width": "fill_container",
+              "height": 40,
+              "fill": "#2A2A2D",
+              "padding": [
+                0,
+                14
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Qa6Zu",
+                  "fill": "#9D9D9D",
+                  "content": "WEB DEV  ·  Samples",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "a0aiJm",
+                  "fill": "#9D9D9D",
+                  "content": "↻",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "lpHio",
+              "name": "f1SidebarSub",
+              "width": "fill_container",
+              "height": 28,
+              "fill": "#252526",
+              "padding": [
+                0,
+                14
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "SEqrq",
+                  "fill": "#6E6E73",
+                  "content": "built-in: 2  ·  plugins: 1",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "jZvcD",
+              "fill": "#3F3F46",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "rb2lc",
+              "name": "f1List",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#252526",
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "oD6n8",
+                  "name": "f1Item1",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "#0A84FF",
+                  "layout": "vertical",
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "x9Sju",
+                      "fill": "#FFFFFF",
+                      "content": "voice-test",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "F5LZ3W",
+                      "fill": "#D6E6FF",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Voice pipeline sample (selected)",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cgXH3",
+                  "name": "f1Item2",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "#252526",
+                  "layout": "vertical",
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "vAOBF",
+                      "fill": "#E5E5E5",
+                      "content": "chat-test",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ahmmp",
+                      "fill": "#9D9D9D",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "TextLLM chat sub-app",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "k0SCJz",
+                  "name": "f1Item3",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "#252526",
+                  "layout": "vertical",
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "GhicP",
+                      "fill": "#E5E5E5",
+                      "content": "my-plugin",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "H83c1v",
+                      "fill": "#9D9D9D",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Installed plugin",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ejlRE",
+              "name": "f1Install",
+              "width": "fill_container",
+              "height": 60,
+              "fill": "#1F1F22",
+              "layout": "vertical",
+              "padding": [
+                12,
+                14
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "U2bpeY",
+                  "fill": "#7ED9A0",
+                  "content": "+ Install Plugin",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "mCQJM",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "select a .zip — extends WebDev menu at runtime",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "TGTgs",
+          "fill": "#3F3F46",
+          "width": 1,
+          "height": 460
+        },
+        {
+          "type": "frame",
+          "id": "VPG7L",
+          "name": "f1Right",
+          "width": "fill_container",
+          "height": 460,
+          "fill": "#0A0A14",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "z8zF9",
+              "name": "f1Toolbar",
+              "width": "fill_container",
+              "height": 40,
+              "fill": "#252526",
+              "stroke": {
+                "thickness": {
+                  "bottom": 1
+                },
+                "fill": "#3F3F46"
+              },
+              "padding": [
+                0,
+                14
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Gn1Nc",
+                  "name": "f1Crumb",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "rDIz3",
+                      "fill": "#9D9D9D",
+                      "content": "WebDev",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "GCzlo",
+                      "fill": "#5F5F66",
+                      "content": "›",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "CANWi",
+                      "fill": "#E5E5E5",
+                      "content": "voice-test",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "feOPL",
+                  "name": "f1ToolbarRight",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "bkdV0",
+                      "name": "f1DetachBtn",
+                      "fill": "#0A84FF",
+                      "cornerRadius": 3,
+                      "gap": 6,
+                      "padding": [
+                        6,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "g8LBLJ",
+                          "fill": "#FFFFFF",
+                          "content": "⤢",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "B1MqM",
+                          "fill": "#FFFFFF",
+                          "content": "Detach",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KXBTP",
+                      "name": "f1ReloadBtn",
+                      "gap": 6,
+                      "padding": [
+                        6,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "EN0dd",
+                          "fill": "#9D9D9D",
+                          "content": "↻  Reload",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "eIkLO",
+                      "name": "f1DevBtn",
+                      "gap": 6,
+                      "padding": [
+                        6,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "LGRmQ",
+                          "fill": "#9D9D9D",
+                          "content": "⚙  DevTools",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "l08kGQ",
+              "name": "f1WebView",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#0E1422",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Pz6Y5",
+                  "name": "f1WvText",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "r3rz5p",
+                      "fill": "#7ED9A0",
+                      "content": "WebView2 — voice-test",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "DbDQk",
+                      "fill": "#5F6F8E",
+                      "textGrowth": "fixed-width",
+                      "width": 420,
+                      "content": "(JS state preserved by ViewSlot cache; reparented on detach, never destroyed)",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "KLU8u",
+      "x": 800,
+      "y": -12,
+      "name": "f2Label",
+      "fill": "#7ED9A0",
+      "content": "F2 — Action: Detach button on toolbar (new icon)",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "v2x3X",
+      "x": 800,
+      "y": 10,
+      "name": "f2",
+      "clip": true,
+      "width": 480,
+      "height": 200,
+      "fill": "#252526",
+      "cornerRadius": 6,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "yVEjr",
+          "name": "f2Body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#252526",
+          "layout": "vertical",
+          "gap": 14,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "OE3FG",
+              "name": "f2Title",
+              "fill": "#E5E5E5",
+              "content": "Toolbar adds one button (right side)",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "z4IQN",
+              "name": "f2BtnRow",
+              "fill": "#1B1B1C",
+              "cornerRadius": 4,
+              "gap": 10,
+              "padding": [
+                8,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "B5nMt",
+                  "name": "f2Btn",
+                  "fill": "#0A84FF",
+                  "cornerRadius": 4,
+                  "gap": 8,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "C5qwE",
+                      "fill": "#FFFFFF",
+                      "content": "⤢",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "q86VC",
+                      "fill": "#FFFFFF",
+                      "content": "Detach",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "T9o1KD",
+                  "fill": "#7ED9A0",
+                  "content": "→",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "G6jcV",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": 240,
+                  "content": "removes active WebView2 from viewHost.Children, adds it to FloatingWebDevWindow",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "D21QF",
+              "name": "f2Note",
+              "fill": "#1F1F22",
+              "cornerRadius": 4,
+              "layout": "vertical",
+              "gap": 4,
+              "padding": [
+                8,
+                12
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cnqLO",
+                  "fill": "#7ED9A0",
+                  "content": "Constraint",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "wKJHm",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": 420,
+                  "content": "활성 sample 1개만 Detach 됨. 같은 sample 재-Detach = 기존 floating window focus. \"전체 detach\" 같은 일괄 동작은 만들지 않음. 여러 sample 을 띄우려면 각각 개별 Detach 한다.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "maqhK",
+      "x": 800,
+      "y": 238,
+      "name": "f3Label",
+      "fill": "#7ED9A0",
+      "content": "F3 — Floating window (chrome ON, default) — custom title bar + drag",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "Aa5da",
+      "x": 800,
+      "y": 260,
+      "name": "f3",
+      "clip": true,
+      "width": 480,
+      "height": 380,
+      "fill": "#0A0A14",
+      "cornerRadius": 8,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "effect": {
+        "type": "shadow",
+        "shadowType": "outer",
+        "color": "#000000AA",
+        "offset": {
+          "x": 0,
+          "y": 8
+        },
+        "blur": 24
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "gIZl0",
+          "name": "f3Titlebar",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "#1F2A4A",
+          "padding": [
+            0,
+            10
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "v83vv",
+              "name": "f3TbLeft",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "jGChd",
+                  "fill": "#7ED9A0",
+                  "width": 8,
+                  "height": 8
+                },
+                {
+                  "type": "text",
+                  "id": "pMQRh",
+                  "fill": "#E5E5E5",
+                  "content": "WebDev — voice-test",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "NwgNr",
+              "name": "f3TbRight",
+              "gap": 4,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "w9fR23",
+                  "name": "f3TbPin",
+                  "fill": "#3DA0FF",
+                  "cornerRadius": 3,
+                  "gap": 4,
+                  "padding": [
+                    4,
+                    8
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "mNXEp",
+                      "fill": "#FFFFFF",
+                      "content": "📌",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JKieM",
+                      "fill": "#FFFFFF",
+                      "content": "Pin",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "O0UJ7",
+                  "name": "f3TbDock",
+                  "gap": 4,
+                  "padding": [
+                    4,
+                    8
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dx3TM",
+                      "fill": "#9D9D9D",
+                      "content": "⤡  Dock back",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n3jGv",
+                  "name": "f3TbClose",
+                  "padding": [
+                    4,
+                    8
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "e8J7O",
+                      "fill": "#9D9D9D",
+                      "content": "✕",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "MWpmT",
+          "name": "f3WebBody",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#0E1422",
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "lOEGo",
+              "name": "f3WebInner",
+              "layout": "vertical",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "g1Bb1r",
+                  "fill": "#7ED9A0",
+                  "content": "WebView2 — voice-test",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "gsRjI",
+                  "fill": "#5F6F8E",
+                  "textGrowth": "fixed-width",
+                  "width": 380,
+                  "content": "(same instance as F1's WebView — reparented, JS state intact)",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "JOgAs",
+          "name": "f3Footer",
+          "width": "fill_container",
+          "height": 26,
+          "fill": "#1F1F22",
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "pKV1z",
+              "fill": "#5F6F8E",
+              "content": "Right-click anywhere → settings menu",
+              "fontFamily": "Inter",
+              "fontSize": 9,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "atAYl",
+              "fill": "#5F6F8E",
+              "content": "opacity 1.0 · titlebar ON · pin OFF",
+              "fontFamily": "Inter",
+              "fontSize": 9,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "Z5Pir",
+      "x": 1320,
+      "y": 238,
+      "name": "f4Label",
+      "fill": "#7ED9A0",
+      "content": "F4 — Right-click context menu",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "I4KQz",
+      "x": 1320,
+      "y": 260,
+      "name": "f4",
+      "clip": true,
+      "width": 300,
+      "height": 380,
+      "fill": "#1F1F22",
+      "cornerRadius": 6,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "effect": {
+        "type": "shadow",
+        "shadowType": "outer",
+        "color": "#00000099",
+        "offset": {
+          "x": 0,
+          "y": 6
+        },
+        "blur": 18
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "l3tJp3",
+          "name": "f4Header",
+          "width": "fill_container",
+          "height": 34,
+          "fill": "#2A2A2D",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "zuNxE",
+              "fill": "#9D9D9D",
+              "content": "WebDev floating — voice-test",
+              "fontFamily": "Inter",
+              "fontSize": 10,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "gJEut",
+          "fill": "#3F3F46",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "frame",
+          "id": "R3Q46",
+          "name": "f4M1",
+          "width": "fill_container",
+          "height": 34,
+          "fill": "#1F1F22",
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "MXSJu",
+              "fill": "#E5E5E5",
+              "content": "📌  Pin (always on top)",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "MnkUV",
+              "fill": "#3DA0FF",
+              "content": "☑",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "U0EJB",
+          "name": "f4M2",
+          "width": "fill_container",
+          "fill": "#1F1F22",
+          "layout": "vertical",
+          "gap": 6,
+          "padding": [
+            8,
+            12
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "r2zE01",
+              "name": "f4M2Top",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Upshu",
+                  "fill": "#E5E5E5",
+                  "content": "🌫  Transparency",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "a30Qg",
+                  "fill": "#3DA0FF",
+                  "content": "70%",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "IcGzh",
+              "name": "f4M2Slide",
+              "width": "fill_container",
+              "height": 6,
+              "fill": "#2A2A2D",
+              "cornerRadius": 3,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "JMgGP",
+                  "width": 188,
+                  "height": 6,
+                  "fill": "#3DA0FF",
+                  "cornerRadius": 3
+                },
+                {
+                  "type": "ellipse",
+                  "id": "p2uT0s",
+                  "fill": "#FFFFFF",
+                  "width": 12,
+                  "height": 12
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "W01dx",
+              "fill": "#5F6F8E",
+              "content": "50% ━━━━━━━━━━━━━━━ 100%",
+              "fontFamily": "Inter",
+              "fontSize": 8,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "G9Lmw",
+          "name": "f4M3",
+          "width": "fill_container",
+          "height": 34,
+          "fill": "#1F1F22",
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "Hv1M3",
+              "fill": "#E5E5E5",
+              "content": "▭  Title bar (off → Alt+drag)",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "Kqhl9",
+              "fill": "#9D9D9D",
+              "content": "☐",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "gqBsw",
+          "fill": "#3F3F46",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "frame",
+          "id": "Fasqm",
+          "name": "f4M4",
+          "width": "fill_container",
+          "height": 34,
+          "fill": "#1F1F22",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "W7uKoA",
+              "fill": "#E5E5E5",
+              "content": "↻  Reload",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "NINsc",
+          "name": "f4M5",
+          "width": "fill_container",
+          "height": 34,
+          "fill": "#1F1F22",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "zscqI",
+              "fill": "#E5E5E5",
+              "content": "⚙  DevTools",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "s6SeLD",
+          "fill": "#3F3F46",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "frame",
+          "id": "sRGJj",
+          "name": "f4M6",
+          "width": "fill_container",
+          "height": 34,
+          "fill": "#0A84FF",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "b8nYG",
+              "fill": "#FFFFFF",
+              "content": "⤡  Dock back to main window",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "kXn5E",
+          "name": "f4Foot",
+          "width": "fill_container",
+          "fill": "#15151A",
+          "layout": "vertical",
+          "gap": 2,
+          "padding": [
+            10,
+            12
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "frZ8g",
+              "fill": "#5F6F8E",
+              "textGrowth": "fixed-width",
+              "width": 276,
+              "content": "⚠  Title bar OFF → drag = Alt + 마우스 좌클릭 (WPF HwndSource 후크). 일반 좌클릭은 WebView2 로 전달.",
+              "lineHeight": 1.4,
+              "fontFamily": "Inter",
+              "fontSize": 9,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "powyU",
+              "fill": "#5F6F8E",
+              "textGrowth": "fixed-width",
+              "width": 276,
+              "content": "창 닫기 = Dock back (WebView2 인스턴스는 살아서 main 으로 reparent — 재로딩 없음).",
+              "lineHeight": 1.4,
+              "fontFamily": "Inter",
+              "fontSize": 9,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "V4f3BA",
+              "name": "altHintRow",
+              "fill": "#1F2A4ACC",
+              "cornerRadius": 3,
+              "gap": 6,
+              "padding": [
+                6,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "DEV2f",
+                  "fill": "#3DA0FF",
+                  "content": "Alt + 드래그",
+                  "fontFamily": "Inter",
+                  "fontSize": 9,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "Ermk8",
+                  "fill": "#9D9D9D",
+                  "content": "= titleless 창 이동 (오른쪽 메뉴에도 안내 표시)",
+                  "fontFamily": "Inter",
+                  "fontSize": 9,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "V5p6BZ",
+      "x": 0,
+      "y": 498,
+      "name": "f5Label",
+      "fill": "#7ED9A0",
+      "content": "F5 — Floating window (chrome OFF + opacity 0.7 + Pin) — titleless overlay",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "sT1Mn",
+      "x": 0,
+      "y": 520,
+      "name": "f5",
+      "clip": true,
+      "width": 480,
+      "height": 380,
+      "fill": "#0A0A14B3",
+      "cornerRadius": 8,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#3DA0FF"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "M3Eat",
+          "name": "f5Body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#0E1422B3",
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "yyhSx",
+              "name": "f5Inner",
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 24,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "u4JZ05",
+                  "fill": "#7ED9A0",
+                  "content": "WebView2 — voice-test",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "p4yVtu",
+                  "fill": "#3DA0FF",
+                  "content": "chrome OFF · opacity 0.7 · pin ON",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "MQOyl",
+                  "fill": "#5F6F8E",
+                  "textGrowth": "fixed-width",
+                  "width": 380,
+                  "content": "WPF 구현: WindowStyle=None + AllowsTransparency=true 로 항상 시작. chrome OFF 면 커스텀 titlebar 만 숨김 — 창 자체는 Alt+드래그 (HwndSource 후크) 로 이동, 우클릭 메뉴로도 복귀/dock-back 진입 가능.",
+                  "lineHeight": 1.5,
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "h3fube",
+                  "name": "f5HintBox",
+                  "fill": "#1F2A4ACC",
+                  "cornerRadius": 4,
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Yoe5g",
+                      "fill": "#3DA0FF",
+                      "content": "Right-click",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "D7yFB",
+                      "fill": "#9D9D9D",
+                      "content": "to bring chrome back / dock back",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "YysXA",
+      "x": 520,
+      "y": 498,
+      "name": "f6Label",
+      "fill": "#7ED9A0",
+      "content": "F6 — Main page WHILE sample is detached → placeholder + 도킹 복귀",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "x7zUJL",
+      "x": 520,
+      "y": 520,
+      "name": "f6",
+      "clip": true,
+      "width": 760,
+      "height": 380,
+      "fill": "#1B1B1C",
+      "cornerRadius": 6,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "children": [
+        {
+          "type": "frame",
+          "id": "lPtGt",
+          "name": "f6Side",
+          "width": 240,
+          "height": 380,
+          "fill": "#252526",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "oJNhK",
+              "name": "f6SideHeader",
+              "width": "fill_container",
+              "height": 40,
+              "fill": "#2A2A2D",
+              "padding": [
+                0,
+                14
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "twkFB",
+                  "fill": "#9D9D9D",
+                  "content": "WEB DEV  ·  Samples",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "c7PI77",
+              "name": "f6SideSub",
+              "width": "fill_container",
+              "height": 28,
+              "padding": [
+                0,
+                14
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "qnNGR",
+                  "fill": "#6E6E73",
+                  "content": "built-in: 2  ·  plugins: 1",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "yBYDk",
+              "fill": "#3F3F46",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "f1Tx2",
+              "name": "f6Item1",
+              "width": "fill_container",
+              "height": 54,
+              "fill": "#0A84FF",
+              "layout": "vertical",
+              "padding": [
+                10,
+                14
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "AY3X9",
+                  "name": "f6Item1Top",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "y72K2",
+                      "fill": "#FFFFFF",
+                      "content": "voice-test",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "T99tJ",
+                      "fill": "#FFE48A",
+                      "content": "⤢ floating",
+                      "fontFamily": "Inter",
+                      "fontSize": 9,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "P7X0L",
+                  "fill": "#D6E6FF",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Currently detached — see floating window",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n3VtpI",
+              "name": "f6Item2",
+              "width": "fill_container",
+              "height": 54,
+              "layout": "vertical",
+              "padding": [
+                10,
+                14
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "MNjDJ",
+                  "fill": "#E5E5E5",
+                  "content": "chat-test",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "NEiaP",
+          "fill": "#3F3F46",
+          "width": 1,
+          "height": 380
+        },
+        {
+          "type": "frame",
+          "id": "jtaJE",
+          "name": "f6Right",
+          "width": "fill_container",
+          "height": 380,
+          "fill": "#0A0A14",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "K5Bpi",
+              "name": "f6Toolbar",
+              "width": "fill_container",
+              "height": 40,
+              "fill": "#252526",
+              "padding": [
+                0,
+                14
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "WGAF5",
+                  "name": "f6Crumb",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "gOUvF",
+                      "fill": "#9D9D9D",
+                      "content": "WebDev",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Nof7Q",
+                      "fill": "#5F5F66",
+                      "content": "›",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "fxQv3",
+                      "fill": "#E5E5E5",
+                      "content": "voice-test",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "YdFeS",
+                      "fill": "#FFE48A",
+                      "content": " · floating",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "H3Ktg",
+              "name": "f6PlaceBg",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#0E1422",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "lEeMr",
+                  "name": "f6Place",
+                  "fill": "#15151A",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "#1F2A4A"
+                  },
+                  "layout": "vertical",
+                  "gap": 14,
+                  "padding": 32,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "IAUxZ",
+                      "fill": "#3DA0FF",
+                      "content": "⤢",
+                      "fontFamily": "Inter",
+                      "fontSize": 36,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "P1mW18",
+                      "fill": "#E5E5E5",
+                      "content": "voice-test is running in a floating window",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "FKQoo",
+                      "fill": "#9D9D9D",
+                      "textGrowth": "fixed-width",
+                      "width": 340,
+                      "content": "Click below to dock it back into the main window.",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "C243dN",
+                      "name": "f6BackBtn",
+                      "fill": "#0A84FF",
+                      "cornerRadius": 4,
+                      "gap": 6,
+                      "padding": [
+                        10,
+                        18
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "RhF8Y",
+                          "fill": "#FFFFFF",
+                          "content": "⤡",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "pxiTP",
+                          "fill": "#FFFFFF",
+                          "content": "도킹 복귀  ·  Dock back",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "eiXZi",
+      "x": 0,
+      "y": 928,
+      "name": "f7Label",
+      "fill": "#7ED9A0",
+      "content": "F7 — State machine + persistence model (one-screen contract)",
+      "fontFamily": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "VWgy6",
+      "x": 0,
+      "y": 950,
+      "name": "f7",
+      "width": 1620,
+      "height": 300,
+      "fill": "#15151A",
+      "cornerRadius": 6,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#3F3F46"
+      },
+      "layout": "vertical",
+      "gap": 18,
+      "padding": 24,
+      "children": [
+        {
+          "type": "text",
+          "id": "o383Ja",
+          "name": "f7Title",
+          "fill": "#E5E5E5",
+          "content": "State machine — WebView2 instance lives, only its Visual parent moves",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "POqqh",
+          "name": "f7Row",
+          "width": "fill_container",
+          "height": 140,
+          "gap": 12,
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "qrbW8",
+              "name": "f7S1",
+              "width": 280,
+              "height": 120,
+              "fill": "#15151A",
+              "cornerRadius": 6,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#3F3F46"
+              },
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "C1ncg9",
+                  "fill": "#7ED9A0",
+                  "content": "State A — Docked",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "bDwVA",
+                  "fill": "#9D9D9D",
+                  "content": "WebView2 ∈ viewHost.Children",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "OMBRo",
+                  "fill": "#9D9D9D",
+                  "content": "_floatingBySampleId.Empty",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "GDRmY",
+                  "fill": "#9D9D9D",
+                  "content": "Toolbar shows ⤢ Detach",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "bM8lT",
+              "fill": "#3DA0FF",
+              "content": "⤢  →",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "jv6ou",
+              "name": "f7S2",
+              "width": 280,
+              "height": 120,
+              "fill": "#15151A",
+              "cornerRadius": 6,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#3DA0FF"
+              },
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "wLUyp",
+                  "fill": "#3DA0FF",
+                  "content": "Reparent",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "WqDN4",
+                  "fill": "#9D9D9D",
+                  "content": "viewHost.Children.Remove(view)",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "tKXfp",
+                  "fill": "#9D9D9D",
+                  "content": "new FloatingWebDevWindow(view)",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "W4GbkF",
+                  "fill": "#9D9D9D",
+                  "content": "window.Body.Children.Add(view)",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "QRn0e",
+                  "fill": "#7ED9A0",
+                  "content": "window.Show() — no Navigate, no dispose",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "joCyA",
+              "fill": "#3DA0FF",
+              "content": "  →  ⤡",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "GMs0b",
+              "name": "f7S3",
+              "width": 280,
+              "height": 120,
+              "fill": "#15151A",
+              "cornerRadius": 6,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#FFE48A"
+              },
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "nbqZt",
+                  "fill": "#FFE48A",
+                  "content": "State B — Floating",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "AsF66",
+                  "fill": "#9D9D9D",
+                  "content": "WebView2 ∈ FloatingWindow.Body.Children",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "g7oQi",
+                  "fill": "#9D9D9D",
+                  "content": "_floatingBySampleId[id] = window",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "g2I68",
+                  "fill": "#9D9D9D",
+                  "content": "Toolbar shows ⤡ Dock back / Focus",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "daRKX",
+                  "fill": "#9D9D9D",
+                  "content": "Main page shows placeholder (F6)",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "oMO1s",
+          "name": "f7Persist",
+          "width": "fill_container",
+          "gap": 14,
+          "justifyContent": "space_between",
+          "children": [
+            {
+              "type": "frame",
+              "id": "KfUTx",
+              "name": "f7PCol1",
+              "width": "fill_container",
+              "fill": "#1F1F22",
+              "cornerRadius": 6,
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "gWkLk",
+                  "fill": "#7ED9A0",
+                  "content": "Settings persistence — per sample id",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "SfGdf",
+                  "fill": "#9DB1D8",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "%LOCALAPPDATA%/AgentZeroLite/WebDev/floating-prefs.json",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "S9YFYF",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "{ \"voice-test\": { topmost:true, opacity:0.7, chrome:false, x:1480, y:220, w:720, h:480 }, \"chat-test\": { … } }",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "U6pEz",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Detach 시 로드 — 마지막 topmost / opacity / chrome 뿐 아니라 화면상 좌표 (x,y,w,h) 까지 복원 (현재 작업영역으로 clamp). 토글 / 슬라이더 release / 창 이동 / 창 크기변경 / Close 시 모두 저장.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ZFoMK",
+              "name": "f7PCol2",
+              "width": "fill_container",
+              "fill": "#1F1F22",
+              "cornerRadius": 6,
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pxNOD",
+                  "fill": "#FFE48A",
+                  "content": "Invariants",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "MZDmI",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· One floating window per sample id (re-Detach = focus existing).",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "iHFLS",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· WebView2 lifetime = ViewSlot cache (M0006) — Detach/Dock only swaps Visual parent.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "BoaBh",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· Closing main window disposes all floating windows + all WebView2 instances.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "EqTol",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· Closing floating window = dock back (no destruction). Right-click → Dock back is explicit alias.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "c7KdD",
+                  "name": "posInv",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 위치/크기는 sample 별로 기억된다 — 다음 Detach 시 마지막으로 닫힌 좌표에 다시 뜸.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "gObBJ",
+                  "name": "indInv",
+                  "fill": "#FFE48A",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 개별 Detach 만 지원 — \"모든 sample 한꺼번에 분리\" 같은 일괄 동작은 없음.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

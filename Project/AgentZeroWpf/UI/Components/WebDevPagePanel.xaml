@@ -225,6 +225,13 @@
                     BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
                 <DockPanel LastChildFill="True" Margin="14,0">
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                        <Button x:Name="btnDetach" Content="&#x2922;  Detach"
+                                ToolTip="Detach this sample to a floating window (right-click in floating window for pin / opacity / titlebar settings)"
+                                Background="#0A84FF" Foreground="#FFFFFF"
+                                FontWeight="Bold" BorderThickness="0"
+                                Padding="10,4" FontSize="11" Cursor="Hand"
+                                Margin="0,0,6,0"
+                                Click="OnDetachClick"/>
                         <Button x:Name="btnReload" Content="&#x21BB;  Reload"
                                 Style="{StaticResource ToolbarButton}"
                                 Click="OnReloadClick"/>
@@ -240,6 +247,10 @@
                         <TextBlock x:Name="lblBreadcrumbSample" Text="—"
                                    FontSize="11" FontWeight="SemiBold"
                                    Foreground="#E5E5E5" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="lblBreadcrumbFloating" Text=" · floating"
+                                   FontSize="11" FontWeight="Bold"
+                                   Foreground="#FFE48A" VerticalAlignment="Center"
+                                   Visibility="Collapsed"/>
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -247,8 +258,55 @@
             <Grid Grid.Row="1">
                 <!-- One WebView2 per sample, cached so re-selecting a sample
                      is instant (Visibility toggle only). Children added on
-                     first navigate. Reload button forces a fresh load. -->
+                     first navigate. Reload button forces a fresh load.
+                     Reparented out (not destroyed) when the user clicks
+                     Detach — see _floatingBySampleId. -->
                 <Grid x:Name="viewHost"/>
+
+                <!-- Floating placeholder — visible when the active sample's
+                     WebView2 has been moved into a FloatingWebDevWindow.
+                     Click "Dock back" to bring the WebView2 back into
+                     viewHost (no reload — same instance). -->
+                <Border x:Name="floatingPlaceholder" Background="#0E1422"
+                        Visibility="Collapsed">
+                    <Border MaxWidth="420" MaxHeight="280"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Background="#15151A" CornerRadius="8"
+                            BorderBrush="#1F2A4A" BorderThickness="1"
+                            Padding="32">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="&#x2922;" FontSize="36"
+                                       FontWeight="Bold" Foreground="#3DA0FF"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="lblFloatingPlaceholderTitle"
+                                       Text="floating in a separate window"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#E5E5E5"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,12,0,8"/>
+                            <TextBlock Text="Click below to dock it back into the main window."
+                                       FontSize="11" Foreground="#9D9D9D"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       MaxWidth="340" TextWrapping="Wrap"/>
+                            <Button x:Name="btnDockBack"
+                                    Content="&#x2921;  &#xB3C4;&#xD0B9; &#xBCF5;&#xADC0;  &#xB7;  Dock back"
+                                    Background="#0A84FF" Foreground="#FFFFFF"
+                                    FontWeight="Bold" BorderThickness="0"
+                                    Padding="14,8" FontSize="12" Cursor="Hand"
+                                    Margin="0,18,0,0"
+                                    HorizontalAlignment="Center"
+                                    Click="OnDockBackClick"/>
+                            <Button x:Name="btnFocusFloating"
+                                    Content="Focus floating window"
+                                    Background="Transparent" Foreground="#9D9D9D"
+                                    BorderThickness="0" Cursor="Hand"
+                                    FontSize="10" Margin="0,6,0,0"
+                                    HorizontalAlignment="Center"
+                                    Click="OnFocusFloatingClick"/>
+                        </StackPanel>
+                    </Border>
+                </Border>
 
                 <!-- Loading overlay — sits on top of viewHost. Background
                      matches the dark theme so the WebView2 white-flash on
