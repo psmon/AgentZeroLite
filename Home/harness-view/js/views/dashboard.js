@@ -37,12 +37,16 @@ export async function render(ctx) {
   const contribAll    = index?.contributorsAll    || index?.contributors || [];
   const contribRecent = index?.contributorsRecent || [];
   const windowDays    = index?.contributorsWindowDays || 14;
+  const commitStats   = index?.commitStats || null;
+  const topFiles      = index?.topChangedFiles || [];
 
   const sections = h('div', { class: 'dash-sections' });
   sections.appendChild(renderNewsSection(news));
   sections.appendChild(renderPdsaSection(pdsa));
   sections.appendChild(renderBuildLogSection(menu, items, index));
-  sections.appendChild(renderContribSection({ all: contribAll, recent: contribRecent, windowDays }, items));
+  sections.appendChild(renderContribSection({
+    all: contribAll, recent: contribRecent, windowDays, commitStats, topFiles,
+  }, items));
   mount(viewEl, sections);
 }
 
@@ -234,7 +238,7 @@ function versionKind(title) {
 /* ────────────────────────────────────────────────
  *  4) Build-up Contributors
  * ──────────────────────────────────────────────── */
-function renderContribSection({ all, recent, windowDays }, items) {
+function renderContribSection({ all, recent, windowDays, commitStats, topFiles }, items) {
   const sec = h('section', { class: 'dash-sec contrib-sec' });
   let mode = 'recent';
 
@@ -257,16 +261,35 @@ function renderContribSection({ all, recent, windowDays }, items) {
   const donutCard = h('div', { class: 'contrib-donut card-plain' });
   body.appendChild(donutCard);
 
-  // Right: 3 stat cards
+  // Right: stat cards + (optional) top-changed-files panel
   const stats = h('div', { class: 'contrib-stats' });
   const latest = items[0];
+  // Velocity card — total commits across the broadened scope. Big number
+  // so single-contributor projects see motion (the old "1 contributor"
+  // hero stat was technically right but conveyed no growth).
+  const totalCommitsCard = h('div', { class: 'stat-card card-plain' });
+  stats.appendChild(totalCommitsCard);
   stats.appendChild(statCard(String(items.length), 'Total docs', 'tone-blue'));
   stats.appendChild(statCard(latest?.title || '—', `Latest doc · ${latest?.committed || latest?.modified || ''}`, 'tone-purple'));
+  // 7d / 30d activity tiles — only when build supplied them.
+  if (commitStats) {
+    stats.appendChild(statCard(String(commitStats.last7d ?? 0),  'Commits · last 7 days',  'tone-amber'));
+    stats.appendChild(statCard(String(commitStats.last30d ?? 0), 'Commits · last 30 days', 'tone-amber'));
+  }
+  // Subordinate "contributors count" card — kept so the original metric
+  // is still visible, just no longer the hero.
   const contribCountCard = h('div', { class: 'stat-card card-plain' });
   stats.appendChild(contribCountCard);
   body.appendChild(stats);
 
   sec.appendChild(body);
+
+  // Top-changed-files list — surfaces "where activity actually lives"
+  // (single-author projects can't differentiate via the donut). Hidden
+  // when build supplied no list or 0 entries.
+  if (topFiles && topFiles.length) {
+    sec.appendChild(renderTopFiles(topFiles));
+  }
 
   function setMode(next) {
     mode = next;
@@ -309,15 +332,52 @@ function renderContribSection({ all, recent, windowDays }, items) {
       inner,
     );
 
+    // Velocity hero — total commits in the active mode (recent vs all).
+    // commitStats.totalAllTime is the union-deduped count from the build;
+    // when only contributors data is available we approximate via sum.
+    const heroCommits = mode === 'recent'
+      ? totalCommits
+      : (commitStats?.totalAllTime ?? totalCommits);
+    const heroLabel = mode === 'recent'
+      ? `Commits · last ${windowDays} days`
+      : 'Commits · all time (Docs scope)';
+    mount(totalCommitsCard,
+      h('div', { class: 'stat-val tone-green' }, String(heroCommits)),
+      h('div', { class: 'stat-label' }, heroLabel),
+    );
+
     const countLabel = mode === 'recent' ? `Contributors (last ${windowDays} days)` : 'Total contributors';
     mount(contribCountCard,
-      h('div', { class: 'stat-val tone-green' }, String(contributors.length)),
+      h('div', { class: 'stat-val tone-blue' }, String(contributors.length)),
       h('div', { class: 'stat-label' }, countLabel),
     );
   }
 
   renderDonut();
   return sec;
+}
+
+function renderTopFiles(topFiles) {
+  const wrap = h('div', { class: 'contrib-topfiles card-plain' });
+  wrap.appendChild(h('div', { class: 'topfiles-head' }, [
+    h('span', { class: 'topfiles-title' }, 'Top changed files · last 30 days'),
+    h('span', { class: 'topfiles-sub' }, 'union of harness/, Docs/, Home/harness-view/'),
+  ]));
+  const list = h('ul', { class: 'topfiles-list' });
+  const max = Math.max(...topFiles.map(f => f.commits), 1);
+  topFiles.forEach((f) => {
+    const ratio = (f.commits / max) * 100;
+    const row = h('li', { class: 'topfile-row' }, [
+      h('span', { class: 'topfile-path', title: f.path }, f.path),
+      h('span', { class: 'topfile-bar' }, [
+        h('span', { class: 'topfile-bar-fill', style: { width: ratio + '%' } }),
+      ]),
+      h('span', { class: 'topfile-count' }, `${f.commits}`),
+    ]);
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+  return wrap;
 }
 
 function statCard(value, label, toneClass) {

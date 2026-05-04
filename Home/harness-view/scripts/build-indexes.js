@@ -167,6 +167,74 @@ function gitContributors(relPaths, since /* optional, e.g. "14 days ago" */) {
   } catch (e) { return []; }
 }
 
+// Counts unique commits touching any of the given paths within an optional
+// time window. Companion to gitContributors() — same scope union, but
+// returns just the count instead of per-author breakdown. Used to feed
+// the dashboard's "commit velocity" stat cards (7d / 30d).
+function gitCommitCount(relPaths, since) {
+  try {
+    const paths = Array.isArray(relPaths) ? relPaths : [relPaths];
+    const sinceArg = since ? ` --since="${since}"` : '';
+    const pathArgs = paths.map(p => `"${p}"`).join(' ');
+    const out = execSync(
+      `git log --format=%H${sinceArg} -- ${pathArgs}`,
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+    if (!out) return 0;
+    const seen = new Set();
+    for (const line of out.split(/\r?\n/)) {
+      const sha = line.trim();
+      if (sha) seen.add(sha);
+    }
+    return seen.size;
+  } catch (e) { return 0; }
+}
+
+// Top-N most-touched files (by commit count) under the given scope, within
+// an optional time window. Surfaces "where doc activity actually lives"
+// for single-contributor projects where the per-author donut conveys
+// little. Returns paths POSIX-relative to ROOT.
+function gitTopChangedFiles(relPaths, since, limit = 5) {
+  try {
+    const paths = Array.isArray(relPaths) ? relPaths : [relPaths];
+    const sinceArg = since ? ` --since="${since}"` : '';
+    const pathArgs = paths.map(p => `"${p}"`).join(' ');
+    const out = execSync(
+      `git log --name-only --format=%H${sinceArg} -- ${pathArgs}`,
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+    if (!out) return [];
+    // git log --name-only emits: SHA \n (blank) \n file1 \n file2 \n …
+    // (blank lines separate commits but ALSO appear right after the SHA
+    // line). We keep curSha across blanks — it only flips when a new
+    // 40-hex line is seen.
+    const counts = Object.create(null);
+    let curSha = null;
+    for (const raw of out.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (/^[0-9a-f]{40}$/.test(line)) { curSha = line; continue; }
+      if (!curSha) continue;
+      // Strip git's path-quoting for non-ASCII filenames (e.g.
+      // "harness/missions/M0010-…md") so the path renders cleanly.
+      let p = line;
+      if (p.startsWith('"') && p.endsWith('"')) p = p.slice(1, -1);
+      counts[p] = (counts[p] || 0) + 1;
+    }
+    // Filter out auto-generated build artifacts so the panel surfaces
+    // real authored source — indexes/*.json get rewritten on every CI
+    // run, dominating the list otherwise.
+    const isArtifact = (p) =>
+      p.startsWith('Home/harness-view/indexes/')
+      || p === 'Home/harness-view/.meta-build.log';
+    return Object.entries(counts)
+      .filter(([p]) => !isArtifact(p))
+      .map(([path, commits]) => ({ path, commits }))
+      .sort((a, b) => b.commits - a.commits)
+      .slice(0, limit);
+  } catch (e) { return []; }
+}
+
 function writeJson(name, data) {
   ensureDir(OUT);
   const file = path.join(OUT, `${name}.json`);
@@ -209,6 +277,22 @@ function buildDocs() {
   const CONTRIB_PATHS = ['harness', 'Docs', 'Home/harness-view'];
   const contributorsAll = gitContributors(CONTRIB_PATHS);
   const contributorsRecent = gitContributors(CONTRIB_PATHS, '14 days ago');
+
+  // Velocity stat cards — single-contributor projects benefit more from
+  // commit-count growth than from per-author percentages. Compute three
+  // buckets so the dashboard can show "this week / this month / total".
+  const totalCommitsAll = contributorsAll.reduce((s, c) => s + c.commits, 0);
+  const commitStats = {
+    totalAllTime: totalCommitsAll,
+    last7d:       gitCommitCount(CONTRIB_PATHS, '7 days ago'),
+    last30d:      gitCommitCount(CONTRIB_PATHS, '30 days ago'),
+  };
+
+  // Top-changed files (last 30 days) — surfaces "what's actively being
+  // worked" so the dashboard doesn't look frozen when the same author
+  // commits many times. Limit to 5 to keep the card scannable.
+  const topChangedFiles = gitTopChangedFiles(CONTRIB_PATHS, '30 days ago', 5);
+
   writeJson('harness-docs', {
     base: PATHS.docs,
     sort: 'semver-desc',
@@ -217,6 +301,8 @@ function buildDocs() {
     contributorsAll,
     contributorsRecent,
     contributorsWindowDays: 14,
+    commitStats,
+    topChangedFiles,
   });
 }
 

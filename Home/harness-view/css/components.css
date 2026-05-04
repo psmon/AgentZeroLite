@@ -405,7 +405,46 @@
 .stat-val.tone-blue   { color: #2563EB; }
 .stat-val.tone-purple { color: #7C3AED; font-size: 24px; }
 .stat-val.tone-green  { color: #15803D; }
+.stat-val.tone-amber  { color: #B45309; }
 .stat-label { font-size: 12px; color: #6B7280; }
+
+/* Top-changed-files panel — sits below the donut+stats row, full width.
+   Surfaces "where doc activity actually lives" for single-author repos
+   where the per-author donut conveys little. */
+.contrib-topfiles { padding: 18px 22px 20px; margin-top: 16px; }
+.topfiles-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.topfiles-title { font-size: 13px; font-weight: 700; color: #111827; }
+.topfiles-sub   { font-size: 11px; color: #6B7280; }
+.topfiles-list  { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.topfile-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px 32px;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.topfile-path  { color: #1F2937; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topfile-bar   { background: #E5E7EB; border-radius: 4px; height: 8px; overflow: hidden; }
+.topfile-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, #2563EB, #7C3AED); }
+.topfile-count { font-variant-numeric: tabular-nums; font-weight: 700; color: #15803D; text-align: right; }
+
+/* Workflow Core tab — flow vs source-files split. The source panel sits
+   below the high-level mermaid and shows the actual C#/XAML files that
+   implement the workflow, since "Open source .md →" was removed (the
+   Docs/harness/*.md files were deleted in commit aefe4c2). */
+.wf-flow-label {
+  font-size: 11px; font-weight: 700; color: #6B7280;
+  text-transform: uppercase; letter-spacing: 0.6px;
+  margin: 18px 0 6px;
+}
+.wf-source-panel {
+  margin-top: 22px; padding: 14px 18px 18px;
+  background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px;
+}
+.wf-source-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.wf-source-title { font-size: 13px; font-weight: 700; color: #111827; }
+.wf-source-sub   { font-size: 11px; color: #6B7280; }
+.wf-source-panel .mermaid { background: #FFFFFF; border-radius: 6px; padding: 12px; }
 
 /* ── 4) 릴리즈 노트 ── */
 .release-grid {

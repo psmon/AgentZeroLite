@@ -57,15 +57,38 @@ node Home/harness-view/scripts/build-indexes.js
 
 이 파일들은 콘텐츠가 손으로 결정되는 영역이라 빌드 인덱스에 안 들어간다.
 
-### 1-B. Contributors 통계는 자동 갱신
+### 1-B. Contributors 통계 + velocity 카드 + top-files 는 자동 갱신
 
-`harness-docs.json` 의 `contributorsAll` / `contributorsRecent` 는
-빌드 스크립트가 매번 git log 로 다시 계산한다 (`gitContributors()`).
-Scope 는 `harness/`, `Docs/`, `Home/harness-view/` union — release-note
-디렉토리 한 곳만 보던 옛 동작이 도큐 활동 전반을 놓쳐서 항상 1명으로
-보이던 문제를 해결 (2026-05-03). CI 가 doc-v* 태그 push 마다 build 를
-다시 돌리므로 **publish 할 때마다 contributor 수치는 자동으로 최신**이
-된다. 별도 손작업 필요 없음.
+`harness-docs.json` 가 빌드 시점에 다음 4종을 모두 git log 로부터 산출한다
+(scope = `harness/`, `Docs/`, `Home/harness-view/` union, SHA 로 dedup):
+
+- `contributorsAll` / `contributorsRecent` — per-author breakdown (`gitContributors()`)
+- `commitStats.{totalAllTime,last7d,last30d}` — 시간축 velocity 카드용 (`gitCommitCount()`)
+- `topChangedFiles` — 최근 30일 가장 많이 변경된 파일 top 5 (`gitTopChangedFiles()`)
+
+Scope 가 release-note 디렉토리 한 곳만 보던 옛 동작이 도큐 활동 전반을
+놓쳐서 항상 1명으로 보이던 문제는 2026-05-03 union 으로 해결. 추가로
+2026-05-04 단일 contributor 환경 가시성 강화 — hero stat 을 contributors
+count 에서 commit count 로 교체, 7d/30d 활동 카드 + top-changed-files
+패널 추가.
+
+CI 가 doc-v* 태그 push 마다 build 를 다시 돌리므로 **publish 할 때마다
+이 4종은 자동으로 최신**. 별도 손작업 필요 없음.
+
+### 1-C. Pre-publish — 미게시 변경분 한 줄 보고
+
+운영 게시 (`doc-v*` 태그 push) 직전, 마지막 publish 이후 도큐 영역에서
+얼마나 변동이 있었는지 한 줄로 보고하면 operator 가 "지금 publish 가치가
+있는지" 즉시 판단할 수 있다. 캐노니컬 명령:
+
+```bash
+LAST=$(git tag -l "doc-v*" | sort -V | tail -1)
+git log --oneline "$LAST..HEAD" -- harness Docs Home/harness-view | wc -l
+```
+
+출력 = 미게시 commit 수. 0 이면 publish 의미 없음, ≥3 이면 publish 권장
+정도가 휴리스틱. PDSA UPDATE / 큰 마일스톤 / Build Log 새 버전 추가
+같이 publish 할 때 함께 안내한다.
 
 ### 2. 결과 확인
 
