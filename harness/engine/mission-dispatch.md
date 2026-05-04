@@ -45,6 +45,11 @@ flowchart TD
   F --> G[completion log]
   G --> H[status done]
   H --> I[report to operator]
+  I --> J{operator smoke test}
+  J -- regression --> K[append 후속 수정 #N]
+  K --> L[update .pen if contract changed]
+  L --> J
+  J -- 잘 작동함 --> M[commit + push]
 ```
 
 1. **Read** `harness/missions/M{NNNN}-*.md` via Glob. If multiple match,
@@ -71,6 +76,38 @@ flowchart TD
 8. **Flip mission status** to `done | partial | blocked | cancelled`.
 9. **Report** to operator in the mission's language (not the chat
    language) per the language-fidelity rubric.
+10. **Iterative fix loop** (after `done`, before commit) — operator
+    smoke-tests on their desktop and may report regressions or design
+    deltas. Each round MUST follow this contract:
+
+    - **a. Diagnose first, fix second** — when operator reports a bug,
+      respond with a concrete root-cause hypothesis BEFORE editing.
+      For UI failures, surface the actual exception: catch blocks
+      should `Clipboard.SetText(stack)` and tell operator to paste
+      it back. Don't guess; one round of diagnosis beats five
+      rounds of speculative patches.
+    - **b. Append, don't overwrite** — every fix round becomes a
+      `## 후속 수정 #N` section in the same `M{NNNN}-수행결과.md`
+      (한국어 미션) / `## Follow-up fix #N` (English). Sections
+      include: operator report verbatim → diagnosis → 수정 (file
+      list) → 빌드 재검증. Numbering starts at #1 for the first
+      post-`done` fix.
+    - **c. Update the design when behavior changes** — if a fix
+      changes the contract (chrome OFF entry path, removed feature,
+      new affordance), update the same `Docs/design/M{NNNN}-*.pen`
+      via `pencil` MCP. Add an "as-built" note in subtitle so the
+      design file reflects the FINAL state, not the original
+      proposal. Don't fork into M{NNNN}-v2.pen.
+    - **d. Don't re-flip status** — `status: done` stays. Iteration
+      is recorded in completion log sections, not by status churn.
+      Exception: if the operator explicitly re-opens with
+      "M{NNNN} 다시 수행해", flip back to `in_progress`.
+    - **e. Commit + push only after operator confirms** — never
+      auto-commit during the iteration. Wait for "잘 작동함" /
+      "approved" / equivalent. Then a single commit captures the
+      whole loop's diff with a message that lists each follow-up
+      fix as a bullet (so reviewers see the complete arc, not just
+      the last patch).
 
 ## Input
 
@@ -93,6 +130,9 @@ flowchart TD
 | Acceptance coverage | All checklist items in the brief addressed | A/B/C/D |
 | Status hygiene | inbox → in_progress → done transitions all happened | Pass/Fail |
 | Filename contract | Completion log starts with `M{NNNN}\b` | Pass/Fail |
+| Iteration capture | Each post-`done` fix appended as `## 후속 수정 #N` (no overwrite, no v2 fork) | Pass/Fail |
+| Diagnose-before-patch | First response to a regression names a concrete root-cause hypothesis (or asks operator for diagnostic data) | Pass/Fail |
+| As-built design sync | When a fix changes the user-facing contract, the same `M{NNNN}-*.pen` is updated (subtitle marked "as-built") | Pass/Fail |
 
 Failures here surface in the harness-view Missions card as `recordFile: null`
 (filename rule violation) or visible status drift.

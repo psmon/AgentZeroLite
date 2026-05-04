@@ -171,6 +171,23 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 8. mission 파일의 `status` 를 `done` (성공) / `partial` (부분 완료) /
    `blocked` / `cancelled` 중 하나로 갱신.
 9. operator에게 결과 보고. 보고문도 mission language를 따른다.
+10. **반복 수정 loop** (status `done` 이후, commit 직전) — operator 가 데스크톱
+    에서 smoke test 후 회귀/디자인 델타 보고할 수 있다. 각 라운드는 다음 5개
+    contract 를 따른다 (자세히는 `harness/engine/mission-dispatch.md` step 10):
+    - **a. 진단 먼저, 패치 나중** — 회귀 보고 시 구체적 root-cause 가설 먼저
+      답하고 편집은 그 다음. UI 실패는 catch 블록이 풀 stack trace 를
+      `Clipboard.SetText` 후 operator 에게 붙여넣기 부탁. 추측보다 1회 진단이
+      낫다.
+    - **b. append, overwrite 안 함** — 같은 `M{NNNN}-수행결과.md` 에
+      `## 후속 수정 #N` 섹션으로 누적. 각 섹션은 operator 보고 verbatim →
+      진단 → 수정 → 빌드 재검증.
+    - **c. 디자인 동기화** — 사용자 노출 contract 가 바뀌면 같은
+      `Docs/design/M{NNNN}-*.pen` 을 pencil MCP 로 갱신. subtitle 에
+      "as-built" 명시. v2 파일 fork 금지.
+    - **d. status 재토글 금지** — `done` 유지. 명시적 "M{NNNN} 다시 수행해" 만
+      `in_progress` 로 되돌린다.
+    - **e. operator 승인 후에만 commit + push** — "잘 작동함" / "approved" /
+      등가 표현 받고 단일 commit. 메시지에 각 후속 수정을 bullet 으로 나열.
 
 > **언어 매칭은 협상 불가** — operator가 한국어로 요청서를 썼는데 영어로
 > 결과를 돌려주면 그 자체로 evaluation rubric의 "Mission language fidelity"

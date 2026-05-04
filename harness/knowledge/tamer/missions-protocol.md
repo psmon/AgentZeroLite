@@ -222,6 +222,33 @@ status: cancelled    ← cancelled at any time (with rationale in completion log
 Tamer flips `status` in-place via Edit, never deletes the mission file.
 The file IS the audit trail.
 
+### Iterative fix loop (post-`done`, pre-commit)
+
+Operator typically smoke-tests on their desktop after `done` and may
+report regressions. Each round is captured **in the existing completion
+log**, NOT by status churn or v2 forks. Contract:
+
+- Append a `## 후속 수정 #N` section (Korean missions) /
+  `## Follow-up fix #N` (English) per round. Sections must include:
+  operator report verbatim → diagnosis (named root cause) → 수정
+  (file list with brief rationale) → 빌드 재검증.
+- If the fix changes user-facing contract, update the same
+  `Docs/design/M{NNNN}-*.pen` file (don't fork into `-v2.pen`). Mark
+  the subtitle "as-built" so the design tracks the final state.
+- Never re-flip `status: done` → `in_progress` automatically. Only
+  on explicit "M{NNNN} 다시 수행해" from operator.
+- First response to a regression names a concrete root-cause hypothesis
+  before any edit. UI failures should surface the actual exception via
+  `Clipboard.SetText(ex.ToString())` + a MessageBox asking operator to
+  paste it back — guessing wastes more time than one diagnostic round.
+- Hold off on `git commit` until operator says "잘 작동함" / "approved"
+  / equivalent. A single commit then captures the entire arc; the
+  message body lists each follow-up fix as a bullet.
+
+The orchestration view of this loop (with mermaid + evaluation rubric
+axes for "Iteration capture / Diagnose-before-patch / As-built design
+sync") lives in `harness/engine/mission-dispatch.md` step 10.
+
 ## What this protocol does NOT do
 
 - Does not block missions on each other automatically. Operator orders.
