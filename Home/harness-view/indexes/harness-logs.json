@@ -12,7 +12,7 @@
   "counts": {
     "build-doctor": 6,
     "code-coach": 18,
-    "mission-records": 9,
+    "mission-records": 10,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
@@ -586,6 +586,14 @@
       "time": null,
       "title": "M0009-수행결과",
       "size": 10094
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0010-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0010-수행결과",
+      "size": 22278
     }
   ]
 }

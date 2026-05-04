@@ -12,6 +12,10 @@
     {
       "type": "pen",
       "file": "M0008-architecture.pen"
+    },
+    {
+      "type": "pen",
+      "file": "M0010-webdev-detach-docking.pen"
     }
   ]
 }

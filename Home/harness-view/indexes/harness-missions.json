@@ -10,15 +10,32 @@
     "cancelled"
   ],
   "counts": {
-    "all": 10,
+    "all": 11,
     "inbox": 1,
     "in_progress": 0,
-    "done": 9,
+    "done": 10,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0010",
+      "file": "harness/missions/M0010-WEBDEB-도킹화.md",
+      "title": "WebDev 플러그인 새창 도킹화 (detach / dock / pin / 투명 / 타이틀바 OFF)",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-04",
+      "recordFile": "harness/logs/mission-records/M0010-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-04T13:30:00+09:00",
+      "recordFinished": "2026-05-04T13:49:33+09:00",
+      "designFile": "Docs/design/M0010-webdev-detach-docking.pen",
+      "modified": "2026-05-04",
+      "size": 3136
+    },
     {
       "id": "M0009",
       "file": "harness/missions/M0009-토큰모니터링-플러그인.md",

@@ -92,16 +92,26 @@ function drawCore(viewEl, data) {
   const drawDetail = () => {
     const wf = data.workflows.find(w => w.id === STATE.current.core);
     if (!wf) { mount(detailPane, emptyState('Workflow not found.')); return; }
-    const open = h('button', {
-      class: 'btn',
-      onclick: () => { location.hash = `#workflow/${encodeURIComponent(wf.file)}`; },
-    }, 'Open source .md →');
-    const box = h('div', { class: 'md-viewer' }, [
+    // Core tab no longer offers "Open source .md" — Docs/harness/*.md was
+    // removed (commit aefe4c2) so the link 404'd on every Core entry. The
+    // sourceMermaid panel below replaces that affordance with the live
+    // file/class picture instead.
+    const children = [
       h('h2', {}, wf.label),
       h('p', {}, wf.description),
+      h('div', { class: 'wf-flow-label' }, 'High-level flow'),
       h('div', { class: 'mermaid', html: wf.mermaid }),
-      h('div', { style: { marginTop: '16px' } }, [open]),
-    ]);
+    ];
+    if (wf.sourceMermaid) {
+      children.push(h('div', { class: 'wf-source-panel' }, [
+        h('div', { class: 'wf-source-head' }, [
+          h('span', { class: 'wf-source-title' }, 'Source files & classes'),
+          h('span', { class: 'wf-source-sub' }, 'in-repo references — open by Ctrl+click in your IDE'),
+        ]),
+        h('div', { class: 'mermaid', html: wf.sourceMermaid }),
+      ]));
+    }
+    const box = h('div', { class: 'md-viewer' }, children);
     mount(detailPane, box);
     if (window.mermaid) {
       mermaid.run({ nodes: box.querySelectorAll('.mermaid') }).catch(e => console.warn('mermaid', e));

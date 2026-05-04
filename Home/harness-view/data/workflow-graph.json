@@ -1,54 +1,82 @@
 {
-  "_description": "Static — workflow graph for AgentZero Lite. Skill-system workflows are intentionally excluded (per project rule). Update when engine .md files change.",
+  "_description": "Static — workflow graph for AgentZero Lite. Each Core workflow has TWO diagrams: `mermaid` (high-level data/control flow) and `sourceMermaid` (the C#/XAML files & classes that implement it). The `file` field is informational only — `Docs/harness/` was removed (commit aefe4c2) so there is no canonical .md to open from the viewer; the source-files panel is the live reference instead. Skill-system workflows are intentionally excluded (per project rule).",
   "workflows": [
     {
       "id": "multi-cli",
       "label": "Multi-CLI Workflow",
-      "file": "Docs/harness/multi-cli-workflow.md",
       "description": "Multiple ConPTY tabs hosting different AI CLIs side by side; messages routed between them via WM_COPYDATA + bot-chat",
-      "mermaid": "graph LR\n  U[User] --> S[StageActor]\n  S --> W[WorkspaceActor]\n  W --> T1[Terminal: Claude]\n  W --> T2[Terminal: Codex]\n  T1 -. bot-chat --from .-> S\n  T2 -. bot-chat --from .-> S"
+      "mermaid": "graph LR\n  U[User] --> S[StageActor]\n  S --> W[WorkspaceActor]\n  W --> T1[Terminal: Claude]\n  W --> T2[Terminal: Codex]\n  T1 -. bot-chat --from .-> S\n  T2 -. bot-chat --from .-> S",
+      "sourceMermaid": "flowchart TB\n  subgraph WPF[Project/AgentZeroWpf]\n    MW[MainWindow.xaml.cs]\n    CPT[Services/ConPtyTerminalSession.cs]\n  end\n  subgraph Actors[Project/ZeroCommon/Actors]\n    SA[StageActor.cs]\n    WA[WorkspaceActor.cs]\n    TA[TerminalActor.cs]\n    AB[AgentBotActor.cs]\n  end\n  subgraph Seam[Project/ZeroCommon/Services]\n    ITS[ITerminalSession.cs]\n  end\n  MW --> SA\n  SA --> WA\n  WA --> TA\n  TA --> ITS\n  CPT -.implements.-> ITS\n  AB -.routes user input.-> SA"
     },
     {
       "id": "aimode-handshake",
       "label": "AIMODE — Identity-first Handshake",
-      "file": "Docs/harness/aimode-handshake.md",
       "description": "Local AgentBot first-contacts a peer terminal, the peer acks via -cli bot-chat with --from <peerName>, then substantive exchange begins",
-      "mermaid": "sequenceDiagram\n  participant U as User\n  participant B as AgentBot (local)\n  participant R as AgentReactorActor\n  participant P as Peer terminal\n  U->>B: \"Talk to the Claude tab\"\n  B->>R: StartReactor (Mode 2)\n  R->>P: send_to_terminal(handshake)\n  P->>B: bot-chat \"DONE(handshake-ok)\" --from Claude\n  R->>P: substantive turn\n  P->>B: real reply"
+      "mermaid": "sequenceDiagram\n  participant U as User\n  participant B as AgentBot (local)\n  participant R as AgentReactorActor\n  participant P as Peer terminal\n  U->>B: \"Talk to the Claude tab\"\n  B->>R: StartReactor (Mode 2)\n  R->>P: send_to_terminal(handshake)\n  P->>B: bot-chat \"DONE(handshake-ok)\" --from Claude\n  R->>P: substantive turn\n  P->>B: real reply",
+      "sourceMermaid": "flowchart LR\n  subgraph Bot[Project/ZeroCommon/Actors]\n    AB[AgentBotActor.cs<br/>_introducedTerminals HashSet]\n    AR[AgentReactorActor.cs<br/>StartReactor / Mode 2]\n    MSG[Messages.cs<br/>IntroduceTerminalIfFirst]\n  end\n  subgraph CLI[Project/AgentZeroWpf]\n    CH[CliHandler.cs<br/>bot-chat --from]\n  end\n  AB --> AR\n  AR --> MSG\n  CH -.WM_COPYDATA.-> AB"
     },
     {
       "id": "tool-call-loop",
       "label": "Tool-call Loop (dual backend)",
-      "file": "Docs/harness/tool-call-loop.md",
       "description": "Gemma path enforces structure via GBNF sampler; Nemotron path uses native Llama-3.1 chat template. Both share IAgentToolHost",
-      "mermaid": "flowchart TD\n  U[User prompt] --> L[AgentToolLoop]\n  L -->|Gemma path| GBNF[GBNF sampler<br/>5-tool catalog]\n  L -->|Nemotron path| TPL[Llama-3.1 chat template<br/>native tool channel]\n  GBNF --> P[Parse JSON]\n  TPL --> P\n  P --> H[IAgentToolHost<br/>WorkspaceTerminalToolHost]\n  H -->|tool result| L\n  L -->|loop until done| L"
+      "mermaid": "flowchart TD\n  U[User prompt] --> L[AgentToolLoop]\n  L -->|Gemma path| GBNF[GBNF sampler<br/>5-tool catalog]\n  L -->|Nemotron path| TPL[Llama-3.1 chat template<br/>native tool channel]\n  GBNF --> P[Parse JSON]\n  TPL --> P\n  P --> H[IAgentToolHost<br/>WorkspaceTerminalToolHost]\n  H -->|tool result| L\n  L -->|loop until done| L",
+      "sourceMermaid": "flowchart TB\n  subgraph Tools[Project/ZeroCommon/Llm/Tools]\n    ATL[AgentToolLoop.cs]\n    CT[ChatTemplates.cs<br/>Gemma + Llama31]\n    ATG[AgentToolGrammar.cs<br/>GBNF sampler]\n    IATH[IAgentToolHost.cs]\n  end\n  subgraph WPF[Project/AgentZeroWpf]\n    WTH[Services/WorkspaceTerminalToolHost.cs]\n  end\n  ATL --> CT\n  ATL --> ATG\n  ATL --> IATH\n  WTH -.implements.-> IATH"
     },
     {
       "id": "provider-switch",
       "label": "LLM Provider Switch",
-      "file": "Docs/harness/provider-switch.md",
       "description": "One Local/External radio in the LLM tab; factory returns the right ILlmProvider at runtime. Four hosted/local providers behind a single OpenAiCompatibleProvider",
-      "mermaid": "flowchart TD\n  S[\"LLM tab — Local · External\"] --> F[LlmProviderFactory]\n  F -->|Local| LH[\"LLamaSharp host<br/>Gemma 4 / Nemotron\"]\n  F -->|External| OAC[OpenAiCompatibleProvider]\n  OAC --> W[Webnori]\n  OAC --> O[OpenAI]\n  OAC --> LMS[LM Studio]\n  OAC --> OLL[Ollama]"
+      "mermaid": "flowchart TD\n  S[\"LLM tab — Local · External\"] --> F[LlmProviderFactory]\n  F -->|Local| LH[\"LLamaSharp host<br/>Gemma 4 / Nemotron\"]\n  F -->|External| OAC[OpenAiCompatibleProvider]\n  OAC --> W[Webnori]\n  OAC --> O[OpenAI]\n  OAC --> LMS[LM Studio]\n  OAC --> OLL[Ollama]",
+      "sourceMermaid": "flowchart TB\n  subgraph Llm[Project/ZeroCommon/Llm]\n    GW[LlmGateway.cs]\n    LLB[LocalLlmBackend.cs]\n  end\n  subgraph Providers[Project/ZeroCommon/Llm/Providers]\n    F[LlmProviderFactory.cs]\n    I[ILlmProvider.cs]\n    OAC[OpenAiCompatibleProvider.cs]\n  end\n  GW --> F\n  F --> I\n  OAC -.implements.-> I\n  LLB -.implements.-> I"
     },
     {
       "id": "voice-pipeline",
       "label": "Voice Pipeline (STT → LLM → TTS)",
-      "file": "Docs/harness/voice-pipeline.md",
       "description": "NAudio mic → dual-VAD → ISpeechToText → LlmGateway.OpenSession → ITextToSpeech → NAudio playback. Mute-while-playing prevents the loop talking to itself",
-      "mermaid": "flowchart LR\n  M[Mic<br/>NAudio<br/>16 kHz mono] --> V[VAD<br/>frame + utterance]\n  V -->|UtteranceEnded| STT[ISpeechToText]\n  STT -->|text| GW[LlmGateway.OpenSession]\n  GW -->|reply| CL[TtsTextCleaner]\n  CL --> TTS[ITextToSpeech]\n  TTS -->|audio bytes| PB[VoicePlaybackService]\n  PB -->|while playing| MUTE[Muted=true]\n  MUTE -.-> M"
+      "mermaid": "flowchart LR\n  M[Mic<br/>NAudio<br/>16 kHz mono] --> V[VAD<br/>frame + utterance]\n  V -->|UtteranceEnded| STT[ISpeechToText]\n  STT -->|text| GW[LlmGateway.OpenSession]\n  GW -->|reply| CL[TtsTextCleaner]\n  CL --> TTS[ITextToSpeech]\n  TTS -->|audio bytes| PB[VoicePlaybackService]\n  PB -->|while playing| MUTE[Muted=true]\n  MUTE -.-> M",
+      "sourceMermaid": "flowchart TB\n  subgraph Capture[Project/AgentZeroWpf/Services/Voice]\n    VCS[VoiceCaptureService.cs<br/>NAudio mic]\n    VPS[VoicePlaybackService.cs]\n    NPQ[NAudioPlaybackQueue.cs]\n  end\n  subgraph Streams[Project/ZeroCommon/Voice/Streams]\n    VC[VadConfig.cs]\n    VSF[VoiceSegmenterFlow.cs]\n    SWA[SttWorkerActor.cs]\n    TWA[TtsWorkerActor.cs]\n  end\n  subgraph Voice[Project/ZeroCommon/Voice]\n    ISTT[ISpeechToText.cs]\n    ITTS[ITextToSpeech.cs]\n    CLEAN[TtsTextCleaner.cs]\n    WL[WhisperLocalStt.cs]\n    OAS[OpenAiWhisperStt.cs]\n    WIN[WindowsTts.cs]\n  end\n  subgraph Actors[Project/ZeroCommon/Actors]\n    VSA[VoiceStreamActor.cs]\n  end\n  VCS --> VSF\n  VSF --> VC\n  VSF --> SWA\n  SWA --> ISTT\n  ISTT --> CLEAN\n  CLEAN --> TWA\n  TWA --> ITTS\n  ITTS --> VPS\n  VPS --> NPQ\n  WL -.impl.-> ISTT\n  OAS -.impl.-> ISTT\n  WIN -.impl.-> ITTS\n  VSA -.coordinates.-> SWA\n  VSA -.coordinates.-> TWA"
+    },
+    {
+      "id": "cli-gui-ipc",
+      "label": "CLI ↔ GUI IPC",
+      "description": "Single AgentZeroLite.exe in two modes: -cli sends WM_COPYDATA to the running GUI, GUI writes JSON to a named memory-mapped file with prefix AgentZeroLite_*, CLI polls and exits. Default 5s timeout; --no-wait skips the wait entirely.",
+      "mermaid": "sequenceDiagram\n  participant CLI as AgentZeroLite.exe -cli <cmd>\n  participant WIN as Win32 (WM_COPYDATA)\n  participant GUI as Running GUI (single instance)\n  participant MMF as Memory-mapped file\n  CLI->>WIN: marker 0x414C \"AL\" + cmd JSON\n  WIN->>GUI: WndProc receive\n  GUI->>GUI: dispatch (terminal / status / bot-chat)\n  GUI->>MMF: write response JSON\n  CLI->>MMF: poll AgentZeroLite_<id>\n  MMF-->>CLI: response\n  CLI-->>CLI: print + exit",
+      "sourceMermaid": "flowchart TB\n  subgraph CLI[Project/AgentZeroWpf]\n    CH[CliHandler.cs<br/>send WM_COPYDATA + poll MMF]\n    CIH[Module/CliTerminalIpcHelper.cs<br/>JSON build + MMF write]\n    APP[App.xaml.cs<br/>OnStartup branch on -cli]\n  end\n  subgraph GUI[Project/AgentZeroWpf/UI/APP]\n    MW[MainWindow.xaml.cs<br/>WndProc receive]\n  end\n  subgraph Wrap[Project/AgentZeroWpf]\n    PS[AgentZeroLite.ps1<br/>-NoNewWindow -Wait]\n  end\n  APP --> CH\n  CH -.WM_COPYDATA.-> MW\n  MW --> CIH\n  CIH -.MMF.-> CH\n  PS -.wraps.-> APP"
+    },
+    {
+      "id": "webdev-plugins",
+      "label": "WebDev Plugin System",
+      "description": "M0006 — Browser plugins for the WebDev sample panel. Manifest-driven discovery from %LOCALAPPDATA%/AgentZeroLite/Wasm/plugins/, install via .zip / Git URL / official catalog (GitHub Trees API), per-sample WebView2 cache so switching is instant and JS state survives.",
+      "mermaid": "flowchart LR\n  U[User] --> WP[WebDevPagePanel]\n  WP -->|select| SC[WebDevSampleCatalog]\n  SC -->|built-in| BR[Wasm/]\n  SC -->|installed| PR[%LOCALAPPDATA%/AgentZeroLite/Wasm/plugins/]\n  WP -->|+ Install| INS[InstallPluginPickerDialog]\n  INS -->|.zip| WPI[WebDevPluginInstaller]\n  INS -->|Git URL| WPI\n  INS -->|Official| OPC[OfficialPluginCatalog]\n  WPI --> PM[PluginManifest validate]\n  PM --> WV[WebView2 mount]\n  WV --> BG[WebDevBridge<br/>JS↔C# RPC]",
+      "sourceMermaid": "flowchart TB\n  subgraph Browser[Project/AgentZeroWpf/Services/Browser]\n    PM[PluginManifest.cs<br/>id/name/entry validate]\n    WSC[WebDevSampleCatalog.cs<br/>discovery]\n    WPI[WebDevPluginInstaller.cs<br/>zip-slip safe]\n    OPC[OfficialPluginCatalog.cs<br/>GitHub Trees API]\n    WH[WebDevHost.cs<br/>shared LLM/voice]\n    WB[WebDevBridge.cs<br/>JS↔.NET]\n  end\n  subgraph UI[Project/AgentZeroWpf/UI/Components]\n    WPP[WebDevPagePanel.xaml.cs<br/>per-sample ViewSlot cache]\n    WTP[WebDevTutorialPanel.xaml.cs]\n    IPD[InstallPluginPickerDialog.xaml.cs]\n  end\n  WPP --> WSC\n  WSC --> PM\n  WPP --> IPD\n  IPD --> WPI\n  IPD --> OPC\n  WPI --> PM\n  WPP --> WH\n  WPP --> WB"
+    },
+    {
+      "id": "webdev-floating",
+      "label": "WebDev Floating Window",
+      "description": "M0010 — Detach a plugin's WebView2 into a separate window. Reparenting only (no reload, no JS state loss); WindowChrome with custom 24-px titlebar; per-sample persistence (pin / opacity / chrome / x,y,w,h); Pin = Owner detach so main-window minimize doesn't pull it down.",
+      "mermaid": "stateDiagram-v2\n  [*] --> Docked\n  Docked --> Reparent: Detach button\n  Reparent --> Floating: Show()\n  Floating --> Reparent: ✕ / Dock back / chromeHandle drag\n  Reparent --> Docked: re-add to viewHost\n  Floating --> Floating: Pin → Owner=null<br/>Opacity slider<br/>Title bar toggle\n  Docked --> [*]: main window close",
+      "sourceMermaid": "flowchart TB\n  subgraph UI[Project/AgentZeroWpf/UI/Components]\n    WPP[WebDevPagePanel.xaml.cs<br/>_floatingBySampleId dict]\n    FWW[FloatingWebDevWindow.xaml.cs<br/>WindowChrome + chromeHandle]\n  end\n  subgraph Browser[Project/AgentZeroWpf/Services/Browser]\n    WFP[WebDevFloatingPrefs.cs<br/>per-sample JSON]\n  end\n  WPP -.reparent WebView2.-> FWW\n  FWW --> WFP\n  WPP --> WFP"
+    },
+    {
+      "id": "token-telemetry",
+      "label": "Token Usage Telemetry",
+      "description": "Cross-vendor LLM token observability. Tails Anthropic + Codex JSONL transcripts disk-side via incremental byte-offset checkpoints, dedups by message id, aggregates by vendor/account/model. Account aliasing for redacted ~/.claude/* directory swaps.",
+      "mermaid": "flowchart LR\n  CC[Claude Code<br/>~/.claude/*.jsonl] --> COL[Token collector<br/>incremental tail]\n  CX[Codex CLI<br/>~/.codex/*.jsonl] --> COL\n  COL -->|per-row| TUR[TokenUsageRecord]\n  TUR -->|aggregate| Q[TokenUsageQueryService]\n  Q --> DASH[Dashboard panel]\n  COL -.checkpoint.-> TSC[TokenSourceCheckpoint<br/>ByteOffset + LineCount]\n  COL -.account map.-> TAA[TokenAccountAlias]",
+      "sourceMermaid": "flowchart TB\n  subgraph Telemetry[Project/ZeroCommon/Telemetry]\n    TUC[TokenUsageCollector.cs]\n    TUQ[TokenUsageQueryService.cs]\n  end\n  subgraph Entities[Project/ZeroCommon/Data/Entities]\n    TUR[TokenUsageRecord.cs<br/>vendor/account/model/in/out/cache]\n    TSC[TokenSourceCheckpoint.cs<br/>per-file ByteOffset/LineCount]\n    TAA[TokenAccountAlias.cs<br/>profile dir → AccountKey]\n  end\n  TUC --> TUR\n  TUC --> TSC\n  TUC --> TAA\n  TUQ --> TUR"
     },
     {
       "id": "release-pipeline",
       "label": "Release Pipeline",
-      "file": "Docs/harness/release-pipeline.md",
       "description": "version.txt bump → annotated git tag → GitHub Actions builds win-x64 self-contained ZIP + Inno Setup installer → publishes to GitHub Releases",
-      "mermaid": "graph LR\n  V[version.txt bump] --> T[annotated git tag]\n  T --> P[git push --tags]\n  P --> GA[GitHub Actions]\n  GA --> Z[win-x64 ZIP]\n  GA --> I[Inno Setup installer]\n  Z --> R[GitHub Releases]\n  I --> R"
+      "mermaid": "graph LR\n  V[version.txt bump] --> T[annotated git tag]\n  T --> P[git push --tags]\n  P --> GA[GitHub Actions]\n  GA --> Z[win-x64 ZIP]\n  GA --> I[Inno Setup installer]\n  Z --> R[GitHub Releases]\n  I --> R",
+      "sourceMermaid": "flowchart TB\n  subgraph Repo[Project/AgentZeroWpf]\n    VT[version.txt]\n    CSP[AgentZeroWpf.csproj<br/>BumpVersionAfterBuild target]\n  end\n  subgraph CI[.github/workflows]\n    REL[release.yml<br/>tags v*]\n    PAG[pages.yml<br/>tags doc-v*]\n  end\n  subgraph Pack[installer/]\n    ISS[setup.iss<br/>Inno Setup]\n  end\n  CSP -.bumps.-> VT\n  VT --> REL\n  REL --> ISS"
     },
     {
       "id": "tech-doc-publish",
       "label": "Tech Doc Publishing (Notion → X)",
-      "file": "Docs/harness/tech-doc-publish.md",
       "description": "Vault-first English drafting in a separate Obsidian repo, then Notion AI-DOC publish, then X announcement (canonical pattern: title + URL + 🔗 backlinks + quote card)",
-      "mermaid": "flowchart LR\n  D[Vault draft<br/>D:\\MYNOTE\\Tech\\AgentZeroLite] --> A[Approval]\n  A --> N[Notion AI-DOC]\n  N --> V[Verify publish]\n  V --> X[X post — canonical]\n  X --> AN[Annotate vault]"
+      "mermaid": "flowchart LR\n  D[Vault draft<br/>D:\\MYNOTE\\Tech\\AgentZeroLite] --> A[Approval]\n  A --> N[Notion AI-DOC]\n  N --> V[Verify publish]\n  V --> X[X post — canonical]\n  X --> AN[Annotate vault]",
+      "sourceMermaid": "flowchart TB\n  subgraph Skill[.claude/skills/psmon-doc-writer]\n    SK[SKILL.md]\n  end\n  subgraph Vault[D:/MYNOTE/Tech/AgentZeroLite]\n    DR[drafts/*.md]\n    ST[Study/*.md]\n  end\n  subgraph External[External MCPs]\n    NO[Notion MCP]\n    XR[X via Atlassian/manual]\n  end\n  SK --> DR\n  DR --> NO\n  NO --> XR\n  XR -.annotate.-> ST"
     }
   ]
 }

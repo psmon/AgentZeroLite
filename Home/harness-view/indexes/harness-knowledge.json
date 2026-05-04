@@ -97,8 +97,8 @@
       "name": "missions-protocol.md",
       "title": "missions-protocol",
       "heading": "Missions protocol — file-based request management",
-      "size": 10749,
-      "modified": "2026-05-03"
+      "size": 12278,
+      "modified": "2026-05-04"
     },
     {
       "id": "harness/knowledge/test-runner/dotnet-test-execution.md",
@@ -222,8 +222,8 @@
           "type": "file",
           "name": "missions-protocol.md",
           "path": "tamer/missions-protocol.md",
-          "size": 10749,
-          "modified": "2026-05-03"
+          "size": 12278,
+          "modified": "2026-05-04"
         }
       ]
     },

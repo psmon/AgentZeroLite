@@ -22,7 +22,7 @@
       "fill": "#9D9D9D",
       "textGrowth": "fixed-width",
       "width": 1500,
-      "content": "Operator brief: WebDev 가 새창으로 분리될 수 있어야 하고 (개별 sample 단위, 일괄 X), 메인은 멀티-CLI 제어에 집중. WebView2 인스턴스는 reparent (재로딩 X) 되며, 창의 위치/크기/pin/opacity/chrome 은 sample 별로 영구 기억.",
+      "content": "As-built design (post-iteration). 작은 24-px titlebar 항상 표시 + Title bar 토글로 chromeHandle 8-px 모드 진입. Alt 관련 코드는 제거됨 (event-bubble 사이드이펙트). Pin 켜지면 Owner=null 로 detach 되어 메인 윈도우 minimize 영향 받지 않음. WebView2 instance 는 reparent 만 (재로딩 0).",
       "fontFamily": "Segoe UI",
       "fontSize": 14,
       "fontWeight": "normal"
@@ -1099,7 +1099,7 @@
               "type": "text",
               "id": "Hv1M3",
               "fill": "#E5E5E5",
-              "content": "▭  Title bar (off → Alt+drag)",
+              "content": "▭  Title bar",
               "fontFamily": "Inter",
               "fontSize": 11,
               "fontWeight": "normal"
@@ -1220,7 +1220,7 @@
               "fill": "#5F6F8E",
               "textGrowth": "fixed-width",
               "width": 276,
-              "content": "⚠  Title bar OFF → drag = Alt + 마우스 좌클릭 (WPF HwndSource 후크). 일반 좌클릭은 WebView2 로 전달.",
+              "content": "창 닫기 / ✕ / Dock back 메뉴 = 모두 reparent 후 메인 복귀 (WebView2 인스턴스 절대 dispose 안 함).",
               "lineHeight": 1.4,
               "fontFamily": "Inter",
               "fontSize": 9,
@@ -1232,44 +1232,11 @@
               "fill": "#5F6F8E",
               "textGrowth": "fixed-width",
               "width": 276,
-              "content": "창 닫기 = Dock back (WebView2 인스턴스는 살아서 main 으로 reparent — 재로딩 없음).",
+              "content": "Title bar OFF 시 진입경로는 창 최상단 8-px 파란 띠 (chromeHandle) — 자세한 동작은 F5 참고.",
               "lineHeight": 1.4,
               "fontFamily": "Inter",
               "fontSize": 9,
               "fontWeight": "normal"
-            },
-            {
-              "type": "frame",
-              "id": "V4f3BA",
-              "name": "altHintRow",
-              "fill": "#1F2A4ACC",
-              "cornerRadius": 3,
-              "gap": 6,
-              "padding": [
-                6,
-                8
-              ],
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "DEV2f",
-                  "fill": "#3DA0FF",
-                  "content": "Alt + 드래그",
-                  "fontFamily": "Inter",
-                  "fontSize": 9,
-                  "fontWeight": "700"
-                },
-                {
-                  "type": "text",
-                  "id": "Ermk8",
-                  "fill": "#9D9D9D",
-                  "content": "= titleless 창 이동 (오른쪽 메뉴에도 안내 표시)",
-                  "fontFamily": "Inter",
-                  "fontSize": 9,
-                  "fontWeight": "normal"
-                }
-              ]
             }
           ]
         }
@@ -1282,7 +1249,7 @@
       "y": 498,
       "name": "f5Label",
       "fill": "#7ED9A0",
-      "content": "F5 — Floating window (chrome OFF + opacity 0.7 + Pin) — titleless overlay",
+      "content": "F5 — chrome OFF 상태: 8-px chromeHandle 띠 + 동작 매핑 (Alt 제거됨)",
       "fontFamily": "Segoe UI",
       "fontSize": 14,
       "fontWeight": "700"
@@ -1301,89 +1268,186 @@
       "stroke": {
         "align": "inside",
         "thickness": 1,
-        "fill": "#3DA0FF"
+        "fill": "#3F3F46"
       },
       "layout": "vertical",
       "children": [
         {
           "type": "frame",
-          "id": "M3Eat",
-          "name": "f5Body",
+          "id": "Wbv9L",
+          "name": "f5Outer",
           "width": "fill_container",
           "height": "fill_container",
-          "fill": "#0E1422B3",
-          "justifyContent": "center",
-          "alignItems": "center",
+          "fill": "#0A0A14",
+          "layout": "vertical",
           "children": [
             {
               "type": "frame",
-              "id": "yyhSx",
-              "name": "f5Inner",
-              "layout": "vertical",
-              "gap": 10,
-              "padding": 24,
+              "id": "OYs4W",
+              "name": "f5Strip",
+              "width": "fill_container",
+              "height": 8,
+              "fill": "#3DA0FF"
+            },
+            {
+              "type": "frame",
+              "id": "gC6IG",
+              "name": "f5Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#0E1422",
+              "justifyContent": "center",
               "alignItems": "center",
               "children": [
                 {
-                  "type": "text",
-                  "id": "u4JZ05",
-                  "fill": "#7ED9A0",
-                  "content": "WebView2 — voice-test",
-                  "fontFamily": "Inter",
-                  "fontSize": 14,
-                  "fontWeight": "700"
-                },
-                {
-                  "type": "text",
-                  "id": "p4yVtu",
-                  "fill": "#3DA0FF",
-                  "content": "chrome OFF · opacity 0.7 · pin ON",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "700"
-                },
-                {
-                  "type": "text",
-                  "id": "MQOyl",
-                  "fill": "#5F6F8E",
-                  "textGrowth": "fixed-width",
-                  "width": 380,
-                  "content": "WPF 구현: WindowStyle=None + AllowsTransparency=true 로 항상 시작. chrome OFF 면 커스텀 titlebar 만 숨김 — 창 자체는 Alt+드래그 (HwndSource 후크) 로 이동, 우클릭 메뉴로도 복귀/dock-back 진입 가능.",
-                  "lineHeight": 1.5,
-                  "textAlign": "center",
-                  "fontFamily": "Inter",
-                  "fontSize": 10,
-                  "fontWeight": "normal"
-                },
-                {
                   "type": "frame",
-                  "id": "h3fube",
-                  "name": "f5HintBox",
-                  "fill": "#1F2A4ACC",
-                  "cornerRadius": 4,
-                  "gap": 6,
-                  "padding": [
-                    6,
-                    10
-                  ],
+                  "id": "c1IaC",
+                  "name": "f5Inner",
+                  "layout": "vertical",
+                  "gap": 14,
+                  "padding": 24,
                   "alignItems": "center",
                   "children": [
                     {
                       "type": "text",
-                      "id": "Yoe5g",
-                      "fill": "#3DA0FF",
-                      "content": "Right-click",
+                      "id": "Y4XF5Y",
+                      "fill": "#7ED9A0",
+                      "content": "WebView2 — voice-test",
                       "fontFamily": "Inter",
-                      "fontSize": 10,
+                      "fontSize": 14,
                       "fontWeight": "700"
                     },
                     {
                       "type": "text",
-                      "id": "D7yFB",
+                      "id": "W3bKB",
                       "fill": "#9D9D9D",
-                      "content": "to bring chrome back / dock back",
+                      "textGrowth": "fixed-width",
+                      "width": 380,
+                      "content": "chrome OFF — titlebar/footer collapsed, only the 8-px blue strip above stays visible",
+                      "lineHeight": 1.5,
+                      "textAlign": "center",
                       "fontFamily": "Inter",
-                      "fontSize": 10,
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "gzIaE",
+                      "name": "f5MapBox",
+                      "fill": "#15151A",
+                      "cornerRadius": 6,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1,
+                        "fill": "#3DA0FF"
+                      },
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": 14,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "gc6Qy",
+                          "fill": "#3DA0FF",
+                          "content": "chromeHandle 동작 (창 최상단 8-px 띠)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "y60HOM",
+                          "name": "f5Map1",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "yy94d",
+                              "fill": "#FFE48A",
+                              "content": "드래그",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "U2NGAU",
+                              "fill": "#9D9D9D",
+                              "content": "= 창 이동 (네이티브 DragMove)",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "mra1t",
+                          "name": "f5Map2",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "af91X",
+                              "fill": "#FFE48A",
+                              "content": "단일 클릭",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "pmxsP",
+                              "fill": "#9D9D9D",
+                              "content": "= titlebar 즉시 복원 (좌표 변화 < 1px 감지)",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "k7aXmb",
+                          "name": "f5Map3",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "STg0s",
+                              "fill": "#FFE48A",
+                              "content": "우클릭",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "mkl4P",
+                              "fill": "#9D9D9D",
+                              "content": "= 설정 메뉴 (Pin / Title bar / Transparency / …)",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "XgLX0",
+                      "fill": "#5F6F8E",
+                      "textGrowth": "fixed-width",
+                      "width": 400,
+                      "content": "Alt 키 / dragOverlay / WebView2 ContextMenuRequested 후킹은 모두 제거됨 — 단일 진입경로만 유지",
+                      "lineHeight": 1.5,
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 9,
                       "fontWeight": "normal"
                     }
                   ]
@@ -1777,7 +1841,7 @@
           "id": "o383Ja",
           "name": "f7Title",
           "fill": "#E5E5E5",
-          "content": "State machine — WebView2 instance lives, only its Visual parent moves",
+          "content": "State machine — WebView2 instance 살아있고 visual parent 만 swap. Pin 토글 = Owner detach (메인 minimize 영향 차단).",
           "fontFamily": "Inter",
           "fontSize": 14,
           "fontWeight": "700"
@@ -2040,7 +2104,7 @@
                   "fill": "#9D9D9D",
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "content": "{ \"voice-test\": { topmost:true, opacity:0.7, chrome:false, x:1480, y:220, w:720, h:480 }, \"chat-test\": { … } }",
+                  "content": "{ \"voice-test\": { topmost:true, opacity:0.7, chrome:true, x:1480, y:220, w:720, h:480 }, \"chat-test\": { … } }",
                   "lineHeight": 1.4,
                   "fontFamily": "Inter",
                   "fontSize": 10,
@@ -2153,6 +2217,45 @@
                   "fontFamily": "Inter",
                   "fontSize": 10,
                   "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "g5RqfQ",
+                  "name": "pinInv",
+                  "fill": "#FFE48A",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· Pin (Topmost) ON 시 Owner=null 로 detach → 메인 윈도우 minimize/restore/activation 영향 없음. Pin OFF 면 Owner 다시 attach.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "LQK8n",
+                  "name": "noAltInv",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· Alt 키 기반 진입경로 (overlay/right-click/move) 는 의도적으로 제거 — event-bubble 사이드이펙트 + WebView2 HwndHost 가 가로채는 신뢰성 문제.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "EA1RX",
+                  "name": "chromeInv",
+                  "fill": "#9D9D9D",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· chrome OFF 시 titlebar + footer 모두 collapse, chromeHandle 8-px 만 자기 row 에 노출 (HwndHost airspace 안 가려지는 위치).",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "normal"
                 }
               ]
             }
