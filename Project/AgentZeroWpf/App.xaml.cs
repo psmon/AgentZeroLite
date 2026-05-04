@@ -113,11 +113,32 @@ public partial class App : Application
         // account has the wrapper installed (snapshots dir won't exist).
         try
         {
+            // M0012: keep wrapper.js on disk in sync with this build's
+            // embedded WrapperScript (idempotent overwrite per app launch).
+            // Existing v2 installs auto-upgrade to v3 the next time the
+            // app launches; settings.json statusLine command is the same
+            // shape so we don't need to retouch each profile.
+            AgentZeroWpf.Services.Browser.StatusLineWrapperInstaller.EnsureWrapperOnDisk();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[StatusLineWrapper] EnsureWrapperOnDisk failed", ex);
+        }
+        try
+        {
             TokenRemainingCollector.Instance.Start();
         }
         catch (Exception ex)
         {
             AppLogger.LogError("[TokenRemainingCollector] start failed", ex);
+        }
+        try
+        {
+            SessionHeartbeatCollector.Instance.Start();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[SessionHeartbeatCollector] start failed", ex);
         }
 
         if (cliDebug || vsDebug)
@@ -150,6 +171,9 @@ public partial class App : Application
 
         try { TokenRemainingCollector.Instance.Stop(); }
         catch (Exception ex) { AppLogger.LogError("[TokenRemainingCollector] stop error", ex); }
+
+        try { SessionHeartbeatCollector.Instance.Stop(); }
+        catch (Exception ex) { AppLogger.LogError("[SessionHeartbeatCollector] stop error", ex); }
 
         // CoordinatedShutdown — fire-and-forget. UI 스레드를 블로킹하지 않고,
         // Akka가 exit-clr=on 설정에 따라 단계 완료 후 Environment.Exit(0)을 호출한다.

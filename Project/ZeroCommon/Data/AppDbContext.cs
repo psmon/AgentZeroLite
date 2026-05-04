@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<TokenSourceCheckpoint> TokenSourceCheckpoints => Set<TokenSourceCheckpoint>();
     public DbSet<TokenAccountAlias> TokenAccountAliases => Set<TokenAccountAlias>();
     public DbSet<TokenRemainingObservation> TokenRemainingObservations => Set<TokenRemainingObservation>();
+    public DbSet<SessionHeartbeat> SessionHeartbeats => Set<SessionHeartbeat>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -71,6 +72,14 @@ public class AppDbContext : DbContext
         mb.Entity<TokenRemainingObservation>()
             .HasIndex(o => new { o.AccountKey, o.Model, o.ObservedAtUtc })
             .IsDescending(false, false, true);
+
+        // SessionHeartbeat — UPSERT key + active-window scan.
+        mb.Entity<SessionHeartbeat>()
+            .HasIndex(h => new { h.AccountKey, h.SessionId })
+            .IsUnique();
+        mb.Entity<SessionHeartbeat>()
+            .HasIndex(h => h.LastSeenUtc)
+            .IsDescending(true);
     }
 
     public static void InitializeDatabase()

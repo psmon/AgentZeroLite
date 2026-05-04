@@ -80,6 +80,9 @@
     textBgColor: '#0F1115',
     textOpacity: 55,
     hiddenModels: {},
+    // M0012 — Active Session panel
+    showActivePanel:   true,
+    activeWindowMin:   5,
   };
   function loadPrefs() {
     try { return Object.assign({}, defaults, JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')); }
@@ -130,6 +133,34 @@
     if (ms < 3600000) return Math.round(ms / 60000) + 'm ago';
     if (ms < 86400000) return Math.round(ms / 3600000) + 'h ago';
     return Math.round(ms / 86400000) + 'd ago';
+  }
+  // Compact age for the active-session table — "12s", "2m 14s", "4m 32s".
+  // No "ago" suffix to keep the column tight (it's already labeled AGE).
+  function fmtAgeShort(iso) {
+    if (!iso) return '—';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (isNaN(ms) || ms < 0) return '—';
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return s + 's';
+    const m = Math.floor(s / 60);
+    const remS = s % 60;
+    if (m < 60) return remS ? m + 'm ' + remS + 's' : m + 'm';
+    const h = Math.floor(m / 60);
+    return h + 'h ' + (m % 60) + 'm';
+  }
+  function ageThresholdClass(iso) {
+    if (!iso) return '';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (isNaN(ms) || ms < 0) return '';
+    if (ms < 60000) return 'ok';
+    if (ms < 180000) return 'warn';
+    return 'bad';
+  }
+  function basenameOf(p) {
+    if (!p) return '';
+    const trimmed = String(p).replace(/[\\\/]+$/, '');
+    const m = trimmed.match(/[^\\\/]+$/);
+    return m ? m[0] : trimmed;
   }
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>'"]/g, c =>
@@ -274,6 +305,102 @@
     catch { return 'dark'; }
   }
 
+  // ─── Active Session panel (M0012) ─────────────────────────────
+  async function renderActivePanel() {
+    const panel = $('activePanel');
+    if (!panel) return;
+    if (!prefs.showActivePanel) { panel.hidden = true; return; }
+    panel.hidden = false;
+
+    const eff = effectiveTheme();
+    panel.className = 'as ' + (eff === 'light' ? 'as--light' : 'as--dark');
+
+    const window_ = Math.max(1, Math.min(60, +prefs.activeWindowMin || 5));
+    const data = await safe('activeSessions()',
+      () => window.zero.tokens.remaining.activeSessions(window_),
+      { windowMinutes: window_, sessions: [], collector: { totalRows: 0, lastTickUtc: null } });
+
+    const sessions = data.sessions || [];
+    const collector = data.collector || {};
+
+    const winOptions = [1, 3, 5, 10, 15].map(v =>
+      `<option value="${v}"${v === window_ ? ' selected' : ''}>${v} min</option>`).join('');
+
+    const tickAge = fmtAge(collector.lastTickUtc);
+    const totalRows = collector.totalRows || 0;
+
+    if (!sessions.length) {
+      panel.innerHTML =
+        '<div class="as__hdr">'
+        + '<div><div class="as__title">Active Sessions</div>'
+        + '<div class="as__sub">window ' + window_ + ' min · tick ' + tickAge + '</div></div>'
+        + '<div class="as__on">● ON</div>'
+        + '</div>'
+        + '<div class="as__sep"></div>'
+        + '<div class="as__empty">No sessions in the last ' + window_ + ' min. Start a Claude Code session in any installed account to see it here.</div>'
+        + '<div class="as__foot">'
+        + '<span>DB rows: ' + totalRows + ' · heartbeat tick ' + tickAge + '</span>'
+        + '<span><select class="as__win" id="asWindow" title="Active window">' + winOptions + '</select> '
+        + '<button class="as__refresh" id="asRefresh" title="Force a heartbeat tick">⟳ refresh</button></span>'
+        + '</div>';
+    } else {
+      const rows = sessions.map(s => {
+        const ageCls = ageThresholdClass(s.lastSeenUtc);
+        const sessShort = (s.sessionId || '').slice(0, 6) + '…';
+        const proj = basenameOf(s.projectDir || s.cwd);
+        const acctCls = (s.accountKey || '').toLowerCase().includes('qa') ? ' as--qa' : '';
+        return '<tr>'
+          + '<td><span class="as__cell-acct' + acctCls + '">' + escapeHtml(s.accountKey) + '</span></td>'
+          + '<td class="as__cell-model">' + escapeHtml(s.model || '—') + '</td>'
+          + '<td class="as__cell-proj" title="' + escapeHtml(s.projectDir || s.cwd || '') + '">' + escapeHtml(proj) + '</td>'
+          + '<td class="as__cell-sess" data-full="' + escapeHtml(s.sessionId) + '" title="Click to copy full session id\n' + escapeHtml(s.sessionId) + '">' + escapeHtml(sessShort) + '</td>'
+          + '<td class="as__cell-age ' + ageCls + '">' + fmtAgeShort(s.lastSeenUtc) + '</td>'
+          + '</tr>';
+      }).join('');
+
+      panel.innerHTML =
+        '<div class="as__hdr">'
+        + '<div><div class="as__title">Active Sessions</div>'
+        + '<div class="as__sub">' + sessions.length + ' active · window ' + window_ + ' min · tick ' + tickAge + '</div></div>'
+        + '<div class="as__on">● ON</div>'
+        + '</div>'
+        + '<div class="as__sep"></div>'
+        + '<table class="as__tbl">'
+        + '<thead><tr><th>ACCT</th><th>MODEL</th><th>PROJECT</th><th>SESS</th><th style="text-align:right;">AGE</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table>'
+        + '<div class="as__sep--soft" style="margin-top:8px;"></div>'
+        + '<div class="as__foot">'
+        + '<span>DB rows: ' + totalRows + ' · heartbeat tick ' + tickAge + '</span>'
+        + '<span><select class="as__win" id="asWindow" title="Active window">' + winOptions + '</select> '
+        + '<button class="as__refresh" id="asRefresh" title="Force a heartbeat tick">⟳ refresh</button></span>'
+        + '</div>';
+
+      // Click-to-copy session id.
+      panel.querySelectorAll('.as__cell-sess').forEach(el => {
+        el.onclick = async () => {
+          const full = el.dataset.full;
+          if (!full) return;
+          try { await navigator.clipboard.writeText(full); banner('INFO', 'Copied session id: ' + full); }
+          catch (e) { banner('WARN', 'Copy failed: ' + (e.message || e)); }
+        };
+      });
+    }
+
+    // Wire window selector + refresh.
+    const winEl = $('asWindow');
+    if (winEl) winEl.onchange = () => {
+      prefs.activeWindowMin = +winEl.value || 5;
+      savePrefs(prefs);
+      renderActivePanel().catch(e => warn('window-change render', e));
+    };
+    const refEl = $('asRefresh');
+    if (refEl) refEl.onclick = async () => {
+      await safe('activeSessionsRefresh()',
+        () => window.zero.tokens.remaining.activeSessionsRefresh(), null);
+      await renderActivePanel();
+    };
+  }
+
   // ─── Settings dialog ──────────────────────────────────────────
   async function openSettings() {
     $('settings').hidden = false;
@@ -397,8 +524,18 @@
   };
   $('btnRefresh').onclick = async () => {
     await safe('refresh()', () => window.zero.tokens.remaining.refresh(), null);
+    await safe('activeSessionsRefresh()', () => window.zero.tokens.remaining.activeSessionsRefresh(), null);
     await renderWidget();
+    await renderActivePanel();
   };
+  $('btnTogglePanel').onclick = () => {
+    prefs.showActivePanel = !prefs.showActivePanel;
+    savePrefs(prefs);
+    $('btnTogglePanel').classList.toggle('on', prefs.showActivePanel);
+    renderActivePanel().catch(e => warn('toggle render', e));
+  };
+  // Initial sync of toggle button state from prefs.
+  $('btnTogglePanel').classList.toggle('on', prefs.showActivePanel);
   $('btnSettings').onclick = () => { openSettings().catch(e => banner('ERR', 'openSettings failed: ' + (e.message || e))); };
   $('settingsClose').onclick = closeSettings;
 
@@ -446,6 +583,7 @@
     timer = setInterval(() => {
       log('timer fire');
       renderWidget().catch(e => warn('timer renderWidget', e));
+      renderActivePanel().catch(e => warn('timer renderActivePanel', e));
       rebuildAcctPicker().catch(e => warn('timer rebuildAcctPicker', e));
     }, ms);
   }
@@ -458,12 +596,20 @@
     });
     log('onTick subscribed');
   } catch (e) { warn('onTick subscribe failed', e); }
+  try {
+    window.zero.tokens.remaining.onActiveSessionsTick((s) => {
+      log('host activeSessions tick event', s);
+      renderActivePanel().catch(e => warn('tick renderActivePanel', e));
+    });
+    log('onActiveSessionsTick subscribed');
+  } catch (e) { warn('onActiveSessionsTick subscribe failed', e); }
 
   // ─── Initial load ─────────────────────────────────────────────
   (async function boot() {
     try {
       await rebuildAcctPicker();
       await renderWidget();
+      await renderActivePanel();
       restartTimer();
       log('boot complete');
     } catch (e) {

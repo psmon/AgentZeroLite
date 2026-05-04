@@ -181,6 +181,17 @@
         refresh:    ()           => invoke('tokens.remaining.refresh'),
         reset:      ()           => invoke('tokens.remaining.reset'),
         onTick:     (handler)    => on('tokens.remaining.tick', handler),
+
+        // Active session panel surface (M0012) — sessions whose
+        // statusLine wrapper has ticked within `windowMinutes` (default 5).
+        // Distinct from the rate-limit telemetry above; both ride on the
+        // same wrapper but have separate tables and tick cadences.
+        activeSessions: (windowMinutes) =>
+          invoke('tokens.remaining.activeSessions',
+            windowMinutes == null ? {} : { windowMinutes }),
+        activeSessionsRefresh: () => invoke('tokens.remaining.activeSessions.refresh'),
+        activeSessionsStatus:  () => invoke('tokens.remaining.activeSessions.status'),
+        onActiveSessionsTick:  (handler) => on('tokens.remaining.activeSessions.tick', handler),
       },
     },
   };

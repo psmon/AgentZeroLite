@@ -64,6 +64,7 @@ public sealed class WebDevBridge
 
         TokenUsageCollector.Instance.TickCompleted += OnTokenTick;
         TokenRemainingCollector.Instance.TickCompleted += OnTokenRemainingTick;
+        SessionHeartbeatCollector.Instance.TickCompleted += OnSessionHeartbeatTick;
     }
 
     public void Detach()
@@ -80,6 +81,7 @@ public sealed class WebDevBridge
         }
         try { TokenUsageCollector.Instance.TickCompleted -= OnTokenTick; } catch { }
         try { TokenRemainingCollector.Instance.TickCompleted -= OnTokenRemainingTick; } catch { }
+        try { SessionHeartbeatCollector.Instance.TickCompleted -= OnSessionHeartbeatTick; } catch { }
     }
 
     private void OnTokenTick(TokenUsageCollector.TickSummary s)
@@ -101,6 +103,16 @@ public sealed class WebDevBridge
             rowsSkippedSamePct  = s.RowsSkippedSamePercent,
             finishedAt          = s.FinishedAtUtc,
             error               = s.Error,
+        });
+
+    private void OnSessionHeartbeatTick(SessionHeartbeatCollector.TickSummary s)
+        => PostEvent("tokens.remaining.activeSessions.tick", new
+        {
+            filesScanned = s.FilesScanned,
+            rowsUpserted = s.RowsUpserted,
+            rowsPruned   = s.RowsPruned,
+            finishedAt   = s.FinishedAtUtc,
+            error        = s.Error,
         });
 
     private void OnNoteTranscript(string text)        => PostEvent("note.transcript", new { text });
@@ -385,6 +397,31 @@ public sealed class WebDevBridge
                 var summary = TokenRemainingCollector.Instance.ResetData();
                 return new { rowsDeleted = summary.RowsDeleted, snapshotFilesDeleted = summary.SnapshotFilesDeleted };
             }
+
+            // ─── Active session panel surface (M0012) ──────────────────
+            case "tokens.remaining.activeSessions":
+            {
+                var minutes = TryGetInt(args, "windowMinutes") ?? 5;
+                var window = TimeSpan.FromMinutes(Math.Max(1, Math.Min(60, minutes)));
+                return new {
+                    windowMinutes = (int)window.TotalMinutes,
+                    sessions  = SessionHeartbeatQueryService.GetActive(window),
+                    collector = SessionHeartbeatQueryService.GetCollectorState(),
+                };
+            }
+            case "tokens.remaining.activeSessions.refresh":
+            {
+                var summary = await SessionHeartbeatCollector.Instance.TickNowAsync();
+                return new {
+                    filesScanned = summary.FilesScanned,
+                    rowsUpserted = summary.RowsUpserted,
+                    rowsPruned   = summary.RowsPruned,
+                    finishedAt   = summary.FinishedAtUtc,
+                    error        = summary.Error,
+                };
+            }
+            case "tokens.remaining.activeSessions.status":
+                return SessionHeartbeatQueryService.GetCollectorState();
 
             default:
                 throw new InvalidOperationException($"unknown op '{op}'");

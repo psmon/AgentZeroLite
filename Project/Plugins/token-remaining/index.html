@@ -25,11 +25,14 @@
     <select id="acctPicker" class="bar__sel" title="Active account"></select>
     <span class="bar__sub" id="acctSub">—</span>
     <span class="bar__spacer"></span>
+    <button class="bar__toggle on" id="btnTogglePanel" title="Toggle Active Sessions panel">▦ sessions</button>
     <button class="bar__btn" id="btnRefresh" title="Force a collector tick">⟳</button>
     <button class="bar__btn" id="btnSettings" title="Settings">⚙</button>
   </div>
 
   <section id="widget" class="w w--dark"></section>
+
+  <section id="activePanel" class="as as--dark"></section>
 
   <p id="emptyHint" class="hint" hidden>
     No observations yet for this account. The wrapper writes a snapshot every Claude

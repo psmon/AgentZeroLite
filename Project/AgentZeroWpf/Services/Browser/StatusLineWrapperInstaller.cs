@@ -528,11 +528,27 @@ public static class StatusLineWrapperInstaller
     //      something instead of a blank line.
     private const string WrapperScript = """
 #!/usr/bin/env node
-// AgentZero statusLine wrapper — installed by AgentZeroLite.
-// Captures Claude Code's rate-limit telemetry into per-account snapshot
-// files; pipes stdin through to a downstream statusLine command if one
-// was registered before install (so claude-hud etc. keep working).
+// AgentZero statusLine wrapper v3.0 — installed by AgentZeroLite.
+// Captures Claude Code's rate-limit telemetry + session heartbeat into
+// per-session snapshot files; pipes stdin through to a downstream
+// statusLine command if one was registered before install (so claude-hud
+// etc. keep working).
+//
+// v3 layout (M0012):
+//   cc-hud-snapshots/{account}/{sessionId}.json   — one per active session,
+//                                                   captures session_id /
+//                                                   cwd / workspace.project_dir
+//                                                   alongside the rate-limit
+//                                                   snapshot, so the host can
+//                                                   answer "which sessions are
+//                                                   currently active".
+//   cc-hud-snapshots/_wrapper.log                 — rolling diagnostic
+// Pre-v3 wrote `cc-hud-snapshots/{account}.json` flat (concurrent sessions
+// for the same account would overwrite each other). On first tick, v3
+// removes the stale flat file for its own account.
 'use strict';
+
+const WRAPPER_VERSION = '3.0';
 
 const fs = require('fs');
 const path = require('path');
@@ -562,8 +578,31 @@ if (!pipe && pipeFile) {
 
 const baseDir = path.join(process.env.LOCALAPPDATA || '', 'AgentZeroLite');
 const snapshotsDir = path.join(baseDir, 'cc-hud-snapshots');
-try { fs.mkdirSync(snapshotsDir, { recursive: true }); } catch {}
-const snapshotFile = path.join(snapshotsDir, account + '.json');
+const acctDir = path.join(snapshotsDir, account);
+try { fs.mkdirSync(acctDir, { recursive: true }); } catch {}
+
+// One-time cleanup: pre-v3 wrote `cc-hud-snapshots/{account}.json` flat.
+// If that's still around, it'll be picked up by collectors as a stale
+// snapshot. Remove on first chance — the v3 per-session writes below
+// supersede it.
+try {
+  const legacyFlat = path.join(snapshotsDir, account + '.json');
+  if (fs.existsSync(legacyFlat) && fs.statSync(legacyFlat).isFile()) {
+    fs.unlinkSync(legacyFlat);
+  }
+} catch {}
+
+// SessionId can come from stdin only — until we have it, we don't know
+// where to write the snapshot. The actual path is built per-tick after
+// parse. Validate the id to keep it on the safe side of the filesystem
+// (no path traversal, no Windows reserved chars).
+function safeSessionId(id) {
+  if (!id || typeof id !== 'string') return '';
+  // Claude Code session_id is a UUID — accept anything that's
+  // path-safe and not too long.
+  const cleaned = id.replace(/[^A-Za-z0-9\-_]/g, '').slice(0, 64);
+  return cleaned || '';
+}
 
 // Rolling diagnostic log — last ~64KB. Helps catch stdin parsing /
 // model-detection / pipe-spawn issues without flying blind. Trimmed by
@@ -647,6 +686,7 @@ process.stdin.on('end', () => {
 
   // 1. Snapshot — rewrite atomically.
   let parsed = null, model = '', fhPct = 0, fhReset = 0, sdPct = 0, sdReset = 0;
+  let sessionId = '', cwd = '', projectDir = '';
   try {
     parsed = JSON.parse(stdin);
     model = parsed && parsed.model && parsed.model.display_name ? parsed.model.display_name : '';
@@ -659,20 +699,36 @@ process.stdin.on('end', () => {
       sdPct = Math.round(Number(r.seven_day.used_percentage) || 0);
       sdReset = Number(r.seven_day.resets_at) || 0;
     }
-    dlog('parsed model="' + model + '" fh=' + fhPct + '% sd=' + sdPct + '% hasRL=' + (!!parsed.rate_limits));
+    sessionId = safeSessionId(parsed && parsed.session_id);
+    cwd = (parsed && typeof parsed.cwd === 'string') ? parsed.cwd : '';
+    const ws = parsed && parsed.workspace;
+    if (ws && typeof ws === 'object') {
+      projectDir = (typeof ws.project_dir === 'string' && ws.project_dir) ? ws.project_dir
+                 : (typeof ws.current_dir === 'string' ? ws.current_dir : '');
+      if (!cwd && typeof ws.current_dir === 'string') cwd = ws.current_dir;
+    }
+    dlog('parsed sess=' + (sessionId ? sessionId.slice(0, 8) + '...' : '<none>')
+         + ' model="' + model + '" fh=' + fhPct + '% sd=' + sdPct + '%'
+         + ' cwd=' + JSON.stringify(cwd ? cwd.slice(-40) : '')
+         + ' proj=' + JSON.stringify(projectDir ? projectDir.slice(-40) : ''));
   } catch (e) {
     dlog('parse-error ' + (e && e.message || e));
   }
 
-  if (model) {
+  if (model && sessionId) {
     try {
       const snap = {
+        wrapperVersion: WRAPPER_VERSION,
         account,
+        sessionId,
+        cwd,
+        projectDir,
         writtenAt: new Date().toISOString(),
         model,
         fiveHour: { usedPercentage: fhPct, resetsAt: fhReset },
         sevenDay: { usedPercentage: sdPct, resetsAt: sdReset },
       };
+      const snapshotFile = path.join(acctDir, sessionId + '.json');
       const tmp = snapshotFile + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(snap));
       try { fs.renameSync(tmp, snapshotFile); }
@@ -681,7 +737,7 @@ process.stdin.on('end', () => {
       dlog('snap-write-error ' + (e && e.message || e));
     }
   } else {
-    dlog('skip-snap (no model in stdin)');
+    dlog('skip-snap (model="' + model + '" sess="' + sessionId + '")');
   }
 
   // 2. Pipe-through, or standalone fallback.

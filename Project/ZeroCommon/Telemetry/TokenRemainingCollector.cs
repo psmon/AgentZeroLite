@@ -129,7 +129,12 @@ public sealed class TokenRemainingCollector
             using var db = new AppDbContext();
             db.Database.EnsureCreated();
 
-            foreach (var file in Directory.EnumerateFiles(SnapshotsDir, "*.json"))
+            // v3 layout: snapshots live at SnapshotsDir/{account}/{sessionId}.json
+            // (one file per session). v2 wrote SnapshotsDir/{account}.json
+            // (flat) — wrapper v3 deletes those on first tick, but if the
+            // user's wrapper hasn't upgraded yet we still want to see them.
+            // Recurse so both layouts work.
+            foreach (var file in Directory.EnumerateFiles(SnapshotsDir, "*.json", SearchOption.AllDirectories))
             {
                 if (ct.IsCancellationRequested) break;
                 files++;

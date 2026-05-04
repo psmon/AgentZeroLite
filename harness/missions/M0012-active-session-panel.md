@@ -3,10 +3,11 @@ id: M0012
 title: Token-Remaining 위젯 단순화 + Active Session 패널 분리
 operator: psmon
 language: ko
-status: in_progress
+status: done
 priority: medium
 created: 2026-05-04
 started: 2026-05-04T22:30:00+09:00
+finished: 2026-05-04T23:10:00+09:00
 related: [M0011]
 ---
 
