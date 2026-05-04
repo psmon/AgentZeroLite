@@ -186,11 +186,7 @@
     for (const a of accts) {
       const opt = document.createElement('option');
       opt.value = a.accountKey;
-      const tags = [];
-      if (a.ourWrapperInstalled) tags.push('installed');
-      else tags.push('not installed');
-      if (a.modelCount) tags.push(a.modelCount + ' models');
-      opt.textContent = a.accountKey + '  —  ' + tags.join(' · ');
+      opt.textContent = a.accountKey + '  —  ' + (a.ourWrapperInstalled ? 'installed' : 'not installed');
       sel.appendChild(opt);
     }
     if (!prefs.activeAccount || !accts.some(a => a.accountKey === prefs.activeAccount)) {
@@ -207,11 +203,7 @@
   function updateAcctSub(accts) {
     const a = accts.find(x => x.accountKey === prefs.activeAccount);
     if (!a) { $('acctSub').textContent = '—'; return; }
-    const parts = [];
-    if (a.ourWrapperInstalled) parts.push('wrapper installed');
-    else parts.push('wrapper NOT installed');
-    if (a.modelCount) parts.push(a.modelCount + ' models');
-    $('acctSub').textContent = parts.join(' · ');
+    $('acctSub').textContent = a.ourWrapperInstalled ? 'wrapper installed' : 'wrapper NOT installed';
   }
 
   // ─── Render the widget body ───────────────────────────────────
@@ -226,8 +218,7 @@
       { models: [], collector: { totalRows: 0, lastTickUtc: null, lastError: null } });
     applyThemeClass(w);
 
-    const hidden = new Set((prefs.hiddenModels[prefs.activeAccount] || []));
-    const models = (data.models || []).filter(m => !hidden.has(m.model));
+    const models = data.models || [];
     if (!models.length) {
       w.innerHTML = '';
       $('emptyHint').hidden = false;
@@ -235,40 +226,40 @@
     }
     $('emptyHint').hidden = true;
 
+    // rate_limits are account-scoped (M0011 empirical finding) — collapse
+    // every observed model into a single account-level row. The query
+    // service orders by ObservedAtUtc desc, so models[0] is the freshest
+    // snapshot.
+    const m = models[0];
     const isText = (effectiveTheme() === 'text');
     const rows = [];
     rows.push('<div class="w__hdr">'
       + '<div class="w__acct">acct: ' + escapeHtml(prefs.activeAccount) + '</div>'
-      + '<div class="w__sub">' + models.length + ' model' + (models.length === 1 ? '' : 's')
-      + ' · last sync ' + fmtAge(data.collector && data.collector.lastTickUtc) + '</div>'
+      + '<div class="w__sub">last sync ' + fmtAge(data.collector && data.collector.lastTickUtc) + '</div>'
       + '</div>');
     if (!isText) rows.push('<div class="w__sep"></div>');
 
-    models.forEach((m, idx) => {
-      if (idx > 0) rows.push('<div class="w__msep"></div>');
-      rows.push('<div class="w__model">' + escapeHtml(m.model) + '</div>');
-      const fhClass = thresholdClass(m.fiveHourPercent);
-      const sdClass = thresholdClass(m.sevenDayPercent);
-      const fhReset = fmtReset(m.fiveHourResetsAtUtc);
-      const sdReset = fmtReset(m.sevenDayResetsAtUtc);
-      if (isText) {
-        rows.push(
-          '<div class="w__row"><span class="w__lbl">Usage</span>'
-          + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
-        rows.push(
-          '<div class="w__row"><span class="w__lbl">Weekly</span>'
-          + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
-      } else {
-        rows.push(
-          '<div class="w__row"><span class="w__lbl">Usage</span>'
-          + '<span class="w__bar ' + fhClass + '">' + asciiBar(m.fiveHourPercent, 10) + '</span>'
-          + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
-        rows.push(
-          '<div class="w__row"><span class="w__lbl">Weekly</span>'
-          + '<span class="w__bar ' + sdClass + '">' + asciiBar(m.sevenDayPercent, 10) + '</span>'
-          + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
-      }
-    });
+    const fhClass = thresholdClass(m.fiveHourPercent);
+    const sdClass = thresholdClass(m.sevenDayPercent);
+    const fhReset = fmtReset(m.fiveHourResetsAtUtc);
+    const sdReset = fmtReset(m.sevenDayResetsAtUtc);
+    if (isText) {
+      rows.push(
+        '<div class="w__row"><span class="w__lbl">Usage</span>'
+        + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
+      rows.push(
+        '<div class="w__row"><span class="w__lbl">Weekly</span>'
+        + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
+    } else {
+      rows.push(
+        '<div class="w__row"><span class="w__lbl">Usage</span>'
+        + '<span class="w__bar ' + fhClass + '">' + asciiBar(m.fiveHourPercent, 10) + '</span>'
+        + '<span class="w__val">' + m.fiveHourPercent + '%' + (fhReset ? '  · resets in ' + fhReset : '') + '</span></div>');
+      rows.push(
+        '<div class="w__row"><span class="w__lbl">Weekly</span>'
+        + '<span class="w__bar ' + sdClass + '">' + asciiBar(m.sevenDayPercent, 10) + '</span>'
+        + '<span class="w__val">' + m.sevenDayPercent + '%' + (sdReset ? '  · resets in ' + sdReset : '') + '</span></div>');
+    }
     const c = data.collector || {};
     rows.push('<div class="w__foot">'
       + '<span>DB rows: ' + (c.totalRows || 0) + ' · collector tick ' + fmtAge(c.lastTickUtc) + '</span>'
@@ -287,7 +278,6 @@
   async function openSettings() {
     $('settings').hidden = false;
     syncSettingsControls();
-    await renderModelsList();
     await renderProfilesList();
   }
   function closeSettings() {
@@ -308,41 +298,6 @@
     $('textBgHex').value = prefs.textBgColor;
     $('textOpacity').value = prefs.textOpacity;
     $('syncMin').value = prefs.syncMin;
-    $('modelsAcctName').textContent = prefs.activeAccount || '—';
-  }
-
-  async function renderModelsList() {
-    const acct = prefs.activeAccount;
-    const list = $('modelsList');
-    if (!acct) { list.innerHTML = '<div class="hint">No active account.</div>'; return; }
-    const observed = await safe('observedModels()', () => window.zero.tokens.remaining.observedModels(acct), []);
-    if (!observed || !observed.length) {
-      list.innerHTML = '<div class="hint">No models observed yet for "' + escapeHtml(acct) + '". Use Claude Code with this account; the wrapper will populate snapshots within seconds.</div>';
-      return;
-    }
-    const hidden = new Set(prefs.hiddenModels[acct] || []);
-    const rows = observed.map(m => {
-      const stale = (Date.now() - new Date(m.lastSeenUtc).getTime()) > 3 * 86400e3;
-      const on = !hidden.has(m.model);
-      return '<div class="mrow ' + (stale ? 'stale' : '') + '">'
-        + '<div>'
-        + '  <div class="mrow__title">' + escapeHtml(m.model) + '</div>'
-        + '  <div class="mrow__meta">last seen ' + fmtAge(m.lastSeenUtc) + ' · ' + m.observations + ' obs' + (stale ? ' · stale' : '') + '</div>'
-        + '</div>'
-        + '<div class="toggle ' + (on ? 'on' : '') + '" data-model="' + escapeHtml(m.model) + '"></div>'
-        + '</div>';
-    });
-    list.innerHTML = rows.join('');
-    list.querySelectorAll('.toggle').forEach(el => {
-      el.onclick = () => {
-        const name = el.dataset.model;
-        const set = new Set(prefs.hiddenModels[acct] || []);
-        if (set.has(name)) set.delete(name); else set.add(name);
-        prefs.hiddenModels[acct] = Array.from(set);
-        savePrefs(prefs);
-        el.classList.toggle('on');
-      };
-    });
   }
 
   async function renderProfilesList() {
@@ -476,7 +431,6 @@
       async () => {
         await safe('reset()', () => window.zero.tokens.remaining.reset(), null);
         await renderWidget();
-        await renderModelsList();
       });
   };
 
