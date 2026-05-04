@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Token Remaining</title>
+  <script src="https://zero.local/common/zero-bridge.js"></script>
+  <link rel="stylesheet" href="widget.css" />
+</head>
+<body>
+
+<!-- ============================================================
+     Empty / no-host fallback (when opened outside AgentZero)
+     ============================================================ -->
+<div id="noHost" hidden>
+  <p>Open this from inside AgentZero Lite (WebDev panel).</p>
+  <p>Need a static preview? See <a href="mockup.html">mockup.html</a>.</p>
+</div>
+
+<!-- ============================================================
+     Main widget surface
+     ============================================================ -->
+<main id="app" hidden>
+  <div id="banner" class="banner" hidden></div>
+  <div class="bar">
+    <select id="acctPicker" class="bar__sel" title="Active account"></select>
+    <span class="bar__sub" id="acctSub">—</span>
+    <span class="bar__spacer"></span>
+    <button class="bar__btn" id="btnRefresh" title="Force a collector tick">⟳</button>
+    <button class="bar__btn" id="btnSettings" title="Settings">⚙</button>
+  </div>
+
+  <section id="widget" class="w w--dark"></section>
+
+  <p id="emptyHint" class="hint" hidden>
+    No observations yet for this account. The wrapper writes a snapshot every Claude
+    Code statusline tick (~300ms); the collector imports state-changes every 30 s.
+    If you've never installed the wrapper, open Settings → Install.
+  </p>
+</main>
+
+<!-- ============================================================
+     Settings dialog (overlay)
+     ============================================================ -->
+<div id="settings" class="overlay" hidden>
+  <div class="overlay__panel sp">
+    <header class="sp__hdr">
+      <h2>Token Remaining — Settings</h2>
+      <button class="bar__btn" id="settingsClose">✕</button>
+    </header>
+
+    <section class="sp__sec">
+      <h3>Display</h3>
+      <div class="sp__field">
+        <div>
+          <div class="sp__lbl">Theme</div>
+          <div class="sp__hint">Auto follows OS · Text mode uses custom colours</div>
+        </div>
+        <div class="sp__tabs" id="themeTabs">
+          <button data-theme="auto">Auto</button>
+          <button data-theme="dark" class="active">Dark</button>
+          <button data-theme="light">Light</button>
+          <button data-theme="text">Text</button>
+        </div>
+      </div>
+      <div class="sp__field" id="textModeRow" hidden>
+        <div>
+          <div class="sp__lbl">Text · text colour</div>
+        </div>
+        <div class="sp__color">
+          <input type="color" id="textColor" />
+          <input type="text" id="textColorHex" class="sp__hex" />
+        </div>
+      </div>
+      <div class="sp__field" id="textBgRow" hidden>
+        <div>
+          <div class="sp__lbl">Text · background</div>
+        </div>
+        <div class="sp__color">
+          <input type="color" id="textBgColor" />
+          <input type="text" id="textBgHex" class="sp__hex" />
+        </div>
+      </div>
+      <div class="sp__field" id="textOpacityRow" hidden>
+        <div>
+          <div class="sp__lbl">Text · background opacity</div>
+          <div class="sp__hint">0 transparent · 100 opaque</div>
+        </div>
+        <input type="number" id="textOpacity" class="sp__num" min="0" max="100" />
+      </div>
+    </section>
+
+    <section class="sp__sec">
+      <h3>Sync</h3>
+      <div class="sp__field">
+        <div>
+          <div class="sp__lbl">UI refresh interval (minutes)</div>
+          <div class="sp__hint">Default 1. Snapshots are written every Claude tick (300 ms); this is just how often the widget re-reads the DB.</div>
+        </div>
+        <input type="number" id="syncMin" class="sp__num" min="1" max="60" />
+      </div>
+    </section>
+
+    <section class="sp__sec">
+      <h3>Models for "<span id="modelsAcctName">—</span>" (observed in DB)</h3>
+      <div id="modelsList"></div>
+      <div class="sp__hint" style="margin-top:6px;">
+        New models on this account auto-appear here. Toggle off to hide a model from the
+        widget without deleting DB rows.
+      </div>
+    </section>
+
+    <section class="sp__sec">
+      <h3>Wrapper installation</h3>
+      <div id="profilesList"></div>
+      <div class="sp__hint" style="margin-top:6px;">
+        Per-account install. The wrapper preserves any existing statusLine
+        (claude-hud, etc.) by piping stdin through it.
+      </div>
+    </section>
+
+    <section class="sp__sec">
+      <h3>Danger zone</h3>
+      <div class="sp__field">
+        <div>
+          <div class="sp__lbl">Reset DB</div>
+          <div class="sp__hint">Wipes all observations + snapshot files. Next tick rebuilds.</div>
+        </div>
+        <button class="btn btn--danger" id="btnReset">Reset</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ============================================================
+     Confirm dialog (uninstall safety, reset confirm)
+     ============================================================ -->
+<div id="confirm" class="overlay" hidden>
+  <div class="overlay__panel cf">
+    <h2 id="cfTitle">Confirm</h2>
+    <pre id="cfBody"></pre>
+    <div class="cf__row">
+      <button class="btn" id="cfCancel">Cancel</button>
+      <button class="btn btn--danger" id="cfOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="widget.js"></script>
+</body>
+</html>

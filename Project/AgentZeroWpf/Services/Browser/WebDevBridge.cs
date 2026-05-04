@@ -63,6 +63,7 @@ public sealed class WebDevBridge
         }
 
         TokenUsageCollector.Instance.TickCompleted += OnTokenTick;
+        TokenRemainingCollector.Instance.TickCompleted += OnTokenRemainingTick;
     }
 
     public void Detach()
@@ -78,6 +79,7 @@ public sealed class WebDevBridge
             try { _noteHost.NoteSpeaking         -= OnNoteSpeaking;        } catch { }
         }
         try { TokenUsageCollector.Instance.TickCompleted -= OnTokenTick; } catch { }
+        try { TokenRemainingCollector.Instance.TickCompleted -= OnTokenRemainingTick; } catch { }
     }
 
     private void OnTokenTick(TokenUsageCollector.TickSummary s)
@@ -89,6 +91,16 @@ public sealed class WebDevBridge
             codexRows    = s.CodexRows,
             finishedAt   = s.FinishedAt,
             error        = s.Error,
+        });
+
+    private void OnTokenRemainingTick(TokenRemainingCollector.TickSummary s)
+        => PostEvent("tokens.remaining.tick", new
+        {
+            filesScanned        = s.FilesScanned,
+            rowsInserted        = s.RowsInserted,
+            rowsSkippedSamePct  = s.RowsSkippedSamePercent,
+            finishedAt          = s.FinishedAtUtc,
+            error               = s.Error,
         });
 
     private void OnNoteTranscript(string text)        => PostEvent("note.transcript", new { text });
@@ -298,6 +310,80 @@ public sealed class WebDevBridge
             {
                 var summary = TokenUsageCollector.Instance.ResetData();
                 return new { rowsDeleted = summary.RowsDeleted, checkpointsDeleted = summary.CheckpointsDeleted };
+            }
+
+            // ─── Token-remaining widget surface (M0011) ────────────────
+            case "tokens.remaining.profiles":
+            {
+                // Discovered Claude profiles + their installed-state.
+                // The widget Settings dialog and Install dialog both read this.
+                var profiles = StatusLineWrapperInstaller.DiscoverProfiles();
+                return profiles.Select(p => new {
+                    accountKey            = p.AccountKey,
+                    configDir             = p.ConfigDir,
+                    settingsJsonPath      = p.SettingsJsonPath,
+                    settingsJsonExists    = p.SettingsJsonExists,
+                    currentStatusLine     = p.CurrentStatusLineCommand,
+                    ourWrapperInstalled   = p.OurWrapperInstalled,
+                    claudeHudDetected     = p.ClaudeHudDetected,
+                    pipeTarget            = p.PipeTarget,
+                }).ToList();
+            }
+            case "tokens.remaining.accounts":
+            {
+                // Per-account observation summary (DB rows seen so far),
+                // for the "Active account" picker.
+                return TokenRemainingQueryService.GetAccountProfiles();
+            }
+            case "tokens.remaining.observedModels":
+            {
+                var acct = args?.TryGetProperty("account", out var aEl) == true ? (aEl.GetString() ?? "") : "";
+                return TokenRemainingQueryService.GetObservedModels(acct);
+            }
+            case "tokens.remaining.latest":
+            {
+                var acct = args?.TryGetProperty("account", out var aEl) == true ? (aEl.GetString() ?? "") : "";
+                return new {
+                    account = acct,
+                    models  = TokenRemainingQueryService.GetLatestForAccount(acct),
+                    collector = TokenRemainingQueryService.GetCollectorState(),
+                };
+            }
+            case "tokens.remaining.series":
+            {
+                var acct  = args?.TryGetProperty("account", out var aEl) == true ? (aEl.GetString() ?? "") : "";
+                var model = args?.TryGetProperty("model",   out var mEl) == true ? (mEl.GetString() ?? "") : "";
+                var hours = TryGetInt(args, "hours") ?? 24;
+                return TokenRemainingQueryService.GetSeries(acct, model, hours);
+            }
+            case "tokens.remaining.status":
+                return TokenRemainingQueryService.GetCollectorState();
+            case "tokens.remaining.refresh":
+            {
+                var summary = await TokenRemainingCollector.Instance.TickNowAsync();
+                return new {
+                    filesScanned       = summary.FilesScanned,
+                    rowsInserted       = summary.RowsInserted,
+                    rowsSkippedSamePct = summary.RowsSkippedSamePercent,
+                    finishedAt         = summary.FinishedAtUtc,
+                    error              = summary.Error,
+                };
+            }
+            case "tokens.remaining.install":
+            {
+                var acct = args?.TryGetProperty("account", out var aEl) == true ? (aEl.GetString() ?? "") : "";
+                return StatusLineWrapperInstaller.Install(acct);
+            }
+            case "tokens.remaining.uninstall":
+            {
+                var acct  = args?.TryGetProperty("account", out var aEl) == true ? (aEl.GetString() ?? "") : "";
+                var force = args?.TryGetProperty("force",   out var fEl) == true && fEl.ValueKind == JsonValueKind.True;
+                return StatusLineWrapperInstaller.Uninstall(acct, force);
+            }
+            case "tokens.remaining.reset":
+            {
+                var summary = TokenRemainingCollector.Instance.ResetData();
+                return new { rowsDeleted = summary.RowsDeleted, snapshotFilesDeleted = summary.SnapshotFilesDeleted };
             }
 
             default:

@@ -1,0 +1,2084 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "text",
+      "id": "i7Ks7u",
+      "x": 0,
+      "y": 0,
+      "name": "tit",
+      "fill": "#0F1115",
+      "content": "M0011 — Token Remaining Widget",
+      "fontFamily": "Inter",
+      "fontSize": 24,
+      "fontWeight": "700"
+    },
+    {
+      "type": "text",
+      "id": "wfbJP",
+      "x": 0,
+      "y": 36,
+      "name": "sub",
+      "fill": "#52525B",
+      "content": "Architecture A. Statusline wrapper tees Claude Code stdin per account. Widget polls snapshots every 1 min.",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "normal"
+    },
+    {
+      "type": "text",
+      "id": "uAIOh",
+      "x": 0,
+      "y": 88,
+      "name": "lbl1",
+      "fill": "#0F1115",
+      "content": "1) Dark theme — HUD bars (default)",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "gBtqP",
+      "x": 0,
+      "y": 114,
+      "name": "dW",
+      "width": 480,
+      "height": 284,
+      "fill": "#0F1115",
+      "cornerRadius": 10,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#27272A"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "s9Mqe",
+          "x": 18,
+          "y": 14,
+          "fill": "#ED7E11",
+          "content": "acct  claude-pel3",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "jZ7ev",
+          "x": 18,
+          "y": 36,
+          "fill": "#A1A1AA",
+          "content": "2 models observed   •   last sync 12s ago",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "id": "dc0s9",
+          "x": 18,
+          "y": 64,
+          "fill": "#27272A",
+          "width": 444,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "eWctf",
+          "x": 18,
+          "y": 96,
+          "fill": "#A1A1AA",
+          "content": "Usage",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "WoNcA",
+          "x": 78,
+          "y": 94,
+          "fill": "#22C55E",
+          "content": "██░░░░░░░░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "CDzNo",
+          "x": 218,
+          "y": 96,
+          "fill": "#E5E7EB",
+          "content": "19%   resets in 17m",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "yJvVX",
+          "x": 18,
+          "y": 120,
+          "fill": "#A1A1AA",
+          "content": "Weekly",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "ibf7A",
+          "x": 78,
+          "y": 118,
+          "fill": "#22C55E",
+          "content": "█░░░░░░░░░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "C8fhW",
+          "x": 218,
+          "y": 120,
+          "fill": "#E5E7EB",
+          "content": "9%   resets in 6d",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "id": "sgToX",
+          "x": 18,
+          "y": 240,
+          "fill": "#27272A",
+          "width": 444,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "Ppx7t",
+          "x": 18,
+          "y": 252,
+          "fill": "#52525B",
+          "content": "DB rows: 1.2k   •   collector tick 38s ago",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "K1rEh",
+          "x": 380,
+          "y": 252,
+          "fill": "#A1A1AA",
+          "content": "⚙ settings",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "TB62u",
+          "x": 18,
+          "y": 74,
+          "fill": "#ED7E11",
+          "content": "Opus 4.7 (1M context)",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "id": "L36T8n",
+          "x": 18,
+          "y": 152,
+          "fill": "#27272A88",
+          "width": 444,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "YnUhw",
+          "x": 18,
+          "y": 162,
+          "fill": "#ED7E11",
+          "content": "Sonnet 4.6 (1M context)",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "K8BnI",
+          "x": 18,
+          "y": 184,
+          "fill": "#A1A1AA",
+          "content": "Usage",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "cMaOJ",
+          "x": 78,
+          "y": 182,
+          "fill": "#22C55E",
+          "content": "░░░░░░░░░░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "R5zTV",
+          "x": 218,
+          "y": 184,
+          "fill": "#E5E7EB",
+          "content": "3%   resets in 4h 11m",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "YLCfR",
+          "x": 18,
+          "y": 208,
+          "fill": "#A1A1AA",
+          "content": "Weekly",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "GRtje",
+          "x": 78,
+          "y": 206,
+          "fill": "#22C55E",
+          "content": "█░░░░░░░░░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "hCWKw",
+          "x": 218,
+          "y": 208,
+          "fill": "#E5E7EB",
+          "content": "10%   resets in 5d 23h",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "Ulz5n",
+      "x": 520,
+      "y": 88,
+      "name": "lbl2",
+      "fill": "#0F1115",
+      "content": "2) Light theme — HUD bars",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "FluGt",
+      "x": 520,
+      "y": 114,
+      "name": "lW",
+      "width": 480,
+      "height": 284,
+      "fill": "#FFFFFF",
+      "cornerRadius": 10,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#D4D4D8"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "k8PyH",
+          "x": 18,
+          "y": 14,
+          "fill": "#C2410C",
+          "content": "acct  claude-qa",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "HyqaW",
+          "x": 18,
+          "y": 36,
+          "fill": "#71717A",
+          "content": "2 models observed   •   last sync 38s ago",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "id": "HbOEz",
+          "x": 18,
+          "y": 64,
+          "fill": "#E4E4E7",
+          "width": 444,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "Ifitm",
+          "x": 18,
+          "y": 96,
+          "fill": "#71717A",
+          "content": "Usage",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "RQI3k",
+          "x": 78,
+          "y": 94,
+          "fill": "#F59E0B",
+          "content": "█████░░░░░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "BvrbX",
+          "x": 218,
+          "y": 96,
+          "fill": "#18181B",
+          "content": "53%   resets in 2h 14m",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "T02wG4",
+          "x": 18,
+          "y": 120,
+          "fill": "#71717A",
+          "content": "Weekly",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "K8Z0Dl",
+          "x": 78,
+          "y": 118,
+          "fill": "#EF4444",
+          "content": "█████████░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "hPHgQ",
+          "x": 218,
+          "y": 120,
+          "fill": "#18181B",
+          "content": "88%   resets in 2d 4h",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "id": "ylOXH",
+          "x": 18,
+          "y": 240,
+          "fill": "#E4E4E7",
+          "width": 444,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "fjn0w",
+          "x": 18,
+          "y": 252,
+          "fill": "#A1A1AA",
+          "content": "DB rows: 1.2k   •   collector tick 38s ago",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "F9qcO",
+          "x": 380,
+          "y": 252,
+          "fill": "#71717A",
+          "content": "⚙ settings",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "doRlw",
+          "x": 18,
+          "y": 74,
+          "fill": "#C2410C",
+          "content": "Opus 4.7 (1M context)",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "id": "UdT3L",
+          "x": 18,
+          "y": 152,
+          "fill": "#E4E4E788",
+          "width": 444,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "M2sA1",
+          "x": 18,
+          "y": 162,
+          "fill": "#C2410C",
+          "content": "Sonnet 4.6 (1M context)",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "hguxx",
+          "x": 18,
+          "y": 184,
+          "fill": "#71717A",
+          "content": "Usage",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "N549mS",
+          "x": 78,
+          "y": 182,
+          "fill": "#22C55E",
+          "content": "░░░░░░░░░░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "b9L3Td",
+          "x": 218,
+          "y": 184,
+          "fill": "#18181B",
+          "content": "3%   resets in 4h 11m",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "dXJsb",
+          "x": 18,
+          "y": 208,
+          "fill": "#71717A",
+          "content": "Weekly",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "ggbD0",
+          "x": 78,
+          "y": 206,
+          "fill": "#22C55E",
+          "content": "█░░░░░░░░░",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "U4aXix",
+          "x": 218,
+          "y": 208,
+          "fill": "#18181B",
+          "content": "10%   resets in 5d 23h",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "MxKWQ",
+      "x": 1040,
+      "y": 88,
+      "name": "lbl3",
+      "fill": "#0F1115",
+      "content": "3) Text-only · custom colors · transparent bg",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "700"
+    },
+    {
+      "type": "rectangle",
+      "id": "LGzCp",
+      "x": 1040,
+      "y": 114,
+      "name": "chk",
+      "fill": "#E5E7EB",
+      "width": 380,
+      "height": 240
+    },
+    {
+      "type": "rectangle",
+      "id": "T2vDoS",
+      "x": 1040,
+      "y": 114,
+      "fill": "#FFFFFF",
+      "width": 190,
+      "height": 120
+    },
+    {
+      "type": "rectangle",
+      "id": "hqFWV",
+      "x": 1230,
+      "y": 114,
+      "fill": "#FFFFFF",
+      "width": 190,
+      "height": 120
+    },
+    {
+      "type": "rectangle",
+      "id": "g8Sqc",
+      "x": 1040,
+      "y": 234,
+      "fill": "#E5E7EB",
+      "width": 190,
+      "height": 120
+    },
+    {
+      "type": "rectangle",
+      "id": "U1bHu",
+      "x": 1230,
+      "y": 234,
+      "fill": "#E5E7EB",
+      "width": 190,
+      "height": 120
+    },
+    {
+      "type": "frame",
+      "id": "VvyTo",
+      "x": 1060,
+      "y": 140,
+      "name": "tW",
+      "width": 340,
+      "height": 160,
+      "fill": "#0F111585",
+      "cornerRadius": 8,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#FDE68A55"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "Wu1bY",
+          "x": 14,
+          "y": 12,
+          "fill": "#FCD34D",
+          "content": "acct claude-pel3",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "oiN3q",
+          "x": 266,
+          "y": 12,
+          "fill": "#FDE68AAA",
+          "content": "2 models",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "IB9Tj",
+          "x": 30,
+          "y": 50,
+          "fill": "#FCD34D",
+          "content": "5h",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "ZmElg",
+          "x": 62,
+          "y": 50,
+          "fill": "#FDE68A",
+          "content": "19%",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "YFYsi",
+          "x": 96,
+          "y": 51,
+          "fill": "#FDE68AAA",
+          "content": "17m",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "pj7pN",
+          "x": 160,
+          "y": 50,
+          "fill": "#FCD34D",
+          "content": "7d",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "oCsmJ",
+          "x": 192,
+          "y": 50,
+          "fill": "#FDE68A",
+          "content": "9%",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "HU61c",
+          "x": 226,
+          "y": 51,
+          "fill": "#FDE68AAA",
+          "content": "6d",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "UGT2S",
+          "x": 14,
+          "y": 138,
+          "fill": "#FCD34D88",
+          "content": "text-only · 2 models · DB-backed",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "T0NLiT",
+          "x": 14,
+          "y": 34,
+          "fill": "#FCD34D",
+          "content": "Opus 4.7",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "kTd0h",
+          "x": 14,
+          "y": 80,
+          "fill": "#FCD34D",
+          "content": "Sonnet 4.6",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "evMzX",
+          "x": 30,
+          "y": 96,
+          "fill": "#FCD34D",
+          "content": "5h",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "LSOmv",
+          "x": 62,
+          "y": 96,
+          "fill": "#FDE68A",
+          "content": "3%",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "EQnMq",
+          "x": 96,
+          "y": 97,
+          "fill": "#FDE68AAA",
+          "content": "4h 11m",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "rtvEF",
+          "x": 160,
+          "y": 96,
+          "fill": "#FCD34D",
+          "content": "7d",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "QvKeq",
+          "x": 192,
+          "y": 96,
+          "fill": "#FDE68A",
+          "content": "10%",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "h3z8BU",
+          "x": 226,
+          "y": 97,
+          "fill": "#FDE68AAA",
+          "content": "5d 23h",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "oSF1K",
+      "x": 0,
+      "y": 400,
+      "name": "lbl4",
+      "fill": "#0F1115",
+      "content": "4) Settings panel",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "yzE1T",
+      "x": 0,
+      "y": 426,
+      "name": "sp",
+      "width": 600,
+      "height": 680,
+      "fill": "#0F1115",
+      "cornerRadius": 10,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#27272A"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "I5aJ0K",
+          "x": 18,
+          "y": 16,
+          "fill": "#E5E7EB",
+          "content": "Token Remaining — Settings",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "gLtbR",
+          "x": 18,
+          "y": 48,
+          "fill": "#A1A1AA",
+          "content": "DISPLAY",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "NEpsm",
+          "x": 18,
+          "y": 70,
+          "fill": "#E5E7EB",
+          "content": "Theme",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "N822y",
+          "x": 380,
+          "y": 64,
+          "fill": "#18181B",
+          "width": 200,
+          "height": 24,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#3F3F46"
+          }
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 4,
+          "id": "h0wpto",
+          "x": 430,
+          "y": 67,
+          "fill": "#27272A",
+          "width": 48,
+          "height": 18
+        },
+        {
+          "type": "text",
+          "id": "hHG5F",
+          "x": 387,
+          "y": 69,
+          "fill": "#A1A1AA",
+          "content": "Auto",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "gYo2F",
+          "x": 438,
+          "y": 69,
+          "fill": "#E5E7EB",
+          "content": "Dark",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "hkINO",
+          "x": 486,
+          "y": 69,
+          "fill": "#A1A1AA",
+          "content": "Light",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "P6yAB",
+          "x": 540,
+          "y": 69,
+          "fill": "#A1A1AA",
+          "content": "Text",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "g5ZVSH",
+          "x": 18,
+          "y": 106,
+          "fill": "#E5E7EB",
+          "content": "Layout",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "YhWlL",
+          "x": 430,
+          "y": 100,
+          "fill": "#18181B",
+          "width": 150,
+          "height": 24,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#3F3F46"
+          }
+        },
+        {
+          "type": "text",
+          "id": "Srx3d",
+          "x": 438,
+          "y": 105,
+          "fill": "#E5E7EB",
+          "content": "HUD bars (ASCII)",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "nqX7Y",
+          "x": 566,
+          "y": 105,
+          "fill": "#A1A1AA",
+          "content": "▾",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "P4rH4",
+          "x": 18,
+          "y": 144,
+          "fill": "#A1A1AA",
+          "content": "TEXT-ONLY CUSTOM",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "QQkEQ",
+          "x": 18,
+          "y": 166,
+          "fill": "#E5E7EB",
+          "content": "Text color",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 4,
+          "id": "L0NPf",
+          "x": 480,
+          "y": 162,
+          "fill": "#FDE68A",
+          "width": 22,
+          "height": 22,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#3F3F46"
+          }
+        },
+        {
+          "type": "text",
+          "id": "fQjdr",
+          "x": 510,
+          "y": 166,
+          "fill": "#A1A1AA",
+          "content": "#FDE68A",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "NMchC",
+          "x": 18,
+          "y": 198,
+          "fill": "#E5E7EB",
+          "content": "Background color",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 4,
+          "id": "tGL5o",
+          "x": 480,
+          "y": 194,
+          "fill": "#0F1115",
+          "width": 22,
+          "height": 22,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#3F3F46"
+          }
+        },
+        {
+          "type": "text",
+          "id": "jsKH3",
+          "x": 510,
+          "y": 198,
+          "fill": "#A1A1AA",
+          "content": "#0F1115",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "ADcNZ",
+          "x": 18,
+          "y": 230,
+          "fill": "#E5E7EB",
+          "content": "Background opacity (0–100)",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 4,
+          "id": "q2ZNe",
+          "x": 520,
+          "y": 226,
+          "fill": "#18181B",
+          "width": 60,
+          "height": 22,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#3F3F46"
+          }
+        },
+        {
+          "type": "text",
+          "id": "N0T4YD",
+          "x": 540,
+          "y": 230,
+          "fill": "#E5E7EB",
+          "content": "55",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "JaBhy",
+          "x": 18,
+          "y": 262,
+          "fill": "#A1A1AA",
+          "content": "SYNC",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "X7Vp5",
+          "x": 18,
+          "y": 284,
+          "fill": "#E5E7EB",
+          "content": "Auto-sync",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 10,
+          "id": "VMLAz",
+          "x": 540,
+          "y": 280,
+          "fill": "#16A34A",
+          "width": 36,
+          "height": 20
+        },
+        {
+          "type": "ellipse",
+          "id": "dCJeG",
+          "x": 558,
+          "y": 282,
+          "fill": "#E5E7EB",
+          "width": 16,
+          "height": 16
+        },
+        {
+          "type": "text",
+          "id": "fV8QW",
+          "x": 18,
+          "y": 316,
+          "fill": "#E5E7EB",
+          "content": "Interval (minutes)",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 4,
+          "id": "Gjj2n",
+          "x": 520,
+          "y": 312,
+          "fill": "#18181B",
+          "width": 60,
+          "height": 22,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#3F3F46"
+          }
+        },
+        {
+          "type": "text",
+          "id": "xkVcD",
+          "x": 548,
+          "y": 316,
+          "fill": "#E5E7EB",
+          "content": "1",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "sDA17",
+          "x": 18,
+          "y": 354,
+          "fill": "#A1A1AA",
+          "content": "ACCOUNTS (visible)",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "x2OkZs",
+          "x": 18,
+          "y": 374,
+          "fill": "#18181B",
+          "width": 564,
+          "height": 32,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#27272A"
+          }
+        },
+        {
+          "type": "text",
+          "id": "Mn01d",
+          "x": 30,
+          "y": 380,
+          "fill": "#E5E7EB",
+          "content": "claude",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "RDNku",
+          "x": 30,
+          "y": 394,
+          "fill": "#71717A",
+          "content": "~/.claude · default · last 12s ago",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 10,
+          "id": "O8hOG",
+          "x": 540,
+          "y": 382,
+          "fill": "#16A34A",
+          "width": 36,
+          "height": 20
+        },
+        {
+          "type": "ellipse",
+          "id": "T02rwr",
+          "x": 558,
+          "y": 384,
+          "fill": "#E5E7EB",
+          "width": 16,
+          "height": 16
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "JbfBX",
+          "x": 18,
+          "y": 412,
+          "fill": "#18181B",
+          "width": 564,
+          "height": 32,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#27272A"
+          }
+        },
+        {
+          "type": "text",
+          "id": "w6BHV",
+          "x": 30,
+          "y": 418,
+          "fill": "#E5E7EB",
+          "content": "claude-pel3",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "PpwV2",
+          "x": 30,
+          "y": 432,
+          "fill": "#71717A",
+          "content": "~/.claude-pel3 · last 8s ago",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 10,
+          "id": "V9EDU",
+          "x": 540,
+          "y": 420,
+          "fill": "#16A34A",
+          "width": 36,
+          "height": 20
+        },
+        {
+          "type": "ellipse",
+          "id": "yPufi",
+          "x": 558,
+          "y": 422,
+          "fill": "#E5E7EB",
+          "width": 16,
+          "height": 16
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "bRVne",
+          "x": 18,
+          "y": 450,
+          "fill": "#18181B",
+          "width": 564,
+          "height": 32,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#27272A"
+          }
+        },
+        {
+          "type": "text",
+          "id": "VFZ3P",
+          "x": 30,
+          "y": 456,
+          "fill": "#E5E7EB",
+          "content": "claude-gou",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "jSi7H",
+          "x": 30,
+          "y": 470,
+          "fill": "#52525B",
+          "content": "~/.claude-gou · NOT INSTALLED — see Install dialog",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 10,
+          "id": "G0Ec1",
+          "x": 540,
+          "y": 458,
+          "fill": "#3F3F46",
+          "width": 36,
+          "height": 20
+        },
+        {
+          "type": "ellipse",
+          "id": "zKSk9",
+          "x": 542,
+          "y": 460,
+          "fill": "#71717A",
+          "width": 16,
+          "height": 16
+        },
+        {
+          "type": "text",
+          "id": "im3et",
+          "x": 18,
+          "y": 446,
+          "fill": "#A1A1AA",
+          "content": "MODELS PER ACCOUNT (observed)",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "A871fd",
+          "x": 18,
+          "y": 466,
+          "fill": "#18181B",
+          "width": 564,
+          "height": 74,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#27272A"
+          }
+        },
+        {
+          "type": "text",
+          "id": "bb5Ny",
+          "x": 30,
+          "y": 474,
+          "fill": "#E5E7EB",
+          "content": "claude-pel3",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "v5d1XL",
+          "x": 108,
+          "y": 476,
+          "fill": "#71717A",
+          "content": "2 observed",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "id": "J5nDC",
+          "x": 32,
+          "y": 496,
+          "fill": "#27272A",
+          "width": 540,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "fj8MV",
+          "x": 36,
+          "y": 504,
+          "fill": "#E5E7EB",
+          "content": "Opus 4.7 (1M context)",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "spyt5",
+          "x": 200,
+          "y": 506,
+          "fill": "#52525B",
+          "content": "last seen 12s ago",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "JiQIT",
+          "x": 540,
+          "y": 503,
+          "fill": "#16A34A",
+          "width": 30,
+          "height": 16
+        },
+        {
+          "type": "ellipse",
+          "id": "lgmof",
+          "x": 556,
+          "y": 505,
+          "fill": "#E5E7EB",
+          "width": 12,
+          "height": 12
+        },
+        {
+          "type": "text",
+          "id": "KUBuC",
+          "x": 36,
+          "y": 522,
+          "fill": "#E5E7EB",
+          "content": "Sonnet 4.6 (1M context)",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "nTh58",
+          "x": 200,
+          "y": 524,
+          "fill": "#52525B",
+          "content": "last seen 4h ago",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "EKQT4",
+          "x": 540,
+          "y": 521,
+          "fill": "#16A34A",
+          "width": 30,
+          "height": 16
+        },
+        {
+          "type": "ellipse",
+          "id": "K8qUK",
+          "x": 556,
+          "y": 523,
+          "fill": "#E5E7EB",
+          "width": 12,
+          "height": 12
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "Thiyr",
+          "x": 18,
+          "y": 546,
+          "fill": "#18181B",
+          "width": 564,
+          "height": 36,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#27272A"
+          }
+        },
+        {
+          "type": "text",
+          "id": "IFQVM",
+          "x": 30,
+          "y": 556,
+          "fill": "#E5E7EB",
+          "content": "claude",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "VHFon",
+          "x": 80,
+          "y": 558,
+          "fill": "#71717A",
+          "content": "1 observed (Opus 4.7)",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "u5y0l3",
+          "x": 540,
+          "y": 558,
+          "fill": "#71717A",
+          "content": "▸",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "Q6nfxj",
+          "x": 18,
+          "y": 588,
+          "fill": "#18181B",
+          "width": 564,
+          "height": 36,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#27272A"
+          }
+        },
+        {
+          "type": "text",
+          "id": "vsltN",
+          "x": 30,
+          "y": 598,
+          "fill": "#A1A1AA",
+          "content": "claude-qa",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "YXMef",
+          "x": 96,
+          "y": 600,
+          "fill": "#52525B",
+          "content": "no observations yet (idle)",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "m3fQgi",
+      "x": 640,
+      "y": 400,
+      "name": "lbl5",
+      "fill": "#0F1115",
+      "content": "5) Install / Uninstall dialog (per account)",
+      "fontFamily": "Inter",
+      "fontSize": 13,
+      "fontWeight": "700"
+    },
+    {
+      "type": "frame",
+      "id": "FgDPJ",
+      "x": 640,
+      "y": 426,
+      "name": "id",
+      "width": 760,
+      "height": 520,
+      "fill": "#FFFFFF",
+      "cornerRadius": 12,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#D4D4D8"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "Q0zfzr",
+          "x": 22,
+          "y": 18,
+          "fill": "#0F1115",
+          "content": "Token Remaining — statusLine wrapper installer",
+          "fontFamily": "Inter",
+          "fontSize": 15,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "KZO6l",
+          "x": 22,
+          "y": 40,
+          "fill": "#71717A",
+          "content": "Installs a tee wrapper for Claude Code's statusLine to capture rate-limit telemetry.",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "MBP6p",
+          "x": 22,
+          "y": 54,
+          "fill": "#71717A",
+          "content": "Existing claude-hud (or any custom statusLine) is preserved and piped through automatically.",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "id": "H7HvVK",
+          "x": 0,
+          "y": 84,
+          "fill": "#E4E4E7",
+          "width": 760,
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "OuBSg",
+          "x": 22,
+          "y": 96,
+          "fill": "#71717A",
+          "content": "DETECTED CLAUDE PROFILES",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "s717S",
+          "x": 22,
+          "y": 118,
+          "fill": "#F0F9FF",
+          "width": 716,
+          "height": 60,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#BFDBFE"
+          }
+        },
+        {
+          "type": "text",
+          "id": "GMoar",
+          "x": 34,
+          "y": 128,
+          "fill": "#0F1115",
+          "content": "claude",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "hv8Ow",
+          "x": 90,
+          "y": 128,
+          "fill": "#DBEAFE",
+          "width": 64,
+          "height": 16
+        },
+        {
+          "type": "text",
+          "id": "TtJKN",
+          "x": 99,
+          "y": 130,
+          "fill": "#1E40AF",
+          "content": "installed",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "W2uI6",
+          "x": 34,
+          "y": 148,
+          "fill": "#71717A",
+          "content": "~/.claude/settings.json",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "qDnkb",
+          "x": 34,
+          "y": 162,
+          "fill": "#71717A",
+          "content": "claude-hud detected → wrapper pipes stdin into the existing /claude-hud command",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "D1dGL",
+          "x": 560,
+          "y": 138,
+          "fill": "#FFFFFF",
+          "width": 74,
+          "height": 24,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#D4D4D8"
+          }
+        },
+        {
+          "type": "text",
+          "id": "S71kdp",
+          "x": 578,
+          "y": 142,
+          "fill": "#0F1115",
+          "content": "Reinstall",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "RsZR6",
+          "x": 644,
+          "y": 138,
+          "fill": "#FFFFFF",
+          "width": 80,
+          "height": 24,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#FCA5A5"
+          }
+        },
+        {
+          "type": "text",
+          "id": "aiUDu",
+          "x": 660,
+          "y": 142,
+          "fill": "#B91C1C",
+          "content": "Uninstall",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "IIQPs",
+          "x": 22,
+          "y": 184,
+          "fill": "#FFFFFF",
+          "width": 716,
+          "height": 60,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#E4E4E7"
+          }
+        },
+        {
+          "type": "text",
+          "id": "a6Mzw",
+          "x": 34,
+          "y": 194,
+          "fill": "#0F1115",
+          "content": "claude-pel3",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "o7k6x",
+          "x": 108,
+          "y": 194,
+          "fill": "#DCFCE7",
+          "width": 48,
+          "height": 16
+        },
+        {
+          "type": "text",
+          "id": "G1bRIW",
+          "x": 122,
+          "y": 196,
+          "fill": "#166534",
+          "content": "ready",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "ozyOX",
+          "x": 34,
+          "y": 214,
+          "fill": "#71717A",
+          "content": "~/.claude-pel3/settings.json",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "oEvCV",
+          "x": 34,
+          "y": 228,
+          "fill": "#71717A",
+          "content": "No statusLine configured · standalone wrapper (no pipe target)",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "tPvTf",
+          "x": 644,
+          "y": 204,
+          "fill": "#0F1115",
+          "width": 80,
+          "height": 24
+        },
+        {
+          "type": "text",
+          "id": "t3Pn8M",
+          "x": 670,
+          "y": 208,
+          "fill": "#FFFFFF",
+          "content": "Install",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "Za7tU",
+          "x": 22,
+          "y": 250,
+          "fill": "#FFFFFF",
+          "width": 716,
+          "height": 60,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#E4E4E7"
+          }
+        },
+        {
+          "type": "text",
+          "id": "eiDgM",
+          "x": 34,
+          "y": 260,
+          "fill": "#0F1115",
+          "content": "claude-qa",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 8,
+          "id": "IaMza",
+          "x": 96,
+          "y": 260,
+          "fill": "#FEF3C7",
+          "width": 120,
+          "height": 16
+        },
+        {
+          "type": "text",
+          "id": "vrlo2",
+          "x": 104,
+          "y": 262,
+          "fill": "#92400E",
+          "content": "3rd-party statusLine",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "fFONd",
+          "x": 34,
+          "y": 280,
+          "fill": "#71717A",
+          "content": "~/.claude-qa/settings.json",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "dozPY",
+          "x": 34,
+          "y": 294,
+          "fill": "#71717A",
+          "content": "current: \"node ~/.dotfiles/cc-line.js\" — wrapper will pipe stdin through it",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "b14Fo",
+          "x": 644,
+          "y": 270,
+          "fill": "#0F1115",
+          "width": 80,
+          "height": 24
+        },
+        {
+          "type": "text",
+          "id": "ZjF67",
+          "x": 670,
+          "y": 274,
+          "fill": "#FFFFFF",
+          "content": "Install",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "qGMjw",
+          "x": 22,
+          "y": 328,
+          "fill": "#71717A",
+          "content": "WHAT GETS INSTALLED (per account)",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "C4XJYK",
+          "x": 22,
+          "y": 348,
+          "fill": "#FAFAFA",
+          "width": 716,
+          "height": 74,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#D4D4D8"
+          }
+        },
+        {
+          "type": "text",
+          "id": "j3FP29",
+          "x": 34,
+          "y": 356,
+          "fill": "#52525B",
+          "content": "1. Backup settings.json → %LOCALAPPDATA%\\AgentZeroLite\\statusline-backup\\<acct>\\settings.json.<ts>.bak",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "T77yaJ",
+          "x": 34,
+          "y": 370,
+          "fill": "#52525B",
+          "content": "2. Replace statusLine.command with az-hud-wrapper.cmd --account <acct> [--pipe <existing-cmd>]",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "b8EqQh",
+          "x": 34,
+          "y": 384,
+          "fill": "#52525B",
+          "content": "3. Wrapper writes per-tick snapshot to %LOCALAPPDATA%\\AgentZeroLite\\cc-hud-snapshots\\<acct>.json",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "q9IadO",
+          "x": 34,
+          "y": 398,
+          "fill": "#52525B",
+          "content": "4. claude-hud (or other statusLine) preserved via --pipe, stdout forwarded transparently",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "Q8B8Ax",
+          "x": 22,
+          "y": 432,
+          "fill": "#71717A",
+          "content": "UNINSTALL — RESTORE PREVIEW",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700"
+        },
+        {
+          "type": "rectangle",
+          "cornerRadius": 6,
+          "id": "s0xy14",
+          "x": 22,
+          "y": 452,
+          "fill": "#FAFAFA",
+          "width": 716,
+          "height": 50,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#D4D4D8"
+          }
+        },
+        {
+          "type": "text",
+          "id": "b6xNaE",
+          "x": 34,
+          "y": 460,
+          "fill": "#52525B",
+          "content": "current: az-hud-wrapper.cmd --account claude --pipe \"node ${CLAUDE_PLUGIN_ROOT}/dist/index.js\"",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "l4IBqX",
+          "x": 34,
+          "y": 474,
+          "fill": "#16A34A",
+          "content": "restore: { type: \"command\", command: \"node ${CLAUDE_PLUGIN_ROOT}/dist/index.js\" }   ✓ sha256 matches backup",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "V9n17",
+          "x": 34,
+          "y": 488,
+          "fill": "#92400E",
+          "content": "if hash mismatch (user edited) → 3-way diff shown, operator must confirm before write",
+          "fontFamily": "Inter",
+          "fontSize": 9,
+          "fontWeight": "normal"
+        }
+      ]
+    }
+  ]
+}

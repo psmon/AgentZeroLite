@@ -108,6 +108,18 @@ public partial class App : Application
             AppLogger.LogError("[TokenCollector] start failed", ex);
         }
 
+        // M0011: per-account rate-limit snapshots written by the AgentZero
+        // statusLine wrapper. Collector is a no-op until at least one
+        // account has the wrapper installed (snapshots dir won't exist).
+        try
+        {
+            TokenRemainingCollector.Instance.Start();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[TokenRemainingCollector] start failed", ex);
+        }
+
         if (cliDebug || vsDebug)
         {
             AppLogger.Log("=== Debug mode active ===");
@@ -135,6 +147,9 @@ public partial class App : Application
     {
         try { TokenUsageCollector.Instance.Stop(); }
         catch (Exception ex) { AppLogger.LogError("[TokenCollector] stop error", ex); }
+
+        try { TokenRemainingCollector.Instance.Stop(); }
+        catch (Exception ex) { AppLogger.LogError("[TokenRemainingCollector] stop error", ex); }
 
         // CoordinatedShutdown — fire-and-forget. UI 스레드를 블로킹하지 않고,
         // Akka가 exit-clr=on 설정에 따라 단계 완료 후 Environment.Exit(0)을 호출한다.

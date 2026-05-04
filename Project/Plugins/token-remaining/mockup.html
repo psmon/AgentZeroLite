@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>M0011 Token Remaining — design mockup</title>
+  <style>
+    :root{
+      --page-bg:#F4F4F5;
+      --page-fg:#0F1115;
+      --muted:#71717A;
+      --card:#FFFFFF;
+      --card-bd:#E4E4E7;
+      --accent:#ED7E11;
+      --ok:#22C55E;
+      --warn:#F59E0B;
+      --bad:#EF4444;
+      --mono:'JetBrains Mono','Cascadia Mono','Consolas','Menlo',ui-monospace,monospace;
+    }
+    body{margin:0;background:var(--page-bg);color:var(--page-fg);font-family:'Inter','Segoe UI',system-ui,sans-serif;padding:24px 32px;font-size:13px;line-height:1.45;}
+    h1{font-size:22px;margin:0 0 4px;}
+    h2{font-size:15px;margin:32px 0 12px;}
+    .lead{color:var(--muted);max-width:920px;margin:0 0 8px;}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+    .panel{background:var(--card);border:1px solid var(--card-bd);border-radius:10px;padding:14px;}
+    .panel h3{margin:0 0 10px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+    .scene{padding:18px;border-radius:10px;}
+    .scene.bg-light{background:#F4F4F5;}
+    .scene.bg-dark{background:#1B1B1F;}
+    .scene.bg-checker{background-color:#fff;background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,9px 0;}
+
+    /* ==================== widget — DARK HUD bars (default) ==================== */
+    .w{font-family:var(--mono);font-size:12px;line-height:1.35;border-radius:10px;padding:14px 18px;width:480px;box-sizing:border-box;}
+    .w--dark{background:#0F1115;color:#E5E7EB;border:1px solid #27272A;}
+    .w--light{background:#FFFFFF;color:#18181B;border:1px solid #D4D4D8;}
+    .w__title{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;}
+    .w__model{font-weight:700;color:var(--accent);font-size:13px;}
+    .w--light .w__model{color:#C2410C;}
+    .w__path{font-size:11px;color:#A1A1AA;}
+    .w--light .w__path{color:#71717A;}
+    .w__sep{height:1px;background:#27272A;margin:0 -18px 10px;}
+    .w--light .w__sep{background:#E4E4E7;}
+    .w__model{font-size:11px;font-weight:700;color:#ED7E11;margin:8px 0 4px;}
+    .w--light .w__model.dim{color:#C2410C;}
+    .w__msep{height:1px;background:#27272A88;margin:6px 0;}
+    .w--light .w__msep{background:#E4E4E788;}
+    .w__row{display:flex;align-items:center;gap:10px;height:22px;}
+    .w__lbl{width:60px;font-size:11px;font-weight:600;color:#A1A1AA;letter-spacing:.02em;}
+    .w--light .w__lbl{color:#71717A;}
+    .w__bar{font-size:13px;letter-spacing:.5px;width:130px;}
+    .w__bar.ok{color:var(--ok);}
+    .w__bar.warn{color:var(--warn);}
+    .w__bar.bad{color:var(--bad);}
+    .w__val{flex:1;font-size:11px;}
+    .w__foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid #27272A;font-size:10px;color:#52525B;}
+    .w--light .w__foot{border-top-color:#E4E4E7;color:#A1A1AA;}
+    .w__cog{cursor:pointer;}
+
+    /* ==================== widget — TEXT-ONLY (no ASCII bars) ==================== */
+    .wt{font-family:var(--mono);font-size:12px;line-height:1.4;width:380px;box-sizing:border-box;padding:10px 12px;border-radius:6px;}
+    .wt__row{display:flex;justify-content:space-between;align-items:baseline;}
+    .wt__lbl{font-weight:600;opacity:.75;}
+    .wt__val{font-variant-numeric:tabular-nums;}
+    .wt__small{font-size:10px;opacity:.55;margin-left:6px;}
+
+    /* ==================== widget — COMPACT one-liner ==================== */
+    .wc{font-family:var(--mono);font-size:11px;display:inline-flex;gap:14px;align-items:center;padding:6px 12px;border-radius:14px;background:#0F1115;color:#E5E7EB;border:1px solid #27272A;}
+    .wc__chip{display:inline-flex;align-items:center;gap:5px;}
+    .wc__dot{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block;}
+    .wc__dot.warn{background:var(--warn);}
+    .wc__dot.bad{background:var(--bad);}
+
+    /* ==================== settings panel ==================== */
+    .sp{font-family:'Inter',system-ui;background:#0F1115;color:#E5E7EB;border:1px solid #27272A;border-radius:10px;padding:18px;width:560px;box-sizing:border-box;}
+    .sp h2{margin:0 0 14px;font-size:14px;color:#E5E7EB;}
+    .sp__sec{margin-bottom:18px;}
+    .sp__sec h3{margin:0 0 10px;font-size:11px;color:#A1A1AA;text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+    .sp__field{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #27272A;}
+    .sp__field:last-child{border-bottom:none;}
+    .sp__field-lbl{font-size:13px;}
+    .sp__field-hint{font-size:11px;color:#71717A;margin-top:2px;}
+    .sp__toggle{position:relative;width:36px;height:20px;background:#3F3F46;border-radius:10px;cursor:pointer;}
+    .sp__toggle::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;background:#E5E7EB;border-radius:50%;transition:left .15s;}
+    .sp__toggle.on{background:#16A34A;}
+    .sp__toggle.on::after{left:18px;}
+    .sp__sel{background:#18181B;color:#E5E7EB;border:1px solid #3F3F46;border-radius:6px;padding:5px 10px;font-size:12px;font-family:inherit;}
+    .sp__num{width:64px;background:#18181B;color:#E5E7EB;border:1px solid #3F3F46;border-radius:6px;padding:5px 8px;font-size:12px;text-align:right;}
+    .sp__color{display:flex;gap:6px;align-items:center;}
+    .sp__chip{width:22px;height:22px;border-radius:4px;border:1px solid #3F3F46;cursor:pointer;}
+    .sp__hex{font-family:var(--mono);font-size:11px;color:#A1A1AA;width:64px;}
+    .sp__theme-tabs{display:flex;gap:4px;background:#18181B;padding:3px;border-radius:8px;border:1px solid #27272A;}
+    .sp__theme-tab{padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;color:#A1A1AA;}
+    .sp__theme-tab.active{background:#27272A;color:#E5E7EB;}
+    .sp__acct{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#18181B;border-radius:8px;margin-bottom:6px;border:1px solid #27272A;}
+    .sp__acct-name{font-family:var(--mono);font-size:12px;color:#E5E7EB;}
+    .sp__acct-meta{font-size:10px;color:#71717A;margin-top:3px;}
+
+    /* ==================== install dialog ==================== */
+    .id{font-family:'Inter',system-ui;background:#FFFFFF;color:#0F1115;border:1px solid #D4D4D8;border-radius:12px;padding:0;width:680px;box-sizing:border-box;overflow:hidden;}
+    .id__hdr{padding:18px 22px 14px;border-bottom:1px solid #E4E4E7;}
+    .id__title{font-size:16px;font-weight:700;margin:0 0 4px;}
+    .id__lead{font-size:12px;color:#71717A;margin:0;}
+    .id__body{padding:14px 22px 22px;}
+    .id__sec{margin-bottom:14px;}
+    .id__sec h3{margin:0 0 8px;font-size:11px;color:#71717A;text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+    .id__pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;}
+    .id__pill.ok{background:#DCFCE7;color:#166534;}
+    .id__pill.miss{background:#FEF3C7;color:#92400E;}
+    .id__pill.installed{background:#DBEAFE;color:#1E40AF;}
+    .id__row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid #E4E4E7;border-radius:8px;margin-bottom:6px;}
+    .id__row.installed{background:#F0F9FF;border-color:#BFDBFE;}
+    .id__acct{font-family:var(--mono);font-size:13px;font-weight:600;}
+    .id__path{font-family:var(--mono);font-size:10px;color:#71717A;margin-top:2px;}
+    .id__hudtag{font-size:10px;color:#71717A;margin-top:4px;font-style:italic;}
+    .id__btn{padding:7px 16px;border-radius:6px;border:1px solid;font-size:12px;font-weight:600;cursor:pointer;background:#0F1115;color:#FFF;border-color:#0F1115;}
+    .id__btn.danger{background:#FFF;color:#B91C1C;border-color:#FCA5A5;}
+    .id__btn.ghost{background:#FFF;color:#0F1115;border-color:#D4D4D8;}
+    .id__backup{background:#FAFAFA;border:1px dashed #D4D4D8;border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:10.5px;color:#52525B;white-space:pre-wrap;}
+    .id__foot{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;border-top:1px solid #E4E4E7;background:#FAFAFA;}
+    .id__foot small{font-size:11px;color:#71717A;}
+
+    .label{font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+
+    .arch{font-family:var(--mono);font-size:11px;line-height:1.5;background:#0F1115;color:#E5E7EB;padding:14px 18px;border-radius:8px;white-space:pre;overflow-x:auto;}
+  </style>
+</head>
+<body>
+
+<h1>M0011 — Token Remaining (Widget)</h1>
+<p class="lead">Minimal claude-hud-style widget. <b>Architecture A</b>: AgentZero installs a tiny statusLine wrapper that tees Claude Code's stdin (rate_limits only) into per-account snapshot files; widget polls every 60 s. claude-hud is detected at install time and piped through (so users keep their statusline). Per-account install/uninstall with full backup/restore of <code>~/.claude/settings.json</code>.</p>
+<p class="lead"><b>Scope</b>: this widget shows <b>Usage (5h)</b> and <b>Weekly (7d)</b> — both per-account aggregates. Context % is intentionally excluded — it's per-session and belongs in a different surface.</p>
+
+<h2>Data flow (snapshot → collector → DB → widget)</h2>
+<div class="arch">┌──────────────┐    stdin (300ms)    ┌────────────────────────────────┐
+│  Claude Code │ ───────────────────▶│  AgentZero statusLine wrapper  │
+└──────────────┘   {model,           │  (per account home dir)        │
+                    rate_limits}     │                                │
+                                     │  1. tee stdin → snapshot.json  │
+                                     │  2. if claude-hud installed:   │
+                                     │     pipe stdin → claude-hud    │
+                                     │     forward stdout             │
+                                     └──────────────┬─────────────────┘
+                                                    │
+                       ┌────────────────────────────┴────────────────┐
+                       ▼                                             ▼
+        %LOCALAPPDATA%/AgentZeroLite/cc-hud-snapshots/      Claude Code statusline
+            claude.json                                     (unchanged behaviour)
+            claude-pel3.json
+            claude-qa.json
+                       │
+                       │ TokenRemainingCollector (host)
+                       │   - reads all snapshot.json every 30 s
+                       │   - dedupe: skip INSERT if (acct, model, 5h%, 7d%) unchanged
+                       │   - INSERT one row per change to DB
+                       ▼
+        ┌────────────────────────────────────────────────┐
+        │  AppDb.TokenRemainingObservations              │
+        │  (Vendor, AccountKey, Model, FiveH, SevenD,    │
+        │   ResetsAt5h, ResetsAt7d, ObservedAtUtc)       │
+        └────────────────┬───────────────────────────────┘
+                         │ queries
+                         ▼
+              window.zero.tokens.remaining.* RPC
+                latest(account)         → models[] with their %s
+                observedModels(account) → for the settings filter
+                series(account, model, hours) → for future chart
+                         │
+                         ▼
+              token-remaining widget (model-grouped rows)</div>
+
+<h2>1) Widget — HUD bar mode</h2>
+<div class="grid">
+
+  <div class="panel"><h3>Dark theme (default)</h3>
+  <div class="scene bg-dark">
+    <div class="w w--dark">
+      <div class="w__title">
+        <div class="w__model" style="color:#E5E7EB;">acct: claude-pel3</div>
+        <div class="w__path">2 models observed · last sync 12s ago</div>
+      </div>
+      <div class="w__sep"></div>
+      <div class="w__model">Opus 4.7 (1M context)</div>
+      <div class="w__row"><span class="w__lbl">Usage</span><span class="w__bar ok">██░░░░░░░░</span><span class="w__val">19%&nbsp;&nbsp;(resets in 17m)</span></div>
+      <div class="w__row"><span class="w__lbl">Weekly</span><span class="w__bar ok">█░░░░░░░░░</span><span class="w__val">9%&nbsp;&nbsp;(resets in 6d)</span></div>
+      <div class="w__msep"></div>
+      <div class="w__model">Sonnet 4.6 (1M context)</div>
+      <div class="w__row"><span class="w__lbl">Usage</span><span class="w__bar ok">░░░░░░░░░░</span><span class="w__val">3%&nbsp;&nbsp;(resets in 4h 11m)</span></div>
+      <div class="w__row"><span class="w__lbl">Weekly</span><span class="w__bar ok">█░░░░░░░░░</span><span class="w__val">10%&nbsp;&nbsp;(resets in 5d 23h)</span></div>
+      <div class="w__foot"><span>DB rows: 1.2k · collector tick 38s ago</span><span class="w__cog">⚙ settings</span></div>
+    </div>
+  </div></div>
+
+  <div class="panel"><h3>Light theme</h3>
+  <div class="scene bg-light">
+    <div class="w w--light">
+      <div class="w__title">
+        <div class="w__model" style="color:#0F1115;">acct: claude-qa</div>
+        <div class="w__path">2 models observed · last sync 38s ago</div>
+      </div>
+      <div class="w__sep"></div>
+      <div class="w__model dim">Opus 4.7 (1M context)</div>
+      <div class="w__row"><span class="w__lbl">Usage</span><span class="w__bar warn">█████░░░░░</span><span class="w__val">53%&nbsp;&nbsp;(resets in 2h 14m)</span></div>
+      <div class="w__row"><span class="w__lbl">Weekly</span><span class="w__bar bad">█████████░</span><span class="w__val">88%&nbsp;&nbsp;(resets in 2d 4h)</span></div>
+      <div class="w__msep"></div>
+      <div class="w__model dim">Sonnet 4.6 (1M context)</div>
+      <div class="w__row"><span class="w__lbl">Usage</span><span class="w__bar ok">░░░░░░░░░░</span><span class="w__val">3%&nbsp;&nbsp;(resets in 4h 11m)</span></div>
+      <div class="w__row"><span class="w__lbl">Weekly</span><span class="w__bar ok">█░░░░░░░░░</span><span class="w__val">10%&nbsp;&nbsp;(resets in 5d 23h)</span></div>
+      <div class="w__foot"><span>DB rows: 1.2k · collector tick 38s ago</span><span class="w__cog">⚙ settings</span></div>
+    </div>
+  </div></div>
+
+</div>
+
+<h2>2) Widget — Text-only mode (no ASCII bars; transparent bg)</h2>
+<div class="grid-3">
+
+  <div class="panel"><h3>Text-only · dark on light</h3>
+  <div class="scene bg-light">
+    <div class="wt" style="background:#FFFFFF;color:#0F1115;border:1px solid #D4D4D8;">
+      <div class="wt__row"><span class="wt__lbl">Opus 4.7</span><span class="wt__val" style="color:#71717A;">claude-pel3</span></div>
+      <div class="wt__row"><span class="wt__lbl">Usage</span><span class="wt__val">19%<span class="wt__small">17m</span></span></div>
+      <div class="wt__row"><span class="wt__lbl">Weekly</span><span class="wt__val">9%<span class="wt__small">6d</span></span></div>
+    </div>
+  </div></div>
+
+  <div class="panel"><h3>Text-only · light on dark</h3>
+  <div class="scene bg-dark">
+    <div class="wt" style="background:#0F1115;color:#E5E7EB;border:1px solid #27272A;">
+      <div class="wt__row"><span class="wt__lbl" style="color:#A1A1AA;">Opus 4.7</span><span class="wt__val" style="color:#71717A;">claude-pel3</span></div>
+      <div class="wt__row"><span class="wt__lbl" style="color:#A1A1AA;">Usage</span><span class="wt__val">19%<span class="wt__small">17m</span></span></div>
+      <div class="wt__row"><span class="wt__lbl" style="color:#A1A1AA;">Weekly</span><span class="wt__val">9%<span class="wt__small">6d</span></span></div>
+    </div>
+  </div></div>
+
+  <div class="panel"><h3>Text-only · custom (transparent bg, opacity 0.55)</h3>
+  <div class="scene bg-checker">
+    <div class="wt" style="background:rgba(15,17,21,0.55);color:#FDE68A;border:1px solid rgba(253,230,138,0.3);backdrop-filter:blur(2px);">
+      <div class="wt__row"><span class="wt__lbl" style="color:#FCD34D;">Opus 4.7</span><span class="wt__val" style="color:#FDE68A;opacity:.7;">claude-pel3</span></div>
+      <div class="wt__row"><span class="wt__lbl" style="color:#FCD34D;">Usage</span><span class="wt__val">19%<span class="wt__small">17m</span></span></div>
+      <div class="wt__row"><span class="wt__lbl" style="color:#FCD34D;">Weekly</span><span class="wt__val">9%<span class="wt__small">6d</span></span></div>
+    </div>
+  </div></div>
+
+</div>
+
+<h2>3) Widget — Compact one-liner (smallest variant)</h2>
+<div class="panel">
+  <div class="scene bg-dark" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;">
+    <div class="wc">
+      <span class="wc__chip"><span class="wc__dot"></span>claude-pel3</span>
+      <span class="wc__chip">5h 19%</span>
+      <span class="wc__chip">7d 9%</span>
+    </div>
+    <div class="wc">
+      <span class="wc__chip"><span class="wc__dot warn"></span>claude-qa</span>
+      <span class="wc__chip">5h 53%</span>
+      <span class="wc__chip">7d 88%</span>
+    </div>
+    <div class="wc" style="background:#FFFFFF;color:#0F1115;border-color:#D4D4D8;">
+      <span class="wc__chip"><span class="wc__dot bad"></span>claude</span>
+      <span class="wc__chip">5h 100% ⚠</span>
+      <span class="wc__chip">7d 88%</span>
+    </div>
+  </div>
+</div>
+
+<h2>4) Settings panel</h2>
+<div class="panel">
+  <div class="scene bg-dark">
+    <div class="sp">
+      <h2>Token Remaining — Settings</h2>
+
+      <div class="sp__sec">
+        <h3>Display</h3>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Theme</div>
+            <div class="sp__field-hint">Dark / Light auto-follows OS by default</div>
+          </div>
+          <div class="sp__theme-tabs">
+            <div class="sp__theme-tab">Auto</div>
+            <div class="sp__theme-tab active">Dark</div>
+            <div class="sp__theme-tab">Light</div>
+            <div class="sp__theme-tab">Text</div>
+          </div>
+        </div>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Layout</div>
+            <div class="sp__field-hint">HUD bars / Text-only / Compact one-liner</div>
+          </div>
+          <select class="sp__sel"><option>HUD bars (ASCII)</option><option>Text-only</option><option>Compact</option></select>
+        </div>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Show 5-hour usage</div>
+          </div>
+          <div class="sp__toggle on"></div>
+        </div>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Show weekly usage</div>
+          </div>
+          <div class="sp__toggle on"></div>
+        </div>
+      </div>
+
+      <div class="sp__sec">
+        <h3>Text-only customization</h3>
+        <div class="sp__field">
+          <div><div class="sp__field-lbl">Text color</div></div>
+          <div class="sp__color"><div class="sp__chip" style="background:#FDE68A;"></div><span class="sp__hex">#FDE68A</span></div>
+        </div>
+        <div class="sp__field">
+          <div><div class="sp__field-lbl">Background color</div></div>
+          <div class="sp__color"><div class="sp__chip" style="background:#0F1115;"></div><span class="sp__hex">#0F1115</span></div>
+        </div>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Background opacity</div>
+            <div class="sp__field-hint">0 = fully transparent, 100 = fully opaque</div>
+          </div>
+          <input class="sp__num" value="55" />
+        </div>
+      </div>
+
+      <div class="sp__sec">
+        <h3>Sync</h3>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Auto-sync</div>
+            <div class="sp__field-hint">Re-read snapshot files on schedule</div>
+          </div>
+          <div class="sp__toggle on"></div>
+        </div>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Interval (minutes)</div>
+            <div class="sp__field-hint">Default 1 min. Snapshots are updated every Claude Code statusline tick (~300 ms), so polling rate only affects UI refresh.</div>
+          </div>
+          <input class="sp__num" value="1" />
+        </div>
+      </div>
+
+      <div class="sp__sec">
+        <h3>Active account</h3>
+        <div class="sp__field">
+          <div>
+            <div class="sp__field-lbl">Account shown in widget</div>
+            <div class="sp__field-hint">Auto-discovered from CLAUDE_CONFIG_DIR siblings — install via dialog if missing</div>
+          </div>
+          <select class="sp__sel"><option>claude-pel3</option><option>claude</option><option>claude-qa</option><option>claude-gou (NOT INSTALLED)</option></select>
+        </div>
+      </div>
+
+      <div class="sp__sec">
+        <h3>Models for "claude-pel3" (observed in DB)</h3>
+        <div class="sp__acct">
+          <div>
+            <div class="sp__acct-name">Opus 4.7 (1M context)</div>
+            <div class="sp__acct-meta">last seen 12 s ago · 247 observations</div>
+          </div>
+          <div class="sp__toggle on"></div>
+        </div>
+        <div class="sp__acct">
+          <div>
+            <div class="sp__acct-name">Sonnet 4.6 (1M context)</div>
+            <div class="sp__acct-meta">last seen 4 h ago · 89 observations</div>
+          </div>
+          <div class="sp__toggle on"></div>
+        </div>
+        <div class="sp__acct" style="opacity:.55;">
+          <div>
+            <div class="sp__acct-name">Haiku 4.5</div>
+            <div class="sp__acct-meta">last seen 3 d ago · 12 observations · stale</div>
+          </div>
+          <div class="sp__toggle"></div>
+        </div>
+        <div class="sp__field-hint" style="margin-top:6px;">List is dynamic — every newly observed model on this account auto-appears here. Toggle off to hide a model from the widget without deleting DB rows.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>5) Install / Uninstall dialog</h2>
+<div class="panel">
+  <div class="scene bg-light">
+    <div class="id">
+      <div class="id__hdr">
+        <div class="id__title">Token Remaining — statusLine wrapper installer</div>
+        <p class="id__lead">Per-account install. The wrapper captures Claude Code's rate-limit telemetry (Usage 5h, Weekly 7d) so the widget can read it. Your existing statusLine (claude-hud, etc.) is preserved and piped through automatically.</p>
+      </div>
+      <div class="id__body">
+        <div class="id__sec">
+          <h3>Detected Claude profiles</h3>
+
+          <div class="id__row installed">
+            <div>
+              <div class="id__acct">claude <span class="id__pill installed">installed</span></div>
+              <div class="id__path">~/.claude/settings.json</div>
+              <div class="id__hudtag">claude-hud detected → wrapper pipes stdin to /claude-hud:setup command</div>
+            </div>
+            <button class="id__btn ghost">Reinstall</button>
+            <button class="id__btn danger">Uninstall</button>
+          </div>
+
+          <div class="id__row">
+            <div>
+              <div class="id__acct">claude-pel3 <span class="id__pill ok">ready</span></div>
+              <div class="id__path">~/.claude-pel3/settings.json</div>
+              <div class="id__hudtag">No statusLine configured · standalone wrapper (no pipe target)</div>
+            </div>
+            <button class="id__btn ghost">—</button>
+            <button class="id__btn">Install</button>
+          </div>
+
+          <div class="id__row">
+            <div>
+              <div class="id__acct">claude-qa <span class="id__pill miss">3rd-party statusLine</span></div>
+              <div class="id__path">~/.claude-qa/settings.json</div>
+              <div class="id__hudtag">Custom statusLine: <code>node ~/.dotfiles/cc-line.js</code> · wrapper will pipe stdin through it</div>
+            </div>
+            <button class="id__btn ghost">—</button>
+            <button class="id__btn">Install</button>
+          </div>
+
+          <div class="id__row">
+            <div>
+              <div class="id__acct">claude-gou <span class="id__pill ok">ready</span></div>
+              <div class="id__path">~/.claude-gou/settings.json</div>
+              <div class="id__hudtag">No statusLine configured · standalone wrapper (no pipe target)</div>
+            </div>
+            <button class="id__btn ghost">—</button>
+            <button class="id__btn">Install</button>
+          </div>
+        </div>
+
+        <div class="id__sec">
+          <h3>What gets installed (per account)</h3>
+          <div class="id__backup">1. Backup current settings.json
+   → %LOCALAPPDATA%\AgentZeroLite\statusline-backup\<acct>\settings.json.<timestamp>.bak
+2. Replace settings.json statusLine.command with:
+   "%LOCALAPPDATA%\AgentZeroLite\statusline\az-hud-wrapper.cmd" --account claude-pel3
+3. Wrapper writes per-tick snapshot to:
+   %LOCALAPPDATA%\AgentZeroLite\cc-hud-snapshots\claude-pel3.json
+4. If claude-hud detected, wrapper appends "node <claude-hud>" as pipe target
+   so user's statusline is preserved.</div>
+        </div>
+
+        <div class="id__sec">
+          <h3>Uninstall — restore preview</h3>
+          <div class="id__backup">For account "claude":
+  current statusLine: az-hud-wrapper.cmd --account claude --pipe claude-hud
+  ↓ restore from .bak (sha256 verified) ↓
+  original statusLine: { type: "command", command: "node ${CLAUDE_PLUGIN_ROOT}/dist/index.js" }
+
+If backup hash doesn't match (user edited settings since install),
+operator is shown a 3-way diff and confirms before any write.
+Snapshot files in cc-hud-snapshots/ are kept (orphaned, but small).</div>
+        </div>
+      </div>
+      <div class="id__foot">
+        <small>Settings.json is parsed via System.Text.Json with comments allowed; written atomically via temp+rename. Wrapper script is read-only after install.</small>
+        <button class="id__btn ghost">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

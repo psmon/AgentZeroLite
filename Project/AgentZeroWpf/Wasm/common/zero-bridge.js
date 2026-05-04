@@ -159,6 +159,29 @@
         invoke('tokens.aliases.remove', { vendor, accountKey }),
       reset:      ()           => invoke('tokens.reset'),
       onTick:     (handler)    => on('tokens.tick', handler),
+
+      // Token-remaining widget surface (M0011) — per-account rate-limit
+      // telemetry captured by the AgentZero statusLine wrapper. The wrapper
+      // tees Claude Code stdin into per-account snapshot files; a 30-second
+      // collector dedupes them into the DB (one row per state-change). The
+      // widget reads via the methods below.
+      remaining: {
+        // Lifecycle
+        profiles:   ()           => invoke('tokens.remaining.profiles'),
+        accounts:   ()           => invoke('tokens.remaining.accounts'),
+        install:    (account)    => invoke('tokens.remaining.install', { account }),
+        uninstall:  (account, force) => invoke('tokens.remaining.uninstall', { account, force: !!force }),
+        // Data
+        observedModels: (account) => invoke('tokens.remaining.observedModels', { account }),
+        latest:     (account)    => invoke('tokens.remaining.latest', { account }),
+        series:     (account, model, hours) =>
+          invoke('tokens.remaining.series', { account, model, hours }),
+        // Collector control
+        status:     ()           => invoke('tokens.remaining.status'),
+        refresh:    ()           => invoke('tokens.remaining.refresh'),
+        reset:      ()           => invoke('tokens.remaining.reset'),
+        onTick:     (handler)    => on('tokens.remaining.tick', handler),
+      },
     },
   };
 })();

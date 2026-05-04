@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<TokenUsageRecord> TokenUsageRecords => Set<TokenUsageRecord>();
     public DbSet<TokenSourceCheckpoint> TokenSourceCheckpoints => Set<TokenSourceCheckpoint>();
     public DbSet<TokenAccountAlias> TokenAccountAliases => Set<TokenAccountAlias>();
+    public DbSet<TokenRemainingObservation> TokenRemainingObservations => Set<TokenRemainingObservation>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -63,6 +64,13 @@ public class AppDbContext : DbContext
         mb.Entity<TokenAccountAlias>()
             .HasIndex(a => new { a.Vendor, a.AccountKey })
             .IsUnique();
+
+        // Latest-per-(account, model) lookup is the hot path for the
+        // token-remaining widget. The DESC ordering on ObservedAtUtc
+        // lets SQLite serve the query with a single index range scan.
+        mb.Entity<TokenRemainingObservation>()
+            .HasIndex(o => new { o.AccountKey, o.Model, o.ObservedAtUtc })
+            .IsDescending(false, false, true);
     }
 
     public static void InitializeDatabase()

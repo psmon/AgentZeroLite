@@ -1,0 +1,8 @@
+{
+  "id": "token-remaining",
+  "name": "Token Remaining",
+  "entry": "index.html",
+  "version": "0.1.0",
+  "icon": "⏱",
+  "description": "Minimal claude-hud-style widget showing per-account / per-model 5-hour and weekly token usage from Claude Code's rate-limit telemetry. Installs a statusLine wrapper per account."
+}
