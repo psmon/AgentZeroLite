@@ -3,7 +3,7 @@
   "$schemaVersion": "1.0.0",
   "name": "AgentZero Lite Harness",
   "description": "QA & research garden for AgentZero Lite — Windows-native multi-CLI shell with on-device LLM experiments and prompt-injection-aware security review",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "agents": ["tamer", "security-guard", "build-doctor", "test-sentinel", "test-runner", "code-coach"],
   "engine": ["release-build-pipeline", "pre-commit-review", "mission-dispatch", "harness-view-publish", "crash-dump-triage"],
   "knowledge_layout": "per-agent",
@@ -11,5 +11,5 @@
   "missions_dir": "harness/missions/",
   "missions_log_dir": "harness/logs/mission-records/",
   "created": "2026-04-25",
-  "lastUpdated": "2026-05-04"
+  "lastUpdated": "2026-05-05"
 }

@@ -37,9 +37,13 @@ public static class StatusLineWrapperInstaller
 
     public static string WrapperDir   => Path.Combine(LocalAppData, "AgentZeroLite", "statusline");
     public static string WrapperPath  => Path.Combine(WrapperDir, "az-hud-wrapper.js");
+    public static string PipeDir      => Path.Combine(LocalAppData, "AgentZeroLite", "statusline-pipes");
     public static string BackupRoot   => Path.Combine(LocalAppData, "AgentZeroLite", "statusline-backup");
     public static string StateRoot    => Path.Combine(LocalAppData, "AgentZeroLite", "statusline-state");
     public static string SnapshotsDir => Path.Combine(LocalAppData, "AgentZeroLite", "cc-hud-snapshots");
+
+    private static string PipeFileFor(string accountKey)
+        => Path.Combine(PipeDir, accountKey + ".cmd.txt");
 
     /// <summary>One row per CLAUDE_CONFIG_DIR sibling found on disk.</summary>
     public sealed record AccountProfile(
@@ -351,13 +355,38 @@ public static class StatusLineWrapperInstaller
     private static string BuildWrapperCommand(string accountKey, string? pipeTarget)
     {
         // Quote the wrapper path (may contain spaces in user-profile names).
-        // Pipe target, when present, is passed VERBATIM as a single arg —
-        // node parses it back when spawning the child.
+        //
+        // Pipe target is NEVER inlined into the command string — Claude Code
+        // applies its own variable / command substitution (${VAR}, $(...)) to
+        // the entire statusLine command before spawning, even inside single
+        // quotes (verified empirically — claude-hud's bash -c '...$(ls -d ...)'
+        // came out with $(ls -d ...) replaced by an empty string).
+        //
+        // Instead we write the raw pipe command to a sidecar text file at
+        // statusline-pipes/<acct>.cmd.txt and pass the FILE PATH via
+        // --pipe-file. The file path is a plain Windows path with no $ chars,
+        // so substitution can't shred it.
+        Directory.CreateDirectory(PipeDir);
+        var pipeFile = PipeFileFor(accountKey);
+        if (!string.IsNullOrWhiteSpace(pipeTarget))
+        {
+            // Atomic write so a tick mid-rewrite reads the previous contents.
+            var tmp = pipeFile + ".tmp";
+            File.WriteAllText(tmp, pipeTarget!);
+            try { File.Move(tmp, pipeFile, overwrite: true); }
+            catch { File.Delete(tmp); throw; }
+        }
+        else
+        {
+            // Standalone install — make sure no stale pipe file is around.
+            try { if (File.Exists(pipeFile)) File.Delete(pipeFile); } catch { }
+        }
+
         var sb = new StringBuilder();
         sb.Append("node \"").Append(WrapperPath).Append("\" --account ").Append(accountKey);
         if (!string.IsNullOrWhiteSpace(pipeTarget))
         {
-            sb.Append(" --pipe \"").Append(pipeTarget!.Replace("\"", "\\\"")).Append("\"");
+            sb.Append(" --pipe-file \"").Append(pipeFile).Append("\"");
         }
         return sb.ToString();
     }
@@ -417,31 +446,51 @@ public static class StatusLineWrapperInstaller
 
     private static string? ExtractPipeArg(string command)
     {
-        // command form: node "...\az-hud-wrapper.js" --account claude-pel3 --pipe "..."
+        // Two forms today:
+        //   --pipe-file "<path>"   (current — sidecar file holds raw command)
+        //   --pipe      "<cmd>"    (legacy v1 — inline; subject to Claude Code substitution)
+        // Try the sidecar form first.
+        const string fileMarker = "--pipe-file ";
+        var fi = command.IndexOf(fileMarker, StringComparison.Ordinal);
+        if (fi >= 0)
+        {
+            var path = ReadQuotedOrToken(command, fi + fileMarker.Length);
+            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+            {
+                try { return File.ReadAllText(path).TrimEnd('\n', '\r'); } catch { }
+            }
+            return null;
+        }
         const string marker = "--pipe ";
         var i = command.IndexOf(marker, StringComparison.Ordinal);
         if (i < 0) return null;
-        var rest = command[(i + marker.Length)..].TrimStart();
-        if (rest.Length == 0) return null;
+        return ReadQuotedOrToken(command, i + marker.Length);
+    }
 
-        if (rest[0] == '"')
+    /// <summary>Read a quoted or whitespace-delimited token starting at <paramref name="start"/>.</summary>
+    private static string? ReadQuotedOrToken(string s, int start)
+    {
+        if (start < 0 || start >= s.Length) return null;
+        // Skip leading whitespace
+        while (start < s.Length && char.IsWhiteSpace(s[start])) start++;
+        if (start >= s.Length) return null;
+
+        if (s[start] == '"')
         {
-            // Find matching close quote, allowing escaped quotes
             var sb = new StringBuilder();
-            for (int p = 1; p < rest.Length; p++)
+            for (int p = start + 1; p < s.Length; p++)
             {
-                if (rest[p] == '\\' && p + 1 < rest.Length && rest[p + 1] == '"')
+                if (s[p] == '\\' && p + 1 < s.Length && s[p + 1] == '"')
                 {
                     sb.Append('"'); p++; continue;
                 }
-                if (rest[p] == '"') return sb.ToString();
-                sb.Append(rest[p]);
+                if (s[p] == '"') return sb.ToString();
+                sb.Append(s[p]);
             }
             return sb.ToString();
         }
-        // Unquoted — take up to next space
-        var spaceIdx = rest.IndexOf(' ');
-        return spaceIdx < 0 ? rest : rest[..spaceIdx];
+        var spaceIdx = s.IndexOf(' ', start);
+        return spaceIdx < 0 ? s[start..] : s[start..spaceIdx];
     }
 
     private static bool LooksLikeClaudeHud(string? command)
@@ -495,7 +544,21 @@ function arg(name) {
 }
 
 const account = arg('--account') || 'claude';
-const pipe    = arg('--pipe');
+// Two ways to get the pipe target:
+//   --pipe       <command>    — inline (legacy v1; vulnerable to Claude Code's
+//                               variable substitution if command contains
+//                               $(...) or ${VAR})
+//   --pipe-file  <path>       — sidecar file with the raw command (safe:
+//                               file path has no $ chars to substitute)
+let pipe = arg('--pipe');
+const pipeFile = arg('--pipe-file');
+if (!pipe && pipeFile) {
+  try {
+    pipe = fs.readFileSync(pipeFile, 'utf8').replace(/^﻿/, '').trim();
+  } catch (e) {
+    // Fall through — we'll log below and exit gracefully.
+  }
+}
 
 const baseDir = path.join(process.env.LOCALAPPDATA || '', 'AgentZeroLite');
 const snapshotsDir = path.join(baseDir, 'cc-hud-snapshots');
@@ -639,18 +702,71 @@ process.stdin.on('end', () => {
       // intact.
       const argv = parseArgv(expanded);
       if (!argv.length) { dlog('pipe parse-empty'); process.exit(0); }
-      const program = argv[0];
-      const args    = argv.slice(1);
-      dlog('pipe spawn program=' + program + ' argc=' + args.length);
+      let program = argv[0];
+      const args  = argv.slice(1);
+
+      // bash on Windows is ambiguous — `bash` on PATH might resolve to
+      // the WSL bash (C:\Windows\System32\bash.exe) which fails on
+      // Git-Bash-style paths (/c/...). Force Git Bash if we see Git
+      // installed at the standard location, since claude-hud's setup
+      // command is written assuming Git Bash semantics. We also need
+      // to give Git Bash a HOME that matches what it sets up
+      // interactively, otherwise bash scripts that probe ~/.claude/...
+      // come up empty.
+      let childEnv = process.env;
+      if (program === 'bash' && process.platform === 'win32') {
+        const candidates = [
+          process.env.PROGRAMFILES + '\\Git\\bin\\bash.exe',
+          process.env['PROGRAMFILES(X86)'] + '\\Git\\bin\\bash.exe',
+          process.env.LOCALAPPDATA + '\\Programs\\Git\\bin\\bash.exe',
+        ];
+        for (const c of candidates) {
+          try { if (fs.existsSync(c)) { program = c; dlog('bash -> ' + c); break; } } catch {}
+        }
+        // Git Bash interactive sessions get HOME=/c/Users/<name> via
+        // /etc/profile, but a non-interactive bash spawned from Node
+        // inherits Windows' HOME (often empty or pointing to a roaming
+        // profile). Force HOME = USERPROFILE in MSYS form so $HOME-
+        // relative globs (`$HOME/.claude/plugins/...`) match the same
+        // place the interactive shell would.
+        if (process.env.USERPROFILE) {
+          // C:\Users\psmon  ->  /c/Users/psmon
+          const w = process.env.USERPROFILE;
+          const msysHome = (w.length >= 2 && w[1] === ':')
+            ? '/' + w[0].toLowerCase() + w.slice(2).replace(/\\/g, '/')
+            : w;
+          childEnv = Object.assign({}, process.env, { HOME: msysHome });
+        }
+      }
+      dlog('pipe spawn program=' + program + ' argc=' + args.length
+        + ' cwd=' + process.cwd()
+        + ' HOME=' + (childEnv.HOME || '<unset>')
+        + ' CLAUDE_CONFIG_DIR=' + (childEnv.CLAUDE_CONFIG_DIR || '<unset>')
+        + ' USERPROFILE=' + (childEnv.USERPROFILE || '<unset>'));
+      // Truncated dump of the script bash will receive (one-line, escaped) —
+      // helps catch parseArgv mis-tokenization when a user has a complex pipe.
+      if (args.length >= 2 && args[0] === '-c') {
+        const s = args[1];
+        dlog('pipe bash-script[' + s.length + 'B]=' + JSON.stringify(s.length > 400 ? s.slice(0, 400) + '...' : s));
+      }
+
+      // Capture stderr so we can see WHY a child failed. Otherwise
+      // Claude Code's statusLine discards stderr and we fly blind.
       const child = cp.spawn(program, args, {
-        stdio: ['pipe', 'inherit', 'inherit'],
+        stdio: ['pipe', 'inherit', 'pipe'],
         windowsHide: true,
-        env: process.env,
+        env: childEnv,
       });
+      let stderrBuf = '';
+      child.stderr.on('data', (d) => { stderrBuf += d.toString(); if (stderrBuf.length > 4096) stderrBuf = stderrBuf.slice(-4096); });
       child.stdin.on('error', () => {}); // pipe might break if downstream is fast
       try { child.stdin.write(stdin); } catch {}
       try { child.stdin.end(); } catch {}
-      child.on('exit', code => { dlog('pipe exit=' + code); process.exit(code || 0); });
+      child.on('exit', code => {
+        const exitTag = (code === 3221225794 ? 'exit=0xC0000142(DLL_INIT_FAILED)' : 'exit=' + code);
+        dlog('pipe ' + exitTag + (stderrBuf ? ' stderr=' + JSON.stringify(stderrBuf.trim().slice(0, 600)) : ''));
+        process.exit(code || 0);
+      });
       child.on('error', err => { dlog('pipe spawn-error ' + (err && err.message || err)); process.exit(0); });
     } catch (e) {
       dlog('pipe try-error ' + (e && e.message || e));

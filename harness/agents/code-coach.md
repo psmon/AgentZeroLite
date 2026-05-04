@@ -212,6 +212,30 @@ Treat them as binding for the file types they cover:
   one-char drift honestly — that's measurement, not flake. See the
   full pattern in the knowledge file.
 
+- **`harness/knowledge/code-coach/nodejs-bash-and-stream-io-pitfalls.md`** —
+  Whenever the staged diff adds or modifies a Node.js wrapper that
+  spawns child processes (statusLine wrappers, hook wrappers, IPC
+  bridges, etc.), or touches `StatusLineWrapperInstaller.cs` /
+  embedded `WrapperScript`, walk the **10-pitfall checklist at the
+  bottom of that file** before approving the commit. The catalogue
+  comes from the M0011 token-remaining wrapper build (claude-hud
+  chain pipe-through) where each pitfall corresponded to a real
+  failure observed in the wrapper diagnostic log:
+  P1 `bash` resolves to WSL not Git Bash (`0xC0000142`),
+  P2 `cp.spawn(_, _, {shell:true})` shreds bash `'…'` nested quotes,
+  P3 Git Bash needs MSYS-form HOME (`/c/Users/...`),
+  P4 Claude Code statusLine substitutes `${VAR}` and `$(...)` even
+  inside single quotes — sidecar-file pattern required for any
+  complex shell payload,
+  P5 inheriting child stderr makes diagnosis impossible (capture to log),
+  P6 `child.stdin.write` without error guard crashes on early-close,
+  P7 file writes that aren't temp+rename atomic corrupt readers,
+  P8 diagnostic logs without size cap grow unbounded,
+  P9 humanise Windows native NTSTATUS exit codes (`0xC0000142` etc),
+  P10 invasive installers must capture original + sha256 + diff-then-confirm
+  uninstall. Each pitfall ships a copy-paste fix snippet; the
+  in-document checklist is also paste-ready into PR descriptions.
+
 ## Evaluation rubric
 
 | Axis | Measure | Scale |
