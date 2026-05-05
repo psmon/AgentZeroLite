@@ -1,0 +1,473 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "frame",
+      "id": "master",
+      "name": "master",
+      "layout": "none",
+      "width": 1280,
+      "height": 1020,
+      "fill": "#08081A",
+      "stroke": { "fill": "#2A2A5E", "thickness": 1 },
+      "x": 0,
+      "y": 0,
+      "children": [
+        {
+          "type": "text",
+          "id": "title",
+          "name": "title",
+          "content": "Smart agent emerges — the actual AgentZero Lite layout",
+          "fill": "#7CFDB0",
+          "fontFamily": "Inter",
+          "fontSize": 20,
+          "fontWeight": "bold",
+          "x": 24,
+          "y": 22
+        },
+        {
+          "type": "text",
+          "id": "sub",
+          "name": "sub",
+          "content": "Real screen: split-CLI on top (Claude Code · Codex CLI side-by-side) + AgentBot panel below. Gemma 4 routes through both via the AgentLoop tool surface.",
+          "fill": "#858585",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontStyle": "italic",
+          "x": 24,
+          "y": 56
+        },
+        {
+          "type": "frame",
+          "id": "window",
+          "name": "window",
+          "layout": "vertical",
+          "width": 1232,
+          "height": 820,
+          "x": 24,
+          "y": 96,
+          "fill": "#0F0F1A",
+          "stroke": { "fill": "#3E3E42", "thickness": 1 },
+          "cornerRadius": 8,
+          "padding": 0,
+          "children": [
+            {
+              "type": "frame",
+              "id": "chrome",
+              "name": "chrome",
+              "layout": "horizontal",
+              "width": "fill_container",
+              "height": 32,
+              "fill": "#1B1B2E",
+              "padding": [0, 12],
+              "alignItems": "center",
+              "gap": 8,
+              "children": [
+                { "type": "ellipse", "id": "btnRed", "name": "btnRed", "width": 10, "height": 10, "fill": "#F47174" },
+                { "type": "ellipse", "id": "btnYel", "name": "btnYel", "width": 10, "height": 10, "fill": "#DCDCAA" },
+                { "type": "ellipse", "id": "btnGrn", "name": "btnGrn", "width": 10, "height": 10, "fill": "#7CFDB0" },
+                { "type": "frame", "id": "chTitleSp", "name": "chTitleSp", "width": 12, "height": 1, "fill": "#1B1B2E" },
+                { "type": "text", "id": "chTitle", "name": "chTitle", "content": "AgentZero Lite — Workspace: agent-zero", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 12, "fontWeight": "bold" },
+                { "type": "frame", "id": "chFlex", "name": "chFlex", "width": "fill_container", "height": 1, "fill": "#1B1B2E" },
+                { "type": "text", "id": "chMode", "name": "chMode", "content": "Split: ON  ·  AIMODE: gemma-4-e4b  ·  GBNF: ON", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 11, "fontStyle": "italic" }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "body",
+              "name": "body",
+              "layout": "horizontal",
+              "width": "fill_container",
+              "height": "fill_container",
+              "padding": 0,
+              "gap": 0,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "sidebar",
+                  "name": "sidebar",
+                  "layout": "vertical",
+                  "width": 168,
+                  "height": "fill_container",
+                  "fill": "#10101F",
+                  "padding": [12, 10],
+                  "gap": 4,
+                  "stroke": { "fill": "#1B1B2E", "thickness": 1 },
+                  "children": [
+                    { "type": "text", "id": "sbLogo", "name": "sbLogo", "content": "AgentZero Lite", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 11, "fontWeight": "bold" },
+                    { "type": "text", "id": "sbWs", "name": "sbWs", "content": "WORKSPACES", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 8, "fontWeight": "bold", "letterSpacing": 0.6 },
+                    {
+                      "type": "frame", "id": "sbActive", "name": "sbActive", "layout": "horizontal", "width": "fill_container", "height": 22, "fill": "#1B3D5A", "cornerRadius": 4, "padding": [0, 8], "alignItems": "center", "gap": 6,
+                      "children": [
+                        { "type": "ellipse", "id": "sbAd", "name": "d", "width": 5, "height": 5, "fill": "#7CFDB0" },
+                        { "type": "text", "id": "sbAt", "name": "t", "content": "agent-zero", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                      ]
+                    },
+                    {
+                      "type": "frame", "id": "sbOther", "name": "sbOther", "layout": "horizontal", "width": "fill_container", "height": 22, "padding": [0, 8], "alignItems": "center", "gap": 6,
+                      "children": [
+                        { "type": "text", "id": "sbOt", "name": "t", "content": "docs", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 10 }
+                      ]
+                    },
+                    { "type": "frame", "id": "sbSep", "name": "sbSep", "width": "fill_container", "height": 1, "fill": "#1B1B2E" },
+                    { "type": "text", "id": "sbTabs", "name": "sbTabs", "content": "OPEN TABS", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 8, "fontWeight": "bold", "letterSpacing": 0.6 },
+                    {
+                      "type": "frame", "id": "sbTab1", "name": "sbTab1", "layout": "horizontal", "width": "fill_container", "height": 22, "fill": "#1B3D5A", "cornerRadius": 4, "padding": [0, 8], "alignItems": "center", "gap": 6,
+                      "children": [
+                        { "type": "ellipse", "id": "sbT1d", "name": "d", "width": 5, "height": 5, "fill": "#3794FF" },
+                        { "type": "text", "id": "sbT1t", "name": "t", "content": "Code", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                      ]
+                    },
+                    {
+                      "type": "frame", "id": "sbTab2", "name": "sbTab2", "layout": "horizontal", "width": "fill_container", "height": 22, "fill": "#2D1B3D", "cornerRadius": 4, "padding": [0, 8], "alignItems": "center", "gap": 6,
+                      "children": [
+                        { "type": "ellipse", "id": "sbT2d", "name": "d", "width": 5, "height": 5, "fill": "#C586C0" },
+                        { "type": "text", "id": "sbT2t", "name": "t", "content": "Codex", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                      ]
+                    },
+                    {
+                      "type": "frame", "id": "sbTab3", "name": "sbTab3", "layout": "horizontal", "width": "fill_container", "height": 22, "padding": [0, 8], "alignItems": "center", "gap": 6,
+                      "children": [
+                        { "type": "text", "id": "sbT3t", "name": "t", "content": "+ new terminal", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 10 }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "mainCol",
+                  "name": "mainCol",
+                  "layout": "vertical",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "#0F0F1A",
+                  "padding": 0,
+                  "gap": 0,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "cliStrip",
+                      "name": "cliStrip",
+                      "layout": "vertical",
+                      "width": "fill_container",
+                      "height": 380,
+                      "padding": 0,
+                      "gap": 0,
+                      "fill": "#0A0A14",
+                      "children": [
+                        {
+                          "type": "frame", "id": "cliBar", "name": "cliBar", "layout": "horizontal", "width": "fill_container", "height": 26, "fill": "#181828", "padding": [0, 12], "alignItems": "center", "gap": 10,
+                          "children": [
+                            { "type": "text", "id": "cliBarLbl", "name": "cliBarLbl", "content": "CLI · Split mode", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" },
+                            { "type": "frame", "id": "cliBarSp", "name": "sp", "width": "fill_container", "height": 1, "fill": "#181828" },
+                            { "type": "text", "id": "cliBarHint", "name": "cliBarHint", "content": "keyboard ⇄ active tab  ·  AIMODE bridges both", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 9, "fontStyle": "italic" }
+                          ]
+                        },
+                        {
+                          "type": "frame", "id": "cliCols", "name": "cliCols", "layout": "horizontal", "width": "fill_container", "height": "fill_container", "padding": 0, "gap": 1, "fill": "#3E3E42",
+                          "children": [
+                            {
+                              "type": "frame", "id": "colClaude", "name": "colClaude", "layout": "vertical", "width": "fill_container", "height": "fill_container", "fill": "#0A0A14", "padding": 0, "gap": 0,
+                              "children": [
+                                {
+                                  "type": "frame", "id": "clHead", "name": "clHead", "layout": "horizontal", "width": "fill_container", "height": 22, "fill": "#0E1622", "padding": [0, 10], "alignItems": "center", "gap": 6,
+                                  "children": [
+                                    { "type": "ellipse", "id": "clDot", "name": "d", "width": 7, "height": 7, "fill": "#3794FF" },
+                                    { "type": "text", "id": "clName", "name": "name", "content": "Code  ·  Claude Code  (active)", "fill": "#3794FF", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" },
+                                    { "type": "frame", "id": "clHsp", "name": "sp", "width": "fill_container", "height": 1, "fill": "#0E1622" },
+                                    { "type": "text", "id": "clShell", "name": "shell", "content": "claude code v0.5", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 9 }
+                                  ]
+                                },
+                                {
+                                  "type": "frame", "id": "clBody", "name": "clBody", "layout": "vertical", "width": "fill_container", "height": "fill_container", "padding": [8, 12], "gap": 2, "fill": "#0A0A14",
+                                  "children": [
+                                    { "type": "text", "id": "cl1",  "content": "╭─────────────────────────────────────╮", "fill": "#3E3E42", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl2",  "content": "│ ✻ Welcome to Claude Code            │", "fill": "#7CFDB0", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl3",  "content": "│   /help · /status                   │", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl4",  "content": "│   cwd: ~/projects/agent-zero        │", "fill": "#5E6470", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl5",  "content": "╰─────────────────────────────────────╯", "fill": "#3E3E42", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl6",  "content": " ", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl7",  "content": "› (incoming via bot-chat — handshake from AgentBot)", "fill": "#5E6470", "fontFamily": "Cascadia Mono", "fontSize": 9, "fontStyle": "italic" },
+                                    { "type": "text", "id": "cl8",  "content": "  AgentBot: Please summarise the last 30 lines", "fill": "#3794FF", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl9",  "content": "  of your output in 5 bullets, then call", "fill": "#3794FF", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl10", "content": "  bot-chat \"DONE(<text>)\" --from Claude.", "fill": "#3794FF", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl11", "content": " ", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl12", "content": "● Reading recent buffer …", "fill": "#7CFDB0", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl13", "content": "● Recap (5 bullets):", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl14", "content": "    • Refactored Reactor → AgentLoop (M0013)", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl15", "content": "    • Renamed IAgentToolHost → IAgentToolbelt", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl16", "content": "    • dotnet test 162/162 passed (24 m)", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl17", "content": "    • doc-v1.18.0 tagged · docs propagated", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl18", "content": "    • Pages deploy succeeded in 29 s", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl19", "content": "● bot-chat \"DONE(...)\" --from Claude  ✓", "fill": "#7CFDB0", "fontFamily": "Cascadia Mono", "fontSize": 10, "fontWeight": "bold" },
+                                    { "type": "text", "id": "cl20", "content": " ", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cl21", "content": "› ▌", "fill": "#7CFDB0", "fontFamily": "Cascadia Mono", "fontSize": 10, "fontWeight": "bold" }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame", "id": "colCodex", "name": "colCodex", "layout": "vertical", "width": "fill_container", "height": "fill_container", "fill": "#0A0A14", "padding": 0, "gap": 0,
+                              "children": [
+                                {
+                                  "type": "frame", "id": "cxHead", "name": "cxHead", "layout": "horizontal", "width": "fill_container", "height": 22, "fill": "#1A0E22", "padding": [0, 10], "alignItems": "center", "gap": 6,
+                                  "children": [
+                                    { "type": "ellipse", "id": "cxDot", "name": "d", "width": 7, "height": 7, "fill": "#C586C0" },
+                                    { "type": "text", "id": "cxName", "name": "name", "content": "Codex  ·  Codex CLI", "fill": "#C586C0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" },
+                                    { "type": "frame", "id": "cxHsp", "name": "sp", "width": "fill_container", "height": 1, "fill": "#1A0E22" },
+                                    { "type": "text", "id": "cxShell", "name": "shell", "content": "codex 0.42", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 9 }
+                                  ]
+                                },
+                                {
+                                  "type": "frame", "id": "cxBody", "name": "cxBody", "layout": "vertical", "width": "fill_container", "height": "fill_container", "padding": [8, 12], "gap": 2, "fill": "#0A0A14",
+                                  "children": [
+                                    { "type": "text", "id": "cx1",  "content": "OpenAI Codex  v0.42", "fill": "#C586C0", "fontFamily": "Cascadia Mono", "fontSize": 10, "fontWeight": "bold" },
+                                    { "type": "text", "id": "cx2",  "content": "model · gpt-5-codex   workspace · agent-zero", "fill": "#5E6470", "fontFamily": "Cascadia Mono", "fontSize": 9 },
+                                    { "type": "text", "id": "cx3",  "content": "──────────────────────────────────────────", "fill": "#3E3E42", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx4",  "content": "› (incoming via bot-chat — relay from AgentBot)", "fill": "#5E6470", "fontFamily": "Cascadia Mono", "fontSize": 9, "fontStyle": "italic" },
+                                    { "type": "text", "id": "cx5",  "content": "  AgentBot: Here is Claude's 5-bullet recap.", "fill": "#3794FF", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx6",  "content": "    · M0013 rename · Reactor → AgentLoop", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx7",  "content": "    · IAgentToolHost → IAgentToolbelt", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx8",  "content": "    · 162/162 tests · 24 min", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx9",  "content": "    · doc-v1.18.0 · Pages 29 s", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx10", "content": "  Please draft a release-note for X / blog.", "fill": "#3794FF", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx11", "content": " ", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx12", "content": "» Drafting …", "fill": "#C586C0", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx13", "content": "» “AgentZero Lite v1.18 — the agent layer", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx14", "content": "    is now an Agent Loop. 162/162 green,", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx15", "content": "    Mode-2 relay across Claude+Codex live.", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx16", "content": "    Shipping today.”", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx17", "content": "» bot-chat \"DONE(...)\" --from Codex  ✓", "fill": "#C586C0", "fontFamily": "Cascadia Mono", "fontSize": 10, "fontWeight": "bold" },
+                                    { "type": "text", "id": "cx18", "content": " ", "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cx19", "content": "» ▌", "fill": "#C586C0", "fontFamily": "Cascadia Mono", "fontSize": 10, "fontWeight": "bold" }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "botPanel",
+                      "name": "botPanel",
+                      "layout": "vertical",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "#0F0F1A",
+                      "padding": 0,
+                      "gap": 0,
+                      "children": [
+                        {
+                          "type": "frame", "id": "botBar", "name": "botBar", "layout": "horizontal", "width": "fill_container", "height": 28, "fill": "#181828", "padding": [0, 12], "alignItems": "center", "gap": 8,
+                          "stroke": { "align": "inside", "thickness": { "top": 1 }, "fill": "#3E3E42" },
+                          "children": [
+                            { "type": "ellipse", "id": "botBarDot", "name": "d", "width": 8, "height": 8, "fill": "#7CFDB0" },
+                            { "type": "text", "id": "botBarTitle", "name": "t", "content": "AgentBot · AIMODE  ·  /user/stage/bot/loop", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 11, "fontWeight": "bold" },
+                            { "type": "frame", "id": "botBarSp", "name": "sp", "width": "fill_container", "height": 1, "fill": "#181828" },
+                            { "type": "text", "id": "botBarTurn", "name": "tt", "content": "turn 5  ·  3.4 s  ·  MaxIterations 12", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 9, "fontStyle": "italic" }
+                          ]
+                        },
+                        {
+                          "type": "frame", "id": "botBody", "name": "botBody", "layout": "horizontal", "width": "fill_container", "height": "fill_container", "padding": 0, "gap": 0,
+                          "children": [
+                            {
+                              "type": "frame", "id": "chatColumn", "name": "chatColumn", "layout": "vertical", "width": "fill_container", "height": "fill_container", "padding": [12, 14], "gap": 8, "fill": "#0F0F1A",
+                              "children": [
+                                {
+                                  "type": "frame", "id": "userRow", "name": "userRow", "layout": "horizontal", "width": "fill_container", "justifyContent": "end",
+                                  "children": [
+                                    {
+                                      "type": "frame", "id": "userBub", "name": "userBub", "layout": "vertical", "width": 520, "fill": "#1B3D5A", "cornerRadius": [10, 10, 2, 10], "padding": 9, "gap": 3,
+                                      "children": [
+                                        { "type": "text", "id": "userTag", "name": "t", "content": "USER", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 9, "fontWeight": "bold" },
+                                        { "type": "text", "id": "userTxt", "name": "u", "content": "Talk to Claude (tab Code) · ask for a 5-bullet recap of recent work · pass it to Codex · ask Codex to draft a release note.", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 11, "textGrowth": "fixed-width", "width": "fill_container", "lineHeight": 1.5 }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame", "id": "pillRow1", "name": "pillRow1", "layout": "horizontal", "width": "fill_container", "gap": 6,
+                                  "children": [
+                                    { "type": "frame", "id": "p1", "layout": "horizontal", "width": "fit_content", "fill": "#1A1A2E", "cornerRadius": 12, "padding": [4, 10], "gap": 6, "alignItems": "center",
+                                      "children": [
+                                        { "type": "text", "id": "p1ic", "content": "💭", "fontFamily": "Inter", "fontSize": 11, "fill": "#DCDCAA" },
+                                        { "type": "text", "id": "p1tx", "content": "Thinking… (AgentLoopPhase = Thinking)", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                      ]
+                                    },
+                                    { "type": "frame", "id": "p2", "layout": "horizontal", "width": "fit_content", "fill": "#1A1A2E", "cornerRadius": 12, "padding": [4, 10], "gap": 6, "alignItems": "center",
+                                      "children": [
+                                        { "type": "text", "id": "p2ic", "content": "⚡", "fontFamily": "Inter", "fontSize": 11, "fill": "#3794FF" },
+                                        { "type": "text", "id": "p2tx", "content": "list_terminals → 2 tabs", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                { "type": "frame", "id": "pillRow2", "layout": "horizontal", "width": "fill_container", "gap": 6,
+                                  "children": [
+                                    { "type": "frame", "id": "p3", "layout": "horizontal", "width": "fit_content", "fill": "#1A1A2E", "cornerRadius": 12, "padding": [4, 10], "gap": 6, "alignItems": "center",
+                                      "children": [
+                                        { "type": "text", "id": "p3ic", "content": "📤", "fontFamily": "Inter", "fontSize": 11, "fill": "#7CFDB0" },
+                                        { "type": "text", "id": "p3tx", "content": "send_to_terminal(g=0,t=0) → Claude (handshake + recap)", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                { "type": "frame", "id": "pillRow3", "layout": "horizontal", "width": "fill_container", "gap": 6,
+                                  "children": [
+                                    { "type": "frame", "id": "p4", "layout": "horizontal", "width": "fit_content", "fill": "#1A1A2E", "cornerRadius": 12, "padding": [4, 10], "gap": 6, "alignItems": "center",
+                                      "children": [
+                                        { "type": "text", "id": "p4ic", "content": "⏳", "fontFamily": "Inter", "fontSize": 11, "fill": "#DCDCAA" },
+                                        { "type": "text", "id": "p4tx", "content": "wait(8 s)", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                      ]
+                                    },
+                                    { "type": "frame", "id": "p5", "layout": "horizontal", "width": "fit_content", "fill": "#1A1A2E", "cornerRadius": 12, "padding": [4, 10], "gap": 6, "alignItems": "center",
+                                      "children": [
+                                        { "type": "text", "id": "p5ic", "content": "📥", "fontFamily": "Inter", "fontSize": 11, "fill": "#3794FF" },
+                                        { "type": "text", "id": "p5tx", "content": "read_terminal → 9-line recap", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                { "type": "frame", "id": "pillRow4", "layout": "horizontal", "width": "fill_container", "gap": 6,
+                                  "children": [
+                                    { "type": "frame", "id": "p6", "layout": "horizontal", "width": "fit_content", "fill": "#1A1A2E", "cornerRadius": 12, "padding": [4, 10], "gap": 6, "alignItems": "center",
+                                      "children": [
+                                        { "type": "text", "id": "p6ic", "content": "📤", "fontFamily": "Inter", "fontSize": 11, "fill": "#C586C0" },
+                                        { "type": "text", "id": "p6tx", "content": "send_to_terminal(g=0,t=1) → Codex (relay + ask draft)", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                { "type": "frame", "id": "pillRow5", "layout": "horizontal", "width": "fill_container", "gap": 6,
+                                  "children": [
+                                    { "type": "frame", "id": "p7", "layout": "horizontal", "width": "fit_content", "fill": "#0E2E1F", "cornerRadius": 12, "padding": [4, 10], "gap": 6, "alignItems": "center", "stroke": { "fill": "#7CFDB0", "thickness": 1 },
+                                      "children": [
+                                        { "type": "text", "id": "p7ic", "content": "✓", "fontFamily": "Inter", "fontSize": 11, "fill": "#7CFDB0", "fontWeight": "bold" },
+                                        { "type": "text", "id": "p7tx", "content": "done — \"Recap captured · release-note draft sent.\"", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame", "id": "botInputRow", "name": "botInputRow", "layout": "horizontal", "width": "fill_container", "fill": "#181828", "cornerRadius": 6, "padding": 8, "gap": 8, "alignItems": "center", "stroke": { "fill": "#3E3E42", "thickness": 1 },
+                                  "children": [
+                                    { "type": "text", "id": "botInputLabel", "content": ">", "fill": "#7CFDB0", "fontFamily": "Cascadia Mono", "fontSize": 13, "fontWeight": "bold" },
+                                    { "type": "text", "id": "botInputTxt", "content": "Type a prompt…", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 11, "fontStyle": "italic" },
+                                    { "type": "frame", "id": "botInputSp", "width": "fill_container", "height": 1, "fill": "#181828" },
+                                    {
+                                      "type": "frame", "id": "botInputBtn", "layout": "horizontal", "width": "fit_content", "fill": "#2563EB", "cornerRadius": 4, "padding": [4, 10],
+                                      "children": [
+                                        { "type": "text", "id": "botInputBtnTxt", "content": "Send · Esc to cancel", "fill": "#FFFFFF", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame", "id": "sideColumn", "name": "sideColumn", "layout": "vertical", "width": 280, "height": "fill_container", "padding": 12, "gap": 8, "fill": "#0B0B14", "stroke": { "align": "inside", "thickness": { "left": 1 }, "fill": "#3E3E42" },
+                              "children": [
+                                { "type": "text", "id": "scTitle", "content": "What Gemma actually emits", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 11, "fontWeight": "bold" },
+                                { "type": "text", "id": "scSub", "content": "Per-turn output, GBNF-constrained — every emission is a single tool call.", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 9, "fontStyle": "italic", "textGrowth": "fixed-width", "width": "fill_container", "lineHeight": 1.5 },
+                                {
+                                  "type": "frame", "id": "codeBox", "layout": "vertical", "width": "fill_container", "fill": "#0A0A14", "cornerRadius": 5, "padding": 10, "gap": 1, "stroke": { "fill": "#3E3E42", "thickness": 1 },
+                                  "children": [
+                                    { "type": "text", "id": "cb1", "content": "{",                                       "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cb2", "content": "  \"tool\": \"send_to_terminal\",",        "fill": "#7CFDB0", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cb3", "content": "  \"args\": {",                          "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cb4", "content": "    \"group\": 0,",                     "fill": "#DCDCAA", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cb5", "content": "    \"tab\":   1,",                     "fill": "#DCDCAA", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cb6", "content": "    \"text\":  \"<recap relayed>\"",     "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cb7", "content": "  }",                                     "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 },
+                                    { "type": "text", "id": "cb8", "content": "}",                                       "fill": "#D4D4D4", "fontFamily": "Cascadia Mono", "fontSize": 10 }
+                                  ]
+                                },
+                                { "type": "text", "id": "cmpTitle", "content": "Why it gets smarter", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 11, "fontWeight": "bold" },
+                                {
+                                  "type": "frame", "id": "cmpL", "layout": "vertical", "width": "fill_container", "fill": "#1A1216", "cornerRadius": 5, "padding": 9, "gap": 3, "stroke": { "fill": "#F47174", "thickness": 1 },
+                                  "children": [
+                                    { "type": "text", "id": "cmpLh", "content": "Vanilla Gemma", "fill": "#F47174", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" },
+                                    { "type": "text", "id": "cmpL1", "content": "• one-shot reply", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 },
+                                    { "type": "text", "id": "cmpL2", "content": "• cannot inspect", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 },
+                                    { "type": "text", "id": "cmpL3", "content": "• cannot relay",   "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                  ]
+                                },
+                                {
+                                  "type": "frame", "id": "cmpR", "layout": "vertical", "width": "fill_container", "fill": "#0E2E1F", "cornerRadius": 5, "padding": 9, "gap": 3, "stroke": { "fill": "#7CFDB0", "thickness": 1 },
+                                  "children": [
+                                    { "type": "text", "id": "cmpRh", "content": "Gemma + AgentLoop", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" },
+                                    { "type": "text", "id": "cmpR1", "content": "• reads peer context",                "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 },
+                                    { "type": "text", "id": "cmpR2", "content": "• handshakes + targeted prompts",     "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 },
+                                    { "type": "text", "id": "cmpR3", "content": "• waits, reads, decides next step",   "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 },
+                                    { "type": "text", "id": "cmpR4", "content": "• routes between specialists",        "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 },
+                                    { "type": "text", "id": "cmpR5", "content": "• multi-step until 'done'",           "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 10 }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "annotations",
+          "name": "annotations",
+          "layout": "horizontal",
+          "width": 1232,
+          "height": 130,
+          "x": 24,
+          "y": 940,
+          "fill": "#0D0D1A",
+          "stroke": { "fill": "#3E3E42", "thickness": 1 },
+          "cornerRadius": 6,
+          "padding": 12,
+          "gap": 12,
+          "children": [
+            {
+              "type": "frame", "id": "fsmCol", "layout": "vertical", "width": "fill_container", "height": "fill_container", "gap": 6,
+              "children": [
+                { "type": "text", "id": "fsmTitle", "content": "AgentLoopActor phase ribbon", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" },
+                {
+                  "type": "frame", "id": "fsmRow", "layout": "horizontal", "width": "fill_container", "gap": 5, "alignItems": "center",
+                  "children": [
+                    { "type": "frame", "id": "ph1", "fill": "#1B2236", "cornerRadius": 4, "padding": [4, 10], "width": "fit_content",
+                      "children": [{ "type": "text", "id": "ph1t", "content": "Idle", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" }] },
+                    { "type": "text", "id": "arr1", "content": "→", "fill": "#3794FF", "fontFamily": "Inter", "fontSize": 13, "fontWeight": "bold" },
+                    { "type": "frame", "id": "ph2", "fill": "#0D2241", "cornerRadius": 4, "padding": [4, 10], "width": "fit_content", "stroke": { "fill": "#3794FF", "thickness": 1 },
+                      "children": [{ "type": "text", "id": "ph2t", "content": "Thinking", "fill": "#3794FF", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" }] },
+                    { "type": "text", "id": "arr2", "content": "→", "fill": "#3794FF", "fontFamily": "Inter", "fontSize": 13, "fontWeight": "bold" },
+                    { "type": "frame", "id": "ph3", "fill": "#3D2A14", "cornerRadius": 4, "padding": [4, 10], "width": "fit_content", "stroke": { "fill": "#DCDCAA", "thickness": 1 },
+                      "children": [{ "type": "text", "id": "ph3t", "content": "Generating", "fill": "#DCDCAA", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" }] },
+                    { "type": "text", "id": "arr3", "content": "→", "fill": "#C586C0", "fontFamily": "Inter", "fontSize": 13, "fontWeight": "bold" },
+                    { "type": "frame", "id": "ph4", "fill": "#3A1F37", "cornerRadius": 4, "padding": [4, 10], "width": "fit_content", "stroke": { "fill": "#C586C0", "thickness": 1 },
+                      "children": [{ "type": "text", "id": "ph4t", "content": "Acting", "fill": "#C586C0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" }] },
+                    { "type": "text", "id": "arr4", "content": "↺", "fill": "#5E6470", "fontFamily": "Inter", "fontSize": 13, "fontStyle": "italic" },
+                    { "type": "frame", "id": "ph5", "fill": "#0E2E1F", "cornerRadius": 4, "padding": [4, 10], "width": "fit_content", "stroke": { "fill": "#7CFDB0", "thickness": 1 },
+                      "children": [{ "type": "text", "id": "ph5t", "content": "Done", "fill": "#7CFDB0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" }] }
+                  ]
+                },
+                { "type": "text", "id": "fsmFoot", "content": "Each phase emits AgentLoopProgress → AgentBotActor → UI delegate. Hard caps: MaxIterations 12 · MaxSameCallRepeats 3 · MaxConsecutiveBlocks 3 (AgentLoopGuards).", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 9, "textGrowth": "fixed-width", "width": "fill_container", "lineHeight": 1.55 }
+              ]
+            },
+            {
+              "type": "frame", "id": "penNote", "layout": "vertical", "width": 380, "height": "fill_container", "fill": "#1A1429", "cornerRadius": 5, "padding": 10, "gap": 5, "stroke": { "fill": "#7C3AED", "thickness": 1 },
+              "children": [
+                { "type": "text", "id": "penTitle", "content": "✎ Edit this design", "fill": "#C586C0", "fontFamily": "Inter", "fontSize": 10, "fontWeight": "bold" },
+                { "type": "text", "id": "penLine1", "content": "harness/knowledge/_shared/agent-loop-real-case.pen — open at pencil.dev (or any compatible editor) to redesign; the viewer reads the latest .pen on next reload.", "fill": "#D4D4D4", "fontFamily": "Inter", "fontSize": 9, "textGrowth": "fixed-width", "width": "fill_container", "lineHeight": 1.55 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

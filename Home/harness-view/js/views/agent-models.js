@@ -11,9 +11,10 @@
  *  - file-list  : monospace path + bilingual note (canonical-source pointers)
  */
 import { h, mount } from '../utils/dom.js';
-import { loadData } from '../utils/loader.js';
+import { loadData, fetchText } from '../utils/loader.js';
 import { renderTopBar, emptyState, loadingState } from './_common.js';
 import { getLang, makeLangToggle, t } from '../components/bilingual.js';
+import { parsePen, renderFrame } from '../components/pen-renderer.js';
 import { ICONS } from '../config/menu.js';
 
 export async function render(ctx) {
@@ -147,6 +148,53 @@ function renderBodyItem(item, lang) {
         ]));
       });
       return list;
+    }
+
+    case 'pen-embed': {
+      // Renders a .pen file inline using the project's pen-renderer.
+      // src is relative to Home/harness-view/, e.g. "../../harness/knowledge/_shared/agent-loop-real-case.pen".
+      const wrap = h('div', { class: 'am-pen-embed' });
+      const stage = h('div', { class: 'am-pen-stage' });
+      const placeholder = h('div', { class: 'am-pen-loading' }, lang === 'ko' ? '펜 로드 중…' : 'Loading pen…');
+      stage.appendChild(placeholder);
+      wrap.appendChild(stage);
+      if (item.caption) {
+        wrap.appendChild(h('div', { class: 'am-pen-caption' }, t(item.caption, lang)));
+      }
+      // Async fetch + render. parsePen + renderFrame are synchronous once we have JSON text.
+      fetchText(item.src)
+        .then(text => {
+          stage.innerHTML = '';
+          const { frames, variables } = parsePen(text);
+          const root = frames[0];
+          if (!root) {
+            stage.appendChild(h('div', { class: 'am-pen-error' },
+              lang === 'ko' ? '펜에 frame 이 없습니다.' : 'No frame found in pen.'));
+            return;
+          }
+          renderFrame(root, stage, { vars: variables, maxWidth: 1880 });
+        })
+        .catch(err => {
+          stage.innerHTML = '';
+          stage.appendChild(h('div', { class: 'am-pen-error' },
+            (lang === 'ko' ? '펜 로드 실패: ' : 'Pen load failed: ') + (err?.message || err)));
+        });
+      return wrap;
+    }
+
+    case 'code-sample': {
+      const wrap = h('div', { class: 'am-code-sample' });
+      if (item.title) {
+        wrap.appendChild(h('div', { class: 'am-code-title' }, [
+          h('span', { class: 'am-code-lang' }, item.lang || 'code'),
+          h('span', {}, t(item.title, lang)),
+        ]));
+      }
+      wrap.appendChild(h('pre', { class: 'am-code-block' }, item.code || ''));
+      if (item.footnote) {
+        wrap.appendChild(h('div', { class: 'am-code-footnote' }, t(item.footnote, lang)));
+      }
+      return wrap;
     }
 
     default:

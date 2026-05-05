@@ -1207,6 +1207,48 @@
   .am-file-row { grid-template-columns: 1fr; gap: 6px; }
 }
 
+.am-pen-embed {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; background: #08081A;
+  border: 1px solid #2A2A5E; border-radius: 12px;
+}
+.am-pen-stage {
+  width: 100%; min-height: 200px; overflow-x: auto; overflow-y: hidden;
+  display: flex; justify-content: center;
+}
+.am-pen-loading { color: #94A3B8; font-size: 12px; padding: 40px; text-align: center; }
+.am-pen-error   { color: #F87171; font-size: 12px; padding: 18px; text-align: center; }
+.am-pen-caption {
+  font-size: 11.5px; line-height: 1.6; color: #C4B5FD; font-style: italic;
+  padding: 4px 8px; border-left: 2px solid #7C3AED;
+}
+
+.am-code-sample {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 0; background: transparent;
+}
+.am-code-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #111827; font-weight: 700;
+}
+.am-code-lang {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px; color: #FFFFFF; background: #7C3AED;
+  padding: 2px 8px; border-radius: 4px; letter-spacing: 0.4px; text-transform: uppercase;
+}
+.am-code-block {
+  margin: 0; padding: 14px 16px;
+  background: #0F172A; color: #E2E8F0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; line-height: 1.6;
+  border-radius: 8px; overflow-x: auto;
+  white-space: pre;
+}
+.am-code-footnote {
+  font-size: 11.5px; line-height: 1.6; color: #6B7280;
+  padding: 0 4px;
+}
+
 /* ============================================================
    WebDev Plugin tutorial blocks (wd-* — used by views/webdev-plugin.js)
    Reuses tut-* container styles; adds plugin-card / api-row / step-list

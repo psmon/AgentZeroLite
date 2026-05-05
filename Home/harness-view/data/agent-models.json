@@ -194,6 +194,68 @@
     },
 
     {
+      "id": "real-case",
+      "kind": "section",
+      "tone": "purple",
+      "tagline": "real case",
+      "title": {
+        "en": "Smart agent emerges — the real screen",
+        "ko": "에이전트가 똑똑해지는 순간 — 실제 화면"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "When you put Gemma 4 behind the AgentLoop tool surface, something concrete happens: the same model that one-shots a chat reply now plans a multi-step relay across two terminals. The pen below is the actual AgentZero Lite layout — split-CLI on top (Claude · Codex side-by-side, the real \"split mode\" feature) and the AgentBot AIMODE panel below. Each pill in the chat is a real tool call the loop actually emitted on this scenario.",
+            "ko": "Gemma 4 를 AgentLoop 의 tool surface 뒤에 두면 구체적인 일이 벌어진다 — 평소 chat 응답을 one-shot 으로 끝내던 같은 모델이, 이제 두 터미널을 가로지르는 다단계 relay 를 계획한다. 아래 펜은 실제 AgentZero Lite 레이아웃 — 위는 split-CLI (Claude · Codex 가 나란히 보이는 \"split mode\" 실 기능), 아래는 AgentBot AIMODE 패널. 채팅의 각 pill 은 이 시나리오에서 루프가 실제로 emit 한 tool call 이다."
+          }
+        },
+        {
+          "kind": "pen-embed",
+          "src": "../../harness/knowledge/_shared/agent-loop-real-case.pen",
+          "caption": {
+            "en": "harness/knowledge/_shared/agent-loop-real-case.pen — open it at pencil.dev to redesign; the viewer renders the latest .pen on next reload.",
+            "ko": "harness/knowledge/_shared/agent-loop-real-case.pen — pencil.dev 에서 열어 자유롭게 재디자인 가능. 뷰어는 다음 로드 때 최신 .pen 을 그대로 렌더링한다."
+          }
+        },
+        {
+          "kind": "p",
+          "text": {
+            "en": "Notice what made the difference: the user typed one prompt. The loop chose to call list_terminals first to verify the catalog, then sent a handshake + recap request to Claude, waited 8 s, read Claude's reply, relayed the recap to Codex with a follow-up prompt, and finally called done with a one-line summary. That is multi-step planning done by a 9 B model — because the tool surface gave it the verbs.",
+            "ko": "차이를 만든 건 이거다: 사용자는 prompt 한 번을 입력했다. 루프는 먼저 list_terminals 로 카탈로그를 검증한 뒤, Claude 에게 handshake + recap 요청을 보내고, 8 초 기다리고, Claude 의 답을 읽고, recap 을 Codex 로 relay 하면서 추가 prompt 를 붙이고, 마지막으로 한 줄 요약과 함께 done 을 호출했다. 9 B 모델이 다단계 계획을 세운다 — tool surface 가 동사들을 줬기 때문이다."
+          }
+        },
+        {
+          "kind": "code-sample",
+          "title": { "en": "What Gemma actually emits per turn", "ko": "Gemma 가 매 turn 에 실제로 emit 하는 것" },
+          "lang": "json",
+          "code": "{\n  \"tool\": \"send_to_terminal\",\n  \"args\": {\n    \"group\": 0,\n    \"tab\":   1,\n    \"text\":  \"Here is Claude's recap:\\n • M0013 rename...\\n • 162/162 tests pass\\n\\nPlease draft a release note for X / blog.\"\n  }\n}",
+          "footnote": {
+            "en": "GBNF grammar (AgentToolGrammar.Gbnf) is wired into the LLamaSharp sampler, so every emission is structurally valid JSON for one of the 6 tools (list_terminals, read_terminal, send_to_terminal, send_key, wait, done). The parser at LocalAgentLoop.ParseToolCall validates the envelope; the toolbelt at IAgentToolbelt executes the call.",
+            "ko": "GBNF 문법(AgentToolGrammar.Gbnf)이 LLamaSharp sampler 에 연결돼 있어, 매 emission 이 6개 tool (list_terminals, read_terminal, send_to_terminal, send_key, wait, done) 중 하나에 대한 구조적으로 유효한 JSON 이 보장된다. LocalAgentLoop.ParseToolCall 이 envelope 을 검증하고, IAgentToolbelt 가 호출을 실행한다."
+          }
+        },
+        {
+          "kind": "code-sample",
+          "title": { "en": "Toolbelt dispatch (the side effect)", "ko": "Toolbelt dispatch (실제 사이드이펙트)" },
+          "lang": "csharp",
+          "code": "// Project/ZeroCommon/Llm/Tools/LocalAgentLoop.cs\nprivate async Task<string> ExecuteToolAsync(ToolCall call, CancellationToken ct)\n{\n    switch (call.Tool)\n    {\n        case \"list_terminals\":   return await _host.ListTerminalsAsync(ct);\n        case \"read_terminal\":    return await _host.ReadTerminalAsync(g, t, n, ct);\n        case \"send_to_terminal\": return await _host.SendToTerminalAsync(g, t, text, ct);\n        case \"send_key\":         return await _host.SendKeyAsync(g, t, key, ct);\n        case \"wait\":             await Task.Delay(seconds, ct); return ok;\n        // \"done\" is intercepted before this switch — terminal of the run.\n    }\n}",
+          "footnote": {
+            "en": "Five branches, ~30 lines, no special-casing per model. Same dispatch handles Gemma, Nemotron Nano, or any OpenAI-compat external — the agent loop is a contract, not a model-specific path.",
+            "ko": "5 개 branch, ~30 줄, 모델별 특별 처리 없음. 동일 dispatch 가 Gemma · Nemotron Nano · OpenAI 호환 외부를 모두 처리한다 — agent loop 은 모델-특정 경로가 아니라 계약이다."
+          }
+        },
+        {
+          "kind": "callout-large",
+          "text": {
+            "en": "✎ Edit the pen — agent-loop-real-case.pen is a real Pencil document. Open it at pencil.dev (or any compatible .pen editor) to redesign anything; the AgentZero Dev viewer reads the file fresh on each reload, no rebuild needed.",
+            "ko": "✎ 펜을 직접 편집하세요 — agent-loop-real-case.pen 은 실제 Pencil 문서입니다. pencil.dev (또는 호환 .pen 에디터) 에서 열어 자유롭게 재디자인하면, AgentZero Dev 뷰어는 새로고침 때마다 파일을 새로 읽어 반영합니다 — 재빌드 불필요."
+          }
+        }
+      ]
+    },
+
+    {
       "id": "spec",
       "kind": "section",
       "tone": "amber",

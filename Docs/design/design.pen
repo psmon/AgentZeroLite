@@ -2069,7 +2069,7 @@
                       "id": "0n0N7",
                       "name": "spField4L",
                       "fill": "#858585",
-                      "content": "AgentToolLoop max tokens (per turn)",
+                      "content": "AgentLoop max tokens (per turn)",
                       "fontFamily": "Inter",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -2437,7 +2437,7 @@
               "id": "xaNO2",
               "name": "boxBotT",
               "fill": "#3794FF",
-              "content": "/bot · /bot/reactor",
+              "content": "/bot · /bot/loop",
               "fontFamily": "Inter",
               "fontSize": 12,
               "fontWeight": "bold"
@@ -2447,7 +2447,7 @@
               "id": "JzuV9",
               "name": "boxBot1",
               "fill": "#D4D4D4",
-              "content": "AgentBotActor + AgentReactorActor",
+              "content": "AgentBotActor + AgentLoopActor",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -2457,7 +2457,7 @@
               "id": "cwB0o",
               "name": "boxBot2",
               "fill": "#D4D4D4",
-              "content": "Wraps AgentToolLoop (KV cache lives here)",
+              "content": "Wraps IAgentLoop (KV cache lives here)",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -2497,7 +2497,7 @@
               "id": "DuhUU",
               "name": "boxToolHostT",
               "fill": "#C586C0",
-              "content": "IAgentToolHost",
+              "content": "IAgentToolbelt",
               "fontFamily": "Inter",
               "fontSize": 12,
               "fontWeight": "bold"
@@ -2647,7 +2647,7 @@
               "id": "KiimU",
               "name": "boxIPC3",
               "fill": "#D4D4D4",
-              "content": "MainWindow.HandleBotChat → Tells reactor",
+              "content": "MainWindow.HandleBotChat → Tells AgentLoop",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -2996,7 +2996,7 @@
           "y": 300,
           "name": "revArrLab",
           "fill": "#DCDCAA",
-          "content": "⟵ peer signal: bot-chat → WM_COPYDATA → MarkConversationActive → reactor cycle",
+          "content": "⟵ peer signal: bot-chat → WM_COPYDATA → MarkConversationActive → AgentLoop cycle",
           "fontFamily": "Inter",
           "fontSize": 10,
           "fontWeight": "normal",
@@ -3934,7 +3934,7 @@
       "y": 1502,
       "name": "animSub",
       "fill": "#858585",
-      "content": "Pencil has no timeline; states laid out left→right as keyframes. Each frame = one tick of the reactor cycle.",
+      "content": "Pencil has no timeline; states laid out left→right as keyframes. Each frame = one tick of the AgentLoop cycle.",
       "fontFamily": "Inter",
       "fontSize": 11,
       "fontWeight": "normal"
@@ -5080,7 +5080,7 @@
               "fill": "#858585",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "Peer signal arrives via bot-chat\nIPC (--from \"Claude 2\").\nReactor cycle ends, KV cache preserves.",
+              "content": "Peer signal arrives via bot-chat\nIPC (--from \"Claude 2\").\nAgentLoop cycle ends, KV cache preserves.",
               "lineHeight": 1.4,
               "fontFamily": "Inter",
               "fontSize": 9,
@@ -5122,7 +5122,7 @@
       "y": 2252,
       "name": "intSub",
       "fill": "#858585",
-      "content": "Akka.NET ReceiveActors. State per actor + supervisor strategy + 3 FSMs (mode / reactor phase / handshake)",
+      "content": "Akka.NET ReceiveActors. State per actor + supervisor strategy + 3 FSMs (mode / agent-loop phase / handshake)",
       "fontFamily": "Inter",
       "fontSize": 11,
       "fontWeight": "normal"
@@ -5195,7 +5195,7 @@
               "id": "ecLPj",
               "name": "tree3",
               "fill": "#C586C0",
-              "content": "  │     └── /reactor     AgentReactorActor   (lazy child)",
+              "content": "  │     └── /loop        AgentLoopActor   (lazy child)",
               "fontFamily": "Inter",
               "fontSize": 11,
               "fontWeight": "normal"
@@ -5386,7 +5386,7 @@
               "id": "drNpd",
               "name": "mini2",
               "fill": "#D4D4D4",
-              "content": "• Reactor's loop runs on Task.Run, but EVERY callback funnels through",
+              "content": "• The agent loop runs on Task.Run, but EVERY callback funnels through",
               "fontFamily": "Inter",
               "fontSize": 11,
               "fontWeight": "normal"
@@ -5648,7 +5648,7 @@
               "id": "Y20bn",
               "name": "botS4",
               "fill": "#D4D4D4",
-              "content": "  IActorRef? _reactor   ReactorBindings? _reactorBindings",
+              "content": "  IActorRef? _agentLoop   AgentLoopBindings? _agentLoopBindings",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -5698,7 +5698,7 @@
               "id": "wrUZD",
               "name": "botR2",
               "fill": "#D4D4D4",
-              "content": "  StartReactor → EnsureReactorChild → forward",
+              "content": "  StartAgentLoop → EnsureAgentLoopChild → forward",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -5708,7 +5708,7 @@
               "id": "7qCY8",
               "name": "botR3",
               "fill": "#D4D4D4",
-              "content": "  TerminalSentToBot → handshake → if active: continuation StartReactor",
+              "content": "  TerminalSentToBot → handshake → if active: continuation StartAgentLoop",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -5738,7 +5738,7 @@
               "id": "a8IRz",
               "name": "rxT",
               "fill": "#C586C0",
-              "content": "/bot/reactor   ·   AgentReactorActor",
+              "content": "/bot/loop   ·   AgentLoopActor",
               "fontFamily": "Inter",
               "fontSize": 12,
               "fontWeight": "bold"
@@ -5769,7 +5769,7 @@
               "id": "Y4h3B",
               "name": "rxS1",
               "fill": "#D4D4D4",
-              "content": "  ReactorBindings _bindings   (factories + opts)",
+              "content": "  AgentLoopBindings _bindings   (factories + opts)",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -5779,7 +5779,7 @@
               "id": "RuO2M",
               "name": "rxS2",
               "fill": "#D4D4D4",
-              "content": "  IAgentToolLoop? _loop   ← KV cache lives here",
+              "content": "  IAgentLoop? _loop   ← KV cache lives here",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -5829,7 +5829,7 @@
               "id": "mJhTE",
               "name": "rxR1",
               "fill": "#D4D4D4",
-              "content": "  StartReactor → Task.Run + PipeTo(Self) → BecomeRunning",
+              "content": "  StartAgentLoop → Task.Run + PipeTo(Self) → BecomeRunning",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -5839,7 +5839,7 @@
               "id": "H8X92",
               "name": "rxR2",
               "fill": "#D4D4D4",
-              "content": "  TurnCompletedInternal → _round++ → ReactorProgress(Acting)",
+              "content": "  TurnCompletedInternal → _round++ → AgentLoopProgress(Acting)",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -5849,7 +5849,7 @@
               "id": "d7GQN",
               "name": "rxR3",
               "fill": "#D4D4D4",
-              "content": "  RunCompleted/Failed → ReactorResult → BecomeIdle",
+              "content": "  RunCompleted/Failed → AgentLoopResult → BecomeIdle",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -6413,7 +6413,7 @@
               "y": 14,
               "name": "fsm2H",
               "fill": "#C586C0",
-              "content": "Reactor phase FSM   ·   AgentReactorActor.Become()",
+              "content": "AgentLoop phase FSM   ·   AgentLoopActor.Become()",
               "fontFamily": "Inter",
               "fontSize": 12,
               "fontWeight": "bold"
@@ -6425,7 +6425,7 @@
               "y": 36,
               "name": "fsm2Sub",
               "fill": "#858585",
-              "content": "Phases bubble up to AgentBotActor as ReactorProgress messages.",
+              "content": "Phases bubble up to AgentBotActor as AgentLoopProgress messages.",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal",
@@ -6505,7 +6505,7 @@
                   "id": "JxT43",
                   "name": "fsm2Idle5",
                   "fill": "#858585",
-                  "content": "ResetReactorSession",
+                  "content": "ResetAgentLoopMemory",
                   "fontFamily": "Inter",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -6635,7 +6635,7 @@
                   "id": "tGxah",
                   "name": "fsm2Run9",
                   "fill": "#858585",
-                  "content": "StartReactor (busy)",
+                  "content": "StartAgentLoop (busy)",
                   "fontFamily": "Inter",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -6673,7 +6673,7 @@
               "y": 120,
               "name": "fsm2ArrLab",
               "fill": "#7CFDB0",
-              "content": "StartReactor → Task.Run + PipeTo(Self)",
+              "content": "StartAgentLoop → Task.Run + PipeTo(Self)",
               "fontFamily": "Inter",
               "fontSize": 8,
               "fontWeight": "normal"
@@ -6699,7 +6699,7 @@
               "y": 208,
               "name": "fsm2ArrLab2",
               "fill": "#C586C0",
-              "content": "RunCompleted | RunFailed → ReactorResult",
+              "content": "RunCompleted | RunFailed → AgentLoopResult",
               "fontFamily": "Inter",
               "fontSize": 8,
               "fontWeight": "normal"
@@ -6711,7 +6711,7 @@
               "y": 400,
               "name": "fsm2CancelLab",
               "fill": "#DCDCAA",
-              "content": "⌧ CancelReactor in Running: _cts.Cancel(); Task lands RunFailedInternal → returns to Idle",
+              "content": "⌧ CancelAgentLoop in Running: _cts.Cancel(); Task lands RunFailedInternal → returns to Idle",
               "fontFamily": "Inter",
               "fontSize": 9,
               "fontWeight": "normal"
@@ -6723,7 +6723,7 @@
               "y": 418,
               "name": "fsm2ResetLab",
               "fill": "#DCDCAA",
-              "content": "↻ ResetReactorSession in Running: _cts.Cancel + DisposeLoopAndIdle(\"reset (running)\")",
+              "content": "↻ ResetAgentLoopMemory in Running: _cts.Cancel + DisposeLoopAndIdle(\"reset (running)\")",
               "fontFamily": "Inter",
               "fontSize": 9,
               "fontWeight": "normal"
@@ -7044,7 +7044,7 @@
               "y": 282,
               "name": "fsm3Sec1",
               "fill": "#D4D4D4",
-              "content": "  • MarkConversationActive(peer) → adds peer; subsequent TerminalSentToBot wakes Reactor.",
+              "content": "  • MarkConversationActive(peer) → adds peer; subsequent TerminalSentToBot wakes AgentLoop.",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -7080,7 +7080,7 @@
               "y": 362,
               "name": "fsm3Reset",
               "fill": "#DCDCAA",
-              "content": "Reset semantics — ResetReactorSession clears: _introducedTerminals, _activeConversations, _handshakeStates",
+              "content": "Reset semantics — ResetAgentLoopMemory clears: _introducedTerminals, _activeConversations, _handshakeStates",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "bold"
@@ -7092,7 +7092,7 @@
               "y": 382,
               "name": "fsm3ResetD",
               "fill": "#D4D4D4",
-              "content": "+ Stops the Reactor child so the next StartReactor recreates a fresh loop (drops KV cache).",
+              "content": "+ Stops the AgentLoop child so the next StartAgentLoop recreates a fresh loop (drops KV cache).",
               "fontFamily": "Inter",
               "fontSize": 10,
               "fontWeight": "normal"
@@ -7120,7 +7120,7 @@
       "y": 3842,
       "name": "sec8Sub",
       "fill": "#858585",
-      "content": "Typed and spoken input both converge on SendCurrentInput; mode dispatch sends Chat/Key→terminal vs AI→reactor (ReAct loop, tool-catalog dispatch)",
+      "content": "Typed and spoken input both converge on SendCurrentInput; mode dispatch sends Chat/Key→terminal vs AI→AgentLoopActor (function-call cycle via tool catalog)",
       "fontFamily": "Inter",
       "fontSize": 11,
       "fontWeight": "normal"
@@ -7538,7 +7538,7 @@
                       "fill": "#D4D4D4",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "SendThroughAiToolLoopAsync · readiness gate · Tell StartReactor",
+                      "content": "SendThroughAiToolLoopAsync · readiness gate · Tell StartAgentLoop",
                       "fontFamily": "Inter",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7595,7 +7595,7 @@
                       "fill": "#D4D4D4",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "Tell(StartReactor) · spawns AgentReactorActor child · holds session callbacks",
+                      "content": "Tell(StartAgentLoop) · spawns AgentLoopActor child · holds session callbacks",
                       "fontFamily": "Inter",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7621,7 +7621,7 @@
                       "type": "text",
                       "id": "b0HlL4",
                       "fill": "#C586C0",
-                      "content": "AgentReactorActor — ReAct loop",
+                      "content": "AgentLoopActor — agent loop",
                       "fontFamily": "Inter",
                       "fontSize": 11,
                       "fontWeight": "bold"
@@ -7632,7 +7632,7 @@
                       "fill": "#D4D4D4",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "lazy-create IAgentToolLoop · inject host + callbacks · Task.Run(loop.RunAsync) · PipeTo(Self)",
+                      "content": "lazy-create IAgentLoop · inject toolbelt + callbacks · Task.Run(loop.RunAsync) · PipeTo(Self)",
                       "fontFamily": "Inter",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7658,7 +7658,7 @@
                       "type": "text",
                       "id": "d9FvON",
                       "fill": "#DCDCAA",
-                      "content": "IAgentToolLoop iteration",
+                      "content": "IAgentLoop iteration",
                       "fontFamily": "Inter",
                       "fontSize": 11,
                       "fontWeight": "bold"
@@ -7691,7 +7691,7 @@
                       "fill": "#D4D4D4",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "per turn: GenerateOneTurnAsync → ParseToolCall (JSON) → validate ∈ catalog → ExecuteToolAsync via IAgentToolHost",
+                      "content": "per turn: GenerateOneTurnAsync → ParseToolCall (JSON) → validate ∈ catalog → ExecuteToolAsync via IAgentToolbelt",
                       "fontFamily": "Inter",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7717,7 +7717,7 @@
                       "type": "text",
                       "id": "GCPfY",
                       "fill": "#7CFDB0",
-                      "content": "ReactorResult → UI",
+                      "content": "AgentLoopResult → UI",
                       "fontFamily": "Inter",
                       "fontSize": 11,
                       "fontWeight": "bold"
@@ -7728,7 +7728,7 @@
                       "fill": "#D4D4D4",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "on done: Tell(ReactorResult) → Dispatcher.BeginInvoke → AddSystemMessage / final bubble",
+                      "content": "on done: Tell(AgentLoopResult) → Dispatcher.BeginInvoke → AddSystemMessage / final bubble",
                       "fontFamily": "Inter",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7765,7 +7765,7 @@
                   "type": "text",
                   "id": "wkOpI",
                   "fill": "#DCDCAA",
-                  "content": "Tool catalog — IAgentToolHost dispatch (AgentToolGrammar.cs:141-152)",
+                  "content": "Tool catalog — IAgentToolbelt dispatch (AgentToolGrammar.cs:141-152)",
                   "fontFamily": "Inter",
                   "fontSize": 11,
                   "fontWeight": "bold"

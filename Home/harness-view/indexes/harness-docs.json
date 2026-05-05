@@ -136,29 +136,29 @@
   "contributors": [
     {
       "name": "psmon",
-      "commits": 95,
+      "commits": 96,
       "percent": 100
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
-      "commits": 95,
+      "commits": 96,
       "percent": 100
     }
   ],
   "contributorsRecent": [
     {
       "name": "psmon",
-      "commits": 95,
+      "commits": 96,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 95,
-    "last7d": 65,
-    "last30d": 95
+    "totalAllTime": 96,
+    "last7d": 63,
+    "last30d": 96
   },
   "topChangedFiles": [
     {
@@ -174,12 +174,12 @@
       "commits": 10
     },
     {
-      "path": "harness/agents/code-coach.md",
+      "path": "Home/harness-view/css/components.css",
       "commits": 9
     },
     {
-      "path": "Home/harness-view/css/components.css",
-      "commits": 8
+      "path": "harness/agents/code-coach.md",
+      "commits": 9
     }
   ]
 }

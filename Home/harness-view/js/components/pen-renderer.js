@@ -80,9 +80,14 @@ function applySize(el, node, key, scale) {
   if (typeof v === 'number') { el.style[cssKey] = `${v * scale}px`; return; }
   if (typeof v === 'string') {
     if (v === 'fill_container') {
-      // flex parent 가정 — flex: 1
-      if (key === 'width') { el.style.flex = '1 1 auto'; el.style.minWidth = '0'; }
-      else { el.style.alignSelf = 'stretch'; el.style.flex = '1 1 auto'; el.style.minHeight = '0'; }
+      // Mark only — the parent's child loop resolves this based on flex
+      // direction. Applying `flex: 1 1 auto` here would land on the
+      // PARENT's main axis regardless of whether width or height matched
+      // it (e.g. width=fill_container in a vertical parent would wrongly
+      // grow the child's height). The deferred resolution lives in
+      // renderFrameNode below.
+      if (key === 'width')  el.dataset.fillW = '1';
+      else                  el.dataset.fillH = '1';
       return;
     }
     if (v.startsWith('fit_content')) {
@@ -92,6 +97,24 @@ function applySize(el, node, key, scale) {
       // 아니면 default (콘텐츠 기준)
       return;
     }
+  }
+}
+
+// Resolve any fill_container markers on a child after we know the parent's
+// flex direction. Main-axis fill becomes flex-grow; cross-axis fill becomes
+// align-self stretch.
+function resolveFillMarkers(cn, parentLayout) {
+  if (parentLayout !== 'horizontal' && parentLayout !== 'vertical') return;
+  const isHor = parentLayout === 'horizontal';
+  if (cn.dataset?.fillW) {
+    if (isHor) { cn.style.flex = '1 1 auto'; cn.style.minWidth = '0'; }
+    else       { cn.style.alignSelf = 'stretch'; cn.style.width = 'auto'; }
+    delete cn.dataset.fillW;
+  }
+  if (cn.dataset?.fillH) {
+    if (!isHor) { cn.style.flex = '1 1 auto'; cn.style.minHeight = '0'; }
+    else        { cn.style.alignSelf = 'stretch'; cn.style.height = 'auto'; }
+    delete cn.dataset.fillH;
   }
 }
 
@@ -272,7 +295,9 @@ function renderFrameNode(node, scale, vars) {
   for (const c of node.children || []) {
     const cn = renderNode(c, scale, vars);
     if (!cn) continue;
-    if (!isFlex && c.layoutPosition !== 'auto') {
+    if (isFlex) {
+      resolveFillMarkers(cn, layout);
+    } else if (c.layoutPosition !== 'auto') {
       cn.style.position = 'absolute';
       cn.style.left = `${(c.x || 0) * scale}px`;
       cn.style.top  = `${(c.y || 0) * scale}px`;
@@ -369,7 +394,9 @@ export function renderFrame(frame, containerEl, { maxWidth = 900, vars = {} } = 
   for (const child of frame.children || []) {
     const n = renderNode(child, scale, vars);
     if (!n) continue;
-    if (!isFlex && child.layoutPosition !== 'auto') {
+    if (isFlex) {
+      resolveFillMarkers(n, layout);
+    } else if (child.layoutPosition !== 'auto') {
       n.style.position = 'absolute';
       n.style.left = `${(child.x || 0) * scale}px`;
       n.style.top  = `${(child.y || 0) * scale}px`;
