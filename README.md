@@ -169,12 +169,16 @@ surface.
 
 ```
 /user/stage                  — supervisor, lifecycle broker, one per app
-    /bot                     — AgentBotActor: mode (Chat/Key), UI callback
+    /bot                     — AgentBotActor: UI gateway (Chat/Key mode,
+                               UI callback, peer routing). Spawns AgentLoop lazily.
+        /loop                — AgentLoopActor: THE agent. Owns one IAgentLoop,
+                               drives Idle→Thinking→Generating→Acting→Done FSM.
     /ws-<workspace>          — WorkspaceActor: owns terminals in a folder
         /term-<id>           — TerminalActor: wraps one ITerminalSession
 ```
 
 Messages are defined in one place (`ZeroCommon/Actors/Messages.cs`).
+Canonical agent vocabulary table — `harness/knowledge/_shared/agent-architecture.md`.
 
 ---
 
@@ -335,9 +339,9 @@ real AI CLIs on your behalf.
 |              | Tell                                     |
 |              v                                          |
 |   +-------------------------------------------------+   |
-|   |  AgentReactorActor   (Akka FSM)                 |   |
+|   |  AgentLoopActor   (Akka FSM, /bot/loop)         |   |
 |   |  Idle -> Thinking -> Generating -> Acting -> Done   |
-|   |  owns KV cache; ONE cycle per StartReactor      |   |
+|   |  owns KV cache; ONE cycle per StartAgentLoop    |   |
 |   +-------------------------------------------------+   |
 +----------------------------+----------------------------+
                              | ConPTY (write text + Enter)
@@ -354,7 +358,7 @@ real AI CLIs on your behalf.
                      v
    MainWindow.HandleBotChat
        -> /user/stage/bot.Tell(TerminalSentToBot)
-       -> Reactor wakes for a continuation cycle
+       -> AgentLoop wakes for a continuation cycle
 ```
 
 ### How an LLM becomes an Agent — the function-call tool chain
@@ -377,12 +381,13 @@ text completion into agency. AgentZero's recipe lives in
 |-------|------|
 | `AgentToolGrammar.Gbnf` | GBNF grammar — sampler can only emit valid tool-call JSON |
 | Tool surface (6 tools) | `list_terminals`, `read_terminal`, `send_to_terminal`, `send_key`, `wait`, `done` |
-| `AgentToolLoop` | The generate → run → feed-back loop |
-| `AgentReactorActor` | Akka wrapper — live progress, cancellation, KV cache, peer-signal continuation |
+| `IAgentLoop` | Backend-agnostic contract: `RunAsync(userRequest) → AgentLoopRun`. Two impls: `LocalAgentLoop` (LLamaSharp + GBNF) and `ExternalAgentLoop` (OpenAI-compatible REST). |
+| `IAgentToolbelt` | The side-effect surface the agent acts against — the 6 tools above are dispatched here. Production = `WorkspaceTerminalToolHost`; tests = `MockAgentToolbelt`. |
+| `AgentLoopActor` | Akka wrapper at `/user/stage/bot/loop` — live progress, cancellation, KV cache, peer-signal continuation |
 | System prompt (Mode 1 / Mode 2) | Teaches the model when to chat directly vs relay to a terminal AI |
 | Handshake protocol | Verifies the reverse channel works before substantive relay |
 
-**One cycle per run** is the central rule: each `StartReactor` does ONE
+**One cycle per run** is the central rule: each `StartAgentLoop` does ONE
 short round-trip with a peer (send → wait → read → react → done) and then
 stops. Subsequent cycles are triggered by the user OR an arriving peer
 signal — never by the LLM trying to script a 5-turn discussion in one

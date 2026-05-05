@@ -12,15 +12,15 @@
       "id": "aimode-handshake",
       "label": "AIMODE — Identity-first Handshake",
       "description": "Local AgentBot first-contacts a peer terminal, the peer acks via -cli bot-chat with --from <peerName>, then substantive exchange begins",
-      "mermaid": "sequenceDiagram\n  participant U as User\n  participant B as AgentBot (local)\n  participant R as AgentReactorActor\n  participant P as Peer terminal\n  U->>B: \"Talk to the Claude tab\"\n  B->>R: StartReactor (Mode 2)\n  R->>P: send_to_terminal(handshake)\n  P->>B: bot-chat \"DONE(handshake-ok)\" --from Claude\n  R->>P: substantive turn\n  P->>B: real reply",
-      "sourceMermaid": "flowchart LR\n  subgraph Bot[Project/ZeroCommon/Actors]\n    AB[AgentBotActor.cs<br/>_introducedTerminals HashSet]\n    AR[AgentReactorActor.cs<br/>StartReactor / Mode 2]\n    MSG[Messages.cs<br/>IntroduceTerminalIfFirst]\n  end\n  subgraph CLI[Project/AgentZeroWpf]\n    CH[CliHandler.cs<br/>bot-chat --from]\n  end\n  AB --> AR\n  AR --> MSG\n  CH -.WM_COPYDATA.-> AB"
+      "mermaid": "sequenceDiagram\n  participant U as User\n  participant B as AgentBot (local)\n  participant R as AgentLoopActor\n  participant P as Peer terminal\n  U->>B: \"Talk to the Claude tab\"\n  B->>R: StartAgentLoop (Mode 2)\n  R->>P: send_to_terminal(handshake)\n  P->>B: bot-chat \"DONE(handshake-ok)\" --from Claude\n  R->>P: substantive turn\n  P->>B: real reply",
+      "sourceMermaid": "flowchart LR\n  subgraph Bot[Project/ZeroCommon/Actors]\n    AB[AgentBotActor.cs<br/>UI gateway · _introducedTerminals]\n    AL[AgentLoopActor.cs<br/>StartAgentLoop / Mode 2]\n    MSG[Messages.cs<br/>IntroduceTerminalIfFirst]\n  end\n  subgraph CLI[Project/AgentZeroWpf]\n    CH[CliHandler.cs<br/>bot-chat --from]\n  end\n  AB --> AL\n  AL --> MSG\n  CH -.WM_COPYDATA.-> AB"
     },
     {
       "id": "tool-call-loop",
       "label": "Tool-call Loop (dual backend)",
-      "description": "Gemma path enforces structure via GBNF sampler; Nemotron path uses native Llama-3.1 chat template. Both share IAgentToolHost",
-      "mermaid": "flowchart TD\n  U[User prompt] --> L[AgentToolLoop]\n  L -->|Gemma path| GBNF[GBNF sampler<br/>5-tool catalog]\n  L -->|Nemotron path| TPL[Llama-3.1 chat template<br/>native tool channel]\n  GBNF --> P[Parse JSON]\n  TPL --> P\n  P --> H[IAgentToolHost<br/>WorkspaceTerminalToolHost]\n  H -->|tool result| L\n  L -->|loop until done| L",
-      "sourceMermaid": "flowchart TB\n  subgraph Tools[Project/ZeroCommon/Llm/Tools]\n    ATL[AgentToolLoop.cs]\n    CT[ChatTemplates.cs<br/>Gemma + Llama31]\n    ATG[AgentToolGrammar.cs<br/>GBNF sampler]\n    IATH[IAgentToolHost.cs]\n  end\n  subgraph WPF[Project/AgentZeroWpf]\n    WTH[Services/WorkspaceTerminalToolHost.cs]\n  end\n  ATL --> CT\n  ATL --> ATG\n  ATL --> IATH\n  WTH -.implements.-> IATH"
+      "description": "Gemma path enforces structure via GBNF sampler; Nemotron path uses native Llama-3.1 chat template. Both implement IAgentLoop and share IAgentToolbelt",
+      "mermaid": "flowchart TD\n  U[User prompt] --> L[IAgentLoop<br/>LocalAgentLoop / ExternalAgentLoop]\n  L -->|Gemma path| GBNF[GBNF sampler<br/>5-tool catalog]\n  L -->|Nemotron path| TPL[Llama-3.1 chat template<br/>native tool channel]\n  GBNF --> P[Parse JSON]\n  TPL --> P\n  P --> H[IAgentToolbelt<br/>WorkspaceTerminalToolHost]\n  H -->|tool result| L\n  L -->|loop until done| L",
+      "sourceMermaid": "flowchart TB\n  subgraph Tools[Project/ZeroCommon/Llm/Tools]\n    IAL[IAgentLoop.cs]\n    LAL[LocalAgentLoop.cs<br/>LLamaSharp + GBNF]\n    EAL[ExternalAgentLoop.cs<br/>OpenAI-compat REST]\n    CT[ChatTemplates.cs<br/>Gemma + Llama31]\n    ATG[AgentToolGrammar.cs<br/>GBNF sampler]\n    IATB[IAgentToolbelt.cs]\n    ALG[AgentLoopGuards.cs<br/>repeat / retry / hard-stop]\n  end\n  subgraph WPF[Project/AgentZeroWpf]\n    WTH[Services/WorkspaceTerminalToolHost.cs]\n  end\n  LAL -.implements.-> IAL\n  EAL -.implements.-> IAL\n  LAL --> CT\n  LAL --> ATG\n  LAL --> IATB\n  EAL --> IATB\n  LAL --> ALG\n  EAL --> ALG\n  WTH -.implements.-> IATB"
     },
     {
       "id": "provider-switch",
