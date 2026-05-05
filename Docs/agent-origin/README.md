@@ -27,7 +27,7 @@
 | LLamaSharp | **제거됨** (ggml.dll 충돌) | **0.26.0** (self-built llama.dll) |
 | Speech (Whisper/NAudio) | **있음** | 없음 |
 | LLM 백엔드 | OpenAI 호환 외부 only | Local + External hybrid |
-| 액터 추론 루프 | `ReActActor` (5상태 머신) | `AgentReactorActor` (단순화) |
+| 액터 추론 루프 | `ReActActor` (5상태 머신) | `AgentLoopActor` (단순화) |
 | 추가 윈도우 | NoteWindow / HarnessMonitorWindow / Scrap / VirtualDesktop API | 없음 |
 | CLI 명령 표면 | 데스크톱 자동화 풀세트 (capture, mouseclick, keypress 등) | 핵심 IPC만 (status, terminal-*, bot-chat) |
 | 인스톨러 다국어 | English (Inno) + publish/에 16개 언어 잔재 | English + Korean (Inno) |

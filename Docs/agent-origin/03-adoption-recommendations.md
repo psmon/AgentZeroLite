@@ -29,7 +29,7 @@
 
 **대상 파일**:
 - 출처: `D:\Code\AI\AgentWin\Project\ZeroCommon\Actors\ReActActor.cs`
-- 적용: `Project/ZeroCommon/Llm/Tools/AgentToolLoop.cs`, `ExternalAgentToolLoop.cs`, `Project/ZeroCommon/Actors/AgentReactorActor.cs`
+- 적용: `Project/ZeroCommon/Llm/Tools/LocalAgentLoop.cs`, `ExternalAgentLoop.cs`, `Project/ZeroCommon/Actors/AgentLoopActor.cs` (M0013 rename 후 신규 이름)
 
 **이식 항목**:
 > **2026-04-27 정밀 분석 갱신**: 오리진 가드 11개를 모두 이식하지 않고 **3종 세트만** 발췌. 액터 5상태 머신·적응형 대기·`CompletionSignal`은 Lite의 `Task.await` 시간 모델과 충돌하므로 **거부**. 분석: [`harness/logs/tamer/2026-04-27-15-00-react-actor-guard-analysis.md`](../../harness/logs/tamer/2026-04-27-15-00-react-actor-guard-analysis.md)
@@ -37,8 +37,8 @@
 ### 이식 대상 (3종 세트만)
 
 ```csharp
-// Project/ZeroCommon/Llm/Tools/AgentToolLoopOptions.cs 에 추가
-public sealed record AgentToolLoopOptions
+// Project/ZeroCommon/Llm/Tools/LocalAgentLoop.cs (AgentLoopOptions record) 에 추가
+public sealed record AgentLoopOptions
 {
     public int MaxIterations { get; init; } = 12;          // 기존
     public int MaxSameCallRepeats { get; init; } = 3;      // ★ 신규
@@ -61,8 +61,8 @@ public sealed record AgentToolLoopOptions
 
 ### 수행 절차
 
-1. **`AgentToolLoopOptions`** 에 필드 3개 추가 (위 코드)
-2. **`AgentToolLoop.cs`** for 루프 라인 113 직후 (KnownTools 검증 다음)에 가드 삽입:
+1. **`AgentLoopOptions`** 에 필드 3개 추가 (위 코드)
+2. **`LocalAgentLoop.cs`** for 루프 라인 113 직후 (KnownTools 검증 다음)에 가드 삽입:
    ```csharp
    var callKey = $"{call.Tool}:{NormalizeArgsJson(call.Args)}"; // ⚠️ JSON 정규화 필수
    _callCounts.TryGetValue(callKey, out var count);
@@ -78,7 +78,7 @@ public sealed record AgentToolLoopOptions
    }
    _consecutiveBlockedCalls = 0;
    ```
-3. **`ExternalAgentToolLoop.cs`** 동일 위치에 동일 가드 + catch 블록(라인 76-85)에 transient 재시도 (HTTP 5xx/timeout, **backoff 추가**):
+3. **`ExternalAgentLoop.cs`** 동일 위치에 동일 가드 + catch 블록(라인 76-85)에 transient 재시도 (HTTP 5xx/timeout, **backoff 추가**):
    ```csharp
    catch (Exception ex) when (ex is not OperationCanceledException) {
        if (IsTransientHttpError(ex) && _llmRetryCount < _opts.MaxLlmRetries) {
@@ -91,14 +91,14 @@ public sealed record AgentToolLoopOptions
    ```
 4. **JSON 인자 정규화 헬퍼** (`NormalizeArgsJson`) — `JsonSerializer.Deserialize<JsonElement>` → `Serialize` 라운드트립으로 인자 순서/공백 통일 (오리진 약점 보강)
 5. **`ZeroCommon.Tests`에 단위 테스트 2개**:
-   - `MockAgentToolHost`로 같은 도구 강제 반복 → `FailureReason`에 `"blocked"` 포함 검증
+   - `MockAgentToolbelt`로 같은 도구 강제 반복 → `FailureReason`에 `"blocked"` 포함 검증
    - `MaxConsecutiveBlocks` 도달 → `TerminatedCleanly=false` + 도구 호출 횟수 = `MaxSameCallRepeats + 1` 검증
 
 ### 정량 평가
 
 | 항목 | 값 |
 |---|---|
-| 추가 LOC | ~120 (Options +6, AgentToolLoop +30, ExternalAgentToolLoop +30, helper +20, tests +50) |
+| 추가 LOC | ~120 (Options +6, LocalAgentLoop +30, ExternalAgentLoop +30, helper +20, tests +50) |
 | 영향 파일 | 4개 (Options, 두 loop, 테스트) |
 | 위험도 | 낮음 — failure 경로만 추가, 정상 경로 무영향, 백워드 호환 100% |
 | 작업 시간 | 2~3일 |
@@ -400,7 +400,7 @@ Origin은 `.cer` 보유하지만 CI 미적용. Lite는 `.cer` 미발견.
 
 | 우선순위 | 항목 | 비용 | 의존 | 산출물 |
 |:---:|---|:---:|---|---|
-| **P0-1** | ReActActor 가드 이식 | M | — | `AgentToolLoop` 안정성 가드 + 단위 테스트 |
+| **P0-1** | ReActActor 가드 이식 | M | — | `LocalAgentLoop` / `ExternalAgentLoop` 안정성 가드 + 단위 테스트 |
 | **P0-2** | AppLogger IDE 분기 | S | — | `Project/AgentZeroWpf/Logging/AppLogger.cs` |
 | **P1-1** | Speech 입력 (Whisper) | M (코어) + L (옵션 빌드) | — | `Speech/` 모듈, "Voice Pack" 인스톨러 옵션 |
 | **P1-2** | CLI 데스크톱 자동화 | L | security-guard 검토 | `AgentZeroWpf.Automation` 별도 csproj |

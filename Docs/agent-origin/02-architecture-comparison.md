@@ -85,7 +85,7 @@ DONE 8회+: 5 (MinAiWaitSeconds 도달, 고정)
 
 증가 신호 없음 — 빠른 응답에 점점 적응만 함. 느려지는 터미널엔 회복 안 되는 *알려진 한계*.
 
-#### Lite: `AgentReactorActor` (단순 루프)
+#### Lite: `AgentLoopActor` (단순 루프)
 
 ```
             ┌── Idle ──┐
@@ -101,11 +101,11 @@ DONE 8회+: 5 (MinAiWaitSeconds 도달, 고정)
          Done
 ```
 
-**특징** (`/d/Code/AI/AgentZeroLite/Project/ZeroCommon/Actors/AgentReactorActor.cs`, `Llm/Tools/AgentToolLoop.cs`, `Llm/Tools/ExternalAgentToolLoop.cs`):
-- 액터는 thin (Idle/Running 2단계만 `Become`). 루프는 `for (iter = 0; iter < MaxIterations; iter++)` (`AgentToolLoop.cs` 라인 74-139)
+**특징** (`/d/Code/AI/AgentZeroLite/Project/ZeroCommon/Actors/AgentLoopActor.cs`, `Llm/Tools/LocalAgentLoop.cs`, `Llm/Tools/ExternalAgentLoop.cs`):
+- 액터는 thin (Idle/Running 2단계만 `Become`). 루프는 `for (iter = 0; iter < MaxIterations; iter++)` (`LocalAgentLoop.cs` 라인 74-139)
 - 액터 → `Task.Run` + `PipeTo`로 `RunAsync` 비동기 실행, 콜백을 `Self.Tell`로 메일박스에 푸시
 - **현재 가드 (3개)**:
-  - `MaxIterations = 12` (`AgentToolLoopOptions` 라인 300) — 라운드 cap
+  - `MaxIterations = 12` (`AgentLoopOptions` 라인 300) — 라운드 cap
   - `CancellationToken` (사용자 취소)
   - `KnownTools` 화이트리스트 검증 (라인 109-113) — 알려지지 않은 도구 즉시 break
 - **가드 부재** (오리진 대비 무방비):
@@ -569,8 +569,8 @@ Lite에는 이 파이프라인 전체가 부재. **채택 시 publish 사이즈 
 │       │                                                           │
 │  [ActorSystem]                                                    │
 │       └─ StageActor                                               │
-│             ├─ AgentBotActor                                      │
-│             │     └─ AgentReactorActor (단순 루프)        ◄────── │ ★ Origin ReActActor 가드 이식 (P0)
+│             ├─ AgentBotActor (UI 게이트웨이)                       │
+│             │     └─ AgentLoopActor (단순 루프, /bot/loop)  ◄───── │ ★ Origin ReActActor 가드 이식 (P0)
 │             └─ WorkspaceActor                                     │
 │                   └─ TerminalActor → ConPtyTerminalSession        │
 │       │                                                           │

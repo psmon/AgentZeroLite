@@ -155,12 +155,16 @@ NOTE(워크스페이스별 마크다운 뷰어).
 
 ```
 /user/stage                  — 최상위 감독자, 1개 인스턴스
-    /bot                     — AgentBotActor: 모드(Chat/Key) + UI 콜백
+    /bot                     — AgentBotActor: UI 게이트웨이 (모드 Chat/Key,
+                               UI 콜백, peer 라우팅). 자식 AgentLoop을 lazy로 생성.
+        /loop                — AgentLoopActor: 본 에이전트. IAgentLoop 한 개를
+                               보유, Idle→Thinking→Generating→Acting→Done FSM 구동.
     /ws-<workspace>          — WorkspaceActor: 해당 폴더의 터미널 소유
         /term-<id>           — TerminalActor: ITerminalSession 래핑
 ```
 
 모든 메시지는 `ZeroCommon/Actors/Messages.cs` 한 곳에 정의돼 있습니다.
+Agent 어휘 표준 표 — `harness/knowledge/_shared/agent-architecture.md`.
 
 ---
 
@@ -290,9 +294,9 @@ GPU/CPU에서 도는 Gemma 4(Nemotron 준비 중)가 진짜 AI CLI들을 대신 
 |              | Tell                                     |
 |              v                                          |
 |   +-------------------------------------------------+   |
-|   |  AgentReactorActor   (Akka FSM)                 |   |
+|   |  AgentLoopActor   (Akka FSM, /bot/loop)         |   |
 |   |  Idle -> Thinking -> Generating -> Acting -> Done   |
-|   |  KV cache 보유; StartReactor당 한 사이클        |   |
+|   |  KV cache 보유; StartAgentLoop당 한 사이클      |   |
 |   +-------------------------------------------------+   |
 +----------------------------+----------------------------+
                              | ConPTY (텍스트 + Enter)
@@ -309,7 +313,7 @@ GPU/CPU에서 도는 Gemma 4(Nemotron 준비 중)가 진짜 AI CLI들을 대신 
                      v
    MainWindow.HandleBotChat
        -> /user/stage/bot.Tell(TerminalSentToBot)
-       -> Reactor가 깨어나 continuation cycle
+       -> AgentLoop이 깨어나 continuation cycle
 ```
 
 ### LLM이 Agent가 되는 법 — 펑션콜 툴 체인
@@ -331,12 +335,13 @@ GPU/CPU에서 도는 Gemma 4(Nemotron 준비 중)가 진짜 AI CLI들을 대신 
 |-------|------|
 | `AgentToolGrammar.Gbnf` | GBNF 문법 — sampler가 유효한 tool-call JSON만 emit 가능 |
 | 도구 표면 (6개) | `list_terminals`, `read_terminal`, `send_to_terminal`, `send_key`, `wait`, `done` |
-| `AgentToolLoop` | 생성 → 실행 → 결과 피드백 루프 본체 |
-| `AgentReactorActor` | Akka 래퍼 — 라이브 진행 상황, 취소, KV cache, peer-signal continuation |
+| `IAgentLoop` | 백엔드 무관 계약: `RunAsync(userRequest) → AgentLoopRun`. 두 구현 — `LocalAgentLoop` (LLamaSharp + GBNF) / `ExternalAgentLoop` (OpenAI 호환 REST). |
+| `IAgentToolbelt` | 에이전트가 영향을 끼치는 사이드이펙트 표면 — 위 6개 도구가 여기로 dispatch. 실서비스 = `WorkspaceTerminalToolHost`, 테스트 = `MockAgentToolbelt`. |
+| `AgentLoopActor` | `/user/stage/bot/loop` 의 Akka 래퍼 — 라이브 진행 상황, 취소, KV cache, peer-signal continuation |
 | 시스템 프롬프트 (Mode 1 / Mode 2) | 직답 vs 터미널 릴레이 모드 분기 학습 |
 | 핸드쉐이크 프로토콜 | 본 대화 전에 역방향 채널 동작 검증 |
 
-**한 run = 한 사이클**이 핵심 규칙: 각 `StartReactor`는 peer와 한 번의 짧은
+**한 run = 한 사이클**이 핵심 규칙: 각 `StartAgentLoop`은 peer와 한 번의 짧은
 round-trip만(send → wait → read → react → done) 수행하고 멈춤. 다음 사이클은
 사용자나 도착한 peer signal이 트리거 — LLM이 5턴 토론을 한 거대 tool chain으로
 스크립트하지 *않음*. KV cache가 사이클 간 히스토리를 보존.
