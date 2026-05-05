@@ -10,15 +10,32 @@
     "cancelled"
   ],
   "counts": {
-    "all": 13,
+    "all": 14,
     "inbox": 1,
-    "in_progress": 0,
+    "in_progress": 1,
     "done": 12,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0013",
+      "file": "harness/missions/M0013-agent-loop-rename.md",
+      "title": "Reactor → AgentLoop 리네임 (Agent vocabulary 정렬)",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "in_progress",
+      "priority": "medium",
+      "created": "2026-05-05",
+      "recordFile": "harness/logs/mission-records/M0013-수행결과.md",
+      "recordStatus": "completed",
+      "recordStarted": null,
+      "recordFinished": null,
+      "designFile": null,
+      "modified": "2026-05-05",
+      "size": 5574
+    },
     {
       "id": "M0012",
       "file": "harness/missions/M0012-active-session-panel.md",

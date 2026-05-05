@@ -2,6 +2,15 @@
   "base": "harness/knowledge",
   "items": [
     {
+      "id": "harness/knowledge/_shared/agent-architecture.md",
+      "file": "harness/knowledge/_shared/agent-architecture.md",
+      "name": "agent-architecture.md",
+      "title": "agent-architecture",
+      "heading": "Agent architecture — canonical vocabulary",
+      "size": 9021,
+      "modified": "2026-05-05"
+    },
+    {
       "id": "harness/knowledge/_shared/agentzerolite-architecture.md",
       "file": "harness/knowledge/_shared/agentzerolite-architecture.md",
       "name": "agentzerolite-architecture.md",
@@ -283,6 +292,13 @@
       "name": "_shared",
       "path": "_shared",
       "children": [
+        {
+          "type": "file",
+          "name": "agent-architecture.md",
+          "path": "_shared/agent-architecture.md",
+          "size": 9021,
+          "modified": "2026-05-05"
+        },
         {
           "type": "file",
           "name": "agentzerolite-architecture.md",

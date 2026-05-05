@@ -1,0 +1,386 @@
+{
+  "_description": "AgentModels tutorial — how the Actor model shapes the AgentLoop layer in AgentZero Lite. Bilingual EN/KO content rendered by js/views/agent-models.js. Source-of-truth references: harness/knowledge/_shared/agent-architecture.md (vocabulary), Project/ZeroCommon/Llm/Tools/LocalAgentLoop.cs (AgentLoopOptions spec), Project/ZeroCommon/Llm/Tools/AgentLoopGuards.cs (defenses), Project/ZeroCommon/Actors/AgentLoopActor.cs (FSM + Akka path).",
+  "title":    { "en": "Agent Models", "ko": "에이전트 모델" },
+  "subtitle": {
+    "en": "Why the Actor model is the right substrate for an agent loop",
+    "ko": "Actor 모델이 에이전트 루프의 토양으로 적합한 이유"
+  },
+  "sections": [
+    {
+      "id": "hero",
+      "kind": "hero",
+      "icon": "network",
+      "title": {
+        "en": "Actor + AgentLoop = a composable agent",
+        "ko": "Actor + AgentLoop = 조립 가능한 에이전트"
+      },
+      "lead": {
+        "en": "The Actor model (Hewitt, 1973) gives you encapsulated state, single-threaded message processing, and supervised lifecycles. An agent loop needs all three — a scratchpad that won't tear under concurrency, one tool call at a time, and a parent who can cancel or reset it. AgentZero Lite wires Akka.NET actors directly to LLamaSharp / OpenAI-compatible loops to get those properties without re-inventing them.",
+        "ko": "Actor 모델(Hewitt, 1973)은 상태 캡슐화 · 단일 스레드 메시지 처리 · 감독되는 라이프사이클을 제공한다. 에이전트 루프는 이 세 가지가 다 필요하다 — 동시성에서 찢어지지 않는 스크래치패드, 한 번에 한 tool 호출, 그리고 취소나 재설정을 명령할 수 있는 부모. AgentZero Lite 는 Akka.NET 액터를 LLamaSharp / OpenAI 호환 루프에 곧장 연결해 이 속성들을 새로 발명하지 않고 빌려쓴다."
+      },
+      "callout": {
+        "en": "The mental model: AgentBotActor is the gateway, AgentLoopActor is the agent.",
+        "ko": "정신모형: AgentBotActor 는 게이트웨이, AgentLoopActor 가 진짜 에이전트."
+      }
+    },
+
+    {
+      "id": "actor-traits",
+      "kind": "section",
+      "tone": "blue",
+      "tagline": "1973",
+      "title": {
+        "en": "The Actor model — six traits worth borrowing",
+        "ko": "Actor 모델 — 빌려쓸 만한 여섯 가지 특성"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "Carl Hewitt's actor model arrived as a unit-of-concurrency primitive: an actor is an entity that owns private state, has a mailbox, and processes incoming messages one at a time. Erlang/OTP made the model production-grade by adding supervision trees and \"let it crash\" recovery. Akka.NET ports those guarantees onto the .NET runtime — and we lean on every one of them.",
+            "ko": "Carl Hewitt 의 액터 모델은 동시성의 기본 단위로 등장했다 — 액터는 개인 상태를 소유하고, 메일박스를 가지며, 들어오는 메시지를 한 번에 하나씩 처리하는 엔티티다. Erlang/OTP 는 감독 트리와 \"let it crash\" 복구를 더해 모델을 운영급으로 끌어올렸다. Akka.NET 은 그 보장들을 .NET 런타임에 이식했고 — 우리는 그 모든 보장에 기댄다."
+          }
+        },
+        {
+          "kind": "feature-list",
+          "items": [
+            {
+              "name": { "en": "Encapsulated state", "ko": "상태 캡슐화" },
+              "text": {
+                "en": "Each actor owns its private fields. No other actor can read or mutate them — only message-passing reaches across the boundary.",
+                "ko": "각 액터는 자신의 private 필드를 소유한다. 다른 액터는 그 필드를 읽거나 변경할 수 없으며 — 메시지 전달만이 경계를 넘는다."
+              }
+            },
+            {
+              "name": { "en": "Single-threaded mailbox", "ko": "단일 스레드 메일박스" },
+              "text": {
+                "en": "An actor processes one message at a time, in arrival order. No locks, no race conditions on its private state — concurrency is exposed only between actors.",
+                "ko": "액터는 메시지를 도착 순서대로 한 번에 하나씩 처리한다. 락도, 자체 상태의 race condition 도 없다 — 동시성은 액터 사이에서만 드러난다."
+              }
+            },
+            {
+              "name": { "en": "Async + non-blocking", "ko": "비동기 · 비차단" },
+              "text": {
+                "en": "Tell is fire-and-forget. The sender never waits; long work runs on a thread-pool task that signals completion back through the mailbox.",
+                "ko": "Tell 은 fire-and-forget. 송신자는 기다리지 않고, 긴 작업은 thread-pool 작업으로 돌다가 메일박스로 완료 신호를 보낸다."
+              }
+            },
+            {
+              "name": { "en": "Location transparency", "ko": "위치 투명성" },
+              "text": {
+                "en": "An ActorRef is the same handle whether the actor is in-process or remote. You program against the path, not the address.",
+                "ko": "ActorRef 는 액터가 in-process 든 원격이든 동일한 핸들이다. 주소가 아니라 경로(path)를 대상으로 프로그래밍한다."
+              }
+            },
+            {
+              "name": { "en": "Supervision hierarchies", "ko": "감독 계층" },
+              "text": {
+                "en": "Every child actor has a parent. When the child throws, the parent decides — restart, stop, or escalate. Failure becomes a normal control-flow event.",
+                "ko": "모든 자식 액터에는 부모가 있다. 자식이 throw 하면 부모가 결정한다 — 재시작 / 중지 / 상위로 escalate. 실패는 정상적인 제어 흐름 이벤트가 된다."
+              }
+            },
+            {
+              "name": { "en": "Become / FSM", "ko": "Become / FSM" },
+              "text": {
+                "en": "An actor can swap its message handler at runtime via Become(). This is how a tiny actor expresses Idle → Thinking → Generating → Acting → Done without a 200-line state machine.",
+                "ko": "액터는 런타임에 Become() 으로 메시지 핸들러를 교체할 수 있다. 이것이 작은 액터로 Idle → Thinking → Generating → Acting → Done 을 200줄 짜리 상태 기계 없이 표현하는 방식이다."
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "match",
+      "kind": "section",
+      "tone": "purple",
+      "tagline": "fit",
+      "title": {
+        "en": "Why each trait matters for an agent loop",
+        "ko": "각 특성이 에이전트 루프에 왜 중요한가"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "An LLM agent loop is, mechanically, a generator that takes user-request → tool-call → tool-result → next-tool-call → … → done. The loop must own a model context (KV cache or REST history), accept cancellation mid-turn, stream progress to a UI, and survive a misbehaving model. The Actor model maps onto each of those needs cleanly.",
+            "ko": "LLM 에이전트 루프는 기계적으로 보면 user-request → tool-call → tool-result → next-tool-call → … → done 을 만드는 생성기다. 이 루프는 모델 컨텍스트(KV 캐시나 REST 히스토리)를 소유하고, 한 turn 중간에 취소를 받아들이며, 진행 상황을 UI 로 흘려야 하고, 잘못 동작하는 모델에서도 살아남아야 한다. Actor 모델은 이 요구 각각에 깔끔하게 매핑된다."
+          }
+        },
+        {
+          "kind": "trait-map",
+          "headers": {
+            "trait": { "en": "Actor trait", "ko": "Actor 특성" },
+            "agent": { "en": "AgentLoop benefit", "ko": "AgentLoop 이 얻는 가치" }
+          },
+          "rows": [
+            {
+              "trait": { "en": "Encapsulated state", "ko": "상태 캡슐화" },
+              "agent": {
+                "en": "KV cache + tool-call history live inside the actor — UI cannot accidentally clobber them.",
+                "ko": "KV 캐시 + tool-call 히스토리가 액터 안에 있어 UI 가 실수로 망칠 수 없다."
+              }
+            },
+            {
+              "trait": { "en": "Single-threaded mailbox", "ko": "단일 스레드 메일박스" },
+              "agent": {
+                "en": "Phase transitions (Thinking → Generating → Acting) cannot interleave. Cancel + Reset arrive as ordinary messages.",
+                "ko": "phase 전환 (Thinking → Generating → Acting) 이 끼어들 수 없다. Cancel · Reset 도 평범한 메시지로 도착한다."
+              }
+            },
+            {
+              "trait": { "en": "Async + non-blocking", "ko": "비동기 · 비차단" },
+              "agent": {
+                "en": "RunAsync runs on the thread pool; PipeTo posts the result back into the mailbox. UI thread never blocks on the model.",
+                "ko": "RunAsync 는 thread pool 에서 돌고, PipeTo 가 결과를 메일박스로 되돌린다. UI 스레드는 모델에 블록되지 않는다."
+              }
+            },
+            {
+              "trait": { "en": "Supervision", "ko": "감독" },
+              "agent": {
+                "en": "AgentBotActor (parent) decides what happens when the loop throws — restart, stop, escalate. Crashes become observable, not crashes.",
+                "ko": "부모 AgentBotActor 가 루프 throw 시 동작을 결정 — 재시작 · 중지 · escalate. 크래시는 관찰 가능한 이벤트가 된다."
+              }
+            },
+            {
+              "trait": { "en": "Become / FSM", "ko": "Become / FSM" },
+              "agent": {
+                "en": "Idle / Running are two Become() blocks; phase changes are TellParent calls. The whole agent fits in ~250 lines.",
+                "ko": "Idle / Running 이 두 개의 Become() 블록이고, phase 변화는 TellParent 호출이다. 전체 에이전트가 ~250 줄에 수렴."
+              }
+            },
+            {
+              "trait": { "en": "Location transparency", "ko": "위치 투명성" },
+              "agent": {
+                "en": "The CLI talks to /user/stage/bot via WM_COPYDATA → the agent loop wakes via the same path. Today in-process, tomorrow remoted with no contract change.",
+                "ko": "CLI 가 /user/stage/bot 에 WM_COPYDATA 로 말하면 에이전트 루프가 같은 path 로 깨어난다. 오늘은 in-process, 내일은 원격이어도 계약이 바뀌지 않는다."
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "topology",
+      "kind": "section",
+      "tone": "green",
+      "tagline": "topology",
+      "title": {
+        "en": "The Akka topology in this repo",
+        "ko": "이 레포의 Akka 토폴로지"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "Two actors split the agent's responsibilities. AgentBotActor at /user/stage/bot is the UI gateway — chat/key mode, peer routing, terminal first-contact tracking. AgentLoopActor at /user/stage/bot/loop is the agent itself — owns one IAgentLoop, drives the FSM, holds the KV cache.",
+            "ko": "두 액터가 에이전트의 책임을 나눠 가진다. /user/stage/bot 의 AgentBotActor 가 UI 게이트웨이 — 채팅/키 모드 · peer 라우팅 · terminal 첫 접촉 추적. /user/stage/bot/loop 의 AgentLoopActor 가 에이전트 본체 — IAgentLoop 한 개를 소유하고 FSM 을 구동하며 KV 캐시를 보관한다."
+          }
+        },
+        {
+          "kind": "mermaid",
+          "code": "flowchart TB\n  CLI[\"CLI / Voice / WebDev\"] -->|Tell| BOT[AgentBotActor<br/>/user/stage/bot]\n  UI[\"WPF UI\"] -->|Tell| BOT\n  BOT -->|StartAgentLoop| LOOP[AgentLoopActor<br/>/user/stage/bot/loop]\n  LOOP -->|RunAsync| IAL[\"IAgentLoop\"]\n  IAL -->|tool calls| TB[\"IAgentToolbelt\"]\n  TB -->|results| IAL\n  LOOP -->|AgentLoopProgress / Result| BOT\n  BOT -->|UI callbacks| UI"
+        },
+        {
+          "kind": "p",
+          "text": {
+            "en": "The split lets the gateway evolve independently from the inference engine. The bot can grow new mode buttons without touching the loop; the loop can swap LocalAgentLoop ↔ ExternalAgentLoop without touching the gateway. Both are reached through the same actor path, so peer-signal continuations work the same whether the user typed in the GUI or a terminal AI sent bot-chat.",
+            "ko": "이 분리 덕분에 게이트웨이는 추론 엔진과 독립적으로 진화한다. bot 은 새 모드 버튼을 추가하면서도 loop 을 건드릴 필요 없고, loop 은 LocalAgentLoop ↔ ExternalAgentLoop 을 교체하면서도 게이트웨이를 건드릴 필요 없다. 둘 다 같은 actor path 로 접근되므로, peer-signal 이어가기는 사용자가 GUI 에 입력했든 터미널 AI 가 bot-chat 을 보냈든 동일하게 동작한다."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "spec",
+      "kind": "section",
+      "tone": "amber",
+      "tagline": "spec",
+      "title": {
+        "en": "AgentLoop — the configurable spec",
+        "ko": "AgentLoop — 설정 가능한 스펙"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "AgentLoopOptions is the contract every backend honors. The defaults are tuned for Gemma 4 / Nemotron Nano on a 16 GB CPU laptop; bumping any field is safe in isolation, but the documented rationale is the cheapest place to learn the trade-off.",
+            "ko": "AgentLoopOptions 는 모든 백엔드가 준수하는 계약이다. 기본값은 16 GB CPU 노트북의 Gemma 4 / Nemotron Nano 에 맞춰 튜닝됐다. 어떤 필드든 단독 변경은 안전하지만, 문서화된 근거를 먼저 읽는 게 트레이드오프를 가장 싸게 배우는 방법이다."
+          }
+        },
+        {
+          "kind": "spec-table",
+          "headers": {
+            "field": { "en": "Field", "ko": "필드" },
+            "default": { "en": "Default", "ko": "기본값" },
+            "purpose": { "en": "Purpose / trade-off", "ko": "목적 / 트레이드오프" }
+          },
+          "rows": [
+            {
+              "field": "MaxIterations",
+              "default": "12",
+              "purpose": {
+                "en": "Cap on tool-call rounds before giving up. 12 ≈ 3 round-trips for a Mode-2 relay (send + wait + read = 3 calls each).",
+                "ko": "포기 전까지의 tool-call 라운드 cap. 12 ≈ Mode-2 릴레이 한 번에 3 라운드 트립 (send + wait + read = 호출 3개)."
+              }
+            },
+            {
+              "field": "MaxTokensPerTurn",
+              "default": "384",
+              "purpose": {
+                "en": "Per-turn LLM token cap. Pretty-printed tool JSON can hit 80–250 tokens; under-sizing truncates valid JSON mid-string.",
+                "ko": "turn 당 LLM 토큰 cap. 정렬된 tool JSON 이 80–250 토큰 나올 수 있어, 작게 잡으면 유효한 JSON 이 중간에 잘린다."
+              }
+            },
+            {
+              "field": "Temperature",
+              "default": "0.0",
+              "purpose": {
+                "en": "Greedy sampling. Tool-call paths value reproducibility over creativity; non-zero T can wander into grammar-dead-end states (esp. on Vulkan + Llama-3.1).",
+                "ko": "greedy 샘플링. tool-call 경로는 창의성보다 재현성을 중시하며, T > 0 이면 grammar 가 막히는 dead-end 로 빠질 수 있다 (특히 Vulkan + Llama-3.1)."
+              }
+            },
+            {
+              "field": "MaxSameCallRepeats",
+              "default": "3",
+              "purpose": {
+                "en": "Same (tool, canonicalized-args) call cap before the loop interrupts and feeds an error toolResult back so the model can self-correct.",
+                "ko": "(tool, 정규화된 args) 가 같은 호출이 몇 번 허용되는지. cap 초과 시 루프가 끼어들어 에러 toolResult 를 모델에 되돌려 자가 교정 기회를 준다."
+              }
+            },
+            {
+              "field": "MaxConsecutiveBlocks",
+              "default": "3",
+              "purpose": {
+                "en": "Hard stop after N consecutive blocked repeats. Escalates from \"warn the model\" to \"abort the run\" when self-correction fails.",
+                "ko": "연속 차단된 반복 횟수의 하드 스톱. 자가 교정이 실패하면 \"모델 경고\" 에서 \"run 중단\" 으로 escalate."
+              }
+            },
+            {
+              "field": "MaxLlmRetries",
+              "default": "1",
+              "purpose": {
+                "en": "Transient HTTP retry budget for ExternalAgentLoop (502/503/504/408/429/timeout). LocalAgentLoop never trips this.",
+                "ko": "ExternalAgentLoop 의 transient HTTP 재시도 budget (502/503/504/408/429/timeout). LocalAgentLoop 은 사용 안 함."
+              }
+            },
+            {
+              "field": "ProgressTokenInterval",
+              "default": "64",
+              "purpose": {
+                "en": "Tokens between OnGenerationProgress callbacks. 64 keeps the UI responsive (~1 update / 0.5–4s) without flooding the dispatcher.",
+                "ko": "OnGenerationProgress 콜백 사이의 토큰 수. 64 면 UI 가 ~0.5–4 초 간격으로 갱신되어 dispatcher 가 넘치지 않는다."
+              }
+            },
+            {
+              "field": "OnTurnCompleted",
+              "default": "—",
+              "purpose": {
+                "en": "Optional Action<ToolTurn> fired after each completed turn. The actor wires this into the mailbox so phase events stay single-threaded.",
+                "ko": "각 turn 완료 후 호출되는 선택적 Action<ToolTurn>. 액터가 메일박스에 hook 해 phase 이벤트가 단일 스레드로 유지되게 한다."
+              }
+            },
+            {
+              "field": "OnGenerationProgress",
+              "default": "—",
+              "purpose": {
+                "en": "Optional Action<phase, tokens> for token-level progress. Lets the UI distinguish \"slow\" from \"stuck\" during a long first turn.",
+                "ko": "토큰 단위 진행을 위한 선택적 Action<phase, tokens>. 긴 첫 턴 동안 \"느린 것\" 과 \"멈춘 것\" 을 UI 가 구분하게 해준다."
+              }
+            }
+          ]
+        },
+        {
+          "kind": "callout-large",
+          "text": {
+            "en": "AgentLoopGuards owns the actual repeat / hard-stop / retry state — AgentLoopOptions just configures it. One guards instance per RunAsync; never shared across runs.",
+            "ko": "실제 repeat · hard-stop · retry 상태는 AgentLoopGuards 가 보유 — AgentLoopOptions 는 설정만 한다. RunAsync 한 번당 guards 인스턴스 하나, run 사이 공유 금지."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "where",
+      "kind": "section",
+      "tone": "blue",
+      "tagline": "code",
+      "title": {
+        "en": "Where to look in the source",
+        "ko": "소스에서 어디를 봐야 하나"
+      },
+      "body": [
+        {
+          "kind": "p",
+          "text": {
+            "en": "Every claim above is grounded in code that ships with this repo. The vocabulary glossary at harness/knowledge/_shared/agent-architecture.md is the canonical map; the C# files below are where the spec lives.",
+            "ko": "위의 모든 주장은 이 레포에 들어 있는 코드에 근거한다. harness/knowledge/_shared/agent-architecture.md 의 어휘 글로서리가 표준 매핑이며, 아래의 C# 파일들이 스펙이 살고 있는 위치다."
+          }
+        },
+        {
+          "kind": "file-list",
+          "items": [
+            {
+              "path": "Project/ZeroCommon/Llm/Tools/IAgentLoop.cs",
+              "note": {
+                "en": "The contract: RunAsync(userRequest) → AgentLoopRun. Two impls, one interface.",
+                "ko": "계약: RunAsync(userRequest) → AgentLoopRun. 구현 2개, 인터페이스 1개."
+              }
+            },
+            {
+              "path": "Project/ZeroCommon/Llm/Tools/LocalAgentLoop.cs",
+              "note": {
+                "en": "Local LLamaSharp + GBNF. AgentLoopOptions record lives at the bottom of this file (line ~324).",
+                "ko": "로컬 LLamaSharp + GBNF. 이 파일 하단(라인 ~324)에 AgentLoopOptions record 가 정의돼 있다."
+              }
+            },
+            {
+              "path": "Project/ZeroCommon/Llm/Tools/ExternalAgentLoop.cs",
+              "note": {
+                "en": "OpenAI-compatible REST. No grammar enforcement; same options surface as LocalAgentLoop.",
+                "ko": "OpenAI 호환 REST. grammar 강제 없음, 옵션 surface 는 LocalAgentLoop 와 동일."
+              }
+            },
+            {
+              "path": "Project/ZeroCommon/Llm/Tools/IAgentToolbelt.cs",
+              "note": {
+                "en": "Side-effect surface — list/read/send/key against terminals. Production = WorkspaceTerminalToolHost; tests = MockAgentToolbelt.",
+                "ko": "사이드이펙트 표면 — 터미널에 대한 list/read/send/key. 프로덕션 = WorkspaceTerminalToolHost, 테스트 = MockAgentToolbelt."
+              }
+            },
+            {
+              "path": "Project/ZeroCommon/Llm/Tools/AgentLoopGuards.cs",
+              "note": {
+                "en": "Repeat / hard-stop / transient-retry defenses. One per run, never shared.",
+                "ko": "Repeat · hard-stop · transient 재시도 방어. run 당 1개, 공유 안 함."
+              }
+            },
+            {
+              "path": "Project/ZeroCommon/Actors/AgentLoopActor.cs",
+              "note": {
+                "en": "The actor itself — owns the loop, drives the FSM, pipes results back to AgentBotActor.",
+                "ko": "액터 본체 — 루프를 소유하고 FSM 을 구동, 결과를 AgentBotActor 로 다시 흘려보낸다."
+              }
+            },
+            {
+              "path": "Project/ZeroCommon/Actors/AgentBotActor.cs",
+              "note": {
+                "en": "The gateway — UI callbacks, peer signal routing, terminal introductions. Spawns the loop child lazily.",
+                "ko": "게이트웨이 — UI 콜백 · peer 신호 라우팅 · 터미널 인사. 자식 loop 을 lazy 로 생성."
+              }
+            },
+            {
+              "path": "harness/knowledge/_shared/agent-architecture.md",
+              "note": {
+                "en": "Canonical glossary + retired-name table. Read this before touching the agent layer.",
+                "ko": "표준 글로서리 + 폐기된 이름 표. 에이전트 레이어를 손대기 전에 먼저 읽을 것."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

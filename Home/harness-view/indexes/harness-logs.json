@@ -11,14 +11,22 @@
   ],
   "counts": {
     "build-doctor": 6,
-    "code-coach": 20,
-    "mission-records": 12,
+    "code-coach": 21,
+    "mission-records": 13,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
     "tamer": 17
   },
   "items": [
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-05-10-46-actor-llm-agent-naming-research.md",
+      "date": "2026-05-05",
+      "time": "10:46",
+      "title": "actor llm agent naming research",
+      "size": 10598
+    },
     {
       "category": "tamer",
       "file": "harness/logs/tamer/2026-05-05-07-15-nodejs-bash-stream-io-knowledge.md",
@@ -634,6 +642,14 @@
       "time": null,
       "title": "M0012-수행결과",
       "size": 12562
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0013-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0013-수행결과",
+      "size": 4359
     }
   ]
 }
