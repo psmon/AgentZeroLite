@@ -10,15 +10,49 @@
     "cancelled"
   ],
   "counts": {
-    "all": 11,
+    "all": 13,
     "inbox": 1,
     "in_progress": 0,
-    "done": 10,
+    "done": 12,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0012",
+      "file": "harness/missions/M0012-active-session-panel.md",
+      "title": "Token-Remaining 위젯 단순화 + Active Session 패널 분리",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-04",
+      "recordFile": "harness/logs/mission-records/M0012-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-04T22:30:00+09:00",
+      "recordFinished": "2026-05-04T23:10:00+09:00",
+      "designFile": "Docs/design/M0012-active-session-panel.pen",
+      "modified": "2026-05-04",
+      "size": 4921
+    },
+    {
+      "id": "M0011",
+      "file": "harness/missions/M0011-토큰-잔여-모니터링-플러그인.md",
+      "title": "토큰 잔여 모니터링 — minimal widget plugin (claude-hud 스타일)",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-04",
+      "recordFile": "harness/logs/mission-records/M0011-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-04T17:50:00+09:00",
+      "recordFinished": "2026-05-05T07:10:00+09:00",
+      "designFile": "Docs/design/M0011-token-remaining-widget.pen",
+      "modified": "2026-05-04",
+      "size": 2489
+    },
     {
       "id": "M0010",
       "file": "harness/missions/M0010-WEBDEB-도킹화.md",

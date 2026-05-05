@@ -3,6 +3,16 @@
   "sort": "semver-desc",
   "items": [
     {
+      "file": "v1.6.1.md",
+      "title": "v1.6.1",
+      "heading": "Knowledge addition: Node.js wrapper + bash + stream IO pitfalls",
+      "path": "v1.6.1.md",
+      "size": 3842,
+      "modified": "2026-05-04",
+      "author": "psmon",
+      "committed": "2026-05-04"
+    },
+    {
       "file": "v1.3.1.md",
       "title": "v1.3.1",
       "heading": "Mission log directory renamed to English",
@@ -126,34 +136,34 @@
   "contributors": [
     {
       "name": "psmon",
-      "commits": 83,
+      "commits": 90,
       "percent": 100
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
-      "commits": 83,
+      "commits": 90,
       "percent": 100
     }
   ],
   "contributorsRecent": [
     {
       "name": "psmon",
-      "commits": 83,
+      "commits": 90,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 83,
+    "totalAllTime": 90,
     "last7d": 60,
-    "last30d": 83
+    "last30d": 90
   },
   "topChangedFiles": [
     {
       "path": "harness/harness.config.json",
-      "commits": 14
+      "commits": 15
     },
     {
       "path": "Home/harness-view/scripts/build-indexes.js",
@@ -165,11 +175,11 @@
     },
     {
       "path": "harness/agents/code-coach.md",
-      "commits": 8
+      "commits": 9
     },
     {
       "path": "Home/harness-view/css/components.css",
-      "commits": 6
+      "commits": 7
     }
   ]
 }

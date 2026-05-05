@@ -38,6 +38,15 @@
       "modified": "2026-05-03"
     },
     {
+      "id": "harness/knowledge/code-coach/nodejs-bash-and-stream-io-pitfalls.md",
+      "file": "harness/knowledge/code-coach/nodejs-bash-and-stream-io-pitfalls.md",
+      "name": "nodejs-bash-and-stream-io-pitfalls.md",
+      "title": "nodejs-bash-and-stream-io-pitfalls",
+      "heading": "Node.js Wrapper Pitfalls — bash · child_process · file & stream IO on Windows",
+      "size": 17566,
+      "modified": "2026-05-04"
+    },
+    {
       "id": "harness/knowledge/code-coach/ondevice-tool-calling-survey.md",
       "file": "harness/knowledge/code-coach/ondevice-tool-calling-survey.md",
       "name": "ondevice-tool-calling-survey.md",
@@ -161,6 +170,13 @@
           "path": "code-coach/llm-prompt-conventions.md",
           "size": 4469,
           "modified": "2026-05-03"
+        },
+        {
+          "type": "file",
+          "name": "nodejs-bash-and-stream-io-pitfalls.md",
+          "path": "code-coach/nodejs-bash-and-stream-io-pitfalls.md",
+          "size": 17566,
+          "modified": "2026-05-04"
         },
         {
           "type": "file",

@@ -45,6 +45,9 @@ export async function render(ctx) {
     (data.categories || []).forEach(cat => {
       root.appendChild(renderCategory(cat, lang));
     });
+    if (data.playground && Array.isArray(data.playground.slides) && data.playground.slides.length) {
+      root.appendChild(renderPlayground(data.playground, lang));
+    }
     if (data.footnote) {
       root.appendChild(h('div', { class: 'mod-footnote' }, t(data.footnote, lang)));
     }
@@ -103,4 +106,72 @@ function fact(key, value) {
 
 function slug(s) {
   return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+/**
+ * PlayGround slider — 1-up viewport with translateX track, prev/next
+ * arrows, and dot pagination. Images live at Home/play-demo/...; from
+ * Home/harness-view/ that's `../play-demo/<src>`.
+ */
+function renderPlayground(pg, lang) {
+  const slides = pg.slides;
+  let idx = 0;
+
+  const sec = h('section', { class: 'mod-playground' });
+  sec.appendChild(h('div', { class: 'mod-cat-head' }, [
+    h('h2', { class: 'mod-cat-title' }, t(pg.title, lang)),
+    pg.lead ? h('p', { class: 'mod-cat-lead' }, t(pg.lead, lang)) : null,
+  ].filter(Boolean)));
+
+  const track = h('div', { class: 'mp-track' });
+  slides.forEach((s, i) => {
+    const fig = h('figure', { class: 'mp-slide' }, [
+      h('img', {
+        class: 'mp-img',
+        src: `../play-demo/${s.src}`,
+        alt: t(s.alt, lang) || '',
+        loading: i === 0 ? 'eager' : 'lazy',
+      }),
+      s.caption ? h('figcaption', { class: 'mp-caption' }, t(s.caption, lang)) : null,
+    ].filter(Boolean));
+    track.appendChild(fig);
+  });
+
+  const prev = h('button', {
+    type: 'button',
+    class: 'mp-nav mp-prev',
+    'aria-label': lang === 'ko' ? '이전 슬라이드' : 'Previous slide',
+    onclick: () => goto(idx - 1),
+  }, '‹');
+  const next = h('button', {
+    type: 'button',
+    class: 'mp-nav mp-next',
+    'aria-label': lang === 'ko' ? '다음 슬라이드' : 'Next slide',
+    onclick: () => goto(idx + 1),
+  }, '›');
+
+  const frame = h('div', { class: 'mp-frame' }, [track, prev, next]);
+  sec.appendChild(frame);
+
+  const dotsEl = h('div', { class: 'mp-dots', role: 'tablist' });
+  const dotBtns = slides.map((_, i) => {
+    const b = h('button', {
+      type: 'button',
+      class: 'mp-dot',
+      role: 'tab',
+      'aria-label': `${lang === 'ko' ? '슬라이드' : 'Slide'} ${i + 1}`,
+      onclick: () => goto(i),
+    });
+    dotsEl.appendChild(b);
+    return b;
+  });
+  sec.appendChild(dotsEl);
+
+  function goto(n) {
+    idx = ((n % slides.length) + slides.length) % slides.length;
+    track.style.transform = `translateX(-${idx * 100}%)`;
+    dotBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
+  }
+  goto(0);
+  return sec;
 }

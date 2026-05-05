@@ -11,14 +11,38 @@
   ],
   "counts": {
     "build-doctor": 6,
-    "code-coach": 18,
-    "mission-records": 10,
+    "code-coach": 20,
+    "mission-records": 12,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
-    "tamer": 16
+    "tamer": 17
   },
   "items": [
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-05-05-07-15-nodejs-bash-stream-io-knowledge.md",
+      "date": "2026-05-05",
+      "time": "07:15",
+      "title": "nodejs bash stream io knowledge",
+      "size": 3426
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-04-23-06-precommit-m0012-phase2.md",
+      "date": "2026-05-04",
+      "time": "23:06",
+      "title": "precommit m0012 phase2",
+      "size": 7103
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-04-22-16-token-remaining-active-session-research.md",
+      "date": "2026-05-04",
+      "time": "22:16",
+      "title": "token remaining active session research",
+      "size": 11087
+    },
     {
       "category": "build-doctor",
       "file": "harness/logs/build-doctor/2026-05-03-20-46-M0009-prerelease.md",
@@ -594,6 +618,22 @@
       "time": null,
       "title": "M0010-수행결과",
       "size": 22278
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0011-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0011-수행결과",
+      "size": 17618
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0012-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0012-수행결과",
+      "size": 12562
     }
   ]
 }

@@ -16,6 +16,14 @@
     {
       "type": "pen",
       "file": "M0010-webdev-detach-docking.pen"
+    },
+    {
+      "type": "pen",
+      "file": "M0011-token-remaining-widget.pen"
+    },
+    {
+      "type": "pen",
+      "file": "M0012-active-session-panel.pen"
     }
   ]
 }

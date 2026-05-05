@@ -6,8 +6,8 @@
     "ko": "AgentZero Lite 에 채택된 모델 — 온디바이스, 호스티드, 보이스"
   },
   "intro": {
-    "en": "AgentZero Lite is a multi-CLI shell that talks to several LLM, STT, and TTS backends. The architecture leans on-device-first (LLamaSharp + Whisper.net) so the assistant runs without an internet connection, with hosted vendors as opt-in upgrades. The cards below describe each model that ships with the app — variant, size, on-device vs hosted, and what role it plays.",
-    "ko": "AgentZero Lite 는 여러 LLM / STT / TTS 백엔드와 대화하는 멀티-CLI 셸이다. 아키텍처는 온디바이스 우선(LLamaSharp + Whisper.net)이라 인터넷 없이도 어시스턴트가 동작하며, 호스티드 벤더는 opt-in 업그레이드로 제공된다. 아래 카드들은 앱에 함께 들어있는 모델들을 변형(variant), 용량, 온디바이스 vs 호스티드, 그리고 역할 관점에서 설명한다."
+    "en": "AgentZero Lite is a multi-CLI shell that talks to several LLM, STT, and TTS backends. The architecture leans on-device-first (LLamaSharp + Whisper.net) so the assistant runs without an internet connection, with hosted vendors as opt-in upgrades. The cards below describe each model that ships with the app — variant, size, on-device vs hosted, and what role it plays. Beyond a static catalogue, this surface doubles as a scouting board: as AgentZero develops, when a stronger on-device candidate appears we introduce it here and use the app as a compatibility harness for it. Even if you never touch the CLI, the bundled models are worth exploring as an STT / TTS playground for learning. Continuously discovering good open models → adopting them into AgentZero → exposing them as an open-model playground is itself a learning loop the project commits to.",
+    "ko": "AgentZero Lite 는 여러 LLM / STT / TTS 백엔드와 대화하는 멀티-CLI 셸이다. 아키텍처는 온디바이스 우선(LLamaSharp + Whisper.net)이라 인터넷 없이도 어시스턴트가 동작하며, 호스티드 벤더는 opt-in 업그레이드로 제공된다. 아래 카드들은 앱에 함께 들어있는 모델들을 변형(variant), 용량, 온디바이스 vs 호스티드, 그리고 역할 관점에서 설명한다. 단순한 카탈로그가 아니라 발굴판(scouting board) 역할도 한다 — AgentZero 디벨롭 과정에서 더 좋은 온디바이스 모델이 발견되면 여기서 소개하고, 앱 자체를 호환성 테스트 하네스로 활용한다. CLI 툴을 직접 쓰지 않더라도 함께 동봉된 모델들을 STT / TTS PlayGround 로 둘러보며 학습용으로 살펴봐도 가치가 있다. 괜찮은 오픈 모델의 지속 발굴 → AgentZero 적용 → 오픈모델 PlayGround 로 노출, 이 자체가 프로젝트가 약속하는 학습 루프다."
   },
 
   "categories": [
@@ -227,6 +227,41 @@
       ]
     }
   ],
+
+  "playground": {
+    "title": { "en": "PlayGround — what it looks like inside the app",
+               "ko": "PlayGround — 앱 안에서 실제로 보이는 화면" },
+    "lead": {
+      "en": "Screenshots of the surfaces where these models live. Even without driving the CLI, you can use the settings tabs and the plugin gallery as a sandbox for exploring on-device LLM / STT / TTS behavior.",
+      "ko": "이 모델들이 실제로 노출되는 화면들이다. CLI 를 직접 몰지 않아도 설정 탭과 플러그인 갤러리에서 온디바이스 LLM / STT / TTS 동작을 둘러보는 sandbox 로 쓸 수 있다."
+    },
+    "slides": [
+      {
+        "src": "playground-llm/setting-playground-llm.png",
+        "alt": { "en": "LLM PlayGround settings tab", "ko": "LLM PlayGround 설정 탭" },
+        "caption": {
+          "en": "LLM PlayGround — pick a backend (on-device Gemma 4 / Nemotron / hosted Webnori / OpenAI / LM Studio / Ollama) and chat against it without leaving the app. Useful for A/B comparison before wiring a model into a workflow.",
+          "ko": "LLM PlayGround — 백엔드(온디바이스 Gemma 4 / Nemotron / 호스티드 Webnori / OpenAI / LM Studio / Ollama)를 골라 앱을 떠나지 않고 곧장 대화. 워크플로우에 모델을 적용하기 전 A/B 비교용으로 유용."
+        }
+      },
+      {
+        "src": "playground-llm/setting-playground-voice.png",
+        "alt": { "en": "Voice PlayGround settings tab", "ko": "Voice PlayGround 설정 탭" },
+        "caption": {
+          "en": "Voice PlayGround — STT and TTS lanes side by side. Try Whisper.net dictation or OpenAI Realtime, then send the result through Windows SAPI or OpenAI TTS. Mute-while-playing prevents feedback loops.",
+          "ko": "Voice PlayGround — STT 와 TTS 레인이 나란히 배치. Whisper.net 받아쓰기나 OpenAI Realtime 으로 입력한 뒤 Windows SAPI / OpenAI TTS 로 출력. mute-while-playing 이 피드백 루프를 차단."
+        }
+      },
+      {
+        "src": "playground-llm/plugin-apps.png",
+        "alt": { "en": "Plugin gallery", "ko": "플러그인 갤러리" },
+        "caption": {
+          "en": "Plugin gallery — official plugins (voice-note, token-monitor) installed at runtime via the GitHub Trees API, no hardcoded list. Each plugin is a self-contained playground over the host model surface.",
+          "ko": "플러그인 갤러리 — 공식 플러그인(voice-note, token-monitor)이 GitHub Trees API 로 런타임 탐색·설치된다(하드코딩 zero). 각 플러그인은 호스트 모델 위에서 동작하는 독립 PlayGround."
+        }
+      }
+    ]
+  },
 
   "footnote": {
     "en": "Verify against Project/AgentZeroWpf/AgentZeroWpf.csproj package versions if anything below looks out of date — that file is the single source of truth for runtime deps.",
