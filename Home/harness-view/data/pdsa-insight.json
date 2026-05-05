@@ -1,37 +1,123 @@
 {
+  "_description": "PDSA Learning surface — bilingual EN/KO. Default audience: English. `sources[].title`, `tried[]`, `solved[]`, `remaining[]`, `learned.lead`, `learned.body` use `{ en, ko }` shape. Scalars (date/time/category/file/analyzedAt/windowDays) stay language-neutral. PDSA UPDATE mode in the harness-view-build skill must emit both languages.",
   "analyzedAt": "2026-05-04",
   "windowDays": 14,
-  "language": "ko",
   "sources": [
-    { "date": "2026-05-05", "time": "07:15", "category": "tamer",            "file": "harness/logs/tamer/2026-05-05-07-15-nodejs-bash-stream-io-knowledge.md",           "title": "Tamer — Node.js/bash/stream-IO 10-pitfall catalogue codify + code-coach 자동 review 등록" },
-    { "date": "2026-05-04", "time": "23:10", "category": "mission-records",  "file": "harness/logs/mission-records/M0012-수행결과.md",                                    "title": "Mission M0012 — Token-Remaining 위젯 단순화 + Active Session 패널 분리 (Phase 1+2 + 운영자 fine-tuning)" },
-    { "date": "2026-05-04", "time": "23:06", "category": "code-coach",       "file": "harness/logs/code-coach/2026-05-04-23-06-precommit-m0012-phase2.md",                "title": "Code-coach Mode 2 — M0012 Phase 2 pre-commit review (0 must-fix, 2 suggestion)" },
-    { "date": "2026-05-04", "time": "22:16", "category": "code-coach",       "file": "harness/logs/code-coach/2026-05-04-22-16-token-remaining-active-session-research.md", "title": "Code-coach Mode 3 — token-remaining 수집장치 검토 + Option A/B/C 트레이드오프" },
-    { "date": "2026-05-04", "time": "12:00", "category": "mission-records",  "file": "harness/logs/mission-records/M0011-수행결과.md",                                    "title": "Mission M0011 — Token 잔여 모니터링 위젯 + claude-hud chain pipe-through 정상화 (M0011 follow-up)" }
+    {
+      "date": "2026-05-05", "time": "07:15", "category": "tamer",
+      "file": "harness/logs/tamer/2026-05-05-07-15-nodejs-bash-stream-io-knowledge.md",
+      "title": {
+        "en": "Tamer — Node.js / bash / stream-IO 10-pitfall catalogue codified, code-coach auto-review hooked in",
+        "ko": "Tamer — Node.js/bash/stream-IO 10-pitfall catalogue codify + code-coach 자동 review 등록"
+      }
+    },
+    {
+      "date": "2026-05-04", "time": "23:10", "category": "mission-records",
+      "file": "harness/logs/mission-records/M0012-수행결과.md",
+      "title": {
+        "en": "Mission M0012 — Token-Remaining widget simplification + Active Session panel split (Phase 1+2 + operator fine-tuning)",
+        "ko": "Mission M0012 — Token-Remaining 위젯 단순화 + Active Session 패널 분리 (Phase 1+2 + 운영자 fine-tuning)"
+      }
+    },
+    {
+      "date": "2026-05-04", "time": "23:06", "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-04-23-06-precommit-m0012-phase2.md",
+      "title": {
+        "en": "Code-coach Mode 2 — M0012 Phase 2 pre-commit review (0 must-fix, 2 suggestions)",
+        "ko": "Code-coach Mode 2 — M0012 Phase 2 pre-commit review (0 must-fix, 2 suggestion)"
+      }
+    },
+    {
+      "date": "2026-05-04", "time": "22:16", "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-04-22-16-token-remaining-active-session-research.md",
+      "title": {
+        "en": "Code-coach Mode 3 — token-remaining collector review + Option A/B/C trade-offs",
+        "ko": "Code-coach Mode 3 — token-remaining 수집장치 검토 + Option A/B/C 트레이드오프"
+      }
+    },
+    {
+      "date": "2026-05-04", "time": "12:00", "category": "mission-records",
+      "file": "harness/logs/mission-records/M0011-수행결과.md",
+      "title": {
+        "en": "Mission M0011 — Token-remaining monitoring widget + claude-hud chain pipe-through fixed (M0011 follow-up)",
+        "ko": "Mission M0011 — Token 잔여 모니터링 위젯 + claude-hud chain pipe-through 정상화 (M0011 follow-up)"
+      }
+    }
   ],
   "tried": [
-    "M0011 wrapper 의 stdin drop 경로 분석 — session_id / cwd / workspace.project_dir 을 모두 받지만 model + rate_limits 만 추출하고 나머지를 버림 + 스냅샷 파일이 계정당 1개 (overwrite) 라 동시세션이 서로를 덮어씀",
-    "Option A/B/C 트레이드오프 비교 — (A) 별도 SessionHeartbeat 테이블 / (B) 기존 entity 컬럼 확장 / (C) DB 무변경 파일 mtime 만. state-change-log 와 heartbeat 의미론 충돌 진단 후 Option A 채택",
-    "design-first .pen mockup 4 surfaces (Token simplified dark/light + Active Session dark/light) → 운영자 피드백 4건 (5 min window, click-to-copy session id, basename project, 분리 ON/OFF) 코드 진입 전 반영",
-    "Phase 1 (UX-only collapse — 무위험) → Phase 2 (entity + migration + wrapper v3 + heartbeat collector + RPC + UI) 분할 커밋 + 사이마다 운영자 검증 사이클",
-    "wrapper v3 자동 재배포 hook — App.OnStartup 에서 EnsureWrapperOnDisk() 호출 → 기존 v2 사용자도 앱 재시작만으로 v3 으로 전환, settings.json 손작업 0",
-    "M0011 의 wrapper 빌드에서 노출된 함정 10건을 nodejs-bash-and-stream-io-pitfalls.md 로 catalogue → code-coach owned-conventions 에 등록, 미래 wrapper PR 마다 자동 walk"
+    {
+      "en": "Analyzed the M0011 wrapper's stdin-drop path — it already receives session_id / cwd / workspace.project_dir but only extracts model + rate_limits and discards the rest, and the snapshot file is one-per-account (overwrite), so concurrent sessions overwrite each other.",
+      "ko": "M0011 wrapper 의 stdin drop 경로 분석 — session_id / cwd / workspace.project_dir 을 모두 받지만 model + rate_limits 만 추출하고 나머지를 버림 + 스냅샷 파일이 계정당 1개 (overwrite) 라 동시세션이 서로를 덮어씀"
+    },
+    {
+      "en": "Compared Option A/B/C trade-offs — (A) separate SessionHeartbeat table / (B) extend the existing entity's columns / (C) no DB change, file mtime only. Diagnosed the semantic conflict between state-change-log and heartbeat, then chose Option A.",
+      "ko": "Option A/B/C 트레이드오프 비교 — (A) 별도 SessionHeartbeat 테이블 / (B) 기존 entity 컬럼 확장 / (C) DB 무변경 파일 mtime 만. state-change-log 와 heartbeat 의미론 충돌 진단 후 Option A 채택"
+    },
+    {
+      "en": "Design-first .pen mockups for 4 surfaces (Token simplified dark/light + Active Session dark/light); collected 4 operator feedback items (5-min window, click-to-copy session id, basename project, separate ON/OFF) and folded them in before any code changes.",
+      "ko": "design-first .pen mockup 4 surfaces (Token simplified dark/light + Active Session dark/light) → 운영자 피드백 4건 (5 min window, click-to-copy session id, basename project, 분리 ON/OFF) 코드 진입 전 반영"
+    },
+    {
+      "en": "Split delivery: Phase 1 (UX-only collapse — risk-free) → Phase 2 (entity + migration + wrapper v3 + heartbeat collector + RPC + UI), with an operator validation cycle between commits.",
+      "ko": "Phase 1 (UX-only collapse — 무위험) → Phase 2 (entity + migration + wrapper v3 + heartbeat collector + RPC + UI) 분할 커밋 + 사이마다 운영자 검증 사이클"
+    },
+    {
+      "en": "Auto-redeploy hook for wrapper v3 — App.OnStartup calls EnsureWrapperOnDisk(), so existing v2 users move to v3 just by restarting the app, with zero settings.json hand-editing.",
+      "ko": "wrapper v3 자동 재배포 hook — App.OnStartup 에서 EnsureWrapperOnDisk() 호출 → 기존 v2 사용자도 앱 재시작만으로 v3 으로 전환, settings.json 손작업 0"
+    },
+    {
+      "en": "Catalogued the 10 traps surfaced by M0011's wrapper build into nodejs-bash-and-stream-io-pitfalls.md and registered it under code-coach owned-conventions, so every future wrapper PR auto-walks the list.",
+      "ko": "M0011 의 wrapper 빌드에서 노출된 함정 10건을 nodejs-bash-and-stream-io-pitfalls.md 로 catalogue → code-coach owned-conventions 에 등록, 미래 wrapper PR 마다 자동 walk"
+    }
   ],
   "solved": [
-    "rate_limits 가 계정 단위 quota 라는 사실 empirical 확정 (M0011 의 Opus/Sonnet 동일값 누적) → 모델 그룹화 의미 없음 → Phase 1 의 위젯 collapse 정당화",
-    "SessionHeartbeat 풀스택 (entity + EF migration + UPSERT collector + LastSeenUtc index + RPC + push event + UI) — 기존 TokenRemainingObservation 무손상, state-change-log vs heartbeat 의미론 분리",
-    "Wrapper v3.0 — session_id / cwd / project_dir 캡처 + per-session 스냅샷 subdir (cc-hud-snapshots/{account}/{sessionId}.json) + 첫 tick 시 v2 평탄파일 자동 cleanup + safeSessionId path-traversal 차단",
-    "운영자 fine-tuning 통과 — multi-account stacked widget (계정 picker 제거 + Settings 의 Visible accounts 토글), 상단 정보 메시지 제거, 최근 활동순 정렬",
-    "Node.js wrapper 도메인의 함정 10건이 wpf-xaml-pitfalls 와 동일 격의 catalogue 로 codify → 하네스 성숙도 L4 → L5"
+    {
+      "en": "Empirically confirmed that rate_limits is an account-level quota (M0011 logs Opus / Sonnet sharing the same accumulated value), so model-level grouping carries no information — Phase 1's widget collapse is justified.",
+      "ko": "rate_limits 가 계정 단위 quota 라는 사실 empirical 확정 (M0011 의 Opus/Sonnet 동일값 누적) → 모델 그룹화 의미 없음 → Phase 1 의 위젯 collapse 정당화"
+    },
+    {
+      "en": "Full-stack SessionHeartbeat (entity + EF migration + UPSERT collector + LastSeenUtc index + RPC + push event + UI) — TokenRemainingObservation untouched, state-change-log vs heartbeat semantics cleanly separated.",
+      "ko": "SessionHeartbeat 풀스택 (entity + EF migration + UPSERT collector + LastSeenUtc index + RPC + push event + UI) — 기존 TokenRemainingObservation 무손상, state-change-log vs heartbeat 의미론 분리"
+    },
+    {
+      "en": "Wrapper v3.0 — captures session_id / cwd / project_dir, writes per-session snapshots to a subdir (cc-hud-snapshots/{account}/{sessionId}.json), auto-cleans v2 flat files on first tick, and enforces safeSessionId against path traversal.",
+      "ko": "Wrapper v3.0 — session_id / cwd / project_dir 캡처 + per-session 스냅샷 subdir (cc-hud-snapshots/{account}/{sessionId}.json) + 첫 tick 시 v2 평탄파일 자동 cleanup + safeSessionId path-traversal 차단"
+    },
+    {
+      "en": "Passed operator fine-tuning — multi-account stacked widget (account picker dropped + Settings 'Visible accounts' toggles), top info banner removed, sorted by most-recent activity.",
+      "ko": "운영자 fine-tuning 통과 — multi-account stacked widget (계정 picker 제거 + Settings 의 Visible accounts 토글), 상단 정보 메시지 제거, 최근 활동순 정렬"
+    },
+    {
+      "en": "The 10 Node.js wrapper traps are now codified at the same catalogue grade as wpf-xaml-pitfalls, lifting harness maturity from L4 to L5.",
+      "ko": "Node.js wrapper 도메인의 함정 10건이 wpf-xaml-pitfalls 와 동일 격의 catalogue 로 codify → 하네스 성숙도 L4 → L5"
+    }
   ],
   "remaining": [
-    "code-coach Mode 2 의 Suggestion 1 — `as--qa` heuristic class 가 mockup-leakage (`accountKey.includes('qa')` false-positive 위험). GitHub issue 트래킹 + 다음 PR 처리 보류",
-    "동시 Claude Code 다중 세션 시각 검증 — 코드 경로 (per-session subdir, UPSERT, LastSeenUtc 정렬) 는 통과했으나 운영자 환경에서 5+ 세션 동시 띄워 두 개 row 가 정확히 나타나는지 직접 확인 필요",
-    "M0011 의 M0015 후보 (wrapper IO contention) — wrapper v3 의 per-session fan-out 으로 IO 패턴이 바뀜. 다중 세션 환경에서 per-tick × 세션수 파일 쓰기 + 2 collector 의 15s/30s 스캔 부하 측정 필요",
-    "다른 agent (security-guard 의 prompt-injection / build-doctor 의 csproj-publish) 도 같은 rare-trap catalogue 형식으로 도메인 함정 수집 — 권장 대기"
+    {
+      "en": "Code-coach Mode 2 Suggestion 1 — the `as--qa` heuristic class risks mockup-leakage (`accountKey.includes('qa')` false-positive). Tracked as a GitHub issue and deferred to the next PR.",
+      "ko": "code-coach Mode 2 의 Suggestion 1 — `as--qa` heuristic class 가 mockup-leakage (`accountKey.includes('qa')` false-positive 위험). GitHub issue 트래킹 + 다음 PR 처리 보류"
+    },
+    {
+      "en": "Visual confirmation of multiple concurrent Claude Code sessions — the code paths (per-session subdir, UPSERT, LastSeenUtc ordering) pass, but we still need to launch 5+ live sessions in the operator's environment and confirm both rows appear cleanly.",
+      "ko": "동시 Claude Code 다중 세션 시각 검증 — 코드 경로 (per-session subdir, UPSERT, LastSeenUtc 정렬) 는 통과했으나 운영자 환경에서 5+ 세션 동시 띄워 두 개 row 가 정확히 나타나는지 직접 확인 필요"
+    },
+    {
+      "en": "M0015 candidate from M0011 (wrapper IO contention) — wrapper v3's per-session fan-out changes the IO pattern. Need to measure per-tick × N-sessions file writes and the 15s/30s scan load of both collectors under multi-session conditions.",
+      "ko": "M0011 의 M0015 후보 (wrapper IO contention) — wrapper v3 의 per-session fan-out 으로 IO 패턴이 바뀜. 다중 세션 환경에서 per-tick × 세션수 파일 쓰기 + 2 collector 의 15s/30s 스캔 부하 측정 필요"
+    },
+    {
+      "en": "Other agents (security-guard's prompt-injection, build-doctor's csproj-publish) should also collect their own domain rare-trap catalogues in the same format — pending recommendation.",
+      "ko": "다른 agent (security-guard 의 prompt-injection / build-doctor 의 csproj-publish) 도 같은 rare-trap catalogue 형식으로 도메인 함정 수집 — 권장 대기"
+    }
   ],
   "learned": {
-    "lead": "design-first 와 의미론 분리 + 자동 재배포 = 사용자 손작업 0 의 안전한 schema/wrapper 진화. 두 의미론을 한 테이블에 섞으면 dedupe 키가 깨진다.",
-    "body": "M0011 시점에는 위젯이 모델별 row 를 그렸지만, M0012 사전조사로 rate_limits 가 계정 단위 quota 라는 사실이 확인되어 모델 차원이 의미 없음이 드러났다. 동시에 운영자는 '어떤 모델이 어디서 활성 중인가' 라는 별도 가치를 원했다 — 이것은 state-change-log (rate-limit 변할 때만 row) 가 아니라 heartbeat (매 tick 마다 LastSeen 갱신) 의미론이다. 두 의미론을 한 테이블에 섞으면 dedupe 키에 SessionId 를 넣을지 뺄지로 고통받는다 — 별도 entity (SessionHeartbeat) + 별도 collector + 별도 query 로 분리하니 기존 TokenRemainingObservation 한 줄도 안 건드리고 마이그레이션 1개로 끝났다. wrapper 변경은 EnsureWrapperOnDisk() 를 OnStartup 에 hook 함으로써 idempotent 자동 재배포가 되어, v2 사용자도 앱 재시작만으로 v3 으로 전환된다. design-first (.pen 4 surfaces → 운영자 피드백 4건) 가 implementation 되돌림 비용을 절약했다 — 5 min window, click-to-copy, basename 같은 결정사항이 코드 진입 전 1초 만에 변경되었다. 다음 워크플로우 적용 체크리스트: (1) 새 telemetry 도메인이 들어오면 기존 entity 의미론과 충돌하는지 먼저 점검 (2) state-change vs heartbeat 처럼 두 의미론이면 별도 entity (3) wrapper 변경 시 자동 재배포 hook 의 sha256 idempotent 여부 확인 (4) UI 는 .pen mockup 으로 먼저 그려 운영자 피드백 받음 (5) 도메인의 우연한 함정 10건 정도가 누적되면 catalogue 로 codify 해서 owner agent 의 자동 review 트리거에 박는다."
+    "lead": {
+      "en": "Design-first + semantic separation + auto-redeploy = zero operator hand-work for safe schema/wrapper evolution. Mixing two semantics into one table breaks your dedupe key.",
+      "ko": "design-first 와 의미론 분리 + 자동 재배포 = 사용자 손작업 0 의 안전한 schema/wrapper 진화. 두 의미론을 한 테이블에 섞으면 dedupe 키가 깨진다."
+    },
+    "body": {
+      "en": "At the M0011 boundary the widget rendered one row per model, but M0012 pre-research confirmed that rate_limits is an account-level quota — so the model dimension carries no signal. Meanwhile the operator wanted a separate value: 'which model is active where' — that is heartbeat semantics (LastSeen refreshed every tick), not state-change-log semantics (a row only when rate-limit changes). Mixing the two in one table forces you to debate whether SessionId belongs in the dedupe key. Splitting them into a separate entity (SessionHeartbeat) with its own collector and query meant TokenRemainingObservation didn't change at all and the migration shipped as a single step. The wrapper change works the same way: hooking EnsureWrapperOnDisk() into OnStartup makes auto-redeploy idempotent, so v2 users land on v3 just by restarting the app. Design-first (.pen 4 surfaces → 4 operator feedback items) saved the cost of unwinding implementation — decisions like 5-min window, click-to-copy, and basename were pivoted in seconds, before any code touched them. Checklist for the next workflow: (1) when a new telemetry domain arrives, check first whether it conflicts with the existing entity's semantics; (2) if there are two semantics like state-change vs heartbeat, use a separate entity; (3) when changing the wrapper, verify the auto-redeploy hook is sha256-idempotent; (4) draw the UI as a .pen mockup first and collect operator feedback; (5) once ~10 incidental traps accumulate in a domain, codify them as a catalogue and wire it into the owner agent's auto-review trigger.",
+      "ko": "M0011 시점에는 위젯이 모델별 row 를 그렸지만, M0012 사전조사로 rate_limits 가 계정 단위 quota 라는 사실이 확인되어 모델 차원이 의미 없음이 드러났다. 동시에 운영자는 '어떤 모델이 어디서 활성 중인가' 라는 별도 가치를 원했다 — 이것은 state-change-log (rate-limit 변할 때만 row) 가 아니라 heartbeat (매 tick 마다 LastSeen 갱신) 의미론이다. 두 의미론을 한 테이블에 섞으면 dedupe 키에 SessionId 를 넣을지 뺄지로 고통받는다 — 별도 entity (SessionHeartbeat) + 별도 collector + 별도 query 로 분리하니 기존 TokenRemainingObservation 한 줄도 안 건드리고 마이그레이션 1개로 끝났다. wrapper 변경은 EnsureWrapperOnDisk() 를 OnStartup 에 hook 함으로써 idempotent 자동 재배포가 되어, v2 사용자도 앱 재시작만으로 v3 으로 전환된다. design-first (.pen 4 surfaces → 운영자 피드백 4건) 가 implementation 되돌림 비용을 절약했다 — 5 min window, click-to-copy, basename 같은 결정사항이 코드 진입 전 1초 만에 변경되었다. 다음 워크플로우 적용 체크리스트: (1) 새 telemetry 도메인이 들어오면 기존 entity 의미론과 충돌하는지 먼저 점검 (2) state-change vs heartbeat 처럼 두 의미론이면 별도 entity (3) wrapper 변경 시 자동 재배포 hook 의 sha256 idempotent 여부 확인 (4) UI 는 .pen mockup 으로 먼저 그려 운영자 피드백 받음 (5) 도메인의 우연한 함정 10건 정도가 누적되면 catalogue 로 codify 해서 owner agent 의 자동 review 트리거에 박는다."
+    }
   }
 }

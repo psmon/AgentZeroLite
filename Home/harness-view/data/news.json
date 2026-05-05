@@ -1,15 +1,64 @@
 {
+  "_description": "Recent Updates surface — bilingual EN/KO. Default audience: English. `headline`, `narrative`, `highlights[].label/text`, `prompts[].tag/text` use `{ en, ko }` shape. Scalars (updatedAt, tone) stay language-neutral.",
   "updatedAt": "2026-05-03",
-  "headline": "v0.5.1 — Token Monitor 플러그인과 멀티 프로필 텔레메트리",
-  "narrative": "WebDev 플러그인 플랫폼이 두 번째 공식 플러그인을 받아들였다. Token Monitor 는 Claude Code 와 Codex CLI 가 디스크에 남기는 JSONL 트랜스크립트를 호스트 측 collector 가 10분 주기로 incremental 흡수하고, 벤더/계정/프로젝트 단위 대시보드로 노출한다. 첫 구현이 ~/.claude/ 한 디렉토리만 본다는 사실을 사용자가 지적해 곧장 멀티-profile (CLAUDE_CONFIG_DIR 분기된 ~/.claude*) 자동 탐색 + AccountKey-per-file pinning 으로 보강 — 실제로는 절반의 데이터가 누락되어 있었다. 같은 사이클에 Install Plugin 다이얼로그가 GitHub Trees API 로 official 플러그인을 런타임 탐색하도록 바뀌었고, 다크테마 ComboBox 풀 재템플릿이 도입되면서 'Background/Foreground 만 으로 부족' 이라는 WPF 함정이 harness 의 Pitfall 6 으로 codify 됐다.",
+  "headline": {
+    "en": "v0.5.1 — Token Monitor plugin and multi-profile telemetry",
+    "ko": "v0.5.1 — Token Monitor 플러그인과 멀티 프로필 텔레메트리"
+  },
+  "narrative": {
+    "en": "The WebDev plugin platform welcomed its second official plugin. Token Monitor incrementally ingests the JSONL transcripts that Claude Code and Codex CLI leave on disk via a host-side collector running every 10 minutes, and surfaces them on a per-vendor / per-account / per-project dashboard. After a user pointed out that the first cut watched only ~/.claude/, we hardened it on the spot with multi-profile auto-discovery (CLAUDE_CONFIG_DIR-branched ~/.claude*) and AccountKey-per-file pinning — half the data was actually missing. In the same cycle the Install Plugin dialog was rewritten to discover official plugins at runtime via the GitHub Trees API, and a full re-template of the dark-theme ComboBox pool led us to codify the WPF trap 'Background/Foreground alone is not enough' as Pitfall 6 in the harness.",
+    "ko": "WebDev 플러그인 플랫폼이 두 번째 공식 플러그인을 받아들였다. Token Monitor 는 Claude Code 와 Codex CLI 가 디스크에 남기는 JSONL 트랜스크립트를 호스트 측 collector 가 10분 주기로 incremental 흡수하고, 벤더/계정/프로젝트 단위 대시보드로 노출한다. 첫 구현이 ~/.claude/ 한 디렉토리만 본다는 사실을 사용자가 지적해 곧장 멀티-profile (CLAUDE_CONFIG_DIR 분기된 ~/.claude*) 자동 탐색 + AccountKey-per-file pinning 으로 보강 — 실제로는 절반의 데이터가 누락되어 있었다. 같은 사이클에 Install Plugin 다이얼로그가 GitHub Trees API 로 official 플러그인을 런타임 탐색하도록 바뀌었고, 다크테마 ComboBox 풀 재템플릿이 도입되면서 'Background/Foreground 만 으로 부족' 이라는 WPF 함정이 harness 의 Pitfall 6 으로 codify 됐다."
+  },
   "highlights": [
-    { "label": "Token Monitor", "text": "벤더/계정/프로젝트 분리 대시보드 + alias rename + Reset & Re-scan", "tone": "blue"   },
-    { "label": "멀티 프로필",   "text": "~/.claude*, profile 디렉토리명을 AccountKey 로 pin (race-free)",      "tone": "purple" },
-    { "label": "공식 콤보",     "text": "Install 다이얼로그가 Trees API 로 런타임 탐색 — 하드코딩 zero",         "tone": "green"  }
+    {
+      "label": { "en": "Token Monitor", "ko": "Token Monitor" },
+      "text":  {
+        "en": "Per-vendor / per-account / per-project dashboards + alias rename + Reset & Re-scan",
+        "ko": "벤더/계정/프로젝트 분리 대시보드 + alias rename + Reset & Re-scan"
+      },
+      "tone": "blue"
+    },
+    {
+      "label": { "en": "Multi-profile",      "ko": "멀티 프로필" },
+      "text":  {
+        "en": "~/.claude* directories pinned to AccountKey by folder name (race-free)",
+        "ko": "~/.claude*, profile 디렉토리명을 AccountKey 로 pin (race-free)"
+      },
+      "tone": "purple"
+    },
+    {
+      "label": { "en": "Official plugin combo", "ko": "공식 콤보" },
+      "text":  {
+        "en": "Install dialog discovers official plugins via Trees API at runtime — zero hardcoding",
+        "ko": "Install 다이얼로그가 Trees API 로 런타임 탐색 — 하드코딩 zero"
+      },
+      "tone": "green"
+    }
   ],
   "prompts": [
-    { "tag": "토큰 추적",     "tone": "blue",   "text": "WebDev → Token Monitor 에서 1주일치 사용량을 프로젝트(cwd 리프 폴더)별로 비교" },
-    { "tag": "프로필 라벨",   "tone": "purple", "text": "By account 표에서 각 계정 셀 클릭 → 별칭(a/b/c) 입력해 친화 이름 매핑" },
-    { "tag": "공식 플러그인", "tone": "green",  "text": "+ Install Plugin 다이얼로그의 OFFICIAL 콤보에서 voice-note / token-monitor 즉시 설치" }
+    {
+      "tag":  { "en": "Token tracking", "ko": "토큰 추적" },
+      "tone": "blue",
+      "text": {
+        "en": "In WebDev → Token Monitor, compare last week's usage by project (cwd leaf folder)",
+        "ko": "WebDev → Token Monitor 에서 1주일치 사용량을 프로젝트(cwd 리프 폴더)별로 비교"
+      }
+    },
+    {
+      "tag":  { "en": "Profile labels", "ko": "프로필 라벨" },
+      "tone": "purple",
+      "text": {
+        "en": "On the By-account table, click each account cell and set a friendly alias (a/b/c)",
+        "ko": "By account 표에서 각 계정 셀 클릭 → 별칭(a/b/c) 입력해 친화 이름 매핑"
+      }
+    },
+    {
+      "tag":  { "en": "Official plugins", "ko": "공식 플러그인" },
+      "tone": "green",
+      "text": {
+        "en": "Install voice-note / token-monitor right from the OFFICIAL combo on the + Install Plugin dialog",
+        "ko": "+ Install Plugin 다이얼로그의 OFFICIAL 콤보에서 voice-note / token-monitor 즉시 설치"
+      }
+    }
   ]
 }

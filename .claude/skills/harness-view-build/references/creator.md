@@ -33,7 +33,8 @@ Home/harness-view/
 │   │   ├── md-viewer.js          # marked + mermaid + 보기/편집 토글 + ReadOnly
 │   │   ├── pen-renderer.js       # .pen JSON → DOM
 │   │   ├── pen-viewer.js         # .pen 모달 (현재 메뉴에선 미사용 — Product Design 이 in-place)
-│   │   └── spec-card.js          # ★ Roles/Skills frontmatter (name/persona/triggers/description/allowed-tools) → 카드
+│   │   ├── spec-card.js          # ★ Roles/Skills frontmatter (name/persona/triggers/description/allowed-tools) → 카드
+│   │   └── bilingual.js          # ★ EN/KO 토글 (getLang / makeLangToggle / t) — Principles, Models, Dashboard 가 공유
 │   └── views/
 │       ├── _common.js            # renderTopBar / renderSubBar / emptyState / loadingState
 │       ├── dashboard.js          # 4 섹션: Recent Updates / PDSA / Build Log / Contributors
@@ -129,6 +130,58 @@ screen.appendChild(createMdViewer({ content: body, readOnly: true, breadcrumb })
 ```
 
 skill.js 도 같은 패턴, 단지 `tag: 'SKILLS 2.0'` 만 다르다.
+
+## Bilingual EN/KO (components/bilingual.js)
+
+영문 기본 + 한국어 토글이 필요한 모든 뷰의 단일 진실 원천. 토글 선택은
+`localStorage['harnessViewLang']` 에 저장되고 `Principles`, `Models`,
+`Dashboard` 가 같은 컴포넌트를 공유한다. 새 뷰가 bilingual 을 지원해야
+하면 같은 패턴을 그대로 따른다.
+
+```js
+import { getLang, makeLangToggle, t } from '../components/bilingual.js';
+
+export async function render(ctx) {
+  let data = null;
+
+  const draw = async () => {
+    if (!data) data = await loadData('mything');
+    const lang = getLang();
+
+    renderTopBar(topbarEl, {
+      title:    t(data.title, lang),
+      subtitle: t(data.subtitle, lang),
+      extra:    makeLangToggle(() => draw()),  // 토글 누르면 같은 draw() 재호출
+    });
+    // ... 모든 텍스트는 t(field, lang) 으로 풀어냄
+  };
+
+  await draw();
+}
+```
+
+데이터 모양:
+- 사람이 쓴 필드 (제목, 본문, 라벨) 는 `{ "en": "...", "ko": "..." }` 객체.
+- `t()` 는 `lang` 을 우선 → 없으면 `en` → 없으면 첫 값 → 없으면 빈 문자열.
+- 그래서 레거시 string-only 필드도 그대로 동작 — 점진적 마이그레이션 안전.
+- 언어 중립 데이터 (git 저자명, ISO 날짜, semver, SHA 등) 는 그냥 string 으로 둠.
+
+하드코딩 UI 라벨 (`'Loading...'`, `'Last 14 days'`, `'No data'` 같은) 은 뷰
+파일 상단의 `T` dict 에 모은 다음 작은 헬퍼로 푸는 패턴이 표준:
+
+```js
+const T = {
+  pageTitle: { en: 'Dashboard', ko: '대시보드' },
+  caption:   { en: (n) => `Last ${n} days`, ko: (n) => `최근 ${n}일` },
+};
+function lbl(entry, lang, ...args) {
+  const v = entry?.[lang] ?? entry?.en;
+  return typeof v === 'function' ? v(...args) : v ?? '';
+}
+// 사용: lbl(T.caption, lang, windowDays)
+```
+
+`Home/harness-view/js/views/dashboard.js` 가 이 패턴의 reference.
 
 ## 컴포넌트 패턴
 

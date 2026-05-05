@@ -1,9 +1,14 @@
 /**
  * Dashboard — three pre-built sections + one auto-aggregated section.
- *  1. Recent Updates           — narrative + best prompts (data/news.json — static)
- *  2. PDSA Learning            — Plan/Do/Solved/Remaining/Learned (data/pdsa-insight.json — static)
+ *  1. Recent Updates           — narrative + best prompts (data/news.json — static, bilingual)
+ *  2. PDSA Learning            — Plan/Do/Solved/Remaining/Learned (data/pdsa-insight.json — static, bilingual)
  *  3. Build Log                — harness/docs/*.md cards, semver-desc (indexes/harness-docs.json)
  *  4. Build-up Contributors    — donut + stat cards (indexes/harness-docs.json.contributors — git log)
+ *
+ * Bilingual: EN default, KO optional. Toggle persists via localStorage
+ * (shared with Principles / Models). Static JSON values use `{ en, ko }`
+ * where translation is human-curated; git-derived data (titles, authors,
+ * paths) stays language-neutral and only the surrounding labels switch.
  *
  * Detail screen (#dashboard/<file>) renders the clicked .md as a read-only viewer.
  */
@@ -11,7 +16,120 @@ import { h, mount, humanize } from '../utils/dom.js';
 import { loadIndex, loadMd, loadData } from '../utils/loader.js';
 import { createMdViewer } from '../components/md-viewer.js';
 import { renderTopBar, emptyState, loadingState } from './_common.js';
+import { getLang, makeLangToggle, t } from '../components/bilingual.js';
 import { ICONS } from '../config/menu.js';
+
+/* UI label dictionary — short hardcoded strings that aren't part of
+ * the JSON content. Anything human-authored in news.json / pdsa-insight.json
+ * goes through `t()` instead. */
+const T = {
+  pageTitle: { en: 'Dashboard', ko: '대시보드' },
+  pageSub:   {
+    en: (base) => `${base} — resource-reference mode (read-only)`,
+    ko: (base) => `${base} — 리소스 참고 모드 (읽기 전용)`,
+  },
+  badgeReference: { en: 'Reference', ko: '참고' },
+  backToList:     { en: '← Back to list', ko: '← 목록으로' },
+  fileLoadError:  { en: 'Could not load file.', ko: '파일을 불러오지 못했습니다.' },
+
+  // News section
+  newsTitle:     { en: 'Recent Updates', ko: '최근 업데이트' },
+  newsSubAsOf:   { en: (d) => `As of ${d} · summary of recent shipped features`,
+                   ko: (d) => `${d} 기준 · 최근 배포된 기능 요약` },
+  newsSubFallback: { en: 'Highlights from recent releases', ko: '최근 릴리즈 하이라이트' },
+  newsMissing:   { en: 'data/news.json is missing.', ko: 'data/news.json 파일이 없습니다.' },
+  bestPrompts:   { en: 'Best Prompt Examples', ko: '추천 프롬프트 예시' },
+  bestPromptsDesc: { en: 'Try these to get a feel for the new features',
+                     ko: '아래 프롬프트로 새 기능을 직접 체험해 보세요' },
+
+  // PDSA section
+  pdsaTitle: { en: 'PDSA Learning', ko: 'PDSA 학습' },
+  pdsaSubInline: { en: '— insights distilled from recent activity',
+                   ko: '— 최근 활동에서 정제된 인사이트' },
+  pdsaSubMeta: {
+    en: (days, n, when) => `${days}-day window · ${n} sources · analyzed ${when}`,
+    ko: (days, n, when) => `${days}일 윈도우 · 소스 ${n}개 · 분석일 ${when}`,
+  },
+  pdsaSubFallback: { en: 'Last 14 days · top 5 entries',
+                     ko: '최근 14일 · 상위 5건' },
+  pdsaMissing: { en: 'data/pdsa-insight.json is missing.',
+                 ko: 'data/pdsa-insight.json 파일이 없습니다.' },
+  pdsaTried:     { en: 'Tried',     ko: '시도' },
+  pdsaSolved:    { en: 'Solved',    ko: '해결' },
+  pdsaRemaining: { en: 'Remaining', ko: '잔여' },
+  pdsaTagPD:     { en: 'P + D',  ko: 'P + D' },
+  pdsaTagDone:   { en: 'DONE',   ko: '완료' },
+  pdsaTagTodo:   { en: 'TODO',   ko: '잔여' },
+  pdsaStudyAct:  { en: 'STUDY + ACT', ko: 'STUDY + ACT' },
+  pdsaLearnedTitle: { en: 'Learned · core insight',
+                      ko: '학습 · 핵심 통찰' },
+
+  // Build Log
+  buildLogTitle: { en: 'Build Log', ko: '빌드 로그' },
+  buildLogSub:   {
+    en: (n, base) => `${n} entries · ${base} · newest first`,
+    ko: (n, base) => `${n}건 · ${base} · 최신순`,
+  },
+  buildLogEmpty: {
+    en: 'No build-log entries yet at harness/docs/.',
+    ko: 'harness/docs/ 에 아직 빌드 로그가 없습니다.',
+  },
+  unknownAuthor: { en: 'unknown', ko: '미상' },
+
+  // Contributors
+  contribTitle: {
+    en: 'Build-up Contributors (Docs commits)',
+    ko: '빌드 기여자 (Docs 커밋)',
+  },
+  contribLastN: { en: (n) => `Last ${n} days`, ko: (n) => `최근 ${n}일` },
+  contribAll:   { en: 'All time', ko: '전체 기간' },
+  contribCaptionRecent: {
+    en: (days, total, n) => `Last ${days} days · ${total} commits · ${n} contributors`,
+    ko: (days, total, n) => `최근 ${days}일 · 커밋 ${total}건 · 기여자 ${n}명`,
+  },
+  contribCaptionAll: {
+    en: (total, n) => `All time · ${total} commits · ${n} contributors`,
+    ko: (total, n) => `전체 기간 · 커밋 ${total}건 · 기여자 ${n}명`,
+  },
+  contribEmptyRecent: {
+    en: (days) => `No Docs commits in the last ${days} days.`,
+    ko: (days) => `최근 ${days}일간 Docs 커밋이 없습니다.`,
+  },
+  contribEmptyAll: {
+    en: 'No contributor data available.',
+    ko: '기여자 데이터가 없습니다.',
+  },
+  contribCommitsLine: {
+    en: (n, pct) => `${n} commits · ${pct}%`,
+    ko: (n, pct) => `커밋 ${n}건 · ${pct}%`,
+  },
+  statTotalDocs:   { en: 'Total docs', ko: '전체 문서 수' },
+  statLatestDoc:   { en: (when) => `Latest doc · ${when}`,
+                     ko: (when) => `최신 문서 · ${when}` },
+  statCommits7d:   { en: 'Commits · last 7 days',  ko: '커밋 · 최근 7일' },
+  statCommits30d:  { en: 'Commits · last 30 days', ko: '커밋 · 최근 30일' },
+  statHeroRecent:  { en: (n) => `Commits · last ${n} days`,
+                     ko: (n) => `커밋 · 최근 ${n}일` },
+  statHeroAll:     { en: 'Commits · all time (Docs scope)',
+                     ko: '커밋 · 전체 기간 (Docs 범위)' },
+  statContribRecent: { en: (n) => `Contributors (last ${n} days)`,
+                       ko: (n) => `기여자 (최근 ${n}일)` },
+  statContribAll:    { en: 'Total contributors', ko: '전체 기여자' },
+  topFilesTitle:   { en: 'Top changed files · last 30 days',
+                     ko: '변경 빈도 상위 파일 · 최근 30일' },
+  topFilesSub:     { en: 'union of harness/, Docs/, Home/harness-view/',
+                     ko: 'harness/, Docs/, Home/harness-view/ 합집합' },
+  donutSub:        { en: 'commits', ko: '커밋' },
+  emDash:          { en: '—', ko: '—' },
+};
+
+/** Resolve a label entry against the active lang. Function values are
+ *  invoked with `args` so call sites can pass interpolation values. */
+function lbl(entry, lang, ...args) {
+  if (entry == null) return '';
+  const v = entry[lang] ?? entry.en;
+  return typeof v === 'function' ? v(...args) : v;
+}
 
 export async function render(ctx) {
   const { viewEl, topbarEl, menu, params } = ctx;
@@ -19,54 +137,64 @@ export async function render(ctx) {
   const index = await loadIndex('harness-docs');
   if (params) return renderDetail(ctx, index, params);
 
-  renderTopBar(topbarEl, {
-    title: 'Dashboard',
-    subtitle: `${index ? index.base : 'harness/docs'} — resource-reference mode (read-only)`,
-    badge: { kind: 'readonly', text: 'Reference' },
-  });
+  let news = null;
+  let pdsa = null;
+  let firstDraw = true;
 
-  mount(viewEl, loadingState());
+  const draw = async () => {
+    const lang = getLang();
+    renderTopBar(topbarEl, {
+      title: lbl(T.pageTitle, lang),
+      subtitle: lbl(T.pageSub, lang, index ? index.base : 'harness/docs'),
+      badge: { kind: 'readonly', text: lbl(T.badgeReference, lang) },
+      extra: makeLangToggle(() => draw()),
+    });
 
-  const [news, pdsa] = await Promise.all([
-    loadData('news'),
-    loadData('pdsa-insight'),
-  ]);
+    if (firstDraw) {
+      mount(viewEl, loadingState());
+      [news, pdsa] = await Promise.all([loadData('news'), loadData('pdsa-insight')]);
+      firstDraw = false;
+    }
 
-  const items = (index?.items || []).slice().sort((a, b) =>
-    a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }) * -1);
-  const contribAll    = index?.contributorsAll    || index?.contributors || [];
-  const contribRecent = index?.contributorsRecent || [];
-  const windowDays    = index?.contributorsWindowDays || 14;
-  const commitStats   = index?.commitStats || null;
-  const topFiles      = index?.topChangedFiles || [];
+    const items = (index?.items || []).slice().sort((a, b) =>
+      a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }) * -1);
+    const contribAll    = index?.contributorsAll    || index?.contributors || [];
+    const contribRecent = index?.contributorsRecent || [];
+    const windowDays    = index?.contributorsWindowDays || 14;
+    const commitStats   = index?.commitStats || null;
+    const topFiles      = index?.topChangedFiles || [];
 
-  const sections = h('div', { class: 'dash-sections' });
-  sections.appendChild(renderNewsSection(news));
-  sections.appendChild(renderPdsaSection(pdsa));
-  sections.appendChild(renderBuildLogSection(menu, items, index));
-  sections.appendChild(renderContribSection({
-    all: contribAll, recent: contribRecent, windowDays, commitStats, topFiles,
-  }, items));
-  mount(viewEl, sections);
+    const sections = h('div', { class: 'dash-sections' });
+    sections.appendChild(renderNewsSection(news, lang));
+    sections.appendChild(renderPdsaSection(pdsa, lang));
+    sections.appendChild(renderBuildLogSection(menu, items, index, lang));
+    sections.appendChild(renderContribSection({
+      all: contribAll, recent: contribRecent, windowDays, commitStats, topFiles,
+    }, items, lang));
+    mount(viewEl, sections);
+  };
+
+  await draw();
 }
 
 /* ────────────────────────────────────────────────
  *  1) Recent Updates
  * ──────────────────────────────────────────────── */
-function renderNewsSection(news) {
+function renderNewsSection(news, lang) {
   const sec = h('section', { class: 'dash-sec news-sec' });
   const head = h('div', { class: 'dash-sec-head' }, [
     h('div', { class: 'dash-sec-title' }, [
       h('span', { class: 'dash-sec-icon tone-blue', html: ICONS.newspaper }),
-      h('span', {}, 'Recent Updates'),
+      h('span', {}, lbl(T.newsTitle, lang)),
     ]),
     h('div', { class: 'dash-sec-sub' },
-      news ? `As of ${news.updatedAt} · summary of recent shipped features` : 'Highlights from recent releases'),
+      news ? lbl(T.newsSubAsOf, lang, news.updatedAt)
+           : lbl(T.newsSubFallback, lang)),
   ]);
   sec.appendChild(head);
 
   if (!news) {
-    sec.appendChild(emptyState('data/news.json is missing.'));
+    sec.appendChild(emptyState(lbl(T.newsMissing, lang)));
     return sec;
   }
 
@@ -74,15 +202,15 @@ function renderNewsSection(news) {
 
   // Left: story
   const story = h('div', { class: 'news-story card-plain' });
-  story.appendChild(h('div', { class: 'news-lead' }, news.headline));
-  story.appendChild(h('p', { class: 'news-narrative' }, news.narrative));
+  story.appendChild(h('div', { class: 'news-lead' }, t(news.headline, lang)));
+  story.appendChild(h('p', { class: 'news-narrative' }, t(news.narrative, lang)));
   if (Array.isArray(news.highlights) && news.highlights.length) {
     const hi = h('div', { class: 'news-highlights' });
     for (const it of news.highlights) {
       const cls = `news-hi tone-${it.tone || 'blue'}`;
       hi.appendChild(h('div', { class: cls }, [
-        h('div', { class: 'hi-label' }, it.label),
-        h('div', { class: 'hi-text' }, it.text),
+        h('div', { class: 'hi-label' }, t(it.label, lang)),
+        h('div', { class: 'hi-text' }, t(it.text, lang)),
       ]));
     }
     story.appendChild(hi);
@@ -93,14 +221,14 @@ function renderNewsSection(news) {
   const prompts = h('div', { class: 'news-prompts card-plain' });
   prompts.appendChild(h('div', { class: 'news-prompts-head' }, [
     h('span', { class: 'dash-sec-icon tone-amber', html: ICONS.sparkles }),
-    h('span', {}, 'Best Prompt Examples'),
+    h('span', {}, lbl(T.bestPrompts, lang)),
   ]));
-  prompts.appendChild(h('div', { class: 'news-prompts-desc' }, 'Try these to get a feel for the new features'));
+  prompts.appendChild(h('div', { class: 'news-prompts-desc' }, lbl(T.bestPromptsDesc, lang)));
   const list = h('div', { class: 'news-prompts-list' });
   for (const p of news.prompts || []) {
     const chip = h('div', { class: 'prompt-chip' });
-    chip.appendChild(h('div', { class: `prompt-tag tone-${p.tone || 'blue'}` }, p.tag));
-    chip.appendChild(h('div', { class: 'prompt-text' }, `"${p.text}"`));
+    chip.appendChild(h('div', { class: `prompt-tag tone-${p.tone || 'blue'}` }, t(p.tag, lang)));
+    chip.appendChild(h('div', { class: 'prompt-text' }, `"${t(p.text, lang)}"`));
     list.appendChild(chip);
   }
   prompts.appendChild(list);
@@ -113,22 +241,23 @@ function renderNewsSection(news) {
 /* ────────────────────────────────────────────────
  *  2) PDSA Learning
  * ──────────────────────────────────────────────── */
-function renderPdsaSection(pdsa) {
+function renderPdsaSection(pdsa, lang) {
   const sec = h('section', { class: 'dash-sec pdsa-sec' });
   const head = h('div', { class: 'dash-sec-head' }, [
     h('div', { class: 'dash-sec-title' }, [
       h('span', { class: 'dash-sec-icon tone-purple', html: ICONS.bulb }),
-      h('span', {}, 'PDSA Learning'),
-      h('span', { class: 'dash-sec-sub-inline' }, '— insights distilled from recent activity'),
+      h('span', {}, lbl(T.pdsaTitle, lang)),
+      h('span', { class: 'dash-sec-sub-inline' }, lbl(T.pdsaSubInline, lang)),
     ]),
     h('div', { class: 'dash-sec-sub' },
-      pdsa ? `${pdsa.windowDays || 14}-day window · ${pdsa.sources?.length || 0} sources · analyzed ${pdsa.analyzedAt}`
-           : 'Last 14 days · top 5 entries'),
+      pdsa
+        ? lbl(T.pdsaSubMeta, lang, pdsa.windowDays || 14, pdsa.sources?.length || 0, pdsa.analyzedAt)
+        : lbl(T.pdsaSubFallback, lang)),
   ]);
   sec.appendChild(head);
 
   if (!pdsa) {
-    sec.appendChild(emptyState('data/pdsa-insight.json is missing.'));
+    sec.appendChild(emptyState(lbl(T.pdsaMissing, lang)));
     return sec;
   }
 
@@ -136,9 +265,10 @@ function renderPdsaSection(pdsa) {
   if (Array.isArray(pdsa.sources) && pdsa.sources.length) {
     const srcBar = h('div', { class: 'pdsa-src-bar' });
     for (const s of pdsa.sources) {
+      const titleStr = t(s.title, lang) || (s.file || '').split('/').pop();
       srcBar.appendChild(h('div', { class: 'pdsa-src-pill', title: s.file || '' }, [
         h('span', { class: 'pdsa-src-date' }, (s.date || '').slice(5)),   // MM-DD
-        h('span', { class: 'pdsa-src-title' }, s.title || (s.file || '').split('/').pop()),
+        h('span', { class: 'pdsa-src-title' }, titleStr),
       ]));
     }
     sec.appendChild(srcBar);
@@ -146,31 +276,33 @@ function renderPdsaSection(pdsa) {
 
   // 3-state cards
   const row = h('div', { class: 'pdsa-row' });
-  row.appendChild(quadrantCard('P + D', 'tone-blue',  'Tried',     pdsa.tried));
-  row.appendChild(quadrantCard('DONE',  'tone-green', 'Solved',    pdsa.solved));
-  row.appendChild(quadrantCard('TODO',  'tone-amber', 'Remaining', pdsa.remaining));
+  row.appendChild(quadrantCard(lbl(T.pdsaTagPD, lang),   'tone-blue',  lbl(T.pdsaTried, lang),     pdsa.tried,     lang));
+  row.appendChild(quadrantCard(lbl(T.pdsaTagDone, lang), 'tone-green', lbl(T.pdsaSolved, lang),    pdsa.solved,    lang));
+  row.appendChild(quadrantCard(lbl(T.pdsaTagTodo, lang), 'tone-amber', lbl(T.pdsaRemaining, lang), pdsa.remaining, lang));
   sec.appendChild(row);
 
   // Learned hero
   const learned = pdsa.learned || {};
+  const leadStr = t(learned.lead, lang) || lbl(T.emDash, lang);
+  const bodyStr = t(learned.body, lang);
   const hero = h('div', { class: 'pdsa-hero' }, [
     h('div', { class: 'pdsa-hero-icon-wrap' }, [
       h('span', { class: 'pdsa-hero-icon', html: ICONS.bulb }),
     ]),
     h('div', { class: 'pdsa-hero-body' }, [
       h('div', { class: 'pdsa-hero-head' }, [
-        h('span', { class: 'pdsa-hero-badge' }, 'STUDY + ACT'),
-        h('span', { class: 'pdsa-hero-title' }, 'Learned · core insight'),
+        h('span', { class: 'pdsa-hero-badge' }, lbl(T.pdsaStudyAct, lang)),
+        h('span', { class: 'pdsa-hero-title' }, lbl(T.pdsaLearnedTitle, lang)),
       ]),
-      h('div', { class: 'pdsa-hero-lead' }, learned.lead || '—'),
-      learned.body ? h('div', { class: 'pdsa-hero-desc' }, learned.body) : null,
+      h('div', { class: 'pdsa-hero-lead' }, leadStr),
+      bodyStr ? h('div', { class: 'pdsa-hero-desc' }, bodyStr) : null,
     ]),
   ]);
   sec.appendChild(hero);
   return sec;
 }
 
-function quadrantCard(tag, toneClass, title, items) {
+function quadrantCard(tag, toneClass, title, items, lang) {
   const list = Array.isArray(items) ? items : [];
   return h('div', { class: 'pdsa-card card-plain' }, [
     h('div', { class: 'pdsa-card-head' }, [
@@ -178,26 +310,27 @@ function quadrantCard(tag, toneClass, title, items) {
       h('span', { class: 'pdsa-card-title' }, title),
       h('span', { class: 'pdsa-card-count' }, String(list.length)),
     ]),
-    h('ul', { class: 'pdsa-card-list' }, list.map(item => h('li', {}, item))),
+    h('ul', { class: 'pdsa-card-list' }, list.map(item => h('li', {}, t(item, lang)))),
   ]);
 }
 
 /* ────────────────────────────────────────────────
  *  3) Build Log — harness/docs/*.md (semver-desc release cards)
  * ──────────────────────────────────────────────── */
-function renderBuildLogSection(menu, items, index) {
+function renderBuildLogSection(menu, items, index, lang) {
   const sec = h('section', { class: 'dash-sec release-sec' });
   const head = h('div', { class: 'dash-sec-head' }, [
     h('div', { class: 'dash-sec-title' }, [
       h('span', { class: 'dash-sec-icon tone-amber', html: ICONS.tag }),
-      h('span', {}, 'Build Log'),
+      h('span', {}, lbl(T.buildLogTitle, lang)),
     ]),
-    h('div', { class: 'dash-sec-sub' }, `${items.length} entries · ${index?.base || 'harness/docs'} · newest first`),
+    h('div', { class: 'dash-sec-sub' },
+      lbl(T.buildLogSub, lang, items.length, index?.base || 'harness/docs')),
   ]);
   sec.appendChild(head);
 
   if (!items.length) {
-    sec.appendChild(emptyState('No build-log entries yet at harness/docs/.'));
+    sec.appendChild(emptyState(lbl(T.buildLogEmpty, lang)));
     return sec;
   }
 
@@ -217,7 +350,7 @@ function renderBuildLogSection(menu, items, index) {
       h('div', { class: 'rc-foot' }, [
         h('span', { class: 'rc-avatar', style: { background: '#9CA3AF' } },
           it.author ? it.author.slice(0, 1).toUpperCase() : '?'),
-        h('span', { class: 'rc-author' }, it.author || 'unknown'),
+        h('span', { class: 'rc-author' }, it.author || lbl(T.unknownAuthor, lang)),
       ]),
     ]);
     grid.appendChild(card);
@@ -238,20 +371,22 @@ function versionKind(title) {
 /* ────────────────────────────────────────────────
  *  4) Build-up Contributors
  * ──────────────────────────────────────────────── */
-function renderContribSection({ all, recent, windowDays, commitStats, topFiles }, items) {
+function renderContribSection({ all, recent, windowDays, commitStats, topFiles }, items, lang) {
   const sec = h('section', { class: 'dash-sec contrib-sec' });
   let mode = 'recent';
 
   const toggle = h('div', { class: 'toggle contrib-toggle' });
-  const btnRecent = h('button', { class: 'active', onclick: () => setMode('recent') }, `Last ${windowDays} days`);
-  const btnAll    = h('button', { onclick: () => setMode('all') }, 'All time');
+  const btnRecent = h('button', { class: 'active', onclick: () => setMode('recent') },
+    lbl(T.contribLastN, lang, windowDays));
+  const btnAll    = h('button', { onclick: () => setMode('all') },
+    lbl(T.contribAll, lang));
   toggle.appendChild(btnRecent);
   toggle.appendChild(btnAll);
 
   const head = h('div', { class: 'dash-sec-head' }, [
     h('div', { class: 'dash-sec-title' }, [
       h('span', { class: 'dash-sec-icon tone-green', html: ICONS.pieChart }),
-      h('span', {}, 'Build-up Contributors (Docs commits)'),
+      h('span', {}, lbl(T.contribTitle, lang)),
     ]),
     toggle,
   ]);
@@ -269,12 +404,16 @@ function renderContribSection({ all, recent, windowDays, commitStats, topFiles }
   // hero stat was technically right but conveyed no growth).
   const totalCommitsCard = h('div', { class: 'stat-card card-plain' });
   stats.appendChild(totalCommitsCard);
-  stats.appendChild(statCard(String(items.length), 'Total docs', 'tone-blue'));
-  stats.appendChild(statCard(latest?.title || '—', `Latest doc · ${latest?.committed || latest?.modified || ''}`, 'tone-purple'));
+  stats.appendChild(statCard(String(items.length), lbl(T.statTotalDocs, lang), 'tone-blue'));
+  stats.appendChild(statCard(
+    latest?.title || lbl(T.emDash, lang),
+    lbl(T.statLatestDoc, lang, latest?.committed || latest?.modified || ''),
+    'tone-purple',
+  ));
   // 7d / 30d activity tiles — only when build supplied them.
   if (commitStats) {
-    stats.appendChild(statCard(String(commitStats.last7d ?? 0),  'Commits · last 7 days',  'tone-amber'));
-    stats.appendChild(statCard(String(commitStats.last30d ?? 0), 'Commits · last 30 days', 'tone-amber'));
+    stats.appendChild(statCard(String(commitStats.last7d ?? 0),  lbl(T.statCommits7d, lang),  'tone-amber'));
+    stats.appendChild(statCard(String(commitStats.last30d ?? 0), lbl(T.statCommits30d, lang), 'tone-amber'));
   }
   // Subordinate "contributors count" card — kept so the original metric
   // is still visible, just no longer the hero.
@@ -288,7 +427,7 @@ function renderContribSection({ all, recent, windowDays, commitStats, topFiles }
   // (single-author projects can't differentiate via the donut). Hidden
   // when build supplied no list or 0 entries.
   if (topFiles && topFiles.length) {
-    sec.appendChild(renderTopFiles(topFiles));
+    sec.appendChild(renderTopFiles(topFiles, lang));
   }
 
   function setMode(next) {
@@ -303,24 +442,24 @@ function renderContribSection({ all, recent, windowDays, commitStats, topFiles }
     const totalCommits = contributors.reduce((s, c) => s + c.commits, 0);
 
     const subLabel = mode === 'recent'
-      ? `Last ${windowDays} days · ${totalCommits} commits · ${contributors.length} contributors`
-      : `All time · ${totalCommits} commits · ${contributors.length} contributors`;
+      ? lbl(T.contribCaptionRecent, lang, windowDays, totalCommits, contributors.length)
+      : lbl(T.contribCaptionAll, lang, totalCommits, contributors.length);
 
     const inner = h('div', { class: 'contrib-donut-inner' });
     if (!contributors.length) {
       inner.appendChild(emptyState(mode === 'recent'
-        ? `No Docs commits in the last ${windowDays} days.`
-        : 'No contributor data available.'));
+        ? lbl(T.contribEmptyRecent, lang, windowDays)
+        : lbl(T.contribEmptyAll, lang)));
     } else {
       const colored = contributors.map((c, i) => ({ ...c, color: contribColor(i) }));
-      inner.appendChild(buildDonut(colored, totalCommits));
+      inner.appendChild(buildDonut(colored, totalCommits, lang));
       const legend = h('div', { class: 'contrib-legend' });
       colored.forEach((c) => {
         legend.appendChild(h('div', { class: 'contrib-leg' }, [
           h('span', { class: 'leg-dot', style: { background: c.color } }),
           h('div', { class: 'leg-info' }, [
             h('div', { class: 'leg-name' }, c.name),
-            h('div', { class: 'leg-det' }, `${c.commits} commits · ${c.percent}%`),
+            h('div', { class: 'leg-det' }, lbl(T.contribCommitsLine, lang, c.commits, c.percent)),
           ]),
         ]));
       });
@@ -339,14 +478,16 @@ function renderContribSection({ all, recent, windowDays, commitStats, topFiles }
       ? totalCommits
       : (commitStats?.totalAllTime ?? totalCommits);
     const heroLabel = mode === 'recent'
-      ? `Commits · last ${windowDays} days`
-      : 'Commits · all time (Docs scope)';
+      ? lbl(T.statHeroRecent, lang, windowDays)
+      : lbl(T.statHeroAll, lang);
     mount(totalCommitsCard,
       h('div', { class: 'stat-val tone-green' }, String(heroCommits)),
       h('div', { class: 'stat-label' }, heroLabel),
     );
 
-    const countLabel = mode === 'recent' ? `Contributors (last ${windowDays} days)` : 'Total contributors';
+    const countLabel = mode === 'recent'
+      ? lbl(T.statContribRecent, lang, windowDays)
+      : lbl(T.statContribAll, lang);
     mount(contribCountCard,
       h('div', { class: 'stat-val tone-blue' }, String(contributors.length)),
       h('div', { class: 'stat-label' }, countLabel),
@@ -357,11 +498,11 @@ function renderContribSection({ all, recent, windowDays, commitStats, topFiles }
   return sec;
 }
 
-function renderTopFiles(topFiles) {
+function renderTopFiles(topFiles, lang) {
   const wrap = h('div', { class: 'contrib-topfiles card-plain' });
   wrap.appendChild(h('div', { class: 'topfiles-head' }, [
-    h('span', { class: 'topfiles-title' }, 'Top changed files · last 30 days'),
-    h('span', { class: 'topfiles-sub' }, 'union of harness/, Docs/, Home/harness-view/'),
+    h('span', { class: 'topfiles-title' }, lbl(T.topFilesTitle, lang)),
+    h('span', { class: 'topfiles-sub' }, lbl(T.topFilesSub, lang)),
   ]));
   const list = h('ul', { class: 'topfiles-list' });
   const max = Math.max(...topFiles.map(f => f.commits), 1);
@@ -390,7 +531,7 @@ function statCard(value, label, toneClass) {
 const CONTRIB_PALETTE = ['#2563EB', '#7C3AED', '#15803D', '#B45309', '#DB2777', '#0891B2', '#CA8A04', '#DC2626'];
 function contribColor(idx) { return CONTRIB_PALETTE[idx % CONTRIB_PALETTE.length]; }
 
-function buildDonut(contributors, total) {
+function buildDonut(contributors, total, lang) {
   const size = 200, stroke = 28, radius = (size - stroke) / 2 - 18, cx = size / 2, cy = size / 2;
   const circ = 2 * Math.PI * radius;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -462,7 +603,7 @@ function buildDonut(contributors, total) {
   labelText.setAttribute('x', cx); labelText.setAttribute('y', cy + 18);
   labelText.setAttribute('text-anchor', 'middle');
   labelText.setAttribute('class', 'donut-sub');
-  labelText.textContent = 'commits';
+  labelText.textContent = lbl(T.donutSub, lang);
   svg.appendChild(labelText);
 
   return svg;
@@ -475,22 +616,23 @@ async function renderDetail(ctx, index, filename) {
   const { viewEl, topbarEl } = ctx;
   const file = decodeURIComponent(filename);
   const base = index?.base || 'Docs';
+  const lang = getLang();
 
   renderTopBar(topbarEl, {
     title: humanize(file),
     subtitle: `${base} / ${file}`,
-    badge: { kind: 'readonly', text: 'Reference' },
+    badge: { kind: 'readonly', text: lbl(T.badgeReference, lang) },
     extra: h('button', {
       class: 'btn',
       onclick: () => { location.hash = '#dashboard'; },
-    }, '← Back to list'),
+    }, lbl(T.backToList, lang)),
   });
 
   mount(viewEl, loadingState());
 
   const content = await loadMd(`${base}/${file}`);
   if (content == null) {
-    mount(viewEl, emptyState('Could not load file.'));
+    mount(viewEl, emptyState(lbl(T.fileLoadError, lang)));
     return;
   }
 
