@@ -1,14 +1,14 @@
 namespace Agent.Common.Llm.Tools;
 
 /// <summary>
-/// Chat-template specifics for one model family. The Tools loop
-/// (<see cref="AgentToolLoop"/>) is otherwise model-agnostic; only the prompt
+/// Chat-template specifics for one model family. The agent loop
+/// (<see cref="LocalAgentLoop"/>) is otherwise model-agnostic; only the prompt
 /// markers and anti-prompts differ between Gemma and Llama-3.x-derived models
 /// (Nemotron Nano).
 ///
 /// Both templates inline the system prompt into the first user turn (rather
 /// than using the model's "system" role). This keeps `FormatFirstTurn` /
-/// `FormatToolResultTurn` in <see cref="AgentToolLoop"/> identical across
+/// `FormatToolResultTurn` in <see cref="LocalAgentLoop"/> identical across
 /// templates and lets the Gemma path stay untouched (Gemma has no system
 /// role anyway).
 /// </summary>

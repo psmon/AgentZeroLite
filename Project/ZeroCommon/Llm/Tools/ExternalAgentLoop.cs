@@ -6,7 +6,7 @@ using Agent.Common.Llm.Providers;
 namespace Agent.Common.Llm.Tools;
 
 /// <summary>
-/// AIMODE tool loop that drives an external OpenAI-compatible provider
+/// AIMODE agent loop that drives an external OpenAI-compatible provider
 /// (Webnori/OpenAI/LMStudio/Ollama) instead of an on-device LLamaSharp model.
 ///
 /// Toolchain stance: <b>Gemma 4 is the standard.</b> We send the same
@@ -24,12 +24,12 @@ namespace Agent.Common.Llm.Tools;
 /// list — REST is stateless so each turn replays the full history. The
 /// provider's context window bounds growth; we don't trim client-side yet.
 /// </summary>
-public sealed class ExternalAgentToolLoop : IAgentToolLoop
+public sealed class ExternalAgentLoop : IAgentLoop
 {
     private readonly ILlmProvider _provider;
     private readonly string _model;
-    private readonly IAgentToolHost _host;
-    private readonly AgentToolLoopOptions _opts;
+    private readonly IAgentToolbelt _host;
+    private readonly AgentLoopOptions _opts;
     private readonly List<LlmMessage> _messages = [];
     private bool _isFirstUserSend = true;
     private int _userSendCount;
@@ -37,23 +37,23 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
 
     public int UserSendCount => _userSendCount;
 
-    public ExternalAgentToolLoop(ILlmProvider provider, string model, IAgentToolHost host,
-        AgentToolLoopOptions? opts = null)
+    public ExternalAgentLoop(ILlmProvider provider, string model, IAgentToolbelt host,
+        AgentLoopOptions? opts = null)
     {
         _provider = provider;
         _model = model;
         _host = host;
-        _opts = opts ?? new AgentToolLoopOptions();
+        _opts = opts ?? new AgentLoopOptions();
     }
 
-    public async Task<AgentToolSession> RunAsync(string userRequest, CancellationToken ct = default)
+    public async Task<AgentLoopRun> RunAsync(string userRequest, CancellationToken ct = default)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(ExternalAgentToolLoop));
+        if (_disposed) throw new ObjectDisposedException(nameof(ExternalAgentLoop));
 
         _userSendCount++;
         var turns = new List<ToolTurn>();
         string? failure = null;
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
 
         // First send seeds the system prompt + tool catalog. Follow-up sends
         // append only the new user request — the system message is already in
@@ -93,7 +93,7 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
             ToolCall call;
             try
             {
-                call = AgentToolLoop.ParseToolCall(rawJson);
+                call = LocalAgentLoop.ParseToolCall(rawJson);
             }
             catch (JsonException ex)
             {
@@ -112,11 +112,11 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
                 var doneMsg = call.Args.TryGetPropertyValue("message", out var m) && m is JsonValue v
                     ? v.GetValue<string>()
                     : "(no message)";
-                return new AgentToolSession(turns, doneMsg, TerminatedCleanly: true, FailureReason: null)
+                return new AgentLoopRun(turns, doneMsg, TerminatedCleanly: true, FailureReason: null)
                     { GuardStats = guards.Snapshot() };
             }
 
-            // Same 2-stage repeat defense as AgentToolLoop. The block message
+            // Same 2-stage repeat defense as LocalAgentLoop. The block message
             // is also fed back through the REST history so the model sees it
             // on the next turn just like any other tool result.
             var blockMsg = guards.CheckRepeat(call, _opts.MaxSameCallRepeats);
@@ -154,7 +154,7 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
                 $"--- TOOL RESULT ---\n{toolResult}\n\n(Reply with the next single JSON tool call. Call \"done\" when satisfied.)"));
         }
 
-        return new AgentToolSession(
+        return new AgentLoopRun(
             turns,
             FinalMessage: failure ?? $"max iterations ({_opts.MaxIterations}) reached without 'done'",
             TerminatedCleanly: false,
@@ -164,14 +164,14 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
 
     /// <summary>
     /// Generates one turn with transient-HTTP retry. Exhausting
-    /// <see cref="AgentToolLoopOptions.MaxLlmRetries"/> turns the next failure
+    /// <see cref="AgentLoopOptions.MaxLlmRetries"/> turns the next failure
     /// into the loop's overall <c>failure</c>; non-transient exceptions bubble
     /// out immediately so we don't burn the budget on permanent errors
     /// (auth, model-not-found, etc.). OperationCanceledException always
     /// propagates.
     /// </summary>
     private async Task<(string? Text, string? Error)> CallProviderWithRetryAsync(
-        int iter, ToolLoopGuards guards, CancellationToken ct)
+        int iter, AgentLoopGuards guards, CancellationToken ct)
     {
         while (true)
         {
@@ -181,7 +181,7 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                if (ToolLoopGuards.IsTransientHttpError(ex)
+                if (AgentLoopGuards.IsTransientHttpError(ex)
                     && guards.TryConsumeLlmRetry(_opts.MaxLlmRetries))
                 {
                     var backoff = guards.CurrentBackoff();
@@ -255,7 +255,7 @@ public sealed class ExternalAgentToolLoop : IAgentToolLoop
         return null;
     }
 
-    // Tool dispatch is deliberately duplicated from AgentToolLoop instead of
+    // Tool dispatch is deliberately duplicated from LocalAgentLoop instead of
     // extracted into a shared helper. The 5-tool switch is small and the two
     // loops have different evolution pressures (local will gain GBNF tweaks;
     // external will gain message-trimming / retry policies) — premature

@@ -121,7 +121,7 @@ Mode 2 — TERMINAL RELAY.
        of what happened in THIS cycle. Do not chain another send.
        The user will say "continue" / "다음" / "응답봐" if they want
        another cycle, OR a peer signal will arrive triggering one
-       automatically. Either way, you'll get a fresh StartReactor and
+       automatically. Either way, you'll get a fresh StartAgentLoop and
        can react then — the KV cache preserves the conversation history.
     7. done — call this after ONE real reply was received. NEVER call
        done while the terminal still shows a thinking indicator.

@@ -1,13 +1,14 @@
 // ───────────────────────────────────────────────────────────
-// AgentReactorActor — AIMODE 추론 FSM
+// AgentLoopActor — AIMODE 추론 FSM (the agent itself)
 //
 // 역할:
-//   1. AgentToolLoop 인스턴스 1개를 lazy로 생성/소유 (LLamaContext 보관)
-//   2. StartReactor 수신 → Idle → Thinking → (Generating) → Acting → Done
-//   3. 각 phase change를 ReactorProgress로 부모(AgentBotActor)에게 푸시
-//   4. CancelReactor / ResetReactorSession 수신 시 깨끗하게 idle/dispose
+//   1. IAgentLoop 인스턴스 1개를 lazy로 생성/소유 (LocalAgentLoop 의 LLamaContext
+//      또는 ExternalAgentLoop 의 messages[] history 보관)
+//   2. StartAgentLoop 수신 → Idle → Thinking → (Generating) → Acting → Done
+//   3. 각 phase change를 AgentLoopProgress 로 부모(AgentBotActor)에게 푸시
+//   4. CancelAgentLoop / ResetAgentLoopMemory 수신 시 깨끗하게 idle/dispose
 //
-// 경로: /user/stage/bot/reactor
+// 경로: /user/stage/bot/loop
 //
 // 분리 이유:
 //   - 이전: AgentBotWindow.OnAiSendAsync가 _aiLoop를 직접 소유하고 UI 스레드에서
@@ -24,17 +25,17 @@ using Agent.Common.Llm.Tools;
 
 namespace Agent.Common.Actors;
 
-public sealed class AgentReactorActor : ReceiveActor
+public sealed class AgentLoopActor : ReceiveActor
 {
     private readonly ILoggingAdapter _log = Context.GetLogger();
-    private readonly ReactorBindings _bindings;
+    private readonly AgentLoopBindings _bindings;
 
-    private IAgentToolLoop? _loop;
+    private IAgentLoop? _loop;
     private CancellationTokenSource? _cts;
     private int _round;
     private long _runStartedAtTicks;
 
-    public AgentReactorActor(ReactorBindings bindings)
+    public AgentLoopActor(AgentLoopBindings bindings)
     {
         _bindings = bindings;
         BecomeIdle();
@@ -51,19 +52,19 @@ public sealed class AgentReactorActor : ReceiveActor
     {
         Become(() =>
         {
-            Receive<StartReactor>(msg =>
+            Receive<StartAgentLoop>(msg =>
             {
                 _runStartedAtTicks = Now();
                 _round = 0;
                 _cts = new CancellationTokenSource();
 
-                // Lazy-create the loop on first turn or after ResetReactorSession.
+                // Lazy-create the loop on first turn or after ResetAgentLoopMemory.
                 // The loop is reused across follow-up sends — Local backend
                 // keeps KV cache + system prompt primed; External backend keeps
                 // the messages[] history primed (same effect, different impl).
                 if (_loop is null)
                 {
-                    var host = _bindings.HostFactory();
+                    var host = _bindings.ToolbeltFactory();
                     var baseOpts = _bindings.OptionsFactory();
                     // Inject actor-mailbox callbacks so the loop's thread-pool
                     // task can post progress events back through Self.Tell —
@@ -75,10 +76,10 @@ public sealed class AgentReactorActor : ReceiveActor
                             Self.Tell(new GenerationProgressInternal(phase, tokens)),
                     };
 
-                    var loop = _bindings.ToolLoopFactory(wired, host);
+                    var loop = _bindings.AgentLoopFactory(wired, host);
                     if (loop is null)
                     {
-                        TellParent(new ReactorResult(
+                        TellParent(new AgentLoopResult(
                             Success: false,
                             FinalMessage: "AI Mode backend not ready. Open Settings → LLM and configure (Local: Load model, External: pick provider/model/key).",
                             TurnCount: 0,
@@ -87,10 +88,10 @@ public sealed class AgentReactorActor : ReceiveActor
                         return;
                     }
                     _loop = loop;
-                    _log.Info("[Reactor] Loop created (impl={0})", loop.GetType().Name);
+                    _log.Info("[AgentLoop] Created (impl={0})", loop.GetType().Name);
                 }
 
-                TellParent(new ReactorProgress(ReactorPhase.Thinking,
+                TellParent(new AgentLoopProgress(AgentLoopPhase.Thinking,
                     "thinking…", _round));
 
                 // Drive the loop on the thread pool, PipeTo back into our
@@ -102,8 +103,8 @@ public sealed class AgentReactorActor : ReceiveActor
                 {
                     try
                     {
-                        var session = await loopRef.RunAsync(userRequest, ctsRef.Token);
-                        return (object)new RunCompletedInternal(session);
+                        var run = await loopRef.RunAsync(userRequest, ctsRef.Token);
+                        return (object)new RunCompletedInternal(run);
                     }
                     catch (OperationCanceledException)
                     {
@@ -118,14 +119,14 @@ public sealed class AgentReactorActor : ReceiveActor
                 BecomeRunning();
             });
 
-            Receive<CancelReactor>(_ =>
+            Receive<CancelAgentLoop>(_ =>
             {
-                _log.Info("[Reactor] Cancel received in Idle (no-op)");
+                _log.Info("[AgentLoop] Cancel received in Idle (no-op)");
             });
 
-            Receive<ResetReactorSession>(_ => DisposeLoopAndIdle("reset (idle)"));
+            Receive<ResetAgentLoopMemory>(_ => DisposeLoopAndIdle("reset (idle)"));
 
-            Receive<Ping>(_ => Sender.Tell(new Pong("Reactor", Self.Path.ToString(),
+            Receive<Ping>(_ => Sender.Tell(new Pong("AgentLoop", Self.Path.ToString(),
                 $"Idle, loopActive={_loop is not null}")));
         });
     }
@@ -136,8 +137,8 @@ public sealed class AgentReactorActor : ReceiveActor
         {
             Receive<GenerationProgressInternal>(msg =>
             {
-                TellParent(new ReactorProgress(
-                    ReactorPhase.Generating,
+                TellParent(new AgentLoopProgress(
+                    AgentLoopPhase.Generating,
                     msg.Phase,
                     _round) { Tokens = msg.Tokens });
             });
@@ -145,12 +146,12 @@ public sealed class AgentReactorActor : ReceiveActor
             Receive<TurnCompletedInternal>(msg =>
             {
                 _round++;
-                var info = new ReactorToolCallInfo(
+                var info = new AgentLoopToolCallInfo(
                     Tool: msg.Turn.Call.Tool,
                     ArgsJson: msg.Turn.Call.Args.ToJsonString(),
                     Result: msg.Turn.ToolResult);
-                TellParent(new ReactorProgress(
-                    ReactorPhase.Acting,
+                TellParent(new AgentLoopProgress(
+                    AgentLoopPhase.Acting,
                     msg.Turn.Call.Tool,
                     _round) { ToolCall = info });
             });
@@ -158,26 +159,26 @@ public sealed class AgentReactorActor : ReceiveActor
             Receive<RunCompletedInternal>(msg =>
             {
                 var elapsed = ElapsedMsSinceStart();
-                if (msg.Session.TerminatedCleanly)
+                if (msg.Run.TerminatedCleanly)
                 {
-                    TellParent(new ReactorProgress(ReactorPhase.Done,
-                        msg.Session.FinalMessage, _round));
-                    TellParent(new ReactorResult(
+                    TellParent(new AgentLoopProgress(AgentLoopPhase.Done,
+                        msg.Run.FinalMessage, _round));
+                    TellParent(new AgentLoopResult(
                         Success: true,
-                        FinalMessage: msg.Session.FinalMessage,
-                        TurnCount: msg.Session.TurnCount,
+                        FinalMessage: msg.Run.FinalMessage,
+                        TurnCount: msg.Run.TurnCount,
                         ElapsedMs: elapsed));
                 }
                 else
                 {
-                    TellParent(new ReactorProgress(ReactorPhase.Error,
-                        msg.Session.FailureReason ?? msg.Session.FinalMessage, _round));
-                    TellParent(new ReactorResult(
+                    TellParent(new AgentLoopProgress(AgentLoopPhase.Error,
+                        msg.Run.FailureReason ?? msg.Run.FinalMessage, _round));
+                    TellParent(new AgentLoopResult(
                         Success: false,
-                        FinalMessage: msg.Session.FinalMessage,
-                        TurnCount: msg.Session.TurnCount,
+                        FinalMessage: msg.Run.FinalMessage,
+                        TurnCount: msg.Run.TurnCount,
                         ElapsedMs: elapsed,
-                        FailureReason: msg.Session.FailureReason));
+                        FailureReason: msg.Run.FailureReason));
                 }
                 BecomeIdle();
             });
@@ -185,8 +186,8 @@ public sealed class AgentReactorActor : ReceiveActor
             Receive<RunFailedInternal>(msg =>
             {
                 var elapsed = ElapsedMsSinceStart();
-                TellParent(new ReactorProgress(ReactorPhase.Error, msg.Error, _round));
-                TellParent(new ReactorResult(
+                TellParent(new AgentLoopProgress(AgentLoopPhase.Error, msg.Error, _round));
+                TellParent(new AgentLoopResult(
                     Success: false,
                     FinalMessage: $"⚠ {msg.Error}",
                     TurnCount: _round,
@@ -195,32 +196,32 @@ public sealed class AgentReactorActor : ReceiveActor
                 BecomeIdle();
             });
 
-            Receive<CancelReactor>(_ =>
+            Receive<CancelAgentLoop>(_ =>
             {
-                _log.Info("[Reactor] Cancel received in Running");
+                _log.Info("[AgentLoop] Cancel received in Running");
                 try { _cts?.Cancel(); } catch { }
                 // The PipeTo'd Run task will complete with RunFailedInternal
                 // and tip us back to Idle naturally — don't BecomeIdle here.
             });
 
-            Receive<ResetReactorSession>(_ =>
+            Receive<ResetAgentLoopMemory>(_ =>
             {
                 // User asked for a fresh session mid-run: cancel current and
-                // dispose the loop. Next StartReactor recreates from scratch.
+                // dispose the loop. Next StartAgentLoop recreates from scratch.
                 try { _cts?.Cancel(); } catch { }
                 DisposeLoopAndIdle("reset (running)");
             });
 
-            Receive<StartReactor>(_ =>
+            Receive<StartAgentLoop>(_ =>
             {
-                // Defensive: a second StartReactor while running is a UI bug.
+                // Defensive: a second StartAgentLoop while running is a UI bug.
                 // Tell parent + ignore so we don't double-run on one context.
-                _log.Warning("[Reactor] StartReactor received while running — ignored");
-                TellParent(new ReactorProgress(ReactorPhase.Generating,
+                _log.Warning("[AgentLoop] StartAgentLoop received while running — ignored");
+                TellParent(new AgentLoopProgress(AgentLoopPhase.Generating,
                     "(busy, request ignored)", _round));
             });
 
-            Receive<Ping>(_ => Sender.Tell(new Pong("Reactor", Self.Path.ToString(),
+            Receive<Ping>(_ => Sender.Tell(new Pong("AgentLoop", Self.Path.ToString(),
                 $"Running round={_round}")));
         });
     }
@@ -239,7 +240,7 @@ public sealed class AgentReactorActor : ReceiveActor
                 try { await loop.DisposeAsync(); }
                 catch { /* finalizer is the backstop */ }
             });
-            _log.Info("[Reactor] Loop disposed ({0})", reason);
+            _log.Info("[AgentLoop] Disposed ({0})", reason);
         }
         try { _cts?.Cancel(); } catch { }
         _cts = null;
@@ -255,6 +256,6 @@ public sealed class AgentReactorActor : ReceiveActor
     // ─── Internal mailbox messages (PipeTo / Self.Tell only) ───
     private sealed record GenerationProgressInternal(string Phase, int Tokens);
     private sealed record TurnCompletedInternal(ToolTurn Turn);
-    private sealed record RunCompletedInternal(AgentToolSession Session);
+    private sealed record RunCompletedInternal(AgentLoopRun Run);
     private sealed record RunFailedInternal(string Error);
 }

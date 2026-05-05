@@ -4,12 +4,13 @@ namespace Agent.Common.Llm.Tools;
 
 /// <summary>
 /// Side-effect surface that a tool-using LLM (Gemma 4 / Nemotron Nano) acts
-/// against. The on-device model emits structured tool calls; the host executes
-/// them. Real implementation talks to the workspace + terminal actor topology;
-/// the test implementation (<see cref="MockAgentToolHost"/>) records calls and
-/// returns scripted results so the LLM behavior can be verified deterministically.
+/// against — the agent's "toolbelt". The on-device model emits structured
+/// tool calls; the toolbelt executes them. Real implementation talks to the
+/// workspace + terminal actor topology; the test implementation
+/// (<see cref="MockAgentToolbelt"/>) records calls and returns scripted
+/// results so the LLM behavior can be verified deterministically.
 /// </summary>
-public interface IAgentToolHost
+public interface IAgentToolbelt
 {
     /// <summary>
     /// Returns the catalog of terminal groups and tabs as a compact JSON string,
@@ -43,14 +44,15 @@ public interface IAgentToolHost
 public sealed record ToolCall(string Tool, JsonObject Args);
 
 /// <summary>
-/// One full request → tool-call → result cycle inside a session.
+/// One full request → tool-call → result cycle inside an agent loop run.
 /// </summary>
 public sealed record ToolTurn(ToolCall Call, string ToolResult);
 
 /// <summary>
-/// Outcome of running an <see cref="AgentToolLoop"/> session.
+/// Outcome of one <see cref="IAgentLoop.RunAsync"/> execution — turns,
+/// final user-visible message, and termination metadata.
 /// </summary>
-public sealed record AgentToolSession(
+public sealed record AgentLoopRun(
     IReadOnlyList<ToolTurn> Turns,
     string FinalMessage,
     bool TerminatedCleanly,
@@ -59,7 +61,7 @@ public sealed record AgentToolSession(
     public int TurnCount => Turns.Count;
 
     /// <summary>
-    /// Guard activity over the session — non-zero values mean the loop hit
+    /// Guard activity over the run — non-zero values mean the loop hit
     /// repeat-blocks or transient-retry budgets. Defaults to <see cref="GuardStats.Empty"/>
     /// so callers from before the guard rollout keep compiling.
     /// </summary>

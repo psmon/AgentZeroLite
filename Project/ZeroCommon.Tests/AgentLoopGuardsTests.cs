@@ -6,13 +6,13 @@ using Agent.Common.Llm.Tools;
 namespace ZeroCommon.Tests;
 
 /// <summary>
-/// CPU-only unit tests for the shared <see cref="ToolLoopGuards"/> helper.
+/// CPU-only unit tests for the shared <see cref="AgentLoopGuards"/> helper.
 /// These don't need a model on disk — the guard logic is pure state machine
 /// over <see cref="ToolCall"/> values, so we drive it with synthetic calls.
 /// The two integration tests at the bottom verify the LLM-side semantics
 /// (block message format, hard-stop reason) without binding to a real model.
 /// </summary>
-public sealed class ToolLoopGuardsTests
+public sealed class AgentLoopGuardsTests
 {
     // ─────────────────────────────────────────────────────────────────────
     // Repeat detection
@@ -21,7 +21,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void CheckRepeat_allows_calls_under_the_cap()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var call = MakeCall("read_terminal", "{\"group\":0,\"tab\":0}");
 
         Assert.Null(guards.CheckRepeat(call, maxSameCallRepeats: 3));
@@ -33,7 +33,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void CheckRepeat_blocks_on_overflow_and_message_includes_call_signature()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var call = MakeCall("read_terminal", "{\"group\":0,\"tab\":0}");
 
         for (var i = 0; i < 3; i++)
@@ -50,7 +50,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void CheckRepeat_with_different_args_does_not_count_against_each_other()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var a = MakeCall("read_terminal", "{\"group\":0,\"tab\":0}");
         var b = MakeCall("read_terminal", "{\"group\":1,\"tab\":2}");
 
@@ -66,7 +66,7 @@ public sealed class ToolLoopGuardsTests
         // Origin's known weakness: {"a":1,"b":2} ≠ {"b":2,"a":1} as raw strings.
         // Lite normalization (sorted keys) closes this loophole — the model
         // can't bypass the guard by reordering args.
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var first = MakeCall("send_to_terminal",
             "{\"group\":0,\"tab\":0,\"text\":\"hi\"}");
         var reordered = MakeCall("send_to_terminal",
@@ -89,8 +89,8 @@ public sealed class ToolLoopGuardsTests
         var a = JsonNode.Parse("{\"b\":2,\"a\":1}")!.AsObject();
         var b = JsonNode.Parse("{\"a\":1,\"b\":2}")!.AsObject();
 
-        Assert.Equal(ToolLoopGuards.NormalizeArgsJson(a),
-                     ToolLoopGuards.NormalizeArgsJson(b));
+        Assert.Equal(AgentLoopGuards.NormalizeArgsJson(a),
+                     AgentLoopGuards.NormalizeArgsJson(b));
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void ShouldHardStop_fires_only_after_uninterrupted_block_streak()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var spam = MakeCall("read_terminal", "{\"group\":0,\"tab\":0}");
 
         // Prime: 3 allowed + 1 blocked = streak 1
@@ -118,7 +118,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void Different_call_in_between_resets_consecutive_streak()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var spam = MakeCall("read_terminal", "{\"group\":0,\"tab\":0}");
         var other = MakeCall("list_terminals", "{}");
 
@@ -140,7 +140,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void TryConsumeLlmRetry_caps_at_budget()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         Assert.True(guards.TryConsumeLlmRetry(2));
         Assert.True(guards.TryConsumeLlmRetry(2));
         Assert.False(guards.TryConsumeLlmRetry(2));
@@ -150,7 +150,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void CurrentBackoff_grows_linearly_per_consumed_retry()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         Assert.Equal(TimeSpan.Zero, guards.CurrentBackoff());
 
         guards.TryConsumeLlmRetry(5);
@@ -176,7 +176,7 @@ public sealed class ToolLoopGuardsTests
     public void IsTransientHttpError_typed_status_codes(HttpStatusCode code)
     {
         var ex = new HttpRequestException("upstream blip", inner: null, statusCode: code);
-        Assert.True(ToolLoopGuards.IsTransientHttpError(ex));
+        Assert.True(AgentLoopGuards.IsTransientHttpError(ex));
     }
 
     [Theory]
@@ -186,7 +186,7 @@ public sealed class ToolLoopGuardsTests
     public void IsTransientHttpError_rejects_permanent_status_codes(HttpStatusCode code)
     {
         var ex = new HttpRequestException("nope", inner: null, statusCode: code);
-        Assert.False(ToolLoopGuards.IsTransientHttpError(ex));
+        Assert.False(AgentLoopGuards.IsTransientHttpError(ex));
     }
 
     [Theory]
@@ -196,13 +196,13 @@ public sealed class ToolLoopGuardsTests
     [InlineData("Gateway Time-out")]
     public void IsTransientHttpError_message_keyword_fallback(string message)
     {
-        Assert.True(ToolLoopGuards.IsTransientHttpError(new InvalidOperationException(message)));
+        Assert.True(AgentLoopGuards.IsTransientHttpError(new InvalidOperationException(message)));
     }
 
     [Fact]
     public void IsTransientHttpError_rejects_unrelated_messages()
     {
-        Assert.False(ToolLoopGuards.IsTransientHttpError(
+        Assert.False(AgentLoopGuards.IsTransientHttpError(
             new InvalidOperationException("malformed prompt")));
     }
 
@@ -213,7 +213,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void Block_message_includes_recent_attempt_summary_for_self_correction()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var read = MakeCall("read_terminal", "{\"group\":0,\"tab\":0}");
         var list = MakeCall("list_terminals", "{}");
 
@@ -240,7 +240,7 @@ public sealed class ToolLoopGuardsTests
     [Fact]
     public void Snapshot_reflects_session_activity_for_telemetry()
     {
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
         var spam = MakeCall("read_terminal", "{}");
         for (var i = 0; i < 5; i++) guards.CheckRepeat(spam, 3);
 

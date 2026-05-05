@@ -9,12 +9,12 @@ using LLama.Sampling;
 namespace Agent.Common.Llm.Tools;
 
 /// <summary>
-/// Drives an on-device LLM through a multi-turn tool-calling session against
-/// an <see cref="IAgentToolHost"/>. Output is constrained at the sampler
-/// level by <see cref="AgentToolGrammar.Gbnf"/> so every turn produces
-/// parseable JSON; the loop dispatches to the host, appends the result to
+/// Drives an on-device LLM through a multi-turn agent loop against an
+/// <see cref="IAgentToolbelt"/>. Output is constrained at the sampler level
+/// by <see cref="AgentToolGrammar.Gbnf"/> so every turn produces parseable
+/// JSON; the loop dispatches to the toolbelt, appends the result to
 /// context, and continues until the model emits <c>done</c> or
-/// <see cref="AgentToolLoopOptions.MaxIterations"/> is reached.
+/// <see cref="AgentLoopOptions.MaxIterations"/> is reached.
 ///
 /// Model-family specifics (chat markers, anti-prompts) live in
 /// <see cref="ChatTemplate"/>. The constructor takes the template; default is
@@ -22,14 +22,14 @@ namespace Agent.Common.Llm.Tools;
 /// class was Gemma-only). Pass <see cref="ChatTemplates.Llama31"/> for
 /// Nemotron Nano. Per CLAUDE.md "no premature abstractions" we keep this
 /// single class with template injection rather than splitting into
-/// <c>GemmaAgentToolLoop</c> + <c>NemotronAgentToolLoop</c> — the divergence
-/// is small (markers + anti-prompts only).
+/// <c>GemmaLocalAgentLoop</c> + <c>NemotronLocalAgentLoop</c> — the
+/// divergence is small (markers + anti-prompts only).
 /// </summary>
-public sealed class AgentToolLoop : IAgentToolLoop
+public sealed class LocalAgentLoop : IAgentLoop
 {
     private readonly LlamaSharpLocalLlm _llm;
-    private readonly IAgentToolHost _host;
-    private readonly AgentToolLoopOptions _opts;
+    private readonly IAgentToolbelt _host;
+    private readonly AgentLoopOptions _opts;
     private readonly ChatTemplate _template;
     private readonly LLamaContext _context;
     private readonly InteractiveExecutor _executor;
@@ -42,15 +42,15 @@ public sealed class AgentToolLoop : IAgentToolLoop
     /// <summary>Number of user sends dispatched into this loop.</summary>
     public int UserSendCount => _userSendCount;
 
-    public AgentToolLoop(
+    public LocalAgentLoop(
         LlamaSharpLocalLlm llm,
-        IAgentToolHost host,
-        AgentToolLoopOptions? opts = null,
+        IAgentToolbelt host,
+        AgentLoopOptions? opts = null,
         ChatTemplate? template = null)
     {
         _llm = llm;
         _host = host;
-        _opts = opts ?? new AgentToolLoopOptions();
+        _opts = opts ?? new AgentLoopOptions();
         _template = template ?? ChatTemplates.Gemma;
         var (weights, modelParams) = llm.GetInternals();
         _context = weights.CreateContext(modelParams);
@@ -59,18 +59,18 @@ public sealed class AgentToolLoop : IAgentToolLoop
     }
 
     /// <summary>
-    /// Runs the tool loop for the given user request. Returns when the model
-    /// calls <c>done</c>, when iterations are exhausted, or when the host
-    /// throws.
+    /// Runs the agent loop for the given user request. Returns when the
+    /// model calls <c>done</c>, when iterations are exhausted, or when the
+    /// toolbelt throws.
     /// </summary>
-    public async Task<AgentToolSession> RunAsync(string userRequest, CancellationToken ct = default)
+    public async Task<AgentLoopRun> RunAsync(string userRequest, CancellationToken ct = default)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(AgentToolLoop));
+        if (_disposed) throw new ObjectDisposedException(nameof(LocalAgentLoop));
 
         _userSendCount++;
         var turns = new List<ToolTurn>();
         string? failure = null;
-        var guards = new ToolLoopGuards();
+        var guards = new AgentLoopGuards();
 
         for (var iter = 0; iter < _opts.MaxIterations; iter++)
         {
@@ -118,7 +118,7 @@ public sealed class AgentToolLoop : IAgentToolLoop
                 var doneMsg = call.Args.TryGetPropertyValue("message", out var m) && m is JsonValue v
                     ? v.GetValue<string>()
                     : "(no message)";
-                return new AgentToolSession(turns, doneMsg, TerminatedCleanly: true, FailureReason: null)
+                return new AgentLoopRun(turns, doneMsg, TerminatedCleanly: true, FailureReason: null)
                     { GuardStats = guards.Snapshot() };
             }
 
@@ -159,7 +159,7 @@ public sealed class AgentToolLoop : IAgentToolLoop
             try { _opts.OnTurnCompleted?.Invoke(turn); } catch { /* UI errors must not break the loop */ }
         }
 
-        return new AgentToolSession(
+        return new AgentLoopRun(
             turns,
             FinalMessage: failure ?? $"max iterations ({_opts.MaxIterations}) reached without 'done'",
             TerminatedCleanly: false,
@@ -321,7 +321,7 @@ public sealed class AgentToolLoop : IAgentToolLoop
     }
 }
 
-public sealed record AgentToolLoopOptions
+public sealed record AgentLoopOptions
 {
     /// <summary>
     /// Max model turns before the loop gives up without seeing <c>done</c>.
@@ -406,7 +406,7 @@ public sealed record AgentToolLoopOptions
     /// How many transient HTTP errors (502/503/504/408/429/timeout/etc.) a
     /// REST-backed loop may absorb before declaring the iteration failed.
     /// Local LLamaSharp loops never trip this — the field exists on the
-    /// shared options record because both backends share <see cref="ToolLoopGuards"/>.
+    /// shared options record because both backends share <see cref="AgentLoopGuards"/>.
     /// </summary>
     public int MaxLlmRetries { get; init; } = 1;
 }

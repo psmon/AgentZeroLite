@@ -13,7 +13,7 @@ namespace ZeroCommon.Tests;
 /// Sanity probes for the recently-added Nemotron Nano 8B v1 GGUF — verifies
 /// that the model loads in our LLamaSharp 0.26 + llama.cpp commit
 /// 3f7c29d stack and produces a token. Run BEFORE writing the
-/// NemotronAgentToolLoop backend so we don't sink time into a backend that
+/// NemotronAgentLoop backend so we don't sink time into a backend that
 /// can't even load.
 ///
 /// Same Skip-if-no-model gating pattern as LlamaSharpLocalChatSessionTests.
@@ -61,7 +61,7 @@ public sealed class NemotronProbeTests
 
     /// <summary>
     /// Bare-minimum proof of life: load Nemotron, ask for one word, get one
-    /// word back. If this fails, AgentToolLoop work for Nemotron is blocked
+    /// word back. If this fails, LocalAgentLoop work for Nemotron is blocked
     /// until the load issue is resolved (could be llama.cpp commit support
     /// gap, GGUF format issue, etc.).
     /// </summary>
@@ -118,7 +118,7 @@ public sealed class NemotronProbeTests
     /// `&lt;|python_tag|&gt;...&lt;|eom_id|&gt;` envelope. The survey's
     /// "Native primary" prediction does NOT hold for this GGUF/commit.
     /// Decision: route Nemotron through GBNF too (same as Gemma) — which is
-    /// what the existing AgentToolLoop already does via the Llama31 chat
+    /// what the existing LocalAgentLoop already does via the Llama31 chat
     /// template injection. NativeToolBackend implementation deferred until
     /// either Nano-9B-v2 lands or a future llama.cpp commit changes the
     /// tokenizer behaviour for these tokens.

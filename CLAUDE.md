@@ -54,13 +54,18 @@ Two C# projects with a strict dependency rule: **`AgentZeroWpf → ZeroCommon`, 
 All message types live in one file: `Project/ZeroCommon/Actors/Messages.cs`. The hierarchy is:
 
 ```
-/user/stage                       StageActor     — supervisor + message broker
-    /bot                          AgentBotActor  — 0 or 1; routes UserInput to active terminal
-    /ws-<name>                    WorkspaceActor — one per workspace (folder)
-        /term-<id>                TerminalActor  — wraps one ITerminalSession
+/user/stage                       StageActor      — supervisor + message broker
+    /bot                          AgentBotActor   — UI gateway: chat/key mode, peer routing,
+                                                    intro tracking. Spawns AgentLoopActor lazily.
+        /loop                     AgentLoopActor  — THE agent: owns one IAgentLoop, drives
+                                                    Idle→Thinking→Generating→Acting→Done FSM.
+    /ws-<name>                    WorkspaceActor  — one per workspace (folder)
+        /term-<id>                TerminalActor   — wraps one ITerminalSession
 ```
 
 `ITerminalSession` (`Project/ZeroCommon/Services/ITerminalSession.cs`) is the seam between actors (logic, testable) and `ConPtyTerminalSession` (WPF-side, in `AgentZeroWpf/Services/`). Actor-layer code must not import WPF; if you need to reach the UI, go through `AgentEventStream` / `SetBotUiCallback`.
+
+**Agent vocabulary (M0013)** — the agent loop layer (`Project/ZeroCommon/Llm/Tools/`) uses canonical "agent loop" naming aligned with the Anthropic *Building effective agents* post + Claude Agent SDK: `IAgentLoop` (backend-agnostic contract), `LocalAgentLoop` / `ExternalAgentLoop` (LLamaSharp+GBNF / OpenAI-compat REST), `IAgentToolbelt` (side-effect surface), `AgentLoopRun` (one RunAsync result), `AgentLoopGuards` (repeat / hard-stop / transient-retry defenses). The actor wraps one `IAgentLoop` per session — **`AgentBotActor` is the UI gateway, `AgentLoopActor` is the agent**. Full vocabulary table at `harness/knowledge/_shared/agent-architecture.md`.
 
 Actor names sometimes contain user input (workspace names, terminal IDs). Route them through `ActorNameSanitizer` before constructing paths — Akka rejects characters like `/`, `:`, spaces.
 

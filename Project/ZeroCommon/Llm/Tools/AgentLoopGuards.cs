@@ -5,10 +5,10 @@ using System.Text.Json.Nodes;
 namespace Agent.Common.Llm.Tools;
 
 /// <summary>
-/// Defends a tool loop against pathological LLM behavior. Owned by one
-/// <see cref="AgentToolLoop"/> or <see cref="ExternalAgentToolLoop"/> session
-/// — never shared across loops because state (call counts, recent attempts)
-/// is per-session.
+/// Defends an agent loop against pathological LLM behavior. Owned by one
+/// <see cref="LocalAgentLoop"/> or <see cref="ExternalAgentLoop"/> run —
+/// never shared across loops because state (call counts, recent attempts)
+/// is per-run.
 ///
 /// Three concerns:
 /// <list type="number">
@@ -28,7 +28,7 @@ namespace Agent.Common.Llm.Tools;
 /// <c>{"a":1,"b":2}</c> and <c>{"b":2,"a":1}</c> hit the same counter —
 /// closes a known loophole in Origin's raw-string keying.
 /// </summary>
-public sealed class ToolLoopGuards
+public sealed class AgentLoopGuards
 {
     private const int RecentBufferSize = 5;
     private const int RecentArgsTruncate = 60;
@@ -178,8 +178,8 @@ public sealed class ToolLoopGuards
 }
 
 /// <summary>
-/// Snapshot of guard activity at session end. Surfaced via
-/// <see cref="AgentToolSession.GuardStats"/> so operators can correlate
+/// Snapshot of guard activity at run end. Surfaced via
+/// <see cref="AgentLoopRun.GuardStats"/> so operators can correlate
 /// false-positive rates with model/prompt changes without re-instrumenting.
 /// </summary>
 public sealed record GuardStats(int BlockedRepeats, int LlmRetries)

@@ -33,16 +33,22 @@ public sealed class LlmRuntimeSettings
     public int MaxTokens { get; set; } = 256;
 
     /// <summary>
-    /// PER-TURN cap for the AIMODE tool-call loop (AgentToolLoop). Distinct
-    /// from <see cref="MaxTokens"/> which sizes the TestBot's free-form
-    /// answer length. AIMODE turns ship a single JSON tool envelope, but
-    /// the `done` summary can be long when relayed across terminals — and
-    /// the GBNF root rule ends with a trailing `ws*` so an undersized cap
-    /// truncates valid JSON mid-string. 2048 fits any realistic envelope
-    /// (including long Korean summaries with embedded quotes) while bounding
-    /// the trailing-whitespace stall to ~10-20s on CPU. Lower it only if
-    /// you observe slow per-turn completion that hits the ceiling.
+    /// PER-TURN cap for the AIMODE agent loop's tool-call generation
+    /// (<see cref="Agent.Common.Llm.Tools.LocalAgentLoop"/>). Distinct from
+    /// <see cref="MaxTokens"/> which sizes the TestBot's free-form answer
+    /// length. AIMODE turns ship a single JSON tool envelope, but the `done`
+    /// summary can be long when relayed across terminals — and the GBNF
+    /// root rule ends with a trailing `ws*` so an undersized cap truncates
+    /// valid JSON mid-string. 2048 fits any realistic envelope (including
+    /// long Korean summaries with embedded quotes) while bounding the
+    /// trailing-whitespace stall to ~10-20s on CPU. Lower it only if you
+    /// observe slow per-turn completion that hits the ceiling.
     /// </summary>
+    /// <remarks>
+    /// Field name kept as <c>AgentToolLoopMaxTokens</c> (not renamed to
+    /// <c>AgentLoopMaxTokens</c>) for JSON-persistence backward compat —
+    /// existing users have this key in their settings file.
+    /// </remarks>
     public int AgentToolLoopMaxTokens { get; set; } = 2048;
 
     public float Temperature { get; set; } = 0.7f;

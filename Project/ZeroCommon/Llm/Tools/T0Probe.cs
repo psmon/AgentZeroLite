@@ -12,9 +12,9 @@ namespace Agent.Common.Llm.Tools;
 /// (Llama-3.1 → <c>&lt;|python_tag|&gt;</c> / <c>&lt;|eom_id|&gt;</c>;
 /// Gemma → none expected). The result tells the dual-backend strategy
 /// whether <c>NativeToolBackend</c> is viable for the loaded model or whether
-/// the loop must route through <see cref="AgentToolLoop"/> (GBNF).
+/// the loop must route through <see cref="LocalAgentLoop"/> (GBNF).
 ///
-/// Unlike <see cref="AgentToolLoop"/> this probe is intentionally
+/// Unlike <see cref="LocalAgentLoop"/> this probe is intentionally
 /// grammar-free — that is the entire point of the test. It is also single
 /// turn and stateless (uses <see cref="StatelessExecutor"/> directly), so it
 /// can run cheaply in the test harness alongside the model load already
@@ -83,7 +83,7 @@ public static class T0Probe
             DetectedMarkers: detected,
             Recommendation: nativeViable
                 ? $"NativeToolBackend viable for '{template.FamilyId}'."
-                : $"Use AgentToolLoop (GBNF) for '{template.FamilyId}' — model does not emit native tool tokens.");
+                : $"Use LocalAgentLoop (GBNF) for '{template.FamilyId}' — model does not emit native tool tokens.");
     }
 
     private static string BuildPrompt(ChatTemplate template) => template.FamilyId switch

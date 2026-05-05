@@ -24,15 +24,15 @@ public partial class AgentBotWindow : Window
     private readonly Func<IReadOnlyList<Module.CliGroupInfo>>? _getGroups;
 
     // ── AIMODE state ──
-    // Inference itself lives in AgentReactorActor at /user/stage/bot/reactor.
+    // Inference itself lives in AgentLoopActor at /user/stage/bot/loop.
     // The window only owns the UI-side bookkeeping needed to:
     //   - guard against double-sends while a turn is in flight,
     //   - track the per-send stopwatch for the "X turns in Yms" footer,
     //   - remember which model/template the active session uses for labels.
     private bool _aiSendInFlight;
     private System.Diagnostics.Stopwatch? _aiSendStopwatch;
-    private string? _aiActiveChatFamily;     // "gemma" / "llama31" — for bubble label
-    private bool _aiReactorRegistered;       // SetReactorCallbacks + Bindings sent?
+    private string? _aiActiveChatFamily;          // "gemma" / "llama31" — for bubble label
+    private bool _aiAgentLoopRegistered;          // SetAgentLoopCallbacks + Bindings sent?
 
     // Akka Actor 연동
     private IActorRef? _botActorRef;
@@ -625,7 +625,7 @@ public partial class AgentBotWindow : Window
 
     /// <summary>
     /// Renders a real-time AIMODE terminal exchange as a left-side chat card.
-    /// Called from the AgentToolLoop's OnTurnCompleted callback for
+    /// Called from the LocalAgentLoop's OnTurnCompleted callback for
     /// send_to_terminal (outbound, "→") and read_terminal (inbound, "←")
     /// turns so the user sees the conversation flowing live in the AgentBot
     /// window instead of having to alt-tab to the terminal.
@@ -1016,12 +1016,12 @@ public partial class AgentBotWindow : Window
     }
 
     /// <summary>
-    /// AI mode entry — Tell-based send through AgentBotActor → AgentReactorActor.
+    /// AI mode entry — Tell-based send through AgentBotActor → AgentLoopActor.
     /// Inference no longer runs on the UI task; this method just (a) handles
     /// lazy-load + readiness checks, (b) renders the user bubble, and
-    /// (c) Tells <c>StartReactor(userRequest)</c>. The reactor pumps progress
-    /// + final result back via the callbacks registered once in
-    /// <see cref="EnsureReactorWiring"/>.
+    /// (c) Tells <c>StartAgentLoop(userRequest)</c>. The agent loop pumps
+    /// progress + final result back via the callbacks registered once in
+    /// <see cref="EnsureAgentLoopWiring"/>.
     /// </summary>
     private async Task SendThroughAiToolLoopAsync(string userRequest, string displayText)
     {
@@ -1076,9 +1076,9 @@ public partial class AgentBotWindow : Window
         else
         {
             // External: validate provider+model are configured before kicking
-            // the reactor. The reactor itself returns a typed failure if the
-            // factory still returns null, but failing fast here gives a better
-            // user message.
+            // the agent loop. The agent loop itself returns a typed failure if
+            // the factory still returns null, but failing fast here gives a
+            // better user message.
             if (savedSettings.CreateExternalProvider() is null
                 || string.IsNullOrEmpty(savedSettings.ResolveExternalModel()))
             {
@@ -1097,7 +1097,7 @@ public partial class AgentBotWindow : Window
             return;
         }
 
-        EnsureReactorWiring();
+        EnsureAgentLoopWiring();
 
         string displayName;
         if (savedSettings.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
@@ -1111,7 +1111,7 @@ public partial class AgentBotWindow : Window
             {
                 AddSystemMessage("ℹ️ Note: Nemotron + Vulkan + GBNF is unstable on the current llama.cpp build. If the loop stalls or returns malformed JSON, switch backend to Cpu in Settings → LLM and reload.");
             }
-            AppLogger.Log($"[AIMODE] StartReactor sent (backend=Local, model={entry.Id}, family={entry.ChatFamily})");
+            AppLogger.Log($"[AIMODE] StartAgentLoop sent (backend=Local, model={entry.Id}, family={entry.ChatFamily})");
         }
         else
         {
@@ -1120,42 +1120,42 @@ public partial class AgentBotWindow : Window
             displayName = $"{savedSettings.External.Provider} · {modelId}";
 
             // Heads-up: the AIMODE toolchain is Gemma-4-shaped. Non-Gemma
-            // external models won't emit the JSON envelopes the reactor expects;
-            // user gets fail-fast messages from ExternalAgentToolLoop.
+            // external models won't emit the JSON envelopes the agent loop
+            // expects; user gets fail-fast messages from ExternalAgentLoop.
             if (!modelId.Contains("gemma", StringComparison.OrdinalIgnoreCase))
             {
                 AddSystemMessage($"⚠️ AIMODE toolchain is standardised on Gemma 4. Model '{modelId}' is non-Gemma — expect malformed JSON envelopes. Switch to Webnori / google/gemma-4-e4b for reliable AIMODE.");
             }
-            AppLogger.Log($"[AIMODE] StartReactor sent (backend=External, provider={savedSettings.External.Provider}, model={modelId})");
+            AppLogger.Log($"[AIMODE] StartAgentLoop sent (backend=External, provider={savedSettings.External.Provider}, model={modelId})");
         }
 
         SetAiGenerationStatus($"💭 thinking…  ·  {displayName}");
         _aiSendStopwatch = System.Diagnostics.Stopwatch.StartNew();
         _aiSendInFlight = true;
 
-        _botActorRef.Tell(new Agent.Common.Actors.StartReactor(userRequest));
+        _botActorRef.Tell(new Agent.Common.Actors.StartAgentLoop(userRequest));
     }
 
     /// <summary>
     /// Idempotently registers the UI-side delegates and host bindings on the
-    /// AgentBotActor so it can drive the AgentReactorActor child. Called from
+    /// AgentBotActor so it can drive the AgentLoopActor child. Called from
     /// the first SendThroughAiToolLoopAsync that has all dependencies (bot
     /// actor + getGroups). Bindings are factories (Func&lt;&gt;) so they pull
     /// fresh values per turn — settings/template/host can change between
     /// sends without re-registering.
     /// </summary>
-    private void EnsureReactorWiring()
+    private void EnsureAgentLoopWiring()
     {
-        if (_aiReactorRegistered) return;
+        if (_aiAgentLoopRegistered) return;
         if (_botActorRef is null || _getGroups is null) return;
 
-        _botActorRef.Tell(new Agent.Common.Actors.SetReactorCallbacks(
-            OnProgress: p => Dispatcher.BeginInvoke(new Action(() => HandleReactorProgress(p))),
-            OnResult: r => Dispatcher.BeginInvoke(new Action(() => HandleReactorResult(r)))));
+        _botActorRef.Tell(new Agent.Common.Actors.SetAgentLoopCallbacks(
+            OnProgress: p => Dispatcher.BeginInvoke(new Action(() => HandleAgentLoopProgress(p))),
+            OnResult: r => Dispatcher.BeginInvoke(new Action(() => HandleAgentLoopResult(r)))));
 
         var getGroups = _getGroups;
-        _botActorRef.Tell(new Agent.Common.Actors.ReactorBindings(
-            HostFactory: () => new WorkspaceTerminalToolHost(getGroups),
+        _botActorRef.Tell(new Agent.Common.Actors.AgentLoopBindings(
+            ToolbeltFactory: () => new WorkspaceTerminalToolHost(getGroups),
             OptionsFactory: () =>
             {
                 // Options are read from whichever backend is the source of
@@ -1172,7 +1172,7 @@ public partial class AgentBotWindow : Window
                     var effectiveTemp = (isLlama31 && isVulkan) ? 0.0f : s.Temperature;
                     var perTurnCap = Math.Max(256, s.AgentToolLoopMaxTokens);
                     AppLogger.Log($"[AIMODE] options: backend=Local maxTokens={perTurnCap} temp={effectiveTemp:0.00} family={entry.ChatFamily}");
-                    return new Agent.Common.Llm.Tools.AgentToolLoopOptions
+                    return new Agent.Common.Llm.Tools.AgentLoopOptions
                     {
                         MaxTokensPerTurn = perTurnCap,
                         Temperature = effectiveTemp,
@@ -1183,14 +1183,14 @@ public partial class AgentBotWindow : Window
                     var perTurnCap = Math.Max(256, settings.External.MaxTokens);
                     var effectiveTemp = settings.Temperature;
                     AppLogger.Log($"[AIMODE] options: backend=External provider={settings.External.Provider} model={settings.ResolveExternalModel()} maxTokens={perTurnCap} temp={effectiveTemp:0.00}");
-                    return new Agent.Common.Llm.Tools.AgentToolLoopOptions
+                    return new Agent.Common.Llm.Tools.AgentLoopOptions
                     {
                         MaxTokensPerTurn = perTurnCap,
                         Temperature = effectiveTemp,
                     };
                 }
             },
-            ToolLoopFactory: (opts, host) =>
+            AgentLoopFactory: (opts, host) =>
             {
                 var settings = Agent.Common.Llm.LlmSettingsStore.Load();
                 if (settings.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
@@ -1201,33 +1201,33 @@ public partial class AgentBotWindow : Window
                     var template = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
                         ? Agent.Common.Llm.Tools.ChatTemplates.Llama31
                         : Agent.Common.Llm.Tools.ChatTemplates.Gemma;
-                    return new Agent.Common.Llm.Tools.AgentToolLoop(llm, host, opts, template);
+                    return new Agent.Common.Llm.Tools.LocalAgentLoop(llm, host, opts, template);
                 }
                 else
                 {
                     var provider = settings.CreateExternalProvider();
                     var model = settings.ResolveExternalModel();
                     if (provider is null || string.IsNullOrEmpty(model)) return null;
-                    return new Agent.Common.Llm.Tools.ExternalAgentToolLoop(provider, model, host, opts);
+                    return new Agent.Common.Llm.Tools.ExternalAgentLoop(provider, model, host, opts);
                 }
             }));
 
-        _aiReactorRegistered = true;
-        AppLogger.Log("[AIMODE] Reactor wiring registered");
+        _aiAgentLoopRegistered = true;
+        AppLogger.Log("[AIMODE] AgentLoop wiring registered");
     }
 
-    /// <summary>UI-side handler for ReactorProgress. Dispatches by phase.</summary>
-    private void HandleReactorProgress(Agent.Common.Actors.ReactorProgress p)
+    /// <summary>UI-side handler for AgentLoopProgress. Dispatches by phase.</summary>
+    private void HandleAgentLoopProgress(Agent.Common.Actors.AgentLoopProgress p)
     {
         switch (p.Phase)
         {
-            case Agent.Common.Actors.ReactorPhase.Thinking:
-                // Reactor entered Thinking — the in-place status bubble already
+            case Agent.Common.Actors.AgentLoopPhase.Thinking:
+                // Agent loop entered Thinking — the in-place status bubble already
                 // shows "💭 thinking…" from SendThroughAiToolLoopAsync; nothing
                 // to do until Generating starts.
                 break;
 
-            case Agent.Common.Actors.ReactorPhase.Generating:
+            case Agent.Common.Actors.AgentLoopPhase.Generating:
                 {
                     var saved = LlmSettingsStore.Load();
                     var displayName = saved.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local
@@ -1240,7 +1240,7 @@ public partial class AgentBotWindow : Window
                 }
                 break;
 
-            case Agent.Common.Actors.ReactorPhase.Acting:
+            case Agent.Common.Actors.AgentLoopPhase.Acting:
                 if (p.ToolCall is not null)
                 {
                     // Re-use the existing per-turn renderer by reconstructing a
@@ -1257,21 +1257,21 @@ public partial class AgentBotWindow : Window
                     }
                     catch (Exception ex)
                     {
-                        AppLogger.LogError("[AIMODE] HandleReactorProgress Acting render failed", ex);
+                        AppLogger.LogError("[AIMODE] HandleAgentLoopProgress Acting render failed", ex);
                     }
                 }
                 break;
 
-            case Agent.Common.Actors.ReactorPhase.Done:
-            case Agent.Common.Actors.ReactorPhase.Error:
-                // Final reckoning happens in HandleReactorResult — the
-                // matching ReactorResult always follows.
+            case Agent.Common.Actors.AgentLoopPhase.Done:
+            case Agent.Common.Actors.AgentLoopPhase.Error:
+                // Final reckoning happens in HandleAgentLoopResult — the
+                // matching AgentLoopResult always follows.
                 break;
         }
     }
 
-    /// <summary>UI-side handler for ReactorResult — terminal of one StartReactor.</summary>
-    private void HandleReactorResult(Agent.Common.Actors.ReactorResult r)
+    /// <summary>UI-side handler for AgentLoopResult — terminal of one StartAgentLoop.</summary>
+    private void HandleAgentLoopResult(Agent.Common.Actors.AgentLoopResult r)
     {
         ClearAiGenerationStatus();
         var family = _aiActiveChatFamily ?? "gemma";
@@ -2076,7 +2076,7 @@ public partial class AgentBotWindow : Window
         _chatMode = ChatModeCycle.Next(_chatMode, IsAiModeAvailable());
         s_lastChatMode = _chatMode;
 
-        // AIMODE session boundary: leaving AIMODE asks the reactor actor to
+        // AIMODE session boundary: leaving AIMODE asks the agent loop actor to
         // dispose its loop + KV cache so the next entry starts fresh. Same
         // semantics as before — just behind a Tell instead of a direct call.
         if (previous == ChatMode.Ai && _chatMode != ChatMode.Ai)
@@ -2200,10 +2200,10 @@ public partial class AgentBotWindow : Window
     }
 
     /// <summary>
-    /// Tell the bot to dispose its reactor child + clear introductions. The
-    /// next AIMODE send rebuilds a fresh KV cache + re-introduces terminals.
-    /// Called when (a) the user cycles out of AIMODE, (b) the user clicks
-    /// the New Session button, (c) the window closes.
+    /// Tell the bot to dispose its agent-loop child + clear introductions.
+    /// The next AIMODE send rebuilds a fresh KV cache + re-introduces
+    /// terminals. Called when (a) the user cycles out of AIMODE, (b) the
+    /// user clicks the New Session button, (c) the window closes.
     /// </summary>
     private void RequestAiSessionReset(string reason)
     {
@@ -2213,7 +2213,7 @@ public partial class AgentBotWindow : Window
         try
         {
             (_botActorRef ?? ActorSystemManager.System.ActorSelection("/user/stage/bot").Anchor)
-                .Tell(new Agent.Common.Actors.ResetReactorSession());
+                .Tell(new Agent.Common.Actors.ResetAgentLoopMemory());
         }
         catch { /* actor may already be torn down on app exit */ }
         AppLogger.Log($"[AIMODE] session reset requested ({reason})");
@@ -2287,15 +2287,15 @@ public partial class AgentBotWindow : Window
         }
 
         // The "new session" button is only meaningful in AI mode — outside
-        // AIMODE there's no reactor / KV cache to clear.
+        // AIMODE there's no agent loop / KV cache to clear.
         btnAiNewSession.Visibility = _chatMode == ChatMode.Ai
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
 
     /// <summary>
-    /// Manual reset of the active AIMODE conversation. Tells the reactor to
-    /// dispose its KV cache + the bot to clear introductions. Next send
+    /// Manual reset of the active AIMODE conversation. Tells the agent loop
+    /// to dispose its KV cache + the bot to clear introductions. Next send
     /// starts a fresh conversation. Mirrors Settings → AI Mode → New Session.
     /// </summary>
     private void OnAiNewSessionClick(object sender, RoutedEventArgs e)
@@ -2344,12 +2344,12 @@ public partial class AgentBotWindow : Window
             return;
         }
 
-        // Esc while an AI turn is running cancels it. The reactor actor
-        // accepts CancelReactor and tips back to Idle; the result handler
+        // Esc while an AI turn is running cancels it. The agent loop actor
+        // accepts CancelAgentLoop and tips back to Idle; the result handler
         // clears the in-flight flag and the status bubble.
         if (e.Key == Key.Escape && _aiSendInFlight && _botActorRef is not null)
         {
-            _botActorRef.Tell(new Agent.Common.Actors.CancelReactor());
+            _botActorRef.Tell(new Agent.Common.Actors.CancelAgentLoop());
             e.Handled = true;
             return;
         }

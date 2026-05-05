@@ -28,15 +28,15 @@ public sealed class AgentBotActor : ReceiveActor
     // before sending; the reply tells it whether to prepend a self-intro.
     private readonly HashSet<(int g, int t)> _introducedTerminals = new();
 
-    // ── AIMODE Reactor child + UI delegate gateway ──
-    // The actual inference loop now lives in AgentReactorActor at
-    // /user/stage/bot/reactor. Bot is the gateway: it owns the registered
+    // ── AIMODE AgentLoop child + UI delegate gateway ──
+    // The actual inference loop now lives in AgentLoopActor at
+    // /user/stage/bot/loop. Bot is the gateway: it owns the registered
     // UI callbacks (which marshal to the dispatcher) and forwards
     // user-initiated messages (Start/Cancel/Reset) to the child.
-    private IActorRef? _reactor;
-    private ReactorBindings? _reactorBindings;
-    private Action<ReactorProgress>? _reactorOnProgress;
-    private Action<ReactorResult>? _reactorOnResult;
+    private IActorRef? _agentLoop;
+    private AgentLoopBindings? _agentLoopBindings;
+    private Action<AgentLoopProgress>? _agentLoopOnProgress;
+    private Action<AgentLoopResult>? _agentLoopOnResult;
 
     // ── Peer-signal routing state ──
     // Per-peer (string name, e.g. "Claude") tracking. The string IS the
@@ -45,7 +45,7 @@ public sealed class AgentBotActor : ReceiveActor
     //   - _activeConversations: peer is in an active relay session.
     //   - _handshakeStates    : NotConnected / HandshakeSent / Connected.
     // When a TerminalSentToBot arrives for an ACTIVE peer, Bot
-    // synthesises a continuation StartReactor with the incoming text as
+    // synthesises a continuation StartAgentLoop with the incoming text as
     // the "user prompt". For INACTIVE peers the signal is logged and
     // dropped — peer signals from terminals the user never asked us to
     // talk to are noise, not an invitation.
@@ -102,46 +102,46 @@ public sealed class AgentBotActor : ReceiveActor
             _log.Info("AIMODE introductions cleared (was tracking {0})", n);
         });
 
-        // ── Reactor wiring ──
-        Receive<SetReactorCallbacks>(msg =>
+        // ── AgentLoop wiring ──
+        Receive<SetAgentLoopCallbacks>(msg =>
         {
-            _reactorOnProgress = msg.OnProgress;
-            _reactorOnResult = msg.OnResult;
-            _log.Info("[Bot] Reactor callbacks registered");
+            _agentLoopOnProgress = msg.OnProgress;
+            _agentLoopOnResult = msg.OnResult;
+            _log.Info("[Bot] AgentLoop callbacks registered");
         });
 
-        Receive<ReactorBindings>(msg =>
+        Receive<AgentLoopBindings>(msg =>
         {
-            _reactorBindings = msg;
-            _log.Info("[Bot] Reactor bindings registered");
+            _agentLoopBindings = msg;
+            _log.Info("[Bot] AgentLoop bindings registered");
         });
 
-        Receive<StartReactor>(msg =>
+        Receive<StartAgentLoop>(msg =>
         {
-            if (_reactorBindings is null)
+            if (_agentLoopBindings is null)
             {
-                _log.Warning("[Bot] StartReactor before ReactorBindings — dropping");
-                _reactorOnResult?.Invoke(new ReactorResult(false,
+                _log.Warning("[Bot] StartAgentLoop before AgentLoopBindings — dropping");
+                _agentLoopOnResult?.Invoke(new AgentLoopResult(false,
                     "AI Mode not wired (host bindings missing).", 0, 0,
                     FailureReason: "no bindings"));
                 return;
             }
-            EnsureReactorChild();
-            _reactor!.Tell(msg);
+            EnsureAgentLoopChild();
+            _agentLoop!.Tell(msg);
         });
 
-        Receive<CancelReactor>(_ => _reactor?.Tell(new CancelReactor()));
+        Receive<CancelAgentLoop>(_ => _agentLoop?.Tell(new CancelAgentLoop()));
 
-        Receive<ResetReactorSession>(_ =>
+        Receive<ResetAgentLoopMemory>(_ =>
         {
-            // Tell the reactor to drop its loop + ask it to stop so the next
-            // EnsureReactorChild rebuilds. Also clear introductions so the
+            // Tell the agent loop to drop itself + ask it to stop so the next
+            // EnsureAgentLoopChild rebuilds. Also clear introductions so the
             // peer terminals get re-introduced in the new session.
-            if (_reactor is not null)
+            if (_agentLoop is not null)
             {
-                _reactor.Tell(new ResetReactorSession());
-                Context.Stop(_reactor);
-                _reactor = null;
+                _agentLoop.Tell(new ResetAgentLoopMemory());
+                Context.Stop(_agentLoop);
+                _agentLoop = null;
             }
             var nIntro = _introducedTerminals.Count;
             _introducedTerminals.Clear();
@@ -149,7 +149,7 @@ public sealed class AgentBotActor : ReceiveActor
             _activeConversations.Clear();
             var nHand = _handshakeStates.Count;
             _handshakeStates.Clear();
-            _log.Info("[Bot] Reactor session reset (intros={0}, conversations={1}, handshakes={2})",
+            _log.Info("[Bot] AgentLoop session reset (intros={0}, conversations={1}, handshakes={2})",
                 nIntro, nConv, nHand);
         });
 
@@ -208,46 +208,46 @@ public sealed class AgentBotActor : ReceiveActor
                     msg.Text.Length > 80 ? msg.Text.Substring(0, 80) + "..." : msg.Text);
                 return;
             }
-            // Active — wake the reactor with this incoming as the user
+            // Active — wake the agent loop with this incoming as the user
             // prompt context. Continuation: KV cache from previous cycles
             // gives the model the prior exchange history; the prompt
             // already teaches "one cycle per run" so this becomes one
             // short reaction.
-            _log.Info("[Bot] Peer signal from ACTIVE peer=\"{0}\" → continuation StartReactor",
+            _log.Info("[Bot] Peer signal from ACTIVE peer=\"{0}\" → continuation StartAgentLoop",
                 msg.PeerName);
-            if (_reactorBindings is null)
+            if (_agentLoopBindings is null)
             {
                 _log.Warning("[Bot] Cannot route peer signal — bindings not registered");
                 return;
             }
-            EnsureReactorChild();
+            EnsureAgentLoopChild();
             // Frame the synthetic prompt so the model knows this is a
             // peer-signal continuation, not a fresh user request.
             var synth = $"[peer signal from {msg.PeerName} via bot-chat] {msg.Text}";
-            _reactor!.Tell(new StartReactor(synth));
+            _agentLoop!.Tell(new StartAgentLoop(synth));
         });
 
         // Progress + Result messages bubble UP from the child to here.
-        Receive<ReactorProgress>(msg =>
+        Receive<AgentLoopProgress>(msg =>
         {
-            try { _reactorOnProgress?.Invoke(msg); }
+            try { _agentLoopOnProgress?.Invoke(msg); }
             catch (Exception ex) { _log.Warning("[Bot] OnProgress callback threw: {0}", ex.Message); }
         });
 
-        Receive<ReactorResult>(msg =>
+        Receive<AgentLoopResult>(msg =>
         {
-            try { _reactorOnResult?.Invoke(msg); }
+            try { _agentLoopOnResult?.Invoke(msg); }
             catch (Exception ex) { _log.Warning("[Bot] OnResult callback threw: {0}", ex.Message); }
         });
     }
 
-    private void EnsureReactorChild()
+    private void EnsureAgentLoopChild()
     {
-        if (_reactor is not null) return;
-        _reactor = Context.ActorOf(
-            Props.Create(() => new AgentReactorActor(_reactorBindings!)),
-            "reactor");
-        _log.Info("[Bot] Reactor child created at {0}", _reactor.Path);
+        if (_agentLoop is not null) return;
+        _agentLoop = Context.ActorOf(
+            Props.Create(() => new AgentLoopActor(_agentLoopBindings!)),
+            "loop");
+        _log.Info("[Bot] AgentLoop child created at {0}", _agentLoop.Path);
     }
 
     private void BecomeChat()

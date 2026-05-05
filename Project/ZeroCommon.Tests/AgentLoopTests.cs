@@ -7,10 +7,10 @@ using Xunit.Abstractions;
 
 namespace ZeroCommon.Tests;
 
-[Trait("Category", "AgentToolLoop")]
+[Trait("Category", "AgentLoop")]
 [Trait("Backend", "Cpu")]
 [Trait("Model", "Gemma4-E4B")]
-public sealed class AgentToolLoopTests
+public sealed class AgentLoopTests
 {
     private readonly ITestOutputHelper _output;
 
@@ -18,7 +18,7 @@ public sealed class AgentToolLoopTests
         Environment.GetEnvironmentVariable("GEMMA_MODEL_PATH")
         ?? @"D:\Code\AI\GemmaNet\models\gemma-4-E4B-it-UD-Q4_K_XL.gguf";
 
-    public AgentToolLoopTests(ITestOutputHelper output) => _output = output;
+    public AgentLoopTests(ITestOutputHelper output) => _output = output;
 
     private static LocalLlmOptions Opts() => new()
     {
@@ -73,8 +73,8 @@ public sealed class AgentToolLoopTests
         Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
-        var host = new MockAgentToolHost();
-        await using var loop = new AgentToolLoop(llm, host, new AgentToolLoopOptions { MaxIterations = 1 });
+        var host = new MockAgentToolbelt();
+        await using var loop = new LocalAgentLoop(llm, host, new AgentLoopOptions { MaxIterations = 1 });
 
         var sw = Stopwatch.StartNew();
         var session = await loop.RunAsync(
@@ -109,8 +109,8 @@ public sealed class AgentToolLoopTests
         Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
-        var host = new MockAgentToolHost();
-        await using var loop = new AgentToolLoop(llm, host, new AgentToolLoopOptions { MaxIterations = 1 });
+        var host = new MockAgentToolbelt();
+        await using var loop = new LocalAgentLoop(llm, host, new AgentLoopOptions { MaxIterations = 1 });
 
         var session = await loop.RunAsync(
             "List the terminals that are currently open.");
@@ -137,7 +137,7 @@ public sealed class AgentToolLoopTests
         Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
-        var host = new MockAgentToolHost
+        var host = new MockAgentToolbelt
         {
             ListTerminalsResult =
                 """
@@ -147,7 +147,7 @@ public sealed class AgentToolLoopTests
                 ]}]}
                 """,
         };
-        await using var loop = new AgentToolLoop(llm, host, new AgentToolLoopOptions { MaxIterations = 4 });
+        await using var loop = new LocalAgentLoop(llm, host, new AgentLoopOptions { MaxIterations = 4 });
 
         var session = await loop.RunAsync(
             "Find out what's in the Claude terminal right now and tell me.");
@@ -184,7 +184,7 @@ public sealed class AgentToolLoopTests
         Skip.IfNot(File.Exists(ModelPath), $"Model not present at {ModelPath}");
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
-        var host = new MockAgentToolHost
+        var host = new MockAgentToolbelt
         {
             ListTerminalsResult =
                 """
@@ -194,7 +194,7 @@ public sealed class AgentToolLoopTests
                 ]}]}
                 """,
         };
-        await using var loop = new AgentToolLoop(llm, host, new AgentToolLoopOptions { MaxIterations = 6 });
+        await using var loop = new LocalAgentLoop(llm, host, new AgentLoopOptions { MaxIterations = 6 });
 
         var sw = Stopwatch.StartNew();
         var session = await loop.RunAsync(
@@ -255,8 +255,8 @@ public sealed class AgentToolLoopTests
 
         for (int trial = 0; trial < trials; trial++)
         {
-            var host = new MockAgentToolHost();
-            await using var loop = new AgentToolLoop(llm, host, new AgentToolLoopOptions { MaxIterations = 1 });
+            var host = new MockAgentToolbelt();
+            await using var loop = new LocalAgentLoop(llm, host, new AgentLoopOptions { MaxIterations = 1 });
 
             var sw = Stopwatch.StartNew();
             var session = await loop.RunAsync("List the currently open terminals.");
@@ -306,9 +306,9 @@ public sealed class AgentToolLoopTests
         var trace = new List<string>();
         foreach (var greeting in greetings)
         {
-            var host = new MockAgentToolHost();
-            await using var loop = new AgentToolLoop(llm, host,
-                new AgentToolLoopOptions { MaxIterations = 3 });
+            var host = new MockAgentToolbelt();
+            await using var loop = new LocalAgentLoop(llm, host,
+                new AgentLoopOptions { MaxIterations = 3 });
 
             var sw = Stopwatch.StartNew();
             var session = await loop.RunAsync(greeting);
@@ -360,8 +360,8 @@ public sealed class AgentToolLoopTests
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(Opts());
         var host = new ScriptedTerminalHost();
-        await using var loop = new AgentToolLoop(llm, host,
-            new AgentToolLoopOptions { MaxIterations = 8 });
+        await using var loop = new LocalAgentLoop(llm, host,
+            new AgentLoopOptions { MaxIterations = 8 });
 
         var prompts = new[]
         {
@@ -448,8 +448,8 @@ public sealed class AgentToolLoopTests
             // Pre-load a reply so if the model DOES send + read, it sees content
             // and can naturally complete with done.
             host.ScriptedReplies.Enqueue("Sure, I'd be happy to chat. What's on your mind?");
-            await using var loop = new AgentToolLoop(llm, host,
-                new AgentToolLoopOptions { MaxIterations = 6 });
+            await using var loop = new LocalAgentLoop(llm, host,
+                new AgentLoopOptions { MaxIterations = 6 });
 
             var sw = Stopwatch.StartNew();
             var session = await loop.RunAsync(prompt);
@@ -477,7 +477,7 @@ public sealed class AgentToolLoopTests
     /// Each read consumes the next scripted reply; if the queue is empty,
     /// returns an empty string to mimic "nothing new yet".
     /// </summary>
-    internal sealed class ScriptedTerminalHost : IAgentToolHost
+    internal sealed class ScriptedTerminalHost : IAgentToolbelt
     {
         public List<(string Tool, string Args)> Calls { get; } = new();
         public Queue<string> ScriptedReplies { get; } = new();
@@ -544,11 +544,11 @@ public sealed class AgentToolLoopTests
         Skip.IfNot(File.Exists(NemotronModelPath), $"Model not present at {NemotronModelPath}");
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(NemotronOpts());
-        var host = new MockAgentToolHost();
-        await using var loop = new AgentToolLoop(
+        var host = new MockAgentToolbelt();
+        await using var loop = new LocalAgentLoop(
             llm,
             host,
-            new AgentToolLoopOptions { MaxIterations = 1 },
+            new AgentLoopOptions { MaxIterations = 1 },
             template: ChatTemplates.Llama31);
 
         var sw = Stopwatch.StartNew();
@@ -573,7 +573,7 @@ public sealed class AgentToolLoopTests
         Skip.IfNot(File.Exists(NemotronModelPath), $"Model not present at {NemotronModelPath}");
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(NemotronOpts());
-        var host = new MockAgentToolHost
+        var host = new MockAgentToolbelt
         {
             ListTerminalsResult =
                 """
@@ -583,10 +583,10 @@ public sealed class AgentToolLoopTests
                 ]}]}
                 """,
         };
-        await using var loop = new AgentToolLoop(
+        await using var loop = new LocalAgentLoop(
             llm,
             host,
-            new AgentToolLoopOptions { MaxIterations = 4 },
+            new AgentLoopOptions { MaxIterations = 4 },
             template: ChatTemplates.Llama31);
 
         var session = await loop.RunAsync("Find out what's in the Claude terminal right now and tell me.");
@@ -609,7 +609,7 @@ public sealed class AgentToolLoopTests
         Skip.IfNot(File.Exists(NemotronModelPath), $"Model not present at {NemotronModelPath}");
 
         await using var llm = await LlamaSharpLocalLlm.CreateAsync(NemotronOpts());
-        var host = new MockAgentToolHost
+        var host = new MockAgentToolbelt
         {
             ListTerminalsResult =
                 """
@@ -619,10 +619,10 @@ public sealed class AgentToolLoopTests
                 ]}]}
                 """,
         };
-        await using var loop = new AgentToolLoop(
+        await using var loop = new LocalAgentLoop(
             llm,
             host,
-            new AgentToolLoopOptions { MaxIterations = 6 },
+            new AgentLoopOptions { MaxIterations = 6 },
             template: ChatTemplates.Llama31);
 
         var sw = Stopwatch.StartNew();
@@ -670,11 +670,11 @@ public sealed class AgentToolLoopTests
 
         for (int trial = 0; trial < trials; trial++)
         {
-            var host = new MockAgentToolHost();
-            await using var loop = new AgentToolLoop(
+            var host = new MockAgentToolbelt();
+            await using var loop = new LocalAgentLoop(
                 llm,
                 host,
-                new AgentToolLoopOptions { MaxIterations = 1 },
+                new AgentLoopOptions { MaxIterations = 1 },
                 template: ChatTemplates.Llama31);
 
             var sw = Stopwatch.StartNew();
@@ -706,7 +706,7 @@ public sealed class AgentToolLoopTests
     public void Parser_extracts_tool_and_args_from_grammar_output()
     {
         var raw = """{"tool": "read_terminal", "args": {"group": 0, "tab": 1, "last_n": 500}}""";
-        var call = AgentToolLoop.ParseToolCall(raw);
+        var call = LocalAgentLoop.ParseToolCall(raw);
 
         Assert.Equal("read_terminal", call.Tool);
         Assert.Equal(0, call.Args["group"]!.GetValue<int>());
@@ -718,7 +718,7 @@ public sealed class AgentToolLoopTests
     public void Parser_handles_empty_args_object_for_zero_arg_tool()
     {
         var raw = """{"tool": "list_terminals", "args": {}}""";
-        var call = AgentToolLoop.ParseToolCall(raw);
+        var call = LocalAgentLoop.ParseToolCall(raw);
 
         Assert.Equal("list_terminals", call.Tool);
         Assert.Empty(call.Args);
@@ -728,7 +728,7 @@ public sealed class AgentToolLoopTests
     public void Parser_extracts_string_args_with_done_message()
     {
         var raw = """{"tool": "done", "args": {"message": "All set."}}""";
-        var call = AgentToolLoop.ParseToolCall(raw);
+        var call = LocalAgentLoop.ParseToolCall(raw);
 
         Assert.Equal("done", call.Tool);
         Assert.Equal("All set.", call.Args["message"]!.GetValue<string>());
@@ -745,7 +745,7 @@ public sealed class AgentToolLoopTests
     public void Parser_missing_tool_field_throws_JsonException()
     {
         var raw = """{"args": {"x": 1}}""";
-        var ex = Assert.Throws<System.Text.Json.JsonException>(() => AgentToolLoop.ParseToolCall(raw));
+        var ex = Assert.Throws<System.Text.Json.JsonException>(() => LocalAgentLoop.ParseToolCall(raw));
         Assert.Contains("tool", ex.Message);
     }
 
@@ -754,7 +754,7 @@ public sealed class AgentToolLoopTests
     {
         // 'args' is optional — many models omit it for zero-arg tools.
         var raw = """{"tool": "list_terminals"}""";
-        var call = AgentToolLoop.ParseToolCall(raw);
+        var call = LocalAgentLoop.ParseToolCall(raw);
         Assert.Equal("list_terminals", call.Tool);
         Assert.Empty(call.Args);
     }
@@ -763,16 +763,16 @@ public sealed class AgentToolLoopTests
     public void Parser_non_string_tool_throws_JsonException()
     {
         var raw = """{"tool": 42, "args": {}}""";
-        Assert.Throws<System.Text.Json.JsonException>(() => AgentToolLoop.ParseToolCall(raw));
+        Assert.Throws<System.Text.Json.JsonException>(() => LocalAgentLoop.ParseToolCall(raw));
     }
 }
 
 /// <summary>
-/// Test double for <see cref="IAgentToolHost"/>. Records calls and returns
+/// Test double for <see cref="IAgentToolbelt"/>. Records calls and returns
 /// scripted results so we can assert what the LLM did without standing up the
 /// real terminal/actor topology.
 /// </summary>
-internal sealed class MockAgentToolHost : IAgentToolHost
+internal sealed class MockAgentToolbelt : IAgentToolbelt
 {
     public List<(string Tool, string Args)> Calls { get; } = new();
 

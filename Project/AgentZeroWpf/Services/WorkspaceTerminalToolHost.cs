@@ -11,13 +11,13 @@ using AgentZeroWpf.Module;
 namespace AgentZeroWpf.Services;
 
 /// <summary>
-/// Production <see cref="IAgentToolHost"/> implementation for the AgentBot
-/// AIMODE feature. Bridges the Tools layer (Gemma / Nemotron tool loops in
+/// Production <see cref="IAgentToolbelt"/> implementation for the AgentBot
+/// AIMODE feature. Bridges the Tools layer (Gemma / Nemotron agent loops in
 /// <c>Agent.Common.Llm.Tools</c>) to the live workspace + terminal topology
 /// owned by <c>MainWindow</c>.
 ///
 /// Mock counterpart for headless testing lives at
-/// <c>Project/ZeroCommon.Tests/AgentToolLoopTests.cs / MockAgentToolHost</c>.
+/// <c>Project/ZeroCommon.Tests/AgentLoopTests.cs / MockAgentToolbelt</c>.
 ///
 /// Behavioural parity: this host reuses the **same dispatch helpers** the
 /// existing WM_COPYDATA CLI handlers use — `CliTerminalIpcHelper.TryResolveSession`
@@ -27,7 +27,7 @@ namespace AgentZeroWpf.Services;
 /// <c>send_to_terminal</c> tool call from Gemma reach the terminal in
 /// the exact same way.
 /// </summary>
-public sealed class WorkspaceTerminalToolHost : IAgentToolHost
+public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
 {
     private readonly System.Func<IReadOnlyList<CliGroupInfo>> _groupsProvider;
 
@@ -121,7 +121,7 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolHost
                 catch { /* not load-bearing */ }
             }
             // Mark conversation active on EVERY send so peer signals route
-            // back to the reactor as continuations. Idempotent on the bot side.
+            // back to the agent loop as continuations. Idempotent on the bot side.
             try { bot.Tell(new MarkConversationActive(peerName)); }
             catch { /* not load-bearing */ }
         }
