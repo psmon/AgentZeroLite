@@ -171,7 +171,7 @@
       "y": 260,
       "name": "lbl2",
       "fill": "#A1A1AA",
-      "content": "② Active Session Panel (Dark) — last 3 min activity",
+      "content": "② Active Session Panel (Dark) — last 5 min activity",
       "fontFamily": "Inter",
       "fontSize": 11,
       "fontWeight": "700"
@@ -210,7 +210,7 @@
           "x": 18,
           "y": 36,
           "fill": "#A1A1AA",
-          "content": "4 active   •   window 3 min   •   tick 2s ago",
+          "content": "4 active   •   window 5 min   •   tick 2s ago",
           "fontFamily": "Inter",
           "fontSize": 11,
           "fontWeight": "normal"
@@ -475,7 +475,7 @@
           "x": 418,
           "y": 144,
           "fill": "#F59E0B",
-          "content": "1m 24s",
+          "content": "2m 14s",
           "fontFamily": "Inter",
           "fontSize": 11,
           "fontWeight": "700"
@@ -530,7 +530,7 @@
           "x": 418,
           "y": 166,
           "fill": "#EF4444",
-          "content": "2m 50s",
+          "content": "4m 32s",
           "fontFamily": "Inter",
           "fontSize": 11,
           "fontWeight": "700"
@@ -571,8 +571,8 @@
           "id": "P7mHRg",
           "x": 18,
           "y": 228,
-          "fill": "#71717A",
-          "content": "window: 3 min ▾",
+          "fill": "#A1A1AA",
+          "content": "window: 5 min ▾",
           "fontFamily": "Inter",
           "fontSize": 10,
           "fontWeight": "normal"
@@ -775,7 +775,7 @@
           "x": 18,
           "y": 36,
           "fill": "#71717A",
-          "content": "4 active   •   window 3 min   •   tick 2s ago",
+          "content": "4 active   •   window 5 min   •   tick 2s ago",
           "fontFamily": "Inter",
           "fontSize": 11,
           "fontWeight": "normal"
@@ -1040,7 +1040,7 @@
           "x": 418,
           "y": 144,
           "fill": "#D97706",
-          "content": "1m 24s",
+          "content": "2m 14s",
           "fontFamily": "Inter",
           "fontSize": 11,
           "fontWeight": "700"
@@ -1095,7 +1095,7 @@
           "x": 418,
           "y": 166,
           "fill": "#DC2626",
-          "content": "2m 50s",
+          "content": "4m 32s",
           "fontFamily": "Inter",
           "fontSize": 11,
           "fontWeight": "700"
@@ -1137,7 +1137,7 @@
           "x": 18,
           "y": 228,
           "fill": "#A1A1AA",
-          "content": "window: 3 min ▾",
+          "content": "window: 5 min ▾",
           "fontFamily": "Inter",
           "fontSize": 10,
           "fontWeight": "normal"
