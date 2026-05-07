@@ -7,6 +7,7 @@ using Akka.Actor;
 using Agent.Common.Actors;
 using Agent.Common.Llm.Tools;
 using AgentZeroWpf.Module;
+using AgentZeroWpf.OsControl;
 
 namespace AgentZeroWpf.Services;
 
@@ -294,5 +295,35 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
             }
         }
         return sb.ToString();
+    }
+
+    // ====================== OS-control bridge (mission M0014) ================
+    // Read-only verbs (list/screenshot/activate/element-tree) are unconditional.
+    // Input-simulation verbs (mouse/key) consult OsApprovalGate before
+    // touching SendInput so a hijacked LLM session can't drive the desktop
+    // unless the operator opted in via env var or GUI Settings toggle.
+
+    public Task<string> OsListWindowsAsync(string? titleFilter, CancellationToken ct)
+        => Task.FromResult(OsControlService.ListWindows(titleFilter, includeHidden: false, OsAuditLog.Caller.Llm));
+
+    public Task<string> OsScreenshotAsync(long hwnd, bool grayscale, CancellationToken ct)
+        => Task.FromResult(OsControlService.Screenshot(hwnd, grayscale, fullDesktop: hwnd == 0, OsAuditLog.Caller.Llm));
+
+    public Task<string> OsActivateAsync(long hwnd, CancellationToken ct)
+        => Task.FromResult(OsControlService.Activate(hwnd, OsAuditLog.Caller.Llm));
+
+    public Task<string> OsElementTreeAsync(long hwnd, int maxDepth, string? search, CancellationToken ct)
+        => OsControlService.ElementTreeAsync(hwnd, maxDepth, search, OsAuditLog.Caller.Llm);
+
+    public Task<string> OsMouseClickAsync(int x, int y, bool right, bool dbl, CancellationToken ct)
+    {
+        bool gateOk = OsApprovalGate.IsInputAllowedByEnv();
+        return Task.FromResult(OsControlService.MouseClick(x, y, right, dbl, gateOk, OsAuditLog.Caller.Llm));
+    }
+
+    public Task<string> OsKeyPressAsync(string keySpec, CancellationToken ct)
+    {
+        bool gateOk = OsApprovalGate.IsInputAllowedByEnv();
+        return Task.FromResult(OsControlService.KeyPress(keySpec, gateOk, OsAuditLog.Caller.Llm));
     }
 }

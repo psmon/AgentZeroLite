@@ -259,11 +259,61 @@ scripts from a hung GUI; add `--no-wait` for fire-and-forget.
 | `terminal-key <g> <t> <key>`    | Send a control key (Ctrl+C, Enter, Tab, arrows, …)        |
 | `terminal-read <g> <t> [-n N]`  | Read the last N bytes from a tab's scrollback             |
 | `bot-chat [--from X] "text"`    | Display an external chat bubble in the bot window         |
+| `os <verb> [args]`              | OS-control: window enum, screenshot, UIA, mouse, keypress |
 | `help`                          | Command reference                                         |
 
 A PowerShell wrapper is shipped at `Project/AgentZeroWpf/AgentZeroLite.ps1` for convenience
 once the app directory is on `PATH` (do this from the Settings pane: **AgentZero CLI →
 Register PATH**).
+
+---
+
+## 🖥 OS-Control — drive Windows from CLI or LLM
+
+The `os` verb group (mission **M0014**) imports the desktop-automation
+surface from AgentZero Origin and bolts it on to *both* the CLI and the
+on-device LLM agent loop. Every read-only verb is symmetrical: shell
+calls and LLM tool calls touch the same code path, log to the same
+audit JSONL, and write the same screenshot files.
+
+```powershell
+# Enumerate visible windows
+AgentZeroLite.exe -cli os list-windows --filter "AgentZero"
+
+# Capture a PNG of the whole desktop (grayscale, downscaled to 1920×1080)
+AgentZeroLite.exe -cli os screenshot
+
+# Inspect a window's UI Automation tree
+AgentZeroLite.exe -cli os element-tree 0x000A0234 --depth 5
+
+# Press Alt+F4 (input simulation — gated)
+$env:AGENTZERO_OS_INPUT_ALLOWED = "1"
+AgentZeroLite.exe -cli os keypress alt+f4
+```
+
+**LLM tools** (callable from AIMODE): `os_list_windows`,
+`os_screenshot`, `os_activate`, `os_element_tree`, `os_mouse_click`,
+`os_key_press`. The two `os_mouse_*` / `os_key_*` tools are gated by
+the same env var as the CLI; a denied call returns
+`{"ok":false,"error":"…gate denied…"}` and the system prompt forbids
+retrying. Read-only tools are unconditional.
+
+**Artefacts** land under `tmp/os-cli/`:
+
+```
+tmp/os-cli/
+├── audit/<date>.jsonl         every CLI/LLM call recorded as one line
+├── screenshots/<date>/        PNG outputs
+└── e2e/<date>.log             smoke summary (acceptance probe)
+```
+
+**E2E acceptance probe**: `Docs/scripts/launch-self-smoke.ps1`
+uses the new verbs to verify a fresh build is reachable from the
+desktop. Read-only — no driving, no input simulation. Run it after any
+CLI / build change that touches the OS surface.
+
+Full reference: [`Docs/OsControl.md`](Docs/OsControl.md).
+Internal architecture notes: `harness/knowledge/_shared/os-control.md`.
 
 ---
 

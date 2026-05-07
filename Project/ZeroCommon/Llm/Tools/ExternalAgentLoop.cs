@@ -299,6 +299,53 @@ public sealed class ExternalAgentLoop : IAgentLoop
                 return JsonSerializer.Serialize(new { ok = true, waited_seconds = seconds });
             }
 
+            // ---- OS-control bridge (mission M0014) -----------------------
+            // Mirror of LocalAgentLoop.ExecuteToolAsync. The two switches stay
+            // hand-aligned by convention; the small duplication is preferred
+            // over premature abstraction (per CLAUDE.md guidance).
+
+            case "os_list_windows":
+            {
+                var filter = ReadString(call.Args, "title_filter", "");
+                return await _host.OsListWindowsAsync(string.IsNullOrEmpty(filter) ? null : filter, ct);
+            }
+
+            case "os_screenshot":
+            {
+                var hwnd = ReadLong(call.Args, "hwnd", 0);
+                var grayscale = ReadBool(call.Args, "grayscale", true);
+                return await _host.OsScreenshotAsync(hwnd, grayscale, ct);
+            }
+
+            case "os_activate":
+            {
+                var hwnd = ReadLong(call.Args, "hwnd", 0);
+                return await _host.OsActivateAsync(hwnd, ct);
+            }
+
+            case "os_element_tree":
+            {
+                var hwnd = ReadLong(call.Args, "hwnd", 0);
+                var depth = Math.Clamp(ReadInt(call.Args, "depth", 30), 1, 50);
+                var search = ReadString(call.Args, "search", "");
+                return await _host.OsElementTreeAsync(hwnd, depth, string.IsNullOrEmpty(search) ? null : search, ct);
+            }
+
+            case "os_mouse_click":
+            {
+                var x = ReadInt(call.Args, "x", 0);
+                var y = ReadInt(call.Args, "y", 0);
+                var right = ReadBool(call.Args, "right", false);
+                var dbl = ReadBool(call.Args, "double", false);
+                return await _host.OsMouseClickAsync(x, y, right, dbl, ct);
+            }
+
+            case "os_key_press":
+            {
+                var key = ReadString(call.Args, "key", "");
+                return await _host.OsKeyPressAsync(key, ct);
+            }
+
             default:
                 return $"{{\"error\":\"unknown tool {EscapeJsonString(call.Tool)}\"}}";
         }
@@ -315,6 +362,17 @@ public sealed class ExternalAgentLoop : IAgentLoop
     private static string ReadString(JsonObject args, string key, string fallback)
         => args.TryGetPropertyValue(key, out var v) && v is JsonValue jv && jv.TryGetValue<string>(out var s)
             ? s
+            : fallback;
+
+    private static long ReadLong(JsonObject args, string key, long fallback)
+        => args.TryGetPropertyValue(key, out var v) && v is JsonValue jv
+            && (jv.TryGetValue<long>(out var l) || (jv.TryGetValue<int>(out var i) && (l = i) == l))
+            ? l
+            : fallback;
+
+    private static bool ReadBool(JsonObject args, string key, bool fallback)
+        => args.TryGetPropertyValue(key, out var v) && v is JsonValue jv && jv.TryGetValue<bool>(out var b)
+            ? b
             : fallback;
 
     private static string EscapeJsonString(string s)

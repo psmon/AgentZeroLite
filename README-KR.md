@@ -498,11 +498,60 @@ peer-signal 트리거, ID 스킴을 string으로 전환 — 각 시도가 같은
 | `terminal-key <g> <t> <key>`        | 제어키 전송 (Ctrl+C, Enter, Tab, 화살표, …)                    |
 | `terminal-read <g> <t> [-n N]`      | 탭 스크롤백 마지막 N바이트 읽기                                 |
 | `bot-chat [--from X] "text"`        | Bot 창에 외부 채팅 버블 표시                                    |
+| `os <verb> [args]`                  | OS 자동화: 윈도우 열거 / 스크린샷 / UIA / 마우스 / 키 입력      |
 | `help`                              | 명령어 레퍼런스                                                 |
 
 편의용 PowerShell 래퍼가 `Project/AgentZeroWpf/AgentZeroLite.ps1`에 있습니다. 앱
 디렉토리가 `PATH`에 등록된 뒤라면 어느 셸에서든 호출 가능합니다. Settings에서
 **AgentZero CLI → Register PATH** 버튼으로 등록할 수 있습니다.
+
+---
+
+## 🖥 OS 자동화 — CLI / LLM 양쪽에서 윈도우 제어
+
+`os` 명령군은 미션 **M0014** 에서 AgentZero Origin 의 데스크톱 자동화 표면을
+가져와 CLI 와 온디바이스 LLM agent loop 양쪽에 노출합니다. 읽기 전용 동사들은
+완전 대칭 — 셸 호출과 LLM 도구 호출이 같은 코드 경로를 타며 같은 audit JSONL,
+같은 스크린샷 파일을 만듭니다.
+
+```powershell
+# 보이는 창 열거
+AgentZeroLite.exe -cli os list-windows --filter "AgentZero"
+
+# 데스크탑 전체 PNG 캡처 (그레이스케일, 1920×1080 다운스케일)
+AgentZeroLite.exe -cli os screenshot
+
+# 한 창의 UI Automation 트리 조회
+AgentZeroLite.exe -cli os element-tree 0x000A0234 --depth 5
+
+# Alt+F4 입력 시뮬레이션 (게이트 필요)
+$env:AGENTZERO_OS_INPUT_ALLOWED = "1"
+AgentZeroLite.exe -cli os keypress alt+f4
+```
+
+**LLM 도구** (AIMODE 에서 호출 가능): `os_list_windows`, `os_screenshot`,
+`os_activate`, `os_element_tree`, `os_mouse_click`, `os_key_press`.
+`os_mouse_*` / `os_key_*` 두 도구는 CLI 와 동일한 환경변수
+(`AGENTZERO_OS_INPUT_ALLOWED=1`) 로 게이팅됩니다. 게이트가 닫혀 있으면
+`{"ok":false,"error":"…gate denied…"}` 가 반환되며, 시스템 프롬프트가
+재시도를 금지합니다.
+
+**산출물** 은 `tmp/os-cli/` 아래에 누적됩니다:
+
+```
+tmp/os-cli/
+├── audit/<date>.jsonl          모든 CLI/LLM 호출 1줄씩 기록
+├── screenshots/<date>/         PNG 출력
+└── e2e/<date>.log              스모크 결과 요약
+```
+
+**E2E 수락 검증**: `Docs/scripts/launch-self-smoke.ps1` 가 새
+`os` 동사들을 사용해 빌드된 본체가 데스크탑에서 실제로 접근 가능한지
+확인합니다. 읽기 전용 — 기능 수행 없음. CLI / OS 표면 변경 후 매번 한 번
+실행 권장.
+
+전체 레퍼런스: [`Docs/OsControl.md`](Docs/OsControl.md).
+내부 아키텍처 노트: `harness/knowledge/_shared/os-control.md`.
 
 ---
 

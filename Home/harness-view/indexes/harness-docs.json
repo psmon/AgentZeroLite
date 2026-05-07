@@ -3,6 +3,16 @@
   "sort": "semver-desc",
   "items": [
     {
+      "file": "v1.7.0.md",
+      "title": "v1.7.0",
+      "heading": "OS-control surface (mission M0014)",
+      "path": "v1.7.0.md",
+      "size": 5227,
+      "modified": "2026-05-07",
+      "author": null,
+      "committed": null
+    },
+    {
       "file": "v1.6.1.md",
       "title": "v1.6.1",
       "heading": "Knowledge addition: Node.js wrapper + bash + stream IO pitfalls",
@@ -136,34 +146,38 @@
   "contributors": [
     {
       "name": "psmon",
-      "commits": 96,
+      "commits": 99,
       "percent": 100
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
-      "commits": 96,
+      "commits": 99,
       "percent": 100
     }
   ],
   "contributorsRecent": [
     {
       "name": "psmon",
-      "commits": 96,
+      "commits": 98,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 96,
-    "last7d": 63,
-    "last30d": 96
+    "totalAllTime": 99,
+    "last7d": 59,
+    "last30d": 99
   },
   "topChangedFiles": [
     {
       "path": "harness/harness.config.json",
       "commits": 15
+    },
+    {
+      "path": "Home/harness-view/css/components.css",
+      "commits": 10
     },
     {
       "path": "Home/harness-view/scripts/build-indexes.js",
@@ -172,10 +186,6 @@
     {
       "path": "harness/agents/tamer.md",
       "commits": 10
-    },
-    {
-      "path": "Home/harness-view/css/components.css",
-      "commits": 9
     },
     {
       "path": "harness/agents/code-coach.md",

@@ -149,6 +149,28 @@ Available tools:
   - wait                       sleep for N seconds, then return. Use BETWEEN send_to_terminal
                                and read_terminal to give the terminal AI time to actually respond.
                                args: { "seconds": <int 1..30> }
+
+  --- OS-control (mission M0014, read-only) — only use when the user EXPLICITLY
+      asks about the desktop / a window / a screenshot. Default is Mode 1. ---
+  - os_list_windows            enumerate visible top-level windows on the desktop.
+                               args: { "title_filter": <string?>}     (omit for all)
+  - os_screenshot              capture a PNG and return its file path under tmp/os-cli/.
+                               args: { "hwnd": <int>, "grayscale": <bool> }
+                               hwnd=0 ⇒ whole virtual desktop. Path is returned, not the bytes.
+  - os_activate                bring a window to the foreground by hwnd.
+                               args: { "hwnd": <int> }
+  - os_element_tree            UI Automation tree dump. Use ONLY for inspection.
+                               args: { "hwnd": <int>, "depth": <int 1..50>, "search": <string?> }
+
+  --- OS-control (mission M0014, INPUT SIMULATION — gated, may be denied) ---
+  Only call these if the user explicitly asked you to drive the mouse/keyboard.
+  If the gate is closed you'll get { "ok": false, "error": "gate denied" };
+  do NOT retry, just report it back to the user via done.
+  - os_mouse_click             synthesize a mouse click at virtual-screen coords.
+                               args: { "x": <int>, "y": <int>, "right": <bool>, "double": <bool> }
+  - os_key_press               synthesize a keystroke. Spec uses '+' for modifiers.
+                               args: { "key": <"ctrl+c" | "alt+f4" | "f5" | "a" | ...> }
+
   - done                       end the conversation with a final message to the user.
                                args: { "message": <string> }
 
@@ -184,7 +206,7 @@ Hard rules (apply to BOTH modes):
     public const string Gbnf = """
 root         ::= ws "{" ws "\"tool\"" ws ":" ws toolname ws "," ws "\"args\"" ws ":" ws args ws "}" ws
 
-toolname     ::= "\"list_terminals\"" | "\"read_terminal\"" | "\"send_to_terminal\"" | "\"send_key\"" | "\"wait\"" | "\"done\""
+toolname     ::= "\"list_terminals\"" | "\"read_terminal\"" | "\"send_to_terminal\"" | "\"send_key\"" | "\"wait\"" | "\"os_list_windows\"" | "\"os_screenshot\"" | "\"os_activate\"" | "\"os_element_tree\"" | "\"os_mouse_click\"" | "\"os_key_press\"" | "\"done\""
 
 args         ::= "{" ws "}" | "{" ws kv (ws "," ws kv)* ws "}"
 kv           ::= string ws ":" ws value
@@ -219,6 +241,12 @@ ws           ::= ([ \t\n\r])*
         "send_to_terminal",
         "send_key",
         "wait",
+        "os_list_windows",
+        "os_screenshot",
+        "os_activate",
+        "os_element_tree",
+        "os_mouse_click",
+        "os_key_press",
         "done",
     };
 }

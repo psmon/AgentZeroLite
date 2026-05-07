@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using Agent.Common.Module;
 using AgentZeroWpf.Module;
+using AgentZeroWpf.OsControl;
 using Microsoft.Win32.SafeHandles;
 
 namespace AgentZeroWpf;
@@ -77,6 +78,7 @@ internal static class CliHandler
             "terminal-key" => TerminalKey(cliArgs.Skip(1).ToArray()),
             "terminal-read" => TerminalRead(cliArgs.Skip(1).ToArray()),
             "bot-chat" => BotChat(cliArgs.Skip(1).ToArray()),
+            "os" => OsCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             _ => PrintUnknownCommand(command),
         };
     }
@@ -809,6 +811,7 @@ internal static class CliHandler
         Console.WriteLine("  terminal-key  <grp> <tab> <key>         Send a control key to a terminal");
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
         Console.WriteLine("  bot-chat <message> [--from name]        Display external chat in AgentBot");
+        Console.WriteLine("  os <verb> [args]                        OS-control: window/screenshot/input (see 'os help')");
         Console.WriteLine("  help                                    Show detailed help");
         Console.WriteLine("  version, --version, -v                  Print CLI build identity (no GUI needed)");
     }

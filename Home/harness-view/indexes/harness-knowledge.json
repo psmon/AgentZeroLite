@@ -20,6 +20,15 @@
       "modified": "2026-04-25"
     },
     {
+      "id": "harness/knowledge/_shared/os-control.md",
+      "file": "harness/knowledge/_shared/os-control.md",
+      "name": "os-control.md",
+      "title": "os-control",
+      "heading": "OS Control Surface (M0014) — CLI verbs + LLM tools",
+      "size": 6639,
+      "modified": "2026-05-07"
+    },
+    {
       "id": "harness/knowledge/code-coach/avalondock-float-redock-patterns.md",
       "file": "harness/knowledge/code-coach/avalondock-float-redock-patterns.md",
       "name": "avalondock-float-redock-patterns.md",
@@ -305,6 +314,13 @@
           "path": "_shared/agentzerolite-architecture.md",
           "size": 4583,
           "modified": "2026-04-25"
+        },
+        {
+          "type": "file",
+          "name": "os-control.md",
+          "path": "_shared/os-control.md",
+          "size": 6639,
+          "modified": "2026-05-07"
         }
       ]
     }

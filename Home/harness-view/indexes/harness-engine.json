@@ -23,6 +23,13 @@
       "modified": "2026-05-04"
     },
     {
+      "file": "os-cli-e2e-smoke.md",
+      "title": "os-cli-e2e-smoke",
+      "path": "os-cli-e2e-smoke.md",
+      "size": 4228,
+      "modified": "2026-05-07"
+    },
+    {
       "file": "pre-commit-review.md",
       "title": "pre-commit-review",
       "path": "pre-commit-review.md",

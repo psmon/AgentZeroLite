@@ -36,6 +36,35 @@ public interface IAgentToolbelt
     /// <c>ctrld</c>, <c>up</c>, <c>down</c>, <c>left</c>, <c>right</c>).
     /// </summary>
     Task<bool> SendKeyAsync(int group, int tab, string key, CancellationToken ct);
+
+    // ====================== OS-control surface (mission M0014) ===============
+    // Default implementations return a "not supported" JSON envelope so test
+    // doubles (MockAgentToolbelt) and any future host that doesn't carry the
+    // Win32 surface keep compiling. The production WPF host implements them.
+
+    /// <summary>List visible top-level windows. Returns JSON envelope.</summary>
+    Task<string> OsListWindowsAsync(string? titleFilter, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
+    /// <summary>Capture a PNG screenshot. <paramref name="hwnd"/> = 0 means full virtual desktop.</summary>
+    Task<string> OsScreenshotAsync(long hwnd, bool grayscale, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
+    /// <summary>Bring a window to the foreground.</summary>
+    Task<string> OsActivateAsync(long hwnd, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
+    /// <summary>UI Automation tree dump for a window.</summary>
+    Task<string> OsElementTreeAsync(long hwnd, int maxDepth, string? search, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
+    /// <summary>Synthesize a mouse click at screen coordinates. Gated by approval.</summary>
+    Task<string> OsMouseClickAsync(int x, int y, bool right, bool dbl, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
+    /// <summary>Synthesize a key press by spec ("ctrl+c", "alt+f4", "f5"). Gated by approval.</summary>
+    Task<string> OsKeyPressAsync(string keySpec, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
 }
 
 /// <summary>
