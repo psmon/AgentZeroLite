@@ -22,8 +22,8 @@ public static class ExternalProviderNames
 /// </summary>
 public static class WebnoriDefaults
 {
-    public const string BaseUrl = "https://a2.webnori.com";
-    public const string ApiKey = "sk-lm-fo31fDrG:BmuPhh2BJWRUjkx3W80C";
+    public const string BaseUrl = "https://a1.webnori.com";
+    public const string ApiKey = "sk-lm-AbUGwC6s:nnbfoTZZKnjYF5rcffYM";
 
     /// <summary>The Gemma 4 model AgentZeroLite standardises its toolchain on.</summary>
     public const string DefaultModel = "google/gemma-4-e4b";
