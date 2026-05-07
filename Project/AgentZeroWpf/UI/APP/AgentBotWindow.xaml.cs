@@ -1310,14 +1310,22 @@ public partial class AgentBotWindow : Window
 
     /// <summary>
     /// Send <paramref name="text"/> through the OUTPUT TTS graph if voice
-    /// TTS is enabled in settings. No-op when TtsProvider is Off or
-    /// <paramref name="text"/> is empty. Fire-and-forget — the actor runs
-    /// the synth + playback off the UI thread and the kill switch (BargeIn)
-    /// is what the "그만" command later uses to interrupt.
+    /// mode is currently active AND TTS is configured. Voice mode = mic ON
+    /// (the AUTO toggle on the Voice toolbar). Without this gate, TTS would
+    /// continue to fire on every AI bubble whenever a non-Off provider was
+    /// configured — even after the user explicitly toggled the mic off —
+    /// which the user perceives as "input died but voice keeps speaking."
+    /// Operator spec: 음성모드 진입 시에만 음성으로 출력, 그 외에는 텍스트만.
+    ///
+    /// No-op when mic is off, TtsProvider is Off, or <paramref name="text"/>
+    /// is empty. Fire-and-forget — the actor runs the synth + playback off
+    /// the UI thread and the kill switch (BargeIn) is what the "그만"
+    /// command later uses to interrupt.
     /// </summary>
     private void SpeakBotMessageIfEnabled(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
+        if (!_voiceMicOn) return;
         try
         {
             var v = Agent.Common.Voice.VoiceSettingsStore.Load();

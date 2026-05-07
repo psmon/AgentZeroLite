@@ -500,6 +500,11 @@ public partial class AgentBotWindow
         // The actor itself stays alive (Stage caches the singleton) — next
         // StartListening will re-materialize.
         try { _voiceStreamRef?.Tell(new StopListening()); } catch { }
+        // Also drain any in-flight TTS playback. StopListening only kills the
+        // INPUT graph; without the BargeIn the OUTPUT graph keeps playing the
+        // current AI bubble's audio even after the user toggled the mic off,
+        // which contradicts "음성모드 진입 시에만 음성 출력". Mute this round.
+        try { _voiceStreamRef?.Tell(new BargeIn()); } catch { }
 
         _voiceMicOn = false;
         ApplyVoiceMicUi(on: false);
