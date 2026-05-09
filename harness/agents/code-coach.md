@@ -212,6 +212,33 @@ Treat them as binding for the file types they cover:
   one-char drift honestly — that's measurement, not flake. See the
   full pattern in the knowledge file.
 
+- **`harness/knowledge/code-coach/wm-copydata-ipc-pitfalls.md`** — Whenever
+  the staged diff touches `Project/AgentZeroWpf/CliHandler.cs`,
+  `MainWindow.HandleCliCommand` and the `WndProc` hook,
+  `Project/AgentZeroWpf/Module/CliTerminalIpcHelper.cs`,
+  `IpcMemoryMappedResponseWriter`, the IPC P/Invoke declarations in
+  `NativeMethods.cs`, or `AgentZeroLite.ps1`, walk the **4-pitfall checklist
+  at the bottom of that file** before approving the commit. P1 (`SendMessageW`
+  no-timeout → CLI blocks indefinitely on a busy GUI UI thread) was the
+  recurring "CLI 블락 현상" — Option A landed `SendMessageTimeoutW` with
+  `SMTO_ABORTIFHUNG` + 3 s budget. P2 (heavy synchronous work inside
+  `WndProc` handlers, e.g. `session.WriteAndSubmit` against a paused PTY)
+  is the next adjacent failure mode and applies per-handler. P3 (UI
+  Automation calls from non-STA threads) is dormant in `OsControlService.TextCapture`.
+  P4 (PowerShell wrapper inheriting child hangs via `Start-Process -Wait`)
+  is documented so the symptom isn't misdiagnosed at the wrapper layer.
+
+- **`harness/knowledge/code-coach/terminal-wedge-triage.md`** — Pure triage
+  playbook (no convention enforcement). Cite this when the user reports
+  "터미널 탭이 프리징" / "this CLI tab is frozen" — a different failure
+  class from WM_COPYDATA. Driven by `ConPtyTerminalSession`'s built-in
+  health state machine (Alive → Stale@3 → Dead@5 consecutive INPUT-NO-ECHO)
+  and the wedge-recovery banner from commit `0bc0b35`. Reading
+  `bin/<config>/net10.0-windows/logs/app-log.txt` for `HEALTH` /
+  `INPUT-NO-ECHO` / `Wedge banner shown` lines identifies the exact wedged
+  tab. Sibling-tab differential is the first move — if siblings still
+  echo, the issue is local to one child process, not infra.
+
 - **`harness/knowledge/code-coach/nodejs-bash-and-stream-io-pitfalls.md`** —
   Whenever the staged diff adds or modifies a Node.js wrapper that
   spawns child processes (statusLine wrappers, hook wrappers, IPC
