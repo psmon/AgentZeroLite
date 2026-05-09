@@ -53,6 +53,7 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
     {
         private readonly VoiceSegmenterStage _stage;
         private readonly long _maxPreRollBytes;
+        private readonly long _maxUtteranceBytes;
 
         private bool _inUtterance;
         private int _utteranceSilenceFrames;
@@ -67,6 +68,7 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
         {
             _stage = stage;
             _maxPreRollBytes = (long)Math.Max(0, stage._config.PreRollSeconds * BytesPerSecondMono16k16);
+            _maxUtteranceBytes = (long)Math.Max(0, stage._config.MaxUtteranceSeconds * BytesPerSecondMono16k16);
 
             SetHandler(stage.In, this);
             SetHandler(stage.Out, this);
@@ -107,6 +109,7 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
                 {
                     _buffer!.AddRange(frame.Pcm16k);
                 }
+                if (TryEmitOnDurationCap()) return;
                 Pull(_stage.In);
                 return;
             }
@@ -117,13 +120,10 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
                 _utteranceSilenceFrames++;
                 if (_utteranceSilenceFrames >= _stage._config.UtteranceHangoverFrames)
                 {
-                    _inUtterance = false;
-                    var pcm = _buffer.ToArray();
-                    _buffer = null;
-                    var duration = pcm.Length / (double)BytesPerSecondMono16k16;
-                    Push(_stage.Out, new PcmSegment(pcm, duration, _startedAt));
+                    EmitAndReset();
                     return;
                 }
+                if (TryEmitOnDurationCap()) return;
                 Pull(_stage.In);
                 return;
             }
@@ -133,6 +133,27 @@ public sealed class VoiceSegmenterStage : GraphStage<FlowShape<MicFrame, PcmSegm
         }
 
         public override void OnPull() => Pull(_stage.In);
+
+        // M0015 / 후속 진행 #2 — guard against runaway utterances when the
+        // VAD threshold is at floor and ambient noise keeps the hangover
+        // counter pinned at zero. Force-emit at MaxUtteranceSeconds so a
+        // single utterance can't starve the STT queue.
+        private bool TryEmitOnDurationCap()
+        {
+            if (_maxUtteranceBytes <= 0 || _buffer is null) return false;
+            if (_buffer.Count < _maxUtteranceBytes) return false;
+            EmitAndReset();
+            return true;
+        }
+
+        private void EmitAndReset()
+        {
+            _inUtterance = false;
+            var pcm = _buffer!.ToArray();
+            _buffer = null;
+            var duration = pcm.Length / (double)BytesPerSecondMono16k16;
+            Push(_stage.Out, new PcmSegment(pcm, duration, _startedAt));
+        }
     }
 }
 

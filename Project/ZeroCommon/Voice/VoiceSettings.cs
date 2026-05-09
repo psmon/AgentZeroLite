@@ -117,6 +117,25 @@ public sealed class VoiceSettings
     /// </summary>
     public int VadThreshold { get; set; } = 25;
 
+    /// <summary>
+    /// VAD calibration curve. Three accepted tokens:
+    /// <list type="bullet">
+    ///   <item><c>"Strict"</c> (default) — reproduces the origin-proven
+    ///   personal-mic tuning byte-for-byte.</item>
+    ///   <item><c>"Loose"</c> — scales the threshold down and lengthens
+    ///   the hangover for lecture-style audio (distant speaker, ambient
+    ///   noise, longer pauses).</item>
+    ///   <item><c>"Auto"</c> — context-aware: AgentBot AiMode and the
+    ///   voice-note plugin resolve to Loose, ChatMode / Key resolve to
+    ///   Strict. Routed via
+    ///   <see cref="VoiceSensitivityProfile.ResolveAuto"/>.</item>
+    /// </list>
+    /// Stored as a string so the JSON file stays readable when new
+    /// profiles are added — the runtime falls back to Strict on unknown
+    /// values rather than silently switching the user's curve.
+    /// </summary>
+    public string SensitivityProfile { get; set; } = "Strict";
+
     /// <summary>true = VAD auto-segment by silence, false = manual START/STOP.</summary>
     public bool VoiceTestAutoMode { get; set; } = true;
 

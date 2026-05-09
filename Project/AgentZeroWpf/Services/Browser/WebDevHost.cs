@@ -213,7 +213,13 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
             int effectiveSens = sensitivityPercent.HasValue
                 ? Math.Clamp(sensitivityPercent.Value, 0, 100)
                 : Math.Clamp(100 - v.VadThreshold, 0, 100);
-            float threshold = VoiceRuntimeFactory.SensitivityToThreshold(effectiveSens);
+            // M0015 후속 진행 #1: voice-note plugin captures lecture-style
+            // audio (distant speaker, ambient noise) — that's exactly the
+            // Loose-profile use case. Pass isAgentMode: true so the saved
+            // "Auto" token resolves to Loose here. Explicit Strict / Loose
+            // tokens still win.
+            float threshold = VoiceRuntimeFactory.SensitivityToThreshold(
+                effectiveSens, v, isAgentMode: true);
 
             if (_noteCapture is not null)
             {
@@ -247,11 +253,20 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
                 return new { ok = false, error = ex.Message };
             }
 
+            // M0015 / 후속 진행 #2 — drive PreRoll / Hangover / cap from
+            // the active sensitivity profile so Loose lecture-tuning takes
+            // effect end-to-end on the voice-note path too. Voice-note is
+            // a lecture/note-capture surface so isAgentMode: true matches
+            // the Auto-token resolution used elsewhere.
+            var vadCfg = VoiceRuntimeFactory.BuildVadConfig(v, isAgentMode: true);
             var cap = new VoiceCaptureService
             {
                 BufferPcm = true,
                 Muted = v.MicMuted,
                 VadThreshold = threshold,
+                PreRollSeconds = vadCfg.PreRollSeconds,
+                UtteranceHangoverFrames = vadCfg.UtteranceHangoverFrames,
+                MaxUtteranceSeconds = vadCfg.MaxUtteranceSeconds,
             };
 
             cap.UtteranceStarted += OnNoteUtteranceStarted;
@@ -306,7 +321,11 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     public void SetNoteSensitivity(int percent)
     {
         var c = _noteCapture; if (c is null) return;
-        c.VadThreshold = VoiceRuntimeFactory.SensitivityToThreshold(percent);
+        // M0015 후속 진행 #1: live slider tweak still respects the active
+        // profile — Auto in voice-note context resolves to Loose so a
+        // moved slider doesn't silently revert to Strict-curve mapping.
+        var v = VoiceSettingsStore.Load();
+        c.VadThreshold = VoiceRuntimeFactory.SensitivityToThreshold(percent, v, isAgentMode: true);
     }
 
     public bool IsNoteCapturing => _noteCapture is { IsCapturing: true };
@@ -354,8 +373,20 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
                     AppLogger.Log($"[WebDev:Note] STT returned empty | bytes={pcm.Length} lang={lang}");
                     return;
                 }
-                AppLogger.Log($"[WebDev:Note] STT ok | chars={text.Length}");
-                NoteTranscript?.Invoke(text.Trim());
+                // M0015 / 후속 진행 #2 — voice-note was missing the
+                // hallucination filter that AgentBot already applies. The
+                // 2026-05-09 recording log showed five+ "chars=11" outputs
+                // that were Whisper Korean YouTube outros emitted on
+                // near-silence. Drop them at the source so the timeline
+                // and the summary don't accumulate "구독해주세요" noise.
+                var trimmed = text.Trim();
+                if (WhisperHallucinationFilter.IsLikelyHallucination(trimmed))
+                {
+                    AppLogger.Log($"[WebDev:Note] hallucination dropped | chars={trimmed.Length}");
+                    return;
+                }
+                AppLogger.Log($"[WebDev:Note] STT ok | chars={trimmed.Length}");
+                NoteTranscript?.Invoke(trimmed);
             }
             catch (Exception ex)
             {

@@ -195,7 +195,13 @@ public partial class AgentBotWindow
             _voicePipelineCts?.Dispose();
             _voicePipelineCts = new CancellationTokenSource();
 
-            var threshold = VoiceRuntimeFactory.SensitivityToThreshold(100 - v.VadThreshold);
+            // M0015 / 후속 진행 #1: pass current ChatMode as the agent-mode
+            // hint so the saved profile "Auto" lands on Loose during AiMode
+            // (long-form agent interaction, often off-mic) and on Strict
+            // for ChatMode / Key. Explicit Strict / Loose tokens still win.
+            var isAgentMode = _chatMode == ChatMode.Ai;
+            var threshold = VoiceRuntimeFactory.SensitivityToThreshold(
+                100 - v.VadThreshold, v, isAgentMode);
             _voiceCapture.VadThreshold = threshold;
 
             // Always wire the level meter — needed by both pipelines.
@@ -279,10 +285,16 @@ public partial class AgentBotWindow
         _voiceFrameForwarder = frame => _voiceStreamRef?.Tell(frame);
         _voiceCapture!.FrameAvailable += _voiceFrameForwarder;
 
+        // Drive PreRoll / Hangover from the active sensitivity profile so
+        // Loose lecture-tuning takes effect end-to-end (M0015). Mode-aware
+        // overload honours the "Auto" token: AiMode → Loose, others →
+        // Strict. Threshold is already profile-aware via the caller
+        // computing it with the same isAgentMode flag.
+        var vadCfg = VoiceRuntimeFactory.BuildVadConfig(v, isAgentMode: _chatMode == ChatMode.Ai);
         _voiceStreamRef.Tell(new StartListening(
             VadThreshold: threshold,
-            PreRollSeconds: 1.0,
-            UtteranceHangoverFrames: 40,
+            PreRollSeconds: vadCfg.PreRollSeconds,
+            UtteranceHangoverFrames: vadCfg.UtteranceHangoverFrames,
             MicBufferSize: 64,
             SttParallelism: Math.Max(1, v.StreamSttParallelism),
             Language: v.SttLanguage));

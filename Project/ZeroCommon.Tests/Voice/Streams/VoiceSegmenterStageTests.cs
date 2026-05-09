@@ -97,6 +97,55 @@ public sealed class VoiceSegmenterStageTests : TestKit
     }
 
     [Fact]
+    public void Duration_cap_force_emits_runaway_utterance()
+    {
+        // M0015 / 후속 진행 #2 — when ambient noise keeps the hangover
+        // from tripping, the cap must force-emit. With 1600-byte frames
+        // (50ms at 16k/16-bit-mono), 4 frames = 0.2s. Cap at 0.3s →
+        // segment must emit on or before the 6th loud frame, NOT wait
+        // for the hangover.
+        var cfg = new VadConfig(
+            VadThreshold: 0.1f,
+            PreRollSeconds: 0.0,
+            UtteranceHangoverFrames: 999,           // hangover effectively disabled
+            MaxUtteranceSeconds: 0.3);              // cap = 0.3s = 9600 bytes
+        var (probe, sink) = CreateProbedFlow(cfg);
+
+        sink.Request(2);
+        // Send 8 loud frames (8 × 1600 = 12800 bytes ≈ 0.4s) — must emit
+        // before hangover kicks in because the cap is 9600 bytes.
+        for (int i = 0; i < 8; i++) probe.SendNext(Loud());
+
+        var seg = sink.ExpectNext();
+        Assert.True(seg.Pcm16k.Length >= 9600,
+            $"Capped segment {seg.Pcm16k.Length} must reach the cap (9600 bytes)");
+        Assert.True(seg.Pcm16k.Length < 12800 + 1600,
+            $"Capped segment {seg.Pcm16k.Length} should not include all 8 frames — cap should have fired earlier");
+    }
+
+    [Fact]
+    public void Duration_cap_disabled_when_zero()
+    {
+        // Back-compat — MaxUtteranceSeconds=0 means "no cap" (the legacy
+        // behaviour). A long loud burst followed by hangover must emit a
+        // single segment carrying everything, just like before the cap
+        // was added.
+        var cfg = new VadConfig(
+            VadThreshold: 0.1f,
+            PreRollSeconds: 0.0,
+            UtteranceHangoverFrames: 3,
+            MaxUtteranceSeconds: 0.0);              // disabled
+        var (probe, sink) = CreateProbedFlow(cfg);
+
+        sink.Request(2);
+        for (int i = 0; i < 20; i++) probe.SendNext(Loud());        // 20 × 1600 = 32000 bytes
+        for (int i = 0; i < 3; i++) probe.SendNext(Quiet());         // hangover
+
+        var seg = sink.ExpectNext();
+        Assert.Equal(23 * 1600, seg.Pcm16k.Length);
+    }
+
+    [Fact]
     public void Two_separated_utterances_emit_two_segments()
     {
         var cfg = Cfg(preRollSec: 0.0, hangoverFrames: 3);

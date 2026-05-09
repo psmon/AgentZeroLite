@@ -41,6 +41,15 @@ public sealed class VoiceCaptureService : IDisposable
     /// <summary>Utterance boundary — 40 frames ≈ 2 s at 50 ms per buffer.</summary>
     public int UtteranceHangoverFrames { get; set; } = 40;
 
+    /// <summary>
+    /// Hard cap on a single utterance's length, in seconds. 0 (default)
+    /// disables the cap for back-compat. M0015 / 후속 진행 #2 — at
+    /// near-floor threshold + ambient noise the hangover never trips and
+    /// utterances balloon to tens of seconds. The cap force-emits so the
+    /// STT queue keeps moving.
+    /// </summary>
+    public double MaxUtteranceSeconds { get; set; } = 0.0;
+
     public event Action<float>? AmplitudeChanged;
     public event Action<bool>? SpeakingStateChanged;
     public event Action? UtteranceStarted;
@@ -290,6 +299,7 @@ public sealed class VoiceCaptureService : IDisposable
                     lock (_pcmBuffer) { _pcmBuffer.AddRange(chunk); }
                 }
             }
+            ForceEmitIfDurationCapReached();
         }
         else if (_inUtterance)
         {
@@ -312,8 +322,39 @@ public sealed class VoiceCaptureService : IDisposable
                     AppLogger.Log($"[Voice] UtteranceEnded handler threw: {ex.GetType().Name}: {ex.Message}");
                 }
             }
+            else
+            {
+                ForceEmitIfDurationCapReached();
+            }
         }
         // else: outside an utterance, below threshold. Don't accumulate.
+    }
+
+    /// <summary>
+    /// M0015 / 후속 진행 #2 — guard against runaway utterances. When the
+    /// internal PCM buffer exceeds the configured cap, end the current
+    /// utterance early and let STT process what we have. The next mic
+    /// frame above threshold will start a fresh utterance with fresh
+    /// pre-roll seeding, so the speaker isn't "cut off" — they just get
+    /// a sentence boundary inserted at the cap.
+    /// </summary>
+    private void ForceEmitIfDurationCapReached()
+    {
+        if (!_inUtterance || !BufferPcm) return;
+        var capSeconds = MaxUtteranceSeconds;
+        if (capSeconds <= 0) return;
+        var capBytes = (long)(capSeconds * 16_000 * 2);
+        long currentBytes;
+        lock (_pcmBuffer) { currentBytes = _pcmBuffer.Count; }
+        if (currentBytes < capBytes) return;
+        _inUtterance = false;
+        _utteranceSilenceFrames = 0;
+        AppLogger.Log($"[Voice] utterance capped at {capSeconds:0.#}s ({currentBytes} bytes) — force-emitted");
+        try { UtteranceEnded?.Invoke(); }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Voice] UtteranceEnded handler threw: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 }
 

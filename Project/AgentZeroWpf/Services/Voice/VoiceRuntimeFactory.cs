@@ -1,4 +1,5 @@
 using Agent.Common.Voice;
+using Agent.Common.Voice.Streams;
 
 namespace AgentZeroWpf.Services.Voice;
 
@@ -51,5 +52,54 @@ internal static class VoiceRuntimeFactory
     {
         var inv = Math.Max(0, 100 - sensitivityPercent) / 400.0;
         return Math.Max(0.005f, (float)inv);
+    }
+
+    /// <summary>
+    /// Map a UI sensitivity (0–100) into the threshold for the active
+    /// <see cref="VoiceSensitivityLevel"/> in saved settings. Strict
+    /// reproduces <see cref="SensitivityToThreshold"/>; Loose returns the
+    /// scaled-down threshold from <see cref="VoiceSensitivityProfile"/>.
+    /// Capture-side callers (<c>VoiceCaptureService</c>) only need the
+    /// scalar — pre-roll and hangover are graph-stage knobs and stay on
+    /// <see cref="BuildVadConfig"/>.
+    /// </summary>
+    public static float SensitivityToThreshold(double sensitivityPercent, VoiceSettings v)
+    {
+        var level = VoiceSensitivityProfile.Parse(v.SensitivityProfile);
+        return VoiceSensitivityProfile.BuildVadConfig(level, sensitivityPercent).VadThreshold;
+    }
+
+    /// <summary>
+    /// Build the streaming-pipeline <see cref="VadConfig"/> from saved
+    /// settings. Slider value comes from <c>100 - VadThreshold</c> (the
+    /// stored field is the inverse), profile picks the curve.
+    /// </summary>
+    public static VadConfig BuildVadConfig(VoiceSettings v)
+        => BuildVadConfig(v, isAgentMode: false);
+
+    /// <summary>
+    /// Build a <see cref="VadConfig"/> with mode-aware Auto resolution.
+    /// When the saved profile is <c>"Auto"</c>, agent-mode callsites
+    /// (AgentBot AiMode) get Loose; ChatMode / Key keep Strict. Explicit
+    /// Strict / Loose tokens always win over the mode hint.
+    /// </summary>
+    public static VadConfig BuildVadConfig(VoiceSettings v, bool isAgentMode)
+    {
+        var level = VoiceSensitivityProfile.ResolveAuto(v.SensitivityProfile, isAgentMode);
+        var sensitivityPercent = Math.Clamp(100.0 - v.VadThreshold, 0.0, 100.0);
+        return VoiceSensitivityProfile.BuildVadConfig(level, sensitivityPercent);
+    }
+
+    /// <summary>
+    /// Mode-aware threshold scalar. Mirrors
+    /// <see cref="SensitivityToThreshold(double, VoiceSettings)"/> but
+    /// honours the <c>"Auto"</c> token by routing through
+    /// <see cref="VoiceSensitivityProfile.ResolveAuto"/>.
+    /// </summary>
+    public static float SensitivityToThreshold(
+        double sensitivityPercent, VoiceSettings v, bool isAgentMode)
+    {
+        var level = VoiceSensitivityProfile.ResolveAuto(v.SensitivityProfile, isAgentMode);
+        return VoiceSensitivityProfile.BuildVadConfig(level, sensitivityPercent).VadThreshold;
     }
 }
