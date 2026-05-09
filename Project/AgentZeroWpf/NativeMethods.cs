@@ -384,6 +384,18 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
     public static partial IntPtr SendMessageCopyData(IntPtr hWnd, uint Msg, IntPtr wParam, ref COPYDATASTRUCT lParam);
 
+    // SendMessageTimeoutW returns 0 on timeout/error; non-zero on success.
+    // Used by CliHandler to bound WM_COPYDATA send time so a busy WPF UI thread
+    // can't infinitely block the CLI process.
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageTimeoutW")]
+    public static partial IntPtr SendMessageTimeoutCopyData(
+        IntPtr hWnd, uint Msg, IntPtr wParam, ref COPYDATASTRUCT lParam,
+        uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+    public const uint SMTO_NORMAL              = 0x0000;
+    public const uint SMTO_ABORTIFHUNG         = 0x0002;
+    public const uint SMTO_NOTIMEOUTIFNOTHUNG  = 0x0008;
+
     [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
     public static partial IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 

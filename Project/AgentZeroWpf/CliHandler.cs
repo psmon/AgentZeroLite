@@ -84,6 +84,11 @@ internal static class CliHandler
     }
 
 
+    // Bound the WM_COPYDATA send so a busy/hung WPF UI thread can't infinitely
+    // block the CLI. SendMessageW (no-timeout) was the recurring source of
+    // "CLI 블락 현상" — see harness/logs/code-coach/2026-05-10-07-51-cli-block-recurrence-rca.md.
+    private const uint WpfSendTimeoutMs = 3000;
+
     private static bool SendWpfCommand(IntPtr agentWnd, string jsonCommand)
     {
         byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonCommand);
@@ -96,7 +101,18 @@ internal static class CliHandler
                 cbData = jsonBytes.Length,
                 lpData = gch.AddrOfPinnedObject(),
             };
-            NativeMethods.SendMessageCopyData(agentWnd, NativeMethods.WM_COPYDATA, IntPtr.Zero, ref cds);
+            var rc = NativeMethods.SendMessageTimeoutCopyData(
+                agentWnd, NativeMethods.WM_COPYDATA, IntPtr.Zero, ref cds,
+                NativeMethods.SMTO_ABORTIFHUNG | NativeMethods.SMTO_NORMAL,
+                WpfSendTimeoutMs,
+                out _);
+            if (rc == IntPtr.Zero)
+            {
+                Console.Error.WriteLine(
+                    $"Error: AgentZero GUI unresponsive (WM_COPYDATA timed out after {WpfSendTimeoutMs}ms). " +
+                    "The GUI is alive but its UI thread is blocked. Check the log panel for a stuck operation, then retry.");
+                return false;
+            }
             return true;
         }
         finally
@@ -156,7 +172,8 @@ internal static class CliHandler
             return 1;
         }
 
-        SendWpfCommand(agentWnd, "{\"command\":\"status\"}");
+        if (!SendWpfCommand(agentWnd, "{\"command\":\"status\"}"))
+            return 1;
 
         string? json = TryReadMmf("AgentZeroLite_Status_Response", 8192);
         if (json == null) return _noWait ? 0 : 1;
@@ -196,7 +213,8 @@ internal static class CliHandler
             return 1;
         }
 
-        SendWpfCommand(agentWnd, "{\"command\":\"copy\"}");
+        if (!SendWpfCommand(agentWnd, "{\"command\":\"copy\"}"))
+            return 1;
 
         string? json = TryReadMmf("AgentZeroLite_Copy_Response", 256);
         if (json == null) return _noWait ? 0 : 1;
@@ -415,7 +433,8 @@ internal static class CliHandler
         IntPtr agentWnd = FindAgentZero();
         if (agentWnd == IntPtr.Zero) return 1;
 
-        SendWpfCommand(agentWnd, "{\"command\":\"terminal-list\"}");
+        if (!SendWpfCommand(agentWnd, "{\"command\":\"terminal-list\"}"))
+            return 1;
 
         string? json = TryReadMmf(TerminalListMmfName, TerminalListMmfSize);
         if (json == null) return _noWait ? 0 : 1;
@@ -504,7 +523,8 @@ internal static class CliHandler
         sb.Append($",\"text\":\"{EscapeJson(text)}\"");
         sb.Append('}');
 
-        SendWpfCommand(agentWnd, sb.ToString());
+        if (!SendWpfCommand(agentWnd, sb.ToString()))
+            return 1;
 
         string? json = TryReadMmf(TerminalSendMmfName, TerminalSendMmfSize);
         if (json == null) return _noWait ? 0 : 1;
@@ -575,7 +595,8 @@ internal static class CliHandler
         sb.Append($",\"key\":\"{EscapeJson(keyName)}\"");
         sb.Append('}');
 
-        SendWpfCommand(agentWnd, sb.ToString());
+        if (!SendWpfCommand(agentWnd, sb.ToString()))
+            return 1;
 
         string? json = TryReadMmf(TerminalSendMmfName, TerminalSendMmfSize);
         if (json == null) return _noWait ? 0 : 1;
@@ -647,7 +668,8 @@ internal static class CliHandler
         sb.Append($",\"last\":{lastN}");
         sb.Append('}');
 
-        SendWpfCommand(agentWnd, sb.ToString());
+        if (!SendWpfCommand(agentWnd, sb.ToString()))
+            return 1;
 
         string? json = TryReadMmf(TerminalReadMmfName, TerminalReadMmfSize);
         if (json == null) return _noWait ? 0 : 1;
@@ -720,7 +742,8 @@ internal static class CliHandler
         sb.Append($",\"message\":\"{EscapeJson(message)}\"");
         sb.Append('}');
 
-        SendWpfCommand(agentWnd, sb.ToString());
+        if (!SendWpfCommand(agentWnd, sb.ToString()))
+            return 1;
 
         string? json = TryReadMmf(BotChatMmfName, BotChatMmfSize);
         if (json == null) return _noWait ? 0 : 1;
