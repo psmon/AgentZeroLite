@@ -1534,6 +1534,110 @@
 }
 .aw-tt-more:hover { color: #FFFFFF; }
 
+/* ─── SYSTEM STATUS (bottom-left bars) ─── */
+.aw-sysstatus {
+  position: absolute; left: 14px; bottom: 14px;
+  width: 280px;
+  max-width: calc(100vw - 52px);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  background: rgba(5, 8, 18, 0.78);
+  border: 1px solid rgba(102, 226, 255, 0.22);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #DCE7FF;
+  pointer-events: none;
+  user-select: none;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
+  z-index: 4;
+}
+.aw-sysstatus-title {
+  font-size: 10px; font-weight: 700; color: #FFE38A;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.aw-sys-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.aw-sys-label { color: #A6E2FF; font-weight: 700; }
+.aw-sys-track {
+  position: relative;
+  height: 6px;
+  background: rgba(102, 226, 255, 0.08);
+  border: 1px solid rgba(102, 226, 255, 0.18);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.aw-sys-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  border-radius: 3px;
+  box-shadow: 0 0 8px currentColor;
+}
+.aw-sys-pct { color: #A6E2FF; font-size: 10px; text-align: right; }
+
+/* ─── EVENT STREAM (bottom-right rolling log) ─── */
+.aw-eventstream {
+  position: absolute; right: 14px; bottom: 14px;
+  width: 320px;
+  max-width: calc(100vw - 52px);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  background: rgba(5, 8, 18, 0.78);
+  border: 1px solid rgba(243, 107, 255, 0.28);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #DCE7FF;
+  pointer-events: none;
+  user-select: none;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
+  z-index: 4;
+}
+.aw-eventstream-title {
+  font-size: 10px; font-weight: 700; color: #F36BFF;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.aw-events-list {
+  display: flex; flex-direction: column;
+  gap: 2px;
+  max-height: 168px;
+  overflow: hidden;
+}
+.aw-event {
+  display: grid;
+  grid-template-columns: 56px auto 14px auto 1fr;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  padding: 1px 0;
+  border-left: 2px solid transparent;
+  padding-left: 6px;
+}
+.aw-event-ts    { color: #6680A0; }
+.aw-event-from  { color: #DCE7FF; font-weight: 600; }
+.aw-event-arrow { color: #A6E2FF; }
+.aw-event-to    { color: #DCE7FF; font-weight: 600; }
+.aw-event-msg   { color: #A6E2FF; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aw-event-cyan   { border-left-color: rgba(102, 226, 255, 0.65); }
+.aw-event-cyan   .aw-event-arrow { color: #66E2FF; }
+.aw-event-pink   { border-left-color: rgba(255, 79, 163, 0.65); }
+.aw-event-pink   .aw-event-arrow { color: #FF8FC0; }
+.aw-event-purple { border-left-color: rgba(140, 108, 255, 0.65); }
+.aw-event-purple .aw-event-arrow { color: #B79CFF; }
+.aw-event-gold   { border-left-color: rgba(255, 224, 102, 0.65); }
+.aw-event-gold   .aw-event-arrow { color: #FFE38A; }
+.aw-event-green  { border-left-color: rgba(45, 255, 154, 0.65); }
+.aw-event-green  .aw-event-arrow { color: #6FFFB4; }
+.aw-event-amber  { border-left-color: rgba(255, 178, 74, 0.65); }
+.aw-event-amber  .aw-event-arrow { color: #FFC880; }
+.aw-event-mint   { border-left-color: rgba(185, 255, 234, 0.65); }
+.aw-event-mint   .aw-event-arrow { color: #C8FFEE; }
+
 @media (max-width: 780px) {
   .aw-legend {
     left: 10px; right: 10px; top: 10px;
@@ -1544,4 +1648,6 @@
   .aw-help { left: 10px; right: 10px; top: auto; bottom: 8px; text-align: center; }
   .aw-toolrail { display: none; }
   .aw-tooltip { max-width: calc(100vw - 28px); }
+  .aw-sysstatus { display: none; }
+  .aw-eventstream { display: none; }
 }
