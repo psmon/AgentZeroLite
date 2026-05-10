@@ -3,6 +3,7 @@
   "categories": [
     "build-doctor",
     "code-coach",
+    "kakashi-copy",
     "mission-records",
     "pre-commit-review",
     "release-build-pipeline",
@@ -11,14 +12,39 @@
   ],
   "counts": {
     "build-doctor": 6,
-    "code-coach": 21,
-    "mission-records": 14,
+    "code-coach": 23,
+    "kakashi-copy": 1,
+    "mission-records": 16,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
     "tamer": 17
   },
   "items": [
+    {
+      "category": "kakashi-copy",
+      "file": "harness/logs/kakashi-copy/2026-05-10-10-31-pencil-design-from-pencil-creator.md",
+      "date": "2026-05-10",
+      "time": "10:31",
+      "title": "pencil design from pencil creator",
+      "size": 3272
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-10-07-51-cli-block-recurrence-rca.md",
+      "date": "2026-05-10",
+      "time": "07:51",
+      "title": "cli block recurrence rca",
+      "size": 9350
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-09-15-30-akka-wasm-feasibility-research.md",
+      "date": "2026-05-09",
+      "time": "15:30",
+      "title": "akka wasm feasibility research",
+      "size": 3404
+    },
     {
       "category": "code-coach",
       "file": "harness/logs/code-coach/2026-05-05-10-46-actor-llm-agent-naming-research.md",
@@ -658,6 +684,22 @@
       "time": null,
       "title": "M0014-수행결과",
       "size": 13461
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0015-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0015-수행결과",
+      "size": 23511
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0016-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0016-수행결과",
+      "size": 5902
     }
   ]
 }

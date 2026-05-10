@@ -10,15 +10,49 @@
     "cancelled"
   ],
   "counts": {
-    "all": 15,
+    "all": 17,
     "inbox": 1,
-    "in_progress": 1,
-    "done": 13,
+    "in_progress": 2,
+    "done": 14,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0016",
+      "file": "harness/missions/M0016-하네스뷰-액터모델3d.md",
+      "title": "하네스뷰 액터모델 3D World 카테고리 신설",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "in_progress",
+      "priority": "medium",
+      "created": "2026-05-10",
+      "recordFile": "harness/logs/mission-records/M0016-수행결과.md",
+      "recordStatus": "in_progress",
+      "recordStarted": "2026-05-10T10:30:00+09:00",
+      "recordFinished": "null",
+      "designFile": null,
+      "modified": "2026-05-10",
+      "size": 2258
+    },
+    {
+      "id": "M0015",
+      "file": "harness/missions/M0015-음성노트-개선.md",
+      "title": "음성인식 감도 프로파일(엄격/느슨) 도입 — 강의·환경음 인식 개선",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-05-09",
+      "recordFile": "harness/logs/mission-records/M0015-수행결과.md",
+      "recordStatus": "done",
+      "recordStarted": "2026-05-09T00:00:00+09:00",
+      "recordFinished": "2026-05-09T00:00:00+09:00",
+      "designFile": null,
+      "modified": "2026-05-10",
+      "size": 1636
+    },
     {
       "id": "M0014",
       "file": "harness/missions/M0014-OS-자동화.md",

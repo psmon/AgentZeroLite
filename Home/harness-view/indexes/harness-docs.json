@@ -9,8 +9,8 @@
       "path": "v1.7.0.md",
       "size": 5227,
       "modified": "2026-05-07",
-      "author": null,
-      "committed": null
+      "author": "psmon",
+      "committed": "2026-05-07"
     },
     {
       "file": "v1.6.1.md",
@@ -146,34 +146,38 @@
   "contributors": [
     {
       "name": "psmon",
-      "commits": 99,
+      "commits": 104,
       "percent": 100
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
-      "commits": 99,
+      "commits": 104,
       "percent": 100
     }
   ],
   "contributorsRecent": [
     {
       "name": "psmon",
-      "commits": 98,
+      "commits": 84,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 99,
-    "last7d": 59,
-    "last30d": 99
+    "totalAllTime": 104,
+    "last7d": 43,
+    "last30d": 104
   },
   "topChangedFiles": [
     {
       "path": "harness/harness.config.json",
-      "commits": 15
+      "commits": 16
+    },
+    {
+      "path": "harness/agents/code-coach.md",
+      "commits": 10
     },
     {
       "path": "Home/harness-view/css/components.css",
@@ -186,10 +190,6 @@
     {
       "path": "harness/agents/tamer.md",
       "commits": 10
-    },
-    {
-      "path": "harness/agents/code-coach.md",
-      "commits": 9
     }
   ]
 }

@@ -29,6 +29,33 @@
       "modified": "2026-05-07"
     },
     {
+      "id": "harness/knowledge/_shared/pencil-design-skill-origin.md",
+      "file": "harness/knowledge/_shared/pencil-design-skill-origin.md",
+      "name": "pencil-design-skill-origin.md",
+      "title": "pencil-design-skill-origin",
+      "heading": "pencil-design skill — provenance & local conventions",
+      "size": 4260,
+      "modified": "2026-05-10"
+    },
+    {
+      "id": "harness/knowledge/_shared/threejs-actor-world-primer.md",
+      "file": "harness/knowledge/_shared/threejs-actor-world-primer.md",
+      "name": "threejs-actor-world-primer.md",
+      "title": "threejs-actor-world-primer",
+      "heading": "Three.js Actor World — viewer primer",
+      "size": 6241,
+      "modified": "2026-05-10"
+    },
+    {
+      "id": "harness/knowledge/code-coach/akka-net-wasm-feasibility.md",
+      "file": "harness/knowledge/code-coach/akka-net-wasm-feasibility.md",
+      "name": "akka-net-wasm-feasibility.md",
+      "title": "akka-net-wasm-feasibility",
+      "heading": "Akka.NET in Blazor WASM — Feasibility Survey (no-WebSocket)",
+      "size": 9596,
+      "modified": "2026-05-09"
+    },
+    {
       "id": "harness/knowledge/code-coach/avalondock-float-redock-patterns.md",
       "file": "harness/knowledge/code-coach/avalondock-float-redock-patterns.md",
       "name": "avalondock-float-redock-patterns.md",
@@ -72,6 +99,24 @@
       "heading": "On-Device Tool Calling — Gemma 4 vs Nemotron Nano (2026-04 survey)",
       "size": 8930,
       "modified": "2026-04-25"
+    },
+    {
+      "id": "harness/knowledge/code-coach/terminal-wedge-triage.md",
+      "file": "harness/knowledge/code-coach/terminal-wedge-triage.md",
+      "name": "terminal-wedge-triage.md",
+      "title": "terminal-wedge-triage",
+      "heading": "Terminal Wedge Triage — \"this CLI tab is frozen\"",
+      "size": 8105,
+      "modified": "2026-05-09"
+    },
+    {
+      "id": "harness/knowledge/code-coach/wm-copydata-ipc-pitfalls.md",
+      "file": "harness/knowledge/code-coach/wm-copydata-ipc-pitfalls.md",
+      "name": "wm-copydata-ipc-pitfalls.md",
+      "title": "wm-copydata-ipc-pitfalls",
+      "heading": "WM_COPYDATA IPC Pitfalls — CLI ↔ GUI in AgentZero Lite",
+      "size": 8910,
+      "modified": "2026-05-09"
     },
     {
       "id": "harness/knowledge/code-coach/wpf-xaml-resource-and-window-pitfalls.md",
@@ -163,6 +208,13 @@
       "children": [
         {
           "type": "file",
+          "name": "akka-net-wasm-feasibility.md",
+          "path": "code-coach/akka-net-wasm-feasibility.md",
+          "size": 9596,
+          "modified": "2026-05-09"
+        },
+        {
+          "type": "file",
           "name": "avalondock-float-redock-patterns.md",
           "path": "code-coach/avalondock-float-redock-patterns.md",
           "size": 10731,
@@ -202,6 +254,20 @@
           "path": "code-coach/ondevice-tool-calling-survey.md",
           "size": 8930,
           "modified": "2026-04-25"
+        },
+        {
+          "type": "file",
+          "name": "terminal-wedge-triage.md",
+          "path": "code-coach/terminal-wedge-triage.md",
+          "size": 8105,
+          "modified": "2026-05-09"
+        },
+        {
+          "type": "file",
+          "name": "wm-copydata-ipc-pitfalls.md",
+          "path": "code-coach/wm-copydata-ipc-pitfalls.md",
+          "size": 8910,
+          "modified": "2026-05-09"
         },
         {
           "type": "file",
@@ -321,6 +387,20 @@
           "path": "_shared/os-control.md",
           "size": 6639,
           "modified": "2026-05-07"
+        },
+        {
+          "type": "file",
+          "name": "pencil-design-skill-origin.md",
+          "path": "_shared/pencil-design-skill-origin.md",
+          "size": 4260,
+          "modified": "2026-05-10"
+        },
+        {
+          "type": "file",
+          "name": "threejs-actor-world-primer.md",
+          "path": "_shared/threejs-actor-world-primer.md",
+          "size": 6241,
+          "modified": "2026-05-10"
         }
       ]
     }
