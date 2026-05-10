@@ -1315,3 +1315,232 @@
 @media (max-width: 780px) {
   .wd-api-table { grid-template-columns: 1fr; }
 }
+
+/* ─── Actor World (M0016 — 3D) ────────────────────────────────────────── */
+
+/* Negative margin to defeat the .view's 24/32px padding. The actor-world
+   wants a full-bleed canvas; sibling views still get their normal padding. */
+.aw-root {
+  position: relative;
+  width: calc(100% + 64px);
+  height: calc(100vh - 64px);
+  margin: -24px -32px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(43, 126, 155, 0.16), transparent 28%),
+    radial-gradient(circle at 74% 68%, rgba(255, 115, 150, 0.12), transparent 24%),
+    #05030B;
+  overflow: hidden;
+  border-radius: 0;
+}
+.aw-root.aw-cyber {
+  background:
+    linear-gradient(180deg, rgba(5, 7, 13, 0.2), rgba(5, 7, 13, 0.96)),
+    radial-gradient(circle at 50% 38%, rgba(65, 230, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 78% 58%, rgba(243, 107, 255, 0.16), transparent 26%),
+    #05070D;
+}
+@media (max-width: 780px) {
+  .aw-root { width: calc(100% + 28px); margin: -14px; height: calc(100vh - 60px); }
+  .aw-legend {
+    left: 10px; right: 10px; bottom: 44px;
+    min-width: 0;
+    max-height: 120px;
+    overflow: hidden;
+  }
+  .aw-help { left: 10px; right: 10px; bottom: 8px; text-align: center; }
+}
+
+.aw-stage {
+  position: absolute; inset: 0;
+  display: block;
+}
+.aw-stage canvas {
+  display: block; width: 100% !important; height: 100% !important;
+}
+
+.aw-help {
+  position: absolute; right: 14px; top: 14px;
+  padding: 7px 11px;
+  font-size: 11px; color: #A6E2FF;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(5, 8, 18, 0.68);
+  border: 1px solid rgba(102, 226, 255, 0.28);
+  border-radius: 6px;
+  pointer-events: none;
+  text-shadow: 0 0 6px rgba(102, 226, 255, 0.4);
+  user-select: none;
+  z-index: 4;
+}
+
+.aw-legend {
+  position: absolute; left: 14px; top: 14px;
+  width: 310px;
+  max-width: calc(100vw - 52px);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 11.5px; color: #DCE7FF;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(5, 8, 18, 0.72);
+  border: 1px solid rgba(102, 226, 255, 0.22);
+  border-radius: 6px;
+  pointer-events: none;
+  user-select: none;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  z-index: 4;
+}
+.aw-legend::before {
+  content: "ACTORSTAGE RUNTIME";
+  display: block;
+  margin-bottom: 2px;
+  color: #FFE38A;
+  font-size: 10px;
+  font-weight: 700;
+}
+.aw-legend-item,
+.aw-hud-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.aw-legend-sw,
+.aw-hud-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+.aw-legend-name,
+.aw-hud-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aw-legend-tier,
+.aw-hud-kind {
+  color: #A6E2FF;
+  font-size: 9.5px;
+  font-weight: 700;
+  border: 1px solid rgba(102, 226, 255, 0.22);
+  border-radius: 4px;
+  padding: 2px 5px;
+  background: rgba(102, 226, 255, 0.08);
+}
+.aw-toolrail {
+  position: absolute; right: 14px; top: 52px;
+  width: 270px;
+  max-width: calc(100vw - 52px);
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 12px;
+  background: rgba(5, 8, 18, 0.72);
+  border: 1px solid rgba(243, 107, 255, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  z-index: 4;
+}
+.aw-toolrail-title {
+  flex: 0 0 100%;
+  color: #F36BFF;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+}
+.aw-tool-chip {
+  display: inline-flex;
+  padding: 3px 7px;
+  border: 1px solid rgba(65, 230, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(65, 230, 255, 0.08);
+  color: #DCE7FF;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+}
+
+/* Cyberpunk neon tooltip — fixed-positioned, projected onto the sphere
+   each frame by actor-world.js. Pointer-events auto so the operator can
+   click links/buttons inside, none when behind the camera (re-toggled in JS). */
+.aw-tooltip {
+  position: absolute; left: 0; top: 0;
+  width: 280px;
+  background: rgba(5, 8, 18, 0.94);
+  border: 1px solid rgba(102, 226, 255, 0.55);
+  border-radius: 6px;
+  color: #E2F4FF;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  box-shadow:
+    0 0 0 1px rgba(180, 100, 255, 0.18) inset,
+    0 0 14px rgba(102, 226, 255, 0.40),
+    0 0 30px rgba(180, 100, 255, 0.18);
+  z-index: 5;
+  transition: opacity 120ms linear;
+}
+.aw-tt-head {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(102, 226, 255, 0.20);
+  background: linear-gradient(180deg, rgba(102, 226, 255, 0.08), transparent);
+}
+.aw-tt-glyph {
+  font-size: 22px; line-height: 1; color: #FFE38A;
+  text-shadow: 0 0 10px rgba(255, 227, 138, 0.6);
+}
+.aw-tt-titles { flex: 1 1 auto; min-width: 0; }
+.aw-tt-name {
+  font-size: 13px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.3px;
+}
+.aw-tt-role {
+  font-size: 11px; color: #66E2FF; letter-spacing: 0.5px; text-transform: uppercase;
+  margin-top: 2px;
+}
+.aw-tt-x {
+  background: transparent; border: none; color: #A6E2FF;
+  font-size: 18px; line-height: 1; cursor: pointer;
+  padding: 0 4px;
+}
+.aw-tt-x:hover { color: #FFFFFF; text-shadow: 0 0 6px #66E2FF; }
+
+.aw-tt-body { padding: 10px 12px; font-size: 11.5px; line-height: 1.55; }
+.aw-tt-desc { color: #DCE7FF; }
+.aw-tt-section {
+  margin-top: 10px;
+  font-size: 10px; letter-spacing: 1px; color: #B27CFF;
+}
+.aw-tt-trigs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.aw-tt-trig {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(102, 226, 255, 0.10);
+  border: 1px solid rgba(102, 226, 255, 0.30);
+  border-radius: 3px;
+  color: #A6E2FF;
+  font-size: 10.5px;
+}
+.aw-tt-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+.aw-tt-files code {
+  display: inline-flex;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 224, 102, 0.10);
+  border: 1px solid rgba(255, 224, 102, 0.24);
+  color: #FFE38A;
+  font-size: 10.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.aw-tt-more {
+  display: inline-block; margin-top: 10px;
+  font-size: 11px; color: #FFE38A;
+  text-decoration: none;
+  text-shadow: 0 0 6px rgba(255, 227, 138, 0.4);
+}
+.aw-tt-more:hover { color: #FFFFFF; }
+
+@media (max-width: 780px) {
+  .aw-legend {
+    left: 10px; right: 10px; top: 10px;
+    width: auto;
+    max-height: 120px;
+    overflow: hidden;
+  }
+  .aw-help { left: 10px; right: 10px; top: auto; bottom: 8px; text-align: center; }
+  .aw-toolrail { display: none; }
+  .aw-tooltip { max-width: calc(100vw - 28px); }
+}

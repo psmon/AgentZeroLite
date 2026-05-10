@@ -27,6 +27,20 @@
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
+  <!-- Import map for Three.js (M0016 Actor World view).
+       jsm/* example files use bare `from 'three'` specifiers; without this
+       map the browser refuses with "Failed to resolve module specifier 'three'".
+       Bumping Three.js means updating both the URL and the matching version
+       in js/views/actor-world.js → THREE_VERSION constant. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three":          "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/":  "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
   <!-- App -->
   <script type="module" src="js/app.js"></script>
 </body>

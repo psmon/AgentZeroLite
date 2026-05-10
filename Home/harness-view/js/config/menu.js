@@ -14,6 +14,7 @@ export const MENU = [
   { id: 'principles',    label: 'Principles',      icon: 'bulb',      section: 'secondary', view: 'principles' },
   { id: 'models',        label: 'AIModels',        icon: 'cpu',       section: 'secondary', view: 'models' },
   { id: 'agent-models',  label: 'AgentModels',     icon: 'network',   section: 'secondary', view: 'agent-models' },
+  { id: 'actor-world',   label: 'Actor World',     icon: 'orbit',     section: 'secondary', view: 'actor-world' },
   { id: 'webdev-plugin', label: 'WebDev Plugin',   icon: 'puzzle',    section: 'secondary', view: 'webdev-plugin' },
   { id: 'design',        label: 'Product Design',  icon: 'layers',    section: 'secondary', view: 'design' },
   { id: 'product-intro', label: 'Product Intro',   icon: 'box',       section: 'secondary', view: 'product-intro' },
@@ -57,4 +58,5 @@ export const ICONS = {
   cpu:      '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>',
   network:  '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><line x1="11" y1="7" x2="6.5" y2="16.7"/><line x1="13" y1="7" x2="17.5" y2="16.7"/><line x1="7" y1="19" x2="17" y2="19"/></svg>',
   puzzle:   '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v3a1 1 0 0 0 1 1h3v3a1 1 0 0 1-1 1H3v3a2 2 0 0 0 2 2h3v-2a2 2 0 0 1 4 0v2h3a2 2 0 0 0 2-2v-3h2a2 2 0 0 0 0-4h-2V7a2 2 0 0 0-2-2h-3v2a2 2 0 0 1-4 0V5H5a2 2 0 0 0-2 2"/></svg>',
+  orbit:    '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="4" ry="10" transform="rotate(60 12 12)"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>',
 };
