@@ -1080,6 +1080,7 @@
 .mod-badge.badge-tool-native { background: #CFFAFE; color: #0E7490; }
 .mod-badge.badge-byok       { background: #FFE4E6; color: #BE123C; }
 .mod-badge.badge-free-tier  { background: #ECFCCB; color: #4D7C0F; }
+.mod-badge.badge-test-key   { background: #ECFCCB; color: #4D7C0F; }
 .mod-badge.badge-self-hosted { background: #E0E7FF; color: #4338CA; }
 .mod-badge.badge-experimental { background: #FECACA; color: #B91C1C; }
 .mod-badge.badge-premium    { background: #FCE7F3; color: #BE185D; }

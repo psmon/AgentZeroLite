@@ -707,7 +707,8 @@
                                                 <ComboBox x:Name="cbExtProvider" Style="{StaticResource DarkComboBox}"
                                                           Margin="0,0,0,6"
                                                           SelectionChanged="OnExtProviderChanged">
-                                                    <ComboBoxItem Content="Webnori (free contributor tier — best-effort uptime)"/>
+                                                    <ComboBoxItem Content="Webnori a1 — workhorse (Gemma 4 / GPT-OSS / embeddings · test key bundled)"/>
+                                                    <ComboBoxItem Content="Webnori a2 — experimental (Qwen3.6-27B / Nemotron-3-Nano-4B · same test key)"/>
                                                     <ComboBoxItem Content="OpenAI (api.openai.com — requires key)"/>
                                                     <ComboBoxItem Content="LMStudio (your own LM Studio server)"/>
                                                     <ComboBoxItem Content="Ollama (localhost:11434)"/>

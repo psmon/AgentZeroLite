@@ -4,8 +4,8 @@ using Xunit.Abstractions;
 namespace ZeroCommon.Tests;
 
 /// <summary>
-/// Online smoke tests for the Webnori free-tier provider. These are the
-/// canonical "does the wire still work" tests — much cheaper than spinning
+/// Online smoke tests for the Webnori bundled test-key provider. These are
+/// the canonical "does the wire still work" tests — much cheaper than spinning
 /// up a 5 GB local Gemma 4. Maintainer's dev box can't run the local model
 /// reliably, so this is the default LLM-touching path for CI.
 ///

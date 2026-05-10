@@ -88,6 +88,7 @@ public sealed class LlmRuntimeSettings
         return External.Provider switch
         {
             ExternalProviderNames.Webnori => LlmProviderFactory.CreateWebnori(),
+            ExternalProviderNames.WebnoriA2 => LlmProviderFactory.CreateWebnoriA2(),
             ExternalProviderNames.OpenAI => LlmProviderFactory.CreateOpenAI(External.OpenAIApiKey, External.OpenAIBaseUrl),
             ExternalProviderNames.LMStudio => LlmProviderFactory.CreateLmStudio(External.LMStudioBaseUrl, External.LMStudioApiKey),
             ExternalProviderNames.Ollama => LlmProviderFactory.CreateOllama(External.OllamaBaseUrl),
@@ -100,9 +101,12 @@ public sealed class LlmRuntimeSettings
     {
         if (!string.IsNullOrEmpty(External.SelectedModel))
             return External.SelectedModel;
-        return External.Provider == ExternalProviderNames.Webnori
-            ? WebnoriDefaults.DefaultModel
-            : "";
+        return External.Provider switch
+        {
+            ExternalProviderNames.Webnori => WebnoriDefaults.DefaultModel,
+            ExternalProviderNames.WebnoriA2 => WebnoriDefaults.DefaultModelA2,
+            _ => "",
+        };
     }
 
     public LocalLlmOptions ToOptions(string modelPath) => new()

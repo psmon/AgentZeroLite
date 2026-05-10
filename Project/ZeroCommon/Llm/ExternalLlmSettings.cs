@@ -12,13 +12,14 @@ namespace Agent.Common.Llm;
 /// </summary>
 public sealed class ExternalLlmSettings
 {
-    /// <summary>"Webnori" | "OpenAI" | "LMStudio" | "Ollama". See <see cref="ExternalProviderNames"/>.</summary>
+    /// <summary>"Webnori" | "WebnoriA2" | "OpenAI" | "LMStudio" | "Ollama". See <see cref="ExternalProviderNames"/>.</summary>
     public string Provider { get; set; } = ExternalProviderNames.Webnori;
 
     /// <summary>
-    /// Model id sent on each request. When empty for Webnori we fall back to
-    /// <see cref="WebnoriDefaults.DefaultModel"/>; for other providers an empty
-    /// value means the user hasn't picked one yet (Refresh + select required).
+    /// Model id sent on each request. When empty for Webnori a1/a2 we fall
+    /// back to that host's default (<see cref="WebnoriDefaults.DefaultModel"/>
+    /// or <see cref="WebnoriDefaults.DefaultModelA2"/>); for other providers
+    /// an empty value means the user hasn't picked one yet (Refresh + select required).
     /// </summary>
     public string SelectedModel { get; set; } = WebnoriDefaults.DefaultModel;
 

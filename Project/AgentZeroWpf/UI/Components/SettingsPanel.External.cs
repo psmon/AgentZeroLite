@@ -81,9 +81,10 @@ public partial class SettingsPanel
             cbExtProvider.SelectedIndex = s.External.Provider switch
             {
                 ExternalProviderNames.Webnori => 0,
-                ExternalProviderNames.OpenAI => 1,
-                ExternalProviderNames.LMStudio => 2,
-                ExternalProviderNames.Ollama => 3,
+                ExternalProviderNames.WebnoriA2 => 1,
+                ExternalProviderNames.OpenAI => 2,
+                ExternalProviderNames.LMStudio => 3,
+                ExternalProviderNames.Ollama => 4,
                 _ => 0,
             };
 
@@ -94,11 +95,18 @@ public partial class SettingsPanel
             // get the typed Text either way).
             if (s.External.Provider == ExternalProviderNames.Webnori)
                 PopulateModelDropdown(WebnoriDefaults.KnownModels);
+            else if (s.External.Provider == ExternalProviderNames.WebnoriA2)
+                PopulateModelDropdown(WebnoriDefaults.KnownModelsA2);
             else
                 cbExtModel.Items.Clear();
 
             cbExtModel.Text = string.IsNullOrEmpty(s.External.SelectedModel)
-                ? (s.External.Provider == ExternalProviderNames.Webnori ? WebnoriDefaults.DefaultModel : "")
+                ? s.External.Provider switch
+                {
+                    ExternalProviderNames.Webnori => WebnoriDefaults.DefaultModel,
+                    ExternalProviderNames.WebnoriA2 => WebnoriDefaults.DefaultModelA2,
+                    _ => "",
+                }
                 : s.External.SelectedModel;
 
             tbExtMaxTokens.Text = s.External.MaxTokens.ToString();
@@ -124,6 +132,13 @@ public partial class SettingsPanel
             PopulateModelDropdown(WebnoriDefaults.KnownModels);
             cbExtModel.Text = string.IsNullOrEmpty(s.External.SelectedModel)
                 ? WebnoriDefaults.DefaultModel
+                : s.External.SelectedModel;
+        }
+        else if (s.External.Provider == ExternalProviderNames.WebnoriA2)
+        {
+            PopulateModelDropdown(WebnoriDefaults.KnownModelsA2);
+            cbExtModel.Text = string.IsNullOrEmpty(s.External.SelectedModel)
+                ? WebnoriDefaults.DefaultModelA2
                 : s.External.SelectedModel;
         }
         else
@@ -244,9 +259,11 @@ public partial class SettingsPanel
 
     private static string ProviderFromIndex(int idx) => idx switch
     {
-        1 => ExternalProviderNames.OpenAI,
-        2 => ExternalProviderNames.LMStudio,
-        3 => ExternalProviderNames.Ollama,
+        0 => ExternalProviderNames.Webnori,
+        1 => ExternalProviderNames.WebnoriA2,
+        2 => ExternalProviderNames.OpenAI,
+        3 => ExternalProviderNames.LMStudio,
+        4 => ExternalProviderNames.Ollama,
         _ => ExternalProviderNames.Webnori,
     };
 
@@ -259,7 +276,14 @@ public partial class SettingsPanel
                 tbExtApiKey.Text = WebnoriDefaults.ApiKey;
                 tbExtBaseUrl.IsReadOnly = true;
                 tbExtApiKey.IsReadOnly = true;
-                tbExtProviderHint.Text = "⏱ 임시 한정 제공 — temporary, no-SLA contributor tier. Webnori is a free-tier Gemma 4 host run by the project; the API key is intentionally exposed and the endpoint may be paused, rate-limited, or rotated without notice. For production / long-running work, switch to Local or your own provider.";
+                tbExtProviderHint.Text = "🧪 Webnori a1 — workhorse host (Gemma 4 / GPT-OSS / embeddings). Bundled test key shipped with the app so any AgentZero Lite user can try the External LLM path immediately without setting up their own credentials. Endpoint accepts unauthenticated calls too; the bundled key is shipped on purpose (not a secret) and is included on every request for consistent identification while you evaluate the app. For sustained / production use, switch to Local or your own provider.";
+                break;
+            case ExternalProviderNames.WebnoriA2:
+                tbExtBaseUrl.Text = WebnoriDefaults.BaseUrlA2;
+                tbExtApiKey.Text = WebnoriDefaults.ApiKey;
+                tbExtBaseUrl.IsReadOnly = true;
+                tbExtApiKey.IsReadOnly = true;
+                tbExtProviderHint.Text = "🧪 Webnori a2 — experimental comparison group (Qwen3.6-27B / Nemotron-3-Nano-4B). Same bundled test key as a1; pick this when you want to A/B against a non-Gemma model. Note: AgentZero's AIMODE toolchain is Gemma-4-shaped — non-Gemma models on a2 may struggle with the JSON envelope. Best used from the LLM PlayGround for free-form chat comparison.";
                 break;
             case ExternalProviderNames.OpenAI:
                 tbExtBaseUrl.Text = s.External.OpenAIBaseUrl;

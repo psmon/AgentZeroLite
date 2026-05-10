@@ -9,9 +9,10 @@ namespace Agent.Common.Voice;
 /// <summary>
 /// Webnori-hosted Gemma audio STT. Webnori exposes an OpenAI-compatible chat
 /// endpoint, so we hand the audio in via a Chat-Completions <c>input_audio</c>
-/// content block and ask the model to transcribe verbatim. The credentials
-/// are owned by the LLM tab (<c>WebnoriDefaults.BaseUrl</c> /
-/// <c>WebnoriDefaults.ApiKey</c>) — the user does not maintain a second slot.
+/// content block and ask the model to transcribe verbatim. The endpoint and
+/// the bundled test key are shared with the LLM tab (<c>WebnoriDefaults.BaseUrl</c>
+/// / <c>WebnoriDefaults.ApiKey</c>) — the user does not maintain a second slot,
+/// and the key is shipped on purpose as a try-it-out credential, not a secret.
 ///
 /// The actual audio capability of a given Webnori model is server-side; if
 /// the endpoint refuses the audio content type we surface the upstream error

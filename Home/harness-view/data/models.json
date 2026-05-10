@@ -84,16 +84,46 @@
       },
       "models": [
         {
-          "name": "Webnori Gemma",
-          "variant": "google/gemma-4-e4b · gemma-4-26b-a4b",
+          "name": "Webnori a1 — workhorse",
+          "variant": "google/gemma-4-e4b · openai/gpt-oss-20b · nomic-embed",
           "vendor": "Webnori",
           "size": "—",
-          "params": "9B / 26B",
-          "badges": ["hosted", "free-tier"],
+          "params": "9B / 20B / embed",
+          "badges": ["hosted", "test-key", "default"],
           "tone": "amber",
           "summary": {
-            "en": "Webnori-hosted LM-Studio gateway. Free contributor tier — best-effort SLA, API key rotates without notice. Useful when local inference is unavailable but the user wants to stay in the Gemma toolchain.",
-            "ko": "Webnori 가 호스팅하는 LM-Studio 게이트웨이. 무료 컨트리뷰터 등급 — best-effort SLA, API 키는 사전 통지 없이 회전. 로컬 추론이 불가능하지만 Gemma 툴체인을 유지하고 싶을 때 유용."
+            "en": "Webnori a1 — the workhorse host. Hosts the Gemma 4 lane the local toolchain mirrors, plus GPT-OSS 20B for heavier prompts and a nomic embedding endpoint. The bundled API key is shipped as a free test credential so any AgentZero Lite user can try the External LLM path without setting one up — calls work even without the key, but the app includes it on every request for consistent identification. Useful when local inference is unavailable but the user wants to stay in the Gemma toolchain.",
+            "ko": "Webnori a1 — 워크호스 호스트. 로컬 툴체인이 그대로 미러링하는 Gemma 4 라인 + 더 무거운 프롬프트용 GPT-OSS 20B + nomic 임베딩 엔드포인트를 제공. 동봉된 API 키는 AgentZero Lite 를 즉시 시험해볼 수 있도록 제공되는 테스트용 자격증명 — 키 없이도 호출되지만 앱은 일관된 식별을 위해 매 요청에 함께 보낸다. 로컬 추론이 불가능하지만 Gemma 툴체인을 유지하고 싶을 때 유용."
+          }
+        },
+        {
+          "name": "Webnori a2 — experimental",
+          "variant": "qwen/qwen3.6-27b · nvidia/nemotron-3-nano-4b",
+          "vendor": "Webnori",
+          "size": "—",
+          "params": "27B / 4B",
+          "badges": ["hosted", "test-key", "experimental"],
+          "tone": "amber",
+          "summary": {
+            "en": "Webnori a2 — experimental comparison group. A larger non-Gemma model (Qwen3.6-27B) and a small Nemotron-3-Nano-4B for A/B testing the External path against the a1 Gemma defaults. Same bundled test key as a1 — pick from Settings → LLM → External or just hit the LLM PlayGround for free-form chat. Note: AgentZero's AIMODE tool envelope is Gemma-4-shaped, so non-Gemma models here may struggle with the agent loop's JSON. Best used from PlayGround for quality comparison rather than the agent.",
+            "ko": "Webnori a2 — 실험용 비교군. 비-Gemma 대형 모델(Qwen3.6-27B)과 소형 Nemotron-3-Nano-4B 로 External 경로를 a1 Gemma 기본과 A/B 비교. a1과 동일한 동봉 테스트 키를 사용하며, Settings → LLM → External 에서 선택하거나 LLM PlayGround 에서 자유 채팅으로 비교. 주의: AgentZero AIMODE 툴 envelope 는 Gemma-4 모양이라 여기 비-Gemma 모델들은 에이전트 루프의 JSON 을 못 따라갈 수 있음. PlayGround 에서 품질 비교용으로 쓰는 것이 적합."
+          }
+        },
+        {
+          "name": "Qwen3.6-27B",
+          "variant": "qwen/qwen3.6-27b · via Webnori a2",
+          "vendor": "Alibaba (Qwen Team)",
+          "size": "—",
+          "params": "27B dense",
+          "badges": ["hosted", "experimental"],
+          "tone": "blue",
+          "summary": {
+            "en": "Alibaba's April 2026 dense flagship — 27B parameters that match or beat the ≈15× larger Qwen3.5-397B-A17B on coding benchmarks: SWE-bench Verified 77.2% (vs 76.2%), SWE-bench Pro 53.5% (vs 50.9%), Terminal-Bench 2.0 59.3% (vs 52.5%). Apache-2.0 open-weight. AgentZero Lite reaches it via the Webnori a2 host — pick it from Settings → LLM → External, or open the LLM PlayGround for free-form chat / coding comparison.",
+            "ko": "Alibaba Qwen 팀이 2026-04-22 공개한 dense 플래그십 — 27B 파라미터로 약 15× 큰 Qwen3.5-397B-A17B 를 코딩 벤치마크에서 동급/우위로 따라잡음: SWE-bench Verified 77.2%(vs 76.2%), SWE-bench Pro 53.5%(vs 50.9%), Terminal-Bench 2.0 59.3%(vs 52.5%). Apache-2.0 오픈웨이트. AgentZero Lite 에서는 Webnori a2 호스트를 통해 접근 — Settings → LLM → External 에서 선택하거나 LLM PlayGround 에서 자유 채팅/코딩 비교."
+          },
+          "details": {
+            "en": "Architecturally distinctive — 64 layers grouped into 16 blocks of 3 × (Gated DeltaNet → FFN) + 1 × (Gated Attention → FFN). Three of every four sublayers use linear-attention DeltaNet, which is what lets a dense 27B run efficiently at long context. Native 262,144-token window extensible to ~1 M, 201 languages and dialects, native multimodal input (text + image + video), and the first open-source model to ship 'Thinking Preservation' — chain-of-thought retained across turns rather than re-derived each call. Caveat for AgentZero: the AIMODE tool-call envelope is Gemma-4-shaped (GBNF on the local side, prompt-shaped on the external side), so the agent loop may not parse Qwen's JSON cleanly today. Best used from the LLM PlayGround for free-form chat and coding comparison, not yet as a drop-in agent backend.",
+            "ko": "구조적 특징 — 64 레이어를 16 블록으로 묶고 각 블록이 3 × (Gated DeltaNet → FFN) + 1 × (Gated Attention → FFN) 패턴. 4개 sublayer 중 3개가 선형 어텐션(DeltaNet)이라 dense 27B 가 긴 컨텍스트에서도 효율적으로 동작. 네이티브 262,144 토큰 컨텍스트(약 100만까지 확장), 201개 언어/방언, 네이티브 멀티모달 입력(text + image + video), 그리고 오픈소스 최초의 'Thinking Preservation' — chain-of-thought 를 매번 재생성하지 않고 턴 간 보존. AgentZero 사용 시 주의: AIMODE 툴-콜 envelope 가 Gemma-4 모양(로컬은 GBNF, 외부는 prompt-shaped)이라 에이전트 루프가 Qwen JSON 을 깔끔히 파싱하지 못할 수 있음. 당분간은 LLM PlayGround 에서 자유 채팅·코딩 비교용으로 쓰는 것이 적합 — 에이전트 백엔드 즉시 투입은 아직 이름."
           }
         },
         {
