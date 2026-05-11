@@ -1,127 +1,121 @@
 {
   "_description": "PDSA Learning surface — bilingual EN/KO. Default audience: English. `sources[].title`, `tried[]`, `solved[]`, `remaining[]`, `learned.lead`, `learned.body` use `{ en, ko }` shape. Scalars (date/time/category/file/analyzedAt/windowDays) stay language-neutral. PDSA UPDATE mode in the harness-view-build skill must emit both languages.",
-  "analyzedAt": "2026-05-09",
+  "analyzedAt": "2026-05-12",
   "windowDays": 14,
   "sources": [
     {
-      "date": "2026-05-09", "time": "22:53", "category": "mission-records",
-      "file": "harness/logs/mission-records/M0015-수행결과.md",
+      "date": "2026-05-11", "time": "22:00", "category": "mission-records",
+      "file": "harness/logs/mission-records/M0017-수행결과.md",
       "title": {
-        "en": "Mission M0015 — Voice sensitivity profile (Strict/Loose/Auto) + 4-round iterative fix arc (cap, hallucination filter, sentence-pace retune, test-process audit)",
-        "ko": "Mission M0015 — 음성 감도 프로파일(Strict/Loose/Auto) + 4라운드 반복 수정 arc (cap, 환각 필터, 문장-페이스 재튜닝, 테스트 프로세스 감사)"
+        "en": "Mission M0017 — Accessibility voice mode: hands-free delegation to Claude for web surfing + 10 follow-up fixes (handshake suppression, LLM bypass, DONE→TTS data contract alignment)",
+        "ko": "Mission M0017 — 시각장애인용 보이스 모드: 핸즈프리로 Claude 에 위임해 웹서핑 + 10 후속 fix (핸드셰이크 억제, LLM 우회, DONE→TTS 데이터 계약 정렬)"
       }
     },
     {
-      "date": "2026-05-07", "time": "23:19", "category": "mission-records",
-      "file": "harness/logs/mission-records/M0014-수행결과.md",
+      "date": "2026-05-10", "time": "07:51", "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-10-07-51-cli-block-recurrence-rca.md",
       "title": {
-        "en": "Mission M0014 — Imported AgentWin OS-automation surface: 12 CLI verbs + 6 LLM tools + audit log + E2E smoke",
-        "ko": "Mission M0014 — AgentWin 의 OS 자동화 표면 흡수: 12 CLI 동사 + 6 LLM 도구 + audit 로그 + E2E 스모크"
+        "en": "CLI block recurrence RCA — SendMessageW IPC has no timeout, so any busy UI thread freezes the CLI wrapper. Design flaw, not a regression.",
+        "ko": "CLI 블록 재발 RCA — SendMessageW IPC 가 타임아웃 없어서 UI 스레드가 잠깐만 바빠도 CLI 가 영구 블록. 회귀가 아니라 영구적 설계 결함."
       }
     },
     {
-      "date": "2026-05-05", "time": "11:25", "category": "mission-records",
-      "file": "harness/logs/mission-records/M0013-수행결과.md",
+      "date": "2026-05-10", "time": "10:31", "category": "kakashi-copy",
+      "file": "harness/logs/kakashi-copy/2026-05-10-10-31-pencil-design-from-pencil-creator.md",
       "title": {
-        "en": "Mission M0013 — Reactor → AgentLoop rename: 20 files refactored, vocabulary aligned with Anthropic SDK / Claude Agent SDK",
-        "ko": "Mission M0013 — Reactor → AgentLoop 리네임: 20파일 리팩터, Anthropic SDK / Claude Agent SDK 어휘 정렬"
+        "en": "Pencil-design skill ingested from sibling pencil-creator repo — Gemini + ComfyUI image gen for M0016 Actor World textures",
+        "ko": "형제 레포 pencil-creator 에서 pencil-design 스킬 흡수 — Gemini + ComfyUI 이미지 생성으로 M0016 Actor World 텍스처 준비"
       }
     },
     {
-      "date": "2026-05-05", "time": "10:46", "category": "code-coach",
-      "file": "harness/logs/code-coach/2026-05-05-10-46-actor-llm-agent-naming-research.md",
+      "date": "2026-05-09", "time": "15:30", "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-09-15-30-akka-wasm-feasibility-research.md",
       "title": {
-        "en": "Code-coach Mode 3 — Actor↔LLM agent-ization naming research: AgentBot (gateway) vs AgentLoop (agent) split surfaced in type names",
-        "ko": "Code-coach Mode 3 — Actor↔LLM agent화 네이밍 사전조사: AgentBot(게이트웨이) vs AgentLoop(에이전트) 분리를 타입 이름에 노출"
+        "en": "Akka.NET → WASM feasibility research for browser-side harness viewer actors",
+        "ko": "Akka.NET → WASM 가능성 조사 — 브라우저-사이드 하네스 뷰어 액터 후보"
       }
     },
     {
-      "date": "2026-05-04", "time": "23:10", "category": "mission-records",
-      "file": "harness/logs/mission-records/M0012-수행결과.md",
+      "date": "2026-05-05", "time": "07:15", "category": "tamer",
+      "file": "harness/logs/tamer/2026-05-05-07-15-nodejs-bash-stream-io-knowledge.md",
       "title": {
-        "en": "Mission M0012 — Token-Remaining widget simplification + Active Session panel split (separate SessionHeartbeat entity + wrapper v3 auto-redeploy)",
-        "ko": "Mission M0012 — Token-Remaining 위젯 단순화 + Active Session 패널 분리 (별도 SessionHeartbeat entity + wrapper v3 자동 재배포)"
+        "en": "Node.js / Bash stream-IO patterns captured into the harness — feeds the harness-view dev server preflight design",
+        "ko": "Node.js / Bash 스트림-IO 패턴을 하네스 지식으로 적재 — harness-view dev 서버 preflight 설계 자양분"
       }
     }
   ],
   "tried": [
     {
-      "en": "M0015 voice profile — introduced VoiceSensitivityLevel { Strict, Loose } + an Auto persistence token that resolves by context (AgentBot AiMode + voice-note → Loose, ChatMode/Key → Strict). Strict reproduces the origin curve byte-for-byte; Loose retunes for lecture-style audio. All decisions backed by 8 + 5 + 4 + 3 unit tests across the round arc.",
-      "ko": "M0015 음성 프로파일 — VoiceSensitivityLevel { Strict, Loose } + Auto 영속화 토큰 (AgentBot AiMode + voice-note → Loose, ChatMode/Key → Strict) 도입. Strict 는 origin 커브를 바이트 단위로 재현, Loose 는 강의 음성용 재튜닝. 라운드 arc 전반에 걸쳐 8 + 5 + 4 + 3 unit test 로 결정 뒷받침."
+      "en": "Stand up a voice delegation mode in AgentBot so the user can say '에이전트 큐' once and have every subsequent utterance route to a Claude tab — answer comes back via the existing TTS path. No new tool, no new LLM function-call surface.",
+      "ko": "AgentBot 에 음성 위임 모드를 도입 — 사용자가 한 번 '에이전트 큐' 라고 발화하면 이후 발화가 모두 Claude 탭으로 라우팅되고 응답은 기존 TTS 경로로 돌아옴. 새 도구나 LLM 펑션콜 추가 없음.",
+      "kind": "plan"
     },
     {
-      "en": "M0015 follow-ups — diagnosed live recording log (89s mega-blob, repeating 11-char Whisper hallucinations), then applied: (1) WhisperHallucinationFilter on voice-note path (was AgentBot-only), (2) MaxUtteranceSeconds cap on VadConfig + segmenter + capture (Loose 25s / Strict 30s), (3) raised Loose's min threshold floor 0.005 → 0.012, (4) sentence-pace retune (hangover 80 → 24 frames, preroll 1.5 → 0.5s).",
-      "ko": "M0015 후속진행 — 실측 녹음 로그 진단 (89초 mega-blob, 반복 11자 Whisper 환각) 후 (1) voice-note 경로에 WhisperHallucinationFilter 적용 (이전엔 AgentBot 만), (2) VadConfig + segmenter + capture 에 MaxUtteranceSeconds cap (Loose 25초 / Strict 30초), (3) Loose 최소 threshold floor 0.005 → 0.012, (4) sentence-pace 재튜닝 (hangover 80 → 24 frames, preroll 1.5 → 0.5초)."
+      "en": "Iterate on the Whisper STT trigger word three times — '위임' → '에이전트큐' → anchor 'agent / 에이전트' + alias set {큐, Q, 위임, weim, cue, queue, delegate} — because the same speaker's same phrase transcribed differently across runs.",
+      "ko": "Whisper STT 트리거 단어를 세 번 반복 — '위임' → '에이전트큐' → anchor 'agent / 에이전트' + alias set {큐, Q, 위임, weim, cue, queue, delegate} — 같은 사용자의 같은 발화가 매번 다르게 transcribe 되어서.",
+      "kind": "do"
     },
     {
-      "en": "M0015 test infrastructure — added SentencePaceSegmentationTests (synthetic 12-sentence × 5.5s lecture pattern → asserts ~12 segments per minute) + AgentTest LiveCaptureSegmentationTests (1-min mic capture, 72-config sweep across threshold × preroll × hangover, dumps each segment as a .wav so the operator can listen-and-judge). Skipped by default — manual run.",
-      "ko": "M0015 테스트 인프라 — SentencePaceSegmentationTests (합성 12문장 × 5.5초 강의 패턴 → 분당 ~12 segment 검증) + AgentTest 의 LiveCaptureSegmentationTests (1분 마이크 캡처 + threshold × preroll × hangover 72조합 sweep, 각 segment 를 .wav 로 dump 해서 operator 가 들어보고 판정) 추가. 기본 skip — 수동 실행."
+      "en": "Suppress the 1.5KB Mode-2 first-contact handshake that buried the user's actual question, then replace it with a 280-char focused handshake that teaches only the bot-chat DONE() reverse channel.",
+      "ko": "사용자 질문을 묻어버리던 1.5KB Mode-2 첫-접촉 핸드셰이크를 억제하고, bot-chat DONE() 응답 채널만 가르치는 280자짜리 집중 핸드셰이크로 교체.",
+      "kind": "do"
     },
     {
-      "en": "M0014 OS automation — imported the AgentWin origin's OS-control surface as 12 CLI verbs (os list-windows / screenshot / element-tree / activate / mouse-* / keypress / audit) + 6 LLM tools, with input-simulation gated by AGENTZERO_OS_INPUT_ALLOWED env or per-call --allow-input. Read-only verbs ungated. Audit trail at tmp/os-cli/audit/<date>.jsonl, E2E smoke engine for round-trip verification.",
-      "ko": "M0014 OS 자동화 — AgentWin origin 의 OS 제어 표면을 12개 CLI 동사 (os list-windows / screenshot / element-tree / activate / mouse-* / keypress / audit) + 6개 LLM 도구로 흡수, 입력 시뮬레이션은 AGENTZERO_OS_INPUT_ALLOWED env 또는 호출별 --allow-input 으로 게이팅. 읽기 전용 동사는 게이트 없음. tmp/os-cli/audit/<date>.jsonl 에 audit, 라운드트립 검증용 E2E 스모크 엔진 정의."
+      "en": "Add per-turn timeout (60s default) to ExternalAgentLoop streaming so a stalled Webnori SSE connection doesn't hang the agent loop indefinitely. Surface as TimeoutException → existing transient-retry path engages.",
+      "ko": "ExternalAgentLoop 스트리밍에 per-turn 타임아웃(기본 60s) 추가 — 멈춘 Webnori SSE 가 agent loop 를 영원히 잡지 않게. TimeoutException 으로 surface 해서 기존 transient-retry 경로 발동.",
+      "kind": "do"
     },
     {
-      "en": "M0013 + naming research — code-coach Mode 3 surveyed the existing Actor↔LLM dual-naming layer (AgentBotActor + AgentReactorActor + AgentToolLoop + AgentToolHost), surfaced 5 readability issues, recommended Option B (rename without semantic change). Mission then mechanically applied 14 symbol renames across 20 files, codified the new vocabulary in harness/knowledge/_shared/agent-architecture.md so future drift triggers code-coach Mode 2 auto-review.",
-      "ko": "M0013 + 네이밍 사전조사 — code-coach Mode 3 가 기존 Actor↔LLM 이중 네이밍 (AgentBotActor + AgentReactorActor + AgentToolLoop + AgentToolHost) 을 조사, 가독성 이슈 5건 노출 후 Option B (의미 변경 없이 어휘만 정리) 권장. 미션은 그 후 14개 심볼을 20파일에 기계적으로 rename, 신규 어휘를 harness/knowledge/_shared/agent-architecture.md 로 codify 해서 미래 drift 발생 시 code-coach Mode 2 가 자동 review."
-    },
-    {
-      "en": "M0012 telemetry split — diagnosed M0011's row-per-model widget as semantically wrong (rate_limits is an account-level quota), split into Phase 1 (UX-only collapse, risk-free) + Phase 2 (separate SessionHeartbeat entity, EF migration, wrapper v3 with session_id capture, idempotent OnStartup auto-redeploy hook). Design-first .pen mockups absorbed 4 operator feedback items before any code change.",
-      "ko": "M0012 telemetry 분리 — M0011 의 row-per-model 위젯이 의미론적으로 잘못됨을 진단 (rate_limits 가 계정 단위 quota), Phase 1 (UX-only collapse, 무위험) + Phase 2 (별도 SessionHeartbeat entity, EF migration, session_id 캡처하는 wrapper v3, idempotent OnStartup 자동 재배포 hook) 으로 분할. design-first .pen mockup 이 코드 진입 전에 운영자 피드백 4건 흡수."
+      "en": "After the operator's 'AI 가 별도 해석하지 말고 DONE 만 읽어주면 된다' insight, drop the wrap+tool-call orchestration entirely for delegation — write voice directly to the Claude session and short-circuit DONE callbacks straight to TTS.",
+      "ko": "operator 의 'AI 가 별도 해석하지 말고 DONE 만 읽어주면 된다' 인사이트 후 — 위임에서 wrap+tool-call 오케스트레이션을 통째로 제거. 음성을 Claude 세션에 직접 쓰고 DONE 콜백은 단축경로로 곧장 TTS.",
+      "kind": "do"
     }
   ],
   "solved": [
     {
-      "en": "M0015 voice surface end-to-end — Strict/Loose/Auto profile + sentence-pace timing + hallucination filter + duration cap shipped together. 89/89 voice tests green, AgentZeroWpf + AgentTest both build 0 errors, default \"Strict\" preserves backwards compatibility for existing personal-mic users.",
-      "ko": "M0015 음성 표면 end-to-end — Strict/Loose/Auto 프로파일 + 문장-페이스 타이밍 + 환각 필터 + 길이 cap 동시 배포. 89/89 voice 테스트 그린, AgentZeroWpf + AgentTest 둘 다 0 error 빌드, 기본값 \"Strict\" 로 기존 개인 마이크 사용자 후방 호환."
+      "en": "Voice → Claude → TTS round-trip working end-to-end at ~50ms latency send + ~50ms receive (no LLM cycles, no token cost). Operator-verified hands-free flow: 'open Coupang and find gifts liked by men in their 40s' → spoken answer.",
+      "ko": "음성 → Claude → TTS 왕복이 ~50ms 송신 + ~50ms 수신 latency 로 end-to-end 동작 (LLM 사이클 없음, 토큰 비용 0). operator 가 핸즈프리 흐름 확인: '쿠팡에서 40대 남자가 좋아하는 선물 찾아줘' → 음성 답변."
     },
     {
-      "en": "M0014 OS-automation surface — 13 → 25 total CLI verbs, 5 → 11 LLM tools (KnownTools + GBNF grammar + system prompt aligned), audit trail working across CLI/LLM/E2E, gate refusals also instruct the LLM to terminate (combined with M0013's repeat-defense AgentLoopGuards prevents stuck loops).",
-      "ko": "M0014 OS 자동화 표면 — 총 CLI 동사 13 → 25, LLM 도구 5 → 11 (KnownTools + GBNF 문법 + 시스템 프롬프트 동기화), CLI/LLM/E2E 삼자 audit 트레일 작동, 게이트 거부 시 LLM 에 종료 지시 (M0013 의 repeat-defense AgentLoopGuards 와 결합되어 갇힘 차단)."
+      "en": "Cross-layer data contract bug fixed: MainWindow.HandleBotChat pre-unwraps DONE() for UI display, but AgentBotActor's TTS shortcut was matching the wrapper. Shortcut now accepts wrapper OR raw inner text, handshake-acks (ready/handshake-ok/ok/ack) still filtered."
+,
+      "ko": "레이어 간 데이터 계약 버그 수정: MainWindow.HandleBotChat 가 UI 표시용으로 DONE() 을 미리 벗기는데, AgentBotActor 의 TTS 단축경로는 래퍼 있는 거 기대. 이제 래퍼/raw 둘 다 수용, 핸드셰이크 ack(ready/handshake-ok/ok/ack) 는 여전히 필터링."
     },
     {
-      "en": "M0013 vocabulary alignment — AgentBot (UI gateway) vs AgentLoop (the actual agent) distinction now visible in type names; Akka path /user/stage/bot/reactor → /user/stage/bot/loop; new contributors can map directly from Anthropic Building effective agents post and Claude Agent SDK without learning a parallel Akka idiom.",
-      "ko": "M0013 어휘 정렬 — AgentBot (UI 게이트웨이) vs AgentLoop (실제 에이전트) 구분이 타입 이름에 노출, Akka path /user/stage/bot/reactor → /user/stage/bot/loop, 신규 컨트리뷰터가 Anthropic Building effective agents 포스트 + Claude Agent SDK 어휘를 그대로 매핑 가능."
+      "en": "Shift+Tab now reaches Claude Code's accept-mode cycle via terminal. New TerminalControl.BackTab enum → ESC[Z; MainWindow PreviewKeyDown branches on Shift modifier; CLI terminal-key and AIMODE send_key accept 'shifttab'/'backtab' aliases.",
+      "ko": "터미널 안에서 Shift+Tab 이 Claude Code 의 accept-mode 순환에 도달. 신규 TerminalControl.BackTab enum → ESC[Z; MainWindow PreviewKeyDown 이 Shift 모디파이어 분기; CLI terminal-key 와 AIMODE send_key 가 'shifttab'/'backtab' 별칭 수용."
     },
     {
-      "en": "M0012 SessionHeartbeat full-stack — entity + EF migration + UPSERT collector + LastSeenUtc index + RPC + push event + UI delivered without touching TokenRemainingObservation; multi-account stacked widget passed operator fine-tuning (account picker dropped, sort-by-recent activity).",
-      "ko": "M0012 SessionHeartbeat 풀스택 — entity + EF migration + UPSERT collector + LastSeenUtc 인덱스 + RPC + push 이벤트 + UI 가 TokenRemainingObservation 무손상으로 배포, multi-account 스택 위젯이 운영자 fine-tuning 통과 (account picker 제거, 최근 활동순 정렬)."
-    },
-    {
-      "en": "Test process audit + safe-filter convention — diagnosed the assistant's own background-run mistake (3 unfiltered dotnet test runs loaded Nemotron-8B three times, ~21 GB working set + 5.8 CPU-hours wasted), killed the zombies, and codified a default --filter rule for future runs in M0015's #4 follow-up.",
-      "ko": "테스트 프로세스 감사 + 안전 필터 컨벤션 — assistant 자신의 백그라운드 실행 실수를 진단 (3회 무필터 dotnet test 가 Nemotron-8B 를 세 번 로드, ~21GB working set + 5.8 CPU-시간 낭비), zombie 정리 후 향후 실행을 위한 default --filter 규칙을 M0015 의 후속 진행 #4 에 codify."
+      "en": "Auto-approve pattern coverage extended (v1): MCP/tool/workspace-trust keywords ('Allow Claude to use', 'Use this tool', 'Trust this folder/directory') and Unicode pointer separators (❯/▶/•/◆) for newer Claude Code builds.",
+      "ko": "자동승인 패턴 확장 (v1): MCP/도구/워크스페이스-신뢰 키워드 ('Allow Claude to use', 'Use this tool', 'Trust this folder/directory') 와 유니코드 포인터 (❯/▶/•/◆) — 최신 Claude Code 빌드 대응."
     }
   ],
   "remaining": [
     {
-      "en": "M0015 live tuning round — operator runs LiveCaptureSegmentationTests with TV on, picks the best (threshold × preroll × hangover) combination from the 72-config sweep report by listening to the dumped per-segment .wav files. Numbers may differ from the synthetic 24-frame default.",
-      "ko": "M0015 라이브 튜닝 라운드 — operator 가 TV 켜둔 상태로 LiveCaptureSegmentationTests 실행, 72조합 sweep 리포트에서 dump 된 segment .wav 들을 들어보고 최적 (threshold × preroll × hangover) 선택. 합성 테스트의 24-frame 기본값과 다를 수 있음."
+      "en": "CLI block (SendMessageW with no timeout) is a separate, pre-existing IPC design flaw — code-coach RCA 2026-05-10 — not addressed by M0017. Replace with PostMessage + MMF-only response, or SendMessageTimeout, to make CLI wrappers immune to UI-thread spikes.",
+      "ko": "CLI 블록 (타임아웃 없는 SendMessageW) 은 별개의 기존 IPC 설계 결함 — code-coach 2026-05-10 RCA. M0017 범위 밖. PostMessage + MMF-only 응답 또는 SendMessageTimeout 으로 교체해 UI-스레드 스파이크 immune 화 필요."
     },
     {
-      "en": "Whisper medium-model auto-promotion when Loose/Auto active — currently profile only adjusts VAD; STT model selection still global. Operator's M0015 brief explicitly mentioned medium model for distant lecture audio.",
-      "ko": "Loose/Auto 활성 시 Whisper medium-모델 자동 승격 — 현재 프로파일은 VAD 만 조정, STT 모델 선택은 여전히 전역. operator 의 M0015 brief 가 원거리 강의 음성용 medium 모델을 명시 언급."
+      "en": "Pre-condition automation deferred — playwright capability probe, auto-install, and approval-prompt Enter relay are still manual. Candidate for M0018.",
+      "ko": "사전 조건 자동화 보류 — playwright capability 프로브, 자동 설치, 승인 프롬프트 엔터 중계는 아직 수동. M0018 후보."
     },
     {
-      "en": "Voice settings UI exposure — SensitivityProfile field still JSON-only (operator hand-edits voice.json). Voice tab needs a profile selector (radio buttons / dropdown) so non-technical users can switch curves without touching files.",
-      "ko": "음성 설정 UI 노출 — SensitivityProfile 필드가 여전히 JSON 전용 (operator 가 voice.json 직접 편집). Voice 탭에 프로파일 선택기 (라디오 버튼 / 드롭다운) 추가해서 비기술 사용자도 파일 손대지 않고 커브 전환 가능해야 함."
+      "en": "Whisper STT truncation on Korean tail syllables (observed: '오늘의 날씨 어때?' → '오늘의 날씨는' missing tail) — likely VAD hangover too aggressive. Candidate for M0021.",
+      "ko": "Whisper STT 가 한국어 끝 음절을 자르는 경향 (관측: '오늘의 날씨 어때?' → '오늘의 날씨는' 으로 끝 사라짐) — VAD hangover 가 너무 공격적. M0021 후보."
     },
     {
-      "en": "Other agents codifying their own domain catalogues — security-guard's prompt-injection rare-traps, build-doctor's csproj-publish gotchas should reach the same catalogue grade as M0011's nodejs-bash-pitfalls and M0015's voice-tuning lessons. Pending recommendation since M0012.",
-      "ko": "다른 agent 의 도메인 catalogue codify — security-guard 의 prompt-injection rare-trap, build-doctor 의 csproj-publish gotcha 도 M0011 의 nodejs-bash-pitfalls 및 M0015 의 음성 튜닝 교훈과 동일 격의 catalogue 까지 도달해야 함. M0012 이후 권장 대기 중."
-    },
-    {
-      "en": "M0014's premature-csproj-split rejection trail — the origin survey recommended a separate AgentZeroWpf.Automation csproj, but empirical inspection showed the existing folder structure was sufficient. Document this kind of \"survey says X, empirical says Y\" decision in a code-coach knowledge note so future origin-imports don't re-debate it.",
-      "ko": "M0014 의 premature-csproj-split 거절 트레일 — origin survey 가 별도 AgentZeroWpf.Automation csproj 분리를 권장했으나 실측 결과 기존 폴더 구조로 충분했음. 이런 \"survey says X, empirical says Y\" 결정을 code-coach 지식 노트로 문서화해서 향후 origin-import 가 재논의하지 않도록 해야 함."
+      "en": "ExternalAgentLoop on Webnori occasionally emits {\"message\":...} envelopes without the 'tool' key, breaking GBNF-less external parsing. Auto-wrap top-level {message:...} as done() — M0022 candidate.",
+      "ko": "ExternalAgentLoop 가 Webnori 위에서 가끔 'tool' 키 없는 {\"message\":...} envelope 을 emit — GBNF 없는 외부 백엔드의 파싱이 깨짐. top-level {message:...} 을 done() 으로 자동 wrapping — M0022 후보."
     }
   ],
   "learned": {
     "lead": {
-      "en": "Operator-in-the-loop iteration with append-only fix logs lets you safely invert design assumptions mid-mission. M0015's 4-round arc ended with Loose's hangover semantics flipped (80→24 frames) because each round's diagnosis surfaced a more accurate problem statement, and the protocol's \"append don't overwrite\" rule preserved every wrong turn for review.",
-      "ko": "append-only 수정 로그를 동반한 operator-in-the-loop 반복은 미션 중간에 설계 가정을 안전하게 뒤집을 수 있게 한다. M0015 의 4-라운드 arc 는 Loose 의 hangover 의미론을 80→24 frames 로 뒤집으며 끝났다 — 각 라운드의 진단이 더 정확한 problem statement 를 노출했고, 프로토콜의 \"append don't overwrite\" 규칙이 모든 잘못된 방향까지 review 가능하게 보존했기 때문."
+      "en": "Accessibility-first voice agents work best when the on-device LLM gets out of the way: route, don't interpret — and make every layer agree on the same wire envelope.",
+      "ko": "접근성 우선의 보이스 에이전트는 온디바이스 LLM 이 비켜설 때 가장 잘 동작한다 — 해석하지 말고 라우팅하라, 그리고 모든 레이어가 같은 와이어 envelope 에 동의하게 하라."
     },
     "body": {
-      "en": "M0015 started with a clean Loose/Strict design (#1 done log), then operator's smoke-test feedback drove four append-only follow-up sections in the same record file. Round #2 came from a 4-minute live recording log: the assistant grep'd app-log.txt, counted repeating 11-char STT outputs (Whisper hallucinations), spotted an 89-second mega-blob, and shipped three concrete fixes (filter, cap, floor) plus tests. Round #3 came from a single operator sentence — \"lecture tempo is faster than command tempo\" — which inverted the original Loose intent (long hangover for pause-tolerance) into its opposite (short hangover for sentence-pace cuts). Round #4 was the assistant diagnosing its own mess: three unfiltered background test runs had loaded Nemotron-8B three times into separate testhost.exe instances, eating 21 GB of RAM. The same diagnose-first pattern shows up in M0014 (origin survey said split csproj, empirical inspection said don't) and M0013 (code-coach naming research preceded the rename mission by hours, surfacing 5 issues before any rename touched code). M0012's design-first .pen approach lets operator fine-tune (5-min window, click-to-copy, basename project) decisions in seconds before code commits. Common pattern: a concrete diagnosis (log analysis, naming survey, .pen mockup) precedes every irreversible change. Checklist for the next workflow: (1) when an operator reports a regression, surface a numeric/file-cited diagnosis BEFORE touching code; (2) keep one record file per mission and append \"## 후속 진행 #N\" sections — never fork into v2 files; (3) when the assistant runs background commands, default to --filter to avoid loading multi-GB LLM models in test runs; (4) when an external survey (origin docs, framework recommendations) disagrees with empirical project inspection, the empirical inspection wins — but document the disagreement; (5) after an iterative arc (>2 rounds), the final commit message must list every round as a bullet so reviewers see the full diagnostic trail, not just the last patch.",
-      "ko": "M0015 는 깨끗한 Loose/Strict 설계로 시작 (#1 완료 로그) 했지만, operator 의 smoke-test 피드백이 같은 기록 파일에 4개의 append-only 후속 섹션을 만들었다. #2 라운드는 4분짜리 라이브 녹음 로그에서 비롯 — assistant 가 app-log.txt 를 grep 하여 반복되는 11자 STT 출력 (Whisper 환각) 을 카운트하고, 89초 mega-blob 을 발견한 후 구체적 수정 3개 (필터, cap, floor) + 테스트를 배포. #3 라운드는 operator 의 한 문장 — \"명령보다 템포가 더 빠름\" — 에서 비롯되어 원래 Loose 의도 (휴지 흡수용 긴 hangover) 를 정반대 (문장-페이스 컷용 짧은 hangover) 로 뒤집었다. #4 라운드는 assistant 가 자기 자신의 실수를 진단 — 3회 무필터 백그라운드 테스트 실행이 Nemotron-8B 를 세 번 별도 testhost.exe 에 로드하여 21GB RAM 점유. 같은 diagnose-first 패턴이 M0014 (origin survey 는 csproj 분리 권장 / 실측 검사는 그대로 두라) 와 M0013 (code-coach 네이밍 사전조사가 rename 미션을 수 시간 앞서며 코드 변경 전에 5개 이슈 노출) 에도 등장. M0012 의 design-first .pen 접근법이 operator 가 코드 commit 전 1초 만에 fine-tuning (5분 window, click-to-copy, basename project) 을 결정하게 만들었다. 공통 패턴: 모든 비가역 변경 전에 구체적 진단 (로그 분석, 네이밍 조사, .pen mockup) 이 선행. 다음 워크플로우 적용 체크리스트: (1) operator 가 회귀를 보고하면 코드 손대기 전에 숫자·파일 인용 진단부터 표면화 (2) 미션당 기록 파일 1개 유지하고 \"## 후속 진행 #N\" 섹션을 append — v2 파일로 fork 금지 (3) assistant 가 백그라운드 명령 실행 시 multi-GB LLM 모델이 테스트 실행에 로드되지 않도록 default 로 --filter 사용 (4) 외부 survey (origin 문서, 프레임워크 권장) 가 실측 프로젝트 검사와 어긋나면 실측이 이김 — 단 disagreement 는 문서화 (5) 반복 arc (라운드 >2) 이후 최종 커밋 메시지는 모든 라운드를 bullet 으로 나열하여 reviewer 가 마지막 패치만이 아니라 진단 트레일 전체를 볼 수 있게 한다."
+      "en": "Ten iterative follow-ups on M0017 converged on the same lesson three times: every time we added an LLM cycle ('summarize Claude's reply', 'wrap the user's question with Mode-2 directives', 'continuation cycle on peer signal') the on-device Gemma either rephrased away meaning, collided with its own tool-calling habits, or stalled on the external API. The cleanest fix was always to delete that cycle — direct WriteAndSubmit on the send side (followup #9) and a DONE shortcut on the receive side (followup #5/#10). The trickiest bug was the silent one: IPC layer pre-unwrapped DONE() for UI display but the actor's matcher still expected the wrapper, so TTS just never fired in production despite passing all tests written against the wrapper-only shape. Lesson for next time: when two layers transform the same envelope, write a contract test that uses the SAME bytes both layers see. Next concrete actions are M0018 (playwright auto-install), M0021 (Whisper Korean tail-syllable fix), and M0022 (ExternalAgentLoop envelope auto-wrap) — all candidates already filed in the M0017 record.",
+      "ko": "M0017 의 10번 반복 후속 fix 들이 같은 교훈에 세 번 수렴했다 — LLM 사이클을 추가할 때마다 ('Claude 응답을 요약하라', '사용자 질문을 Mode-2 지시문으로 wrap 하라', 'peer signal 에 continuation cycle') 온디바이스 Gemma 가 의미를 풀어 헤치거나, 자기 tool-calling 본능과 충돌하거나, 외부 API 에서 stall 했다. 가장 깨끗한 fix 는 늘 그 사이클을 삭제하는 것 — 송신 측 직접 WriteAndSubmit (후속 #9) 와 수신 측 DONE 단축경로 (후속 #5/#10). 가장 까다로웠던 버그는 '조용한 것' — IPC 레이어가 UI 표시용으로 DONE() 을 미리 벗겼는데 actor 매처는 여전히 래퍼를 기대해서, 래퍼 전용 모양으로 작성된 모든 테스트는 통과하는데도 운영에서 TTS 가 그냥 안 나왔다. 다음 교훈: 두 레이어가 같은 envelope 을 변환할 땐 두 레이어가 실제로 보는 동일 바이트로 계약 테스트를 써라. 다음 구체 액션은 M0018 (playwright 자동 설치), M0021 (Whisper 한국어 끝 음절 fix), M0022 (ExternalAgentLoop envelope 자동 wrap) — 모두 M0017 수행결과에 후보로 정리해둠."
     }
   }
 }
