@@ -103,6 +103,7 @@ public enum TerminalControl
     Escape,       // ESC     (\x1b)
     Enter,        // CR      (\r)
     Tab,          // Tab     (\t)
+    BackTab,      // ESC[Z   (Shift+Tab — Claude Code mode-cycle, readline reverse-completion)
     Backspace,    // BS      (\x7f)
     Space,        // SP      (\x20)
     Delete,       // ESC[3~

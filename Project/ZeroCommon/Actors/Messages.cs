@@ -131,6 +131,17 @@ public sealed record IntroduceTerminalIfFirst(int GroupIndex, int TabIndex);
 public sealed record IntroduceTerminalReply(bool WasFirstContact);
 public sealed record ResetIntroductions;
 
+/// <summary>
+/// M0017 후속 #1: Tell-pattern variant of <see cref="IntroduceTerminalIfFirst"/>.
+/// Marks (group, tab) as already-introduced without replying — used by
+/// delegation mode entry to suppress the ~1.5 KB first-contact handshake
+/// header that <c>WorkspaceTerminalToolHost</c> auto-prepends to the first
+/// send_to_terminal per session. In delegation mode the user has already
+/// explicitly authorised relay to Claude, so the handshake primer is noise
+/// that buries the actual question and confuses the terminal AI.
+/// </summary>
+public sealed record MarkTerminalIntroduced(int GroupIndex, int TabIndex);
+
 // ═══════════════════════════════════════════════════════════════
 // 8. AgentLoop (AIMODE 추론 FSM) 메시지
 // ═══════════════════════════════════════════════════════════════
@@ -297,3 +308,32 @@ public sealed record QueryHandshakeState(string PeerName);
 
 /// <summary>Reply for QueryHandshakeState.</summary>
 public sealed record HandshakeStateReply(string PeerName, HandshakeState State);
+
+// ═══════════════════════════════════════════════════════════════
+// 9. Delegation mode (M0017 — voice mode for visually impaired users)
+// ═══════════════════════════════════════════════════════════════
+//
+// When delegation mode is ON, AgentBotActor rewrites every incoming
+// StartAgentLoop payload to force Mode 2 (terminal relay) targeting a
+// terminal whose tab title contains "Claude". The LLM still drives the
+// tool loop (list_terminals → send_to_terminal → wait → read_terminal →
+// done) — we just inject a strong directive in front of the user's text
+// so the model can't fall back to Mode 1 direct answer.
+//
+// Toggle is voice-triggered:
+//   "에이전트 위임"       → SetDelegationMode(true)
+//   "에이전트 위임 중단"  → SetDelegationMode(false)
+//
+// State is a single bool on AgentBotActor (singleton). Switching also
+// implies ResetAgentLoopMemory so the new framing applies to a fresh KV
+// cache — leaving the previous Mode 1 history primed would let the model
+// keep its old style even after the toggle.
+
+/// <summary>UI → Bot: set delegation mode flag. AgentBotActor remembers across runs.</summary>
+public sealed record SetDelegationMode(bool Enabled);
+
+/// <summary>Ask pattern → <see cref="DelegationModeReply"/>.</summary>
+public sealed record QueryDelegationMode;
+
+/// <summary>Reply for QueryDelegationMode.</summary>
+public sealed record DelegationModeReply(bool Enabled);

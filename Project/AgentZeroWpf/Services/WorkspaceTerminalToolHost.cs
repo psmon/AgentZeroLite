@@ -263,6 +263,11 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
         "crlf"      => "\r\n",
         "esc"       => "\x1B",
         "tab"       => "\t",
+        // Shift+Tab — ESC[Z. "shifttab" + "backtab" alias kept in lockstep
+        // with MainWindow.HandleTerminalKey so CLI `terminal-key` and AIMODE
+        // `send_key` accept the same names.
+        "shifttab"  => "\x1b[Z",
+        "backtab"   => "\x1b[Z",
         "backspace" => "\x08",
         "del"       => "\x7F",
         "ctrlc"     => "\x03",

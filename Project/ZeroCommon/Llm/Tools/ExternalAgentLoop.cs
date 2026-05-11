@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Agent.Common;
 using Agent.Common.Llm.Providers;
 
 namespace Agent.Common.Llm.Tools;
@@ -196,6 +197,15 @@ public sealed class ExternalAgentLoop : IAgentLoop
 
     private async Task<string> GenerateOneTurnAsync(CancellationToken ct)
     {
+        // M0017 후속 #2: bound each turn with TurnTimeout. Webnori (and other
+        // OpenAI-compatible SSE endpoints) occasionally hold the connection
+        // open without yielding chunks OR end-of-stream OR an error, so the
+        // bare `await foreach` would hang forever. Linked CTS lets the caller
+        // still cancel via the outer `ct` while we add our own deadline.
+        using var turnCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        turnCts.CancelAfter(_opts.TurnTimeout);
+        var turnCt = turnCts.Token;
+
         var request = new LlmRequest
         {
             Model = _model,
@@ -204,25 +214,54 @@ public sealed class ExternalAgentLoop : IAgentLoop
             MaxTokens = _opts.MaxTokensPerTurn,
         };
 
+        var startedAt = DateTime.UtcNow;
+        AppLogger.Log(
+            $"[ExternalAgentLoop] turn start — model={_model} historyMsgs={_messages.Count} " +
+            $"timeout={_opts.TurnTimeout.TotalSeconds:F0}s maxTokens={_opts.MaxTokensPerTurn}");
+
         var sb = new StringBuilder();
         var chunksSeen = 0;
         var interval = Math.Max(1, _opts.ProgressTokenInterval);
         try { _opts.OnGenerationProgress?.Invoke("generating", 0); } catch { }
-        await foreach (var chunk in _provider.StreamAsync(request, ct))
+        try
         {
-            if (string.IsNullOrEmpty(chunk.Text)) continue;
-            sb.Append(chunk.Text);
-            // Approximate progress via SSE chunk count — real token count is not
-            // exposed by the OpenAI streaming protocol. Each chunk is typically
-            // 1–4 tokens, so chunksSeen ≈ tokens / 2.
-            chunksSeen++;
-            if (chunksSeen % interval == 0)
+            await foreach (var chunk in _provider.StreamAsync(request, turnCt))
             {
-                try { _opts.OnGenerationProgress?.Invoke("generating", chunksSeen); }
-                catch { }
+                if (string.IsNullOrEmpty(chunk.Text)) continue;
+                sb.Append(chunk.Text);
+                // Approximate progress via SSE chunk count — real token count is not
+                // exposed by the OpenAI streaming protocol. Each chunk is typically
+                // 1–4 tokens, so chunksSeen ≈ tokens / 2.
+                chunksSeen++;
+                if (chunksSeen % interval == 0)
+                {
+                    try { _opts.OnGenerationProgress?.Invoke("generating", chunksSeen); }
+                    catch { }
+                }
             }
         }
-        return sb.ToString().Trim();
+        catch (OperationCanceledException) when (turnCts.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            // Our deadline fired, not the outer caller's cancel. Surface as
+            // TimeoutException so CallProviderWithRetryAsync routes it through
+            // AgentLoopGuards.IsTransientHttpError (matches on "timeout") and
+            // the MaxLlmRetries budget engages instead of bubbling out as an
+            // OperationCanceledException (which would propagate immediately).
+            var elapsed = (DateTime.UtcNow - startedAt).TotalSeconds;
+            AppLogger.Log(
+                $"[ExternalAgentLoop] turn TIMEOUT after {elapsed:F1}s chunks={chunksSeen} " +
+                $"chars={sb.Length} (limit={_opts.TurnTimeout.TotalSeconds:F0}s)");
+            throw new TimeoutException(
+                $"External provider stalled for {_opts.TurnTimeout.TotalSeconds:F0}s with no end-of-stream " +
+                $"(chunks received: {chunksSeen}, chars buffered: {sb.Length}).");
+        }
+
+        var elapsedOk = (DateTime.UtcNow - startedAt).TotalSeconds;
+        var text = sb.ToString().Trim();
+        var preview = text.Length > 60 ? text[..60].Replace('\n', ' ') + "…" : text.Replace('\n', ' ');
+        AppLogger.Log(
+            $"[ExternalAgentLoop] turn ok — {elapsedOk:F1}s chunks={chunksSeen} chars={text.Length} preview=\"{preview}\"");
+        return text;
     }
 
     /// <summary>

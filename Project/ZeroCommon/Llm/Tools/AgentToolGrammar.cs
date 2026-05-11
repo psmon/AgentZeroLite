@@ -145,7 +145,9 @@ Available tools:
                                args: { "group": <int>, "tab": <int>, "text": <string> }
   - send_key                   sends one control key to a terminal.
                                args: { "group": <int>, "tab": <int>,
-                                       "key":   <"cr"|"lf"|"crlf"|"esc"|"tab"|"backspace"|"del"|"ctrlc"|"ctrld"|"up"|"down"|"left"|"right"> }
+                                       "key":   <"cr"|"lf"|"crlf"|"esc"|"tab"|"shifttab"|"backspace"|"del"|"ctrlc"|"ctrld"|"up"|"down"|"left"|"right"> }
+                               note: "shifttab" (alias "backtab") emits ESC[Z — Claude Code uses
+                                     it to cycle its accept-mode (default ↔ auto-accept ↔ plan).
   - wait                       sleep for N seconds, then return. Use BETWEEN send_to_terminal
                                and read_terminal to give the terminal AI time to actually respond.
                                args: { "seconds": <int 1..30> }

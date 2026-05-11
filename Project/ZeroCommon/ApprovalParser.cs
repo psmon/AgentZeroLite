@@ -32,8 +32,27 @@ public static class ApprovalParser
             buffer.Contains("make this edit", StringComparison.OrdinalIgnoreCase))
             return true;
 
-        // Separator detection: ─── (solid, ≥20 chars) followed by numbered options (1. / 2. / 3.)
-        if (ContainsSolidSeparator(buffer) && Regex.IsMatch(buffer, @">\s*1\.\s"))
+        // M0017 후속 (자동승인 패턴 확장 v1) — MCP / tool-use / workspace-trust
+        // approvals from newer Claude Code builds. These prompts don't always
+        // include the legacy keywords ("requires approval" etc.); the
+        // user-visible question reads "Allow Claude to use …" or "Use this
+        // tool?" or workspace-trust ("Trust this folder?"). Detection here
+        // unblocks auto-approve on the same code path; parsing falls back
+        // to the separator/options regex below.
+        if (buffer.Contains("Allow Claude to use", StringComparison.OrdinalIgnoreCase) ||
+            buffer.Contains("Use this tool",       StringComparison.OrdinalIgnoreCase) ||
+            buffer.Contains("Trust this folder",   StringComparison.OrdinalIgnoreCase) ||
+            buffer.Contains("Trust this directory", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Separator detection: ─── (solid, ≥20 chars) followed by numbered options.
+        // The pointer character before "1." varies across Claude Code
+        // renderers — original `>`, plus Unicode forms `❯` (U+276F), `▶`
+        // (U+25B6), `•` (U+2022), `◆` (U+25C6). Some terminal themes also
+        // produce a bare list without a pointer at all, which the keyword
+        // path above handles.
+        if (ContainsSolidSeparator(buffer)
+            && Regex.IsMatch(buffer, @"[>❯▶•◆]\s*1\.\s"))
             return true;
 
         return false;
@@ -340,6 +359,19 @@ public static class ApprovalParser
         var reqIdx = buffer.IndexOf("requires approval", StringComparison.OrdinalIgnoreCase);
         var editIdx = buffer.IndexOf("make this edit", StringComparison.OrdinalIgnoreCase);
         var startIdx = proceedIdx >= 0 ? proceedIdx : reqIdx >= 0 ? reqIdx : editIdx;
+
+        // M0017 후속 (자동승인 패턴 확장 v1) — anchor on the new keywords too
+        // so MCP/tool/workspace-trust prompts get a stable fingerprint and
+        // don't re-fire ApprovalRequested on every ConPTY chunk.
+        if (startIdx < 0)
+        {
+            var allowIdx = buffer.IndexOf("Allow Claude to use", StringComparison.OrdinalIgnoreCase);
+            var useToolIdx = buffer.IndexOf("Use this tool",       StringComparison.OrdinalIgnoreCase);
+            var trustIdx = buffer.IndexOf("Trust this",            StringComparison.OrdinalIgnoreCase);
+            if (allowIdx >= 0) startIdx = allowIdx;
+            else if (useToolIdx >= 0) startIdx = useToolIdx;
+            else if (trustIdx >= 0) startIdx = trustIdx;
+        }
 
         // Separator-based fallback: use the region after the last ─── line
         if (startIdx < 0 && ContainsSolidSeparator(buffer))

@@ -145,8 +145,10 @@ AgentZeroLite.exe -cli terminal-key 0 0 up       # 히스토리 이전
 AgentZeroLite.exe -cli terminal-key 0 0 hex:0D   # 임의 바이트
 ```
 
-지원 키: `cr`, `lf`, `crlf`, `esc`, `tab`, `backspace`, `del`, `ctrlc`, `ctrld`,
-`up` / `down` / `left` / `right`, `hex:XX`.
+지원 키: `cr`, `lf`, `crlf`, `esc`, `tab`, `shifttab` (alias `backtab`),
+`backspace`, `del`, `ctrlc`, `ctrld`, `up` / `down` / `left` / `right`, `hex:XX`.
+`shifttab` 은 `ESC[Z` 를 보냅니다 — Claude Code 의 accept-mode 순환 (default ↔
+auto-accept ↔ plan) 단축키이자 readline 의 reverse-completion 입니다.
 
 ### 터미널 출력 읽기
 

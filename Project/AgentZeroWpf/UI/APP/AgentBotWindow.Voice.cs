@@ -449,6 +449,16 @@ public partial class AgentBotWindow
                 SetVoiceStatus("(stopped speaking)", System.Windows.Media.Brushes.Goldenrod);
                 return;
 
+            case VoiceCommandIntent.DelegateOn:
+                AppLogger.Log($"[BOT-Voice] ({sourceTag}) delegate ON — \"{transcript}\"");
+                EnterDelegationMode();
+                return;
+
+            case VoiceCommandIntent.DelegateOff:
+                AppLogger.Log($"[BOT-Voice] ({sourceTag}) delegate OFF — \"{transcript}\"");
+                ExitDelegationMode();
+                return;
+
             case VoiceCommandIntent.SummarizeTerminal when _chatMode == ChatMode.Ai:
                 var session = _getActiveSession?.Invoke();
                 var terminalText = session?.GetConsoleText() ?? string.Empty;
@@ -884,6 +894,344 @@ public partial class AgentBotWindow
         }
         if (btnVoiceCancelInflight is not null)
             btnVoiceCancelInflight.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ── Delegation mode (M0017) ───────────────────────────────────────
+    //
+    // Voice utterances "에이전트큐" / "에이전트큐 중단" toggle a state on
+    // AgentBotActor. (The original v1 trigger word "위임" was dropped after
+    // Whisper STT kept fumbling it — see VoiceCommandInterceptor "trigger
+    // v2" note.) While ON, every AI-mode StartAgentLoop is rewritten
+    // server-side to force Mode 2 (terminal relay) targeting a "Claude"
+    // tab. Output is already spoken via the existing TTS path on AddBotMessage
+    // — visually-impaired users hear the final summary without any extra
+    // wiring here.
+    //
+    // Preflight: scan the current terminal list for a tab whose title
+    // contains "Claude". If none, surface a voice-friendly message and
+    // refuse to enter delegation mode so the user isn't left with a silent
+    // black-hole agent loop. Full preflight (playwright availability, CLI
+    // auth) is intentionally NOT implemented here — see M0017 completion
+    // log for rationale.
+
+    private void EnterDelegationMode()
+    {
+        // Auto-promote to AI mode when feasible. Voice users can't reach
+        // the badge anyway, so requiring them to tab-cycle manually would
+        // strand the command in CHT/KEY mode.
+        if (_chatMode != ChatMode.Ai)
+        {
+            if (IsAiModeAvailable())
+            {
+                _chatMode = ChatMode.Ai;
+                s_lastChatMode = _chatMode;
+                UpdateChatModeBadge();
+                AppLogger.Log("[BOT-Voice] Auto-promoted to AI mode for delegation");
+            }
+            else
+            {
+                var blocked = "AI 모드 모델이 준비되지 않아 에이전트큐 모드를 활성화할 수 없습니다. 설정에서 모델을 먼저 로드해 주세요.";
+                AddSystemMessage($"🛡 {blocked}");
+                AddBotMessage(blocked, "AgentCue");
+                AppLogger.Log("[BOT-Voice] Delegation refused — AI mode not available");
+                return;
+            }
+        }
+
+        var claude = FindClaudeTerminal();
+        if (claude is null)
+        {
+            var msg = "Claude 터미널이 활성화되어 있지 않습니다. Claude 탭을 먼저 열어 주세요.";
+            AddSystemMessage($"🛡 {msg}");
+            AddBotMessage(msg, "AgentCue");
+            AppLogger.Log("[BOT-Voice] Delegation refused — no Claude terminal");
+            return;
+        }
+
+        // M0017 후속 #9 — UI-side flag mirrors the actor flag. SendCurrentInput
+        // consults this to bypass the LLM agent loop on the send path.
+        _delegationMode = true;
+
+        // M0017 후속 #3 — route through BotTell so we recover via
+        // ActorSelection if MainWindow's deferred Stage.Ask<BotCreated>
+        // wiring hasn't landed yet. The previous fallback used
+        // `ActorSelection(path).Anchor` which silently sent to the root
+        // guardian instead of the bot actor.
+        BotTell(new Agent.Common.Actors.SetDelegationMode(true));
+        // Fresh KV cache so the new directive applies cleanly — leaving the
+        // prior Mode 1 history primed would tempt the model to keep its old
+        // tone even though the wrap now demands Mode 2.
+        RequestAiSessionReset("entered delegation mode");
+
+        // M0017 후속 #1 — suppress the ~1.5 KB first-contact handshake header
+        // for the Claude tab. The handshake is opt-in for Mode 2 ("introduce
+        // yourself to Claude"); in delegation mode the user has explicitly
+        // authorised relay, so the handshake primer just buries the actual
+        // question and the receiving Claude tries to execute the "run
+        // AgentZeroLite.exe -cli help" Step 1 instruction instead of answering.
+        // Must be sent AFTER RequestAiSessionReset, because ResetAgentLoopMemory
+        // clears _introducedTerminals — otherwise our mark would be wiped.
+        BotTell(new Agent.Common.Actors.MarkTerminalIntroduced(
+            claude.Value.GroupIndex, claude.Value.TabIndex));
+
+        // M0017 후속 #4 — send a SHORT delegation handshake directly to the
+        // Claude session. The full first-contact handshake (suppressed in
+        // 후속 #1) was the only place Claude learned about the bot-chat CLI
+        // callback channel. Without that teaching Claude just types replies
+        // into its own terminal and AgentBot has to poll via read_terminal
+        // — slow + brittle. This message is ~280 chars, taught in Korean,
+        // focuses ONLY on the reverse channel, and uses the exact tab title
+        // as the peer-name string so IPC routing keys match.
+        //
+        // We also pre-arm the actor's per-peer routing state (active +
+        // handshake-sent) so when Claude calls back with `bot-chat "DONE(ready)"
+        // --from <TabTitle>` the IPC delivery is recognised as an active
+        // peer signal instead of being silently dropped.
+        TrySendDelegationHandshake(claude.Value);
+
+        var ack = $"에이전트큐 모드를 시작합니다. 이후 음성 요청은 {claude.Value.Label} 으로 전달됩니다.";
+        AddSystemMessage($"🛡 {ack}");
+        AddBotMessage(ack, "AgentCue");
+        AppLogger.Log($"[BOT-Voice] Delegation ON → target={claude.Value.Label} (pre-marked introduced [{claude.Value.GroupIndex}:{claude.Value.TabIndex}])");
+    }
+
+    private void ExitDelegationMode()
+    {
+        // M0017 후속 #9 — clear UI-side flag in lockstep with the actor.
+        _delegationMode = false;
+
+        // M0017 후속 #3 — same BotTell fallback as EnterDelegationMode.
+        BotTell(new Agent.Common.Actors.SetDelegationMode(false));
+
+        // M0017 후속 #4 — clear the peer's active-conversation flag so any
+        // late Claude CLI callbacks after we've left delegation don't
+        // accidentally trigger a continuation agent loop. The same Claude
+        // tab can still be talked to in normal Mode 2 later — it'll go
+        // through the standard handshake on its next first contact.
+        var claude = FindClaudeTerminal();
+        if (claude is { } c)
+        {
+            BotTell(new Agent.Common.Actors.ClearConversationActive(c.TabTitle));
+            AppLogger.Log($"[BOT-Voice] Delegation peer \"{c.TabTitle}\" cleared from active conversations");
+        }
+
+        RequestAiSessionReset("exited delegation mode");
+
+        var ack = "에이전트큐 모드를 중단합니다. 일반 AI 모드로 돌아갑니다.";
+        AddSystemMessage($"🛡 {ack}");
+        AddBotMessage(ack, "AgentCue");
+        AppLogger.Log("[BOT-Voice] Delegation OFF");
+    }
+
+    /// <summary>
+    /// Result of <see cref="FindClaudeTerminal"/> — the (group, tab) indices
+    /// the delegation wrap will route to, the exact tab title (used as the
+    /// peer-name string for IPC routing in <see cref="MarkConversationActive"/>
+    /// / <see cref="MarkHandshakeSent"/> / <c>--from</c> values), and a
+    /// human-friendly label for the spoken acknowledgement.
+    /// </summary>
+    private readonly record struct ClaudeTerminalRef(
+        int GroupIndex, int TabIndex, string TabTitle, string Label);
+
+    /// <summary>
+    /// Scan the active workspace's terminal tabs for one whose title contains
+    /// "Claude" (case-insensitive). Returns the (g, t) indices, the exact
+    /// title (the IPC peer-name contract), and a human label like
+    /// "Main / Claude Code", or null when no such tab exists.
+    ///
+    /// We use Title contains (not exact match) so labels like "Claude Code",
+    /// "Claude — main", "[Claude]" all qualify. TabTitle is preserved as the
+    /// exact string because <see cref="WorkspaceTerminalToolHost.ResolvePeerName"/>
+    /// uses the same title verbatim when prepending handshake intros and the
+    /// bot-chat CLI's <c>--from</c> argument must match for the
+    /// <see cref="TerminalSentToBot"/> routing to find an active conversation.
+    /// </summary>
+    private ClaudeTerminalRef? FindClaudeTerminal()
+    {
+        try
+        {
+            var groups = _getGroups?.Invoke();
+            if (groups is null) return null;
+            for (int gi = 0; gi < groups.Count; gi++)
+            {
+                var g = groups[gi];
+                if (g.Tabs is null) continue;
+                for (int ti = 0; ti < g.Tabs.Count; ti++)
+                {
+                    var title = g.Tabs[ti].Title ?? string.Empty;
+                    if (title.IndexOf("Claude", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return new ClaudeTerminalRef(gi, ti, title, $"{g.DisplayName} / {title}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[BOT-Voice] FindClaudeTerminal failed", ex);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// M0017 후속 #9 — write a user utterance directly to the Claude terminal
+    /// session, bypassing the on-device LLM agent loop. Used by
+    /// <see cref="SendCurrentInput"/> when <c>_delegationMode</c> is on.
+    /// Returns true on success, false when the Claude tab can't be located
+    /// or its session isn't initialised (caller surfaces a hint to the user
+    /// via <see cref="AddBotMessage"/>; we also log the reason).
+    ///
+    /// Side effects:
+    ///   • Adds a user bubble + a `→ AgentTest / Claude` system breadcrumb
+    ///     so the chat UI mirrors what was sent.
+    ///   • Re-marks Claude as introduced + active in the actor so the
+    ///     forthcoming DONE callback routes correctly even if a prior reset
+    ///     wiped the per-peer state.
+    /// </summary>
+    private bool TryRelayDirectlyToClaude(string text, string displayText)
+    {
+        var target = FindClaudeTerminal();
+        if (target is null)
+        {
+            var msg = "Claude 터미널을 찾을 수 없습니다. Claude 탭을 먼저 열어 주세요.";
+            AddSystemMessage($"🛡 {msg}");
+            AddBotMessage(msg, "AgentCue");
+            AppLogger.Log("[AIMODE] delegation direct-relay refused — no Claude tab");
+            return false;
+        }
+
+        // Match the existing `TrySendDelegationHandshake` style — let the
+        // compiler resolve the Session type via the CliGroupInfo →
+        // ConsoleTabInfo chain so we don't need an extra `using`.
+        AgentZeroWpf.Services.ConPtyTerminalSession? session = null;
+        try
+        {
+            var groups = _getGroups?.Invoke();
+            if (groups is not null
+                && target.Value.GroupIndex >= 0 && target.Value.GroupIndex < groups.Count)
+            {
+                var g = groups[target.Value.GroupIndex];
+                if (g.Tabs is not null
+                    && target.Value.TabIndex >= 0 && target.Value.TabIndex < g.Tabs.Count)
+                {
+                    session = g.Tabs[target.Value.TabIndex].Session;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[AIMODE] delegation direct-relay — resolving Claude session threw", ex);
+        }
+
+        if (session is null)
+        {
+            var msg = "Claude 터미널 세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.";
+            AddSystemMessage($"🛡 {msg}");
+            AddBotMessage(msg, "AgentCue");
+            AppLogger.Log($"[AIMODE] delegation direct-relay refused — Claude session null [{target.Value.GroupIndex}:{target.Value.TabIndex}]");
+            return false;
+        }
+
+        // UI mirror: user bubble first, then a one-line breadcrumb that this
+        // went to Claude (not the LLM). Helps sighted operators correlate
+        // voice prompt → Claude answer when the response eventually comes
+        // back via DONE TTS.
+        AddUserMessage(displayText, "Voice");
+        AddSystemMessage($"→ {target.Value.Label} (delegation direct)");
+
+        // Re-arm the per-peer state on every send. EnterDelegationMode does
+        // this once but the user may have toggled embed/floating or some
+        // other action that cleared the actor's introduction set; cheap to
+        // idempotent-Tell.
+        BotTell(new Agent.Common.Actors.MarkTerminalIntroduced(
+            target.Value.GroupIndex, target.Value.TabIndex));
+        BotTell(new Agent.Common.Actors.MarkConversationActive(target.Value.TabTitle));
+
+        try
+        {
+            session.WriteAndSubmit(text);
+            AppLogger.Log($"[AIMODE] delegation direct-relay → \"{target.Value.TabTitle}\" len={text.Length}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[AIMODE] delegation direct-relay — WriteAndSubmit threw", ex);
+            AddSystemMessage("❌ Claude 터미널 전송 실패 — 자세한 내용은 로그를 확인해 주세요.");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Write the delegation handshake message directly to Claude's terminal
+    /// session (bypassing the LLM tool-call path) and pre-arm the actor's
+    /// per-peer routing state so Claude's CLI callbacks are recognised.
+    /// Returns true if the handshake was written, false if the session was
+    /// unavailable (tab not yet initialised). Failure is non-fatal —
+    /// delegation still works via read_terminal polling.
+    /// </summary>
+    private bool TrySendDelegationHandshake(ClaudeTerminalRef target)
+    {
+        try
+        {
+            var groups = _getGroups?.Invoke();
+            if (groups is null || target.GroupIndex < 0 || target.GroupIndex >= groups.Count)
+            {
+                AppLogger.Log($"[BOT-Voice] Delegation handshake SKIPPED — group index {target.GroupIndex} out of range");
+                return false;
+            }
+            var g = groups[target.GroupIndex];
+            if (g.Tabs is null || target.TabIndex < 0 || target.TabIndex >= g.Tabs.Count)
+            {
+                AppLogger.Log($"[BOT-Voice] Delegation handshake SKIPPED — tab index [{target.GroupIndex}:{target.TabIndex}] out of range");
+                return false;
+            }
+            var session = g.Tabs[target.TabIndex].Session;
+            if (session is null)
+            {
+                AppLogger.Log($"[BOT-Voice] Delegation handshake SKIPPED — Claude tab [{target.GroupIndex}:{target.TabIndex}] session is null (tab not initialised)");
+                return false;
+            }
+
+            var msg = BuildDelegationHandshakeMessage(target.TabTitle);
+            session.WriteAndSubmit(msg);
+
+            // Pre-arm the per-peer state so Claude's `--from <TabTitle>` callbacks
+            // land in the agent loop's continuation path instead of being
+            // dropped as "INACTIVE peer signal".
+            BotTell(new Agent.Common.Actors.MarkConversationActive(target.TabTitle));
+            BotTell(new Agent.Common.Actors.MarkHandshakeSent(target.TabTitle));
+
+            AppLogger.Log($"[BOT-Voice] Delegation handshake SENT to \"{target.TabTitle}\" ({msg.Length} chars, peer marked active)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[BOT-Voice] Delegation handshake write failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// M0017 후속 #4 — short focused setup message sent directly to Claude's
+    /// terminal session when delegation mode is entered. Teaches ONLY the
+    /// reverse channel (bot-chat CLI callback), not the full first-contact
+    /// handshake. Verbose handshake intro was suppressed in 후속 #1; this
+    /// brings back the critical "reply via CLI" instruction without the
+    /// 1.5 KB AgentBot introduction noise that buried the user's question.
+    /// </summary>
+    private static string BuildDelegationHandshakeMessage(string peerName)
+    {
+        // Korean text — Claude routinely operates in Korean for this user,
+        // and short Korean keeps the message under ~280 chars total which
+        // easily fits in a single terminal screen. Triple-quoted strings
+        // keep the literal terminal-line spacing intact.
+        return
+            "[AgentBot 에이전트큐 모드 — 응답 채널 설정]\n" +
+            "지금부터 사용자가 음성으로 묻는 질문이 너에게 전달돼. 답변은 너의 터미널에서 다음 명령을 실행해서 보내:\n" +
+            "\n" +
+            $"    AgentZeroLite.exe -cli bot-chat \"DONE(여기에 답변 내용)\" --from {peerName}\n" +
+            "\n" +
+            "이 줄을 실행하면 답변이 즉시 음성으로 사용자에게 전달돼. 화면에만 적으면 사용자에게 안 들려.\n" +
+            "준비됐으면 알려줘:\n" +
+            $"    AgentZeroLite.exe -cli bot-chat \"DONE(ready)\" --from {peerName}";
     }
 
     private void DisposeVoiceRuntime()

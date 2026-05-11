@@ -272,6 +272,11 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
             TerminalControl.Escape => "\x1b",
             TerminalControl.Enter => "\r",
             TerminalControl.Tab => "\t",
+            // ESC[Z is the standard xterm-style reverse-tab sequence — what
+            // VT220+ terminals emit for Shift+Tab. Claude Code uses it to
+            // cycle modes (auto-accept ↔ plan ↔ default); readline binds it
+            // to menu-complete-backward.
+            TerminalControl.BackTab => "\x1b[Z",
             TerminalControl.Backspace => "\x7f",
             TerminalControl.Space => " ",
             TerminalControl.Delete => "\x1b[3~",

@@ -466,4 +466,24 @@ public sealed record AgentLoopOptions
     /// shared options record because both backends share <see cref="AgentLoopGuards"/>.
     /// </summary>
     public int MaxLlmRetries { get; init; } = 1;
+
+    /// <summary>
+    /// Maximum wall-clock time per single model turn. When the streaming
+    /// response from an external provider hasn't completed within this
+    /// window, <see cref="ExternalAgentLoop"/> cancels the in-flight HTTP
+    /// stream and raises a <see cref="TimeoutException"/> — caught by the
+    /// transient-retry path in <see cref="AgentLoopGuards.IsTransientHttpError"/>
+    /// (matches on "timeout" substring) so <see cref="MaxLlmRetries"/> kicks
+    /// in. Without this cap a stalled SSE connection (no chunks, no EOS, no
+    /// error) hangs the agent loop indefinitely — the case M0017 후속 #2
+    /// was filed for after Webnori dropped a Korean delegation turn at
+    /// iteration 2 with 96s of silence.
+    ///
+    /// <para>60s covers normal Webnori / OpenAI latencies (≤30s for a
+    /// tool-call envelope) with healthy headroom while still bounding the
+    /// "stuck forever" failure mode. Local LLamaSharp loops ignore this
+    /// option — local generation progresses (or fails) deterministically
+    /// without an HTTP layer to stall.</para>
+    /// </summary>
+    public TimeSpan TurnTimeout { get; init; } = TimeSpan.FromSeconds(60);
 }

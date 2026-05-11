@@ -310,6 +310,7 @@ public class TerminalControlTests
     [InlineData(TerminalControl.Escape)]
     [InlineData(TerminalControl.Enter)]
     [InlineData(TerminalControl.Tab)]
+    [InlineData(TerminalControl.BackTab)]
     [InlineData(TerminalControl.DownArrow)]
     [InlineData(TerminalControl.UpArrow)]
     [InlineData(TerminalControl.ClearScreen)]
@@ -328,6 +329,23 @@ public class TerminalControlTests
 
         Assert.Single(session.SentControls);
         Assert.Equal(TerminalControl.Tab, session.SentControls[0]);
+    }
+
+    [Fact]
+    public void BackTab_SendControl_IsCaptured()
+    {
+        // Shift+Tab — used by Claude Code to cycle accept-mode (default ↔
+        // auto-accept ↔ plan). The actual ESC[Z byte sequence is encoded
+        // inside ConPtyTerminalSession.SendControl; this test verifies the
+        // enum value flows through the ITerminalSession contract just like
+        // any other TerminalControl, which is what AgentBotWindow + CLI
+        // paths use to send the keystroke.
+        var session = new FakeTerminalSession();
+
+        session.SendControl(TerminalControl.BackTab);
+
+        Assert.Single(session.SentControls);
+        Assert.Equal(TerminalControl.BackTab, session.SentControls[0]);
     }
 
     [Fact]

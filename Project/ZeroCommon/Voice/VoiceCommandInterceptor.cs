@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Agent.Common.Voice;
 
 /// <summary>
@@ -16,6 +18,19 @@ public enum VoiceCommandIntent
     /// /"summary") — snapshot the active terminal output and ask the LLM to summarise it.
     /// </summary>
     SummarizeTerminal,
+
+    /// <summary>
+    /// M0017 — user said "에이전트 위임" / "위임 시작" / "delegate on" etc.
+    /// AgentBot enters delegation mode: subsequent AI-mode utterances are
+    /// force-routed to a Claude terminal via Mode 2 (terminal relay).
+    /// </summary>
+    DelegateOn,
+
+    /// <summary>
+    /// M0017 — user said "에이전트 위임 중단" / "위임 해제" / "delegate off".
+    /// Leave delegation mode and return to normal mixed Mode 1/2 behaviour.
+    /// </summary>
+    DelegateOff,
 }
 
 /// <summary>
@@ -62,6 +77,43 @@ public static class VoiceCommandInterceptor
         var stripped = StripTrailingPunctuation(trimmed);
         if (StopPhrases.Contains(stripped)) return VoiceCommandIntent.StopSpeaking;
 
+        // ── Delegation mode toggle (M0017, trigger v3 — 에이전트 + alias set) ──
+        //
+        // v1 = "위임" (Whisper-fragile), v2 = "에이전트큐" (cleaner).
+        // Whisper still transcribes the SAME spoken phrase differently
+        // across runs depending on pace / mic / surrounding utterance.
+        // Operator-observed variants of "에이전트큐":
+        //   "에이전트큐"  "에이전트 큐"  "에이전트 Q"  "에이전트 cue"
+        //   "에이전트 위임"  "에이전트 weim"  "agent q"  "agent cue"
+        //
+        // v3 strategy: require a fixed ANCHOR ("에이전트" or "agent") AND
+        // any one of a generous TRIGGER set. The anchor is rare in casual
+        // Korean / English speech so false-positive risk stays low even
+        // with the broader trigger set.
+        //
+        // The bare letter "Q" is a special case — too short to substring-
+        // match safely (would fire on "quick", "queue", etc.). Word-
+        // boundary regex restricts it to standalone tokens.
+        //
+        // OFF markers (중단/해제/끝/중지/종료/off/stop) win over ON. The
+        // Stop check above runs FIRST so "그만" alone always cancels TTS
+        // and never reaches here.
+        var hasAnchor = trimmed.Contains("에이전트", StringComparison.OrdinalIgnoreCase)
+                     || trimmed.Contains("agent",   StringComparison.OrdinalIgnoreCase);
+        if (hasAnchor)
+        {
+            var hasTriggerWord = ContainsAny(trimmed,
+                    "큐", "위임", "weim", "cue", "queue", "delegate", "delegation")
+                || Regex.IsMatch(trimmed, @"\bQ\b", RegexOptions.IgnoreCase);
+
+            if (hasTriggerWord)
+            {
+                if (ContainsAny(trimmed, "중단", "해제", "끝", "중지", "종료", "off", "stop"))
+                    return VoiceCommandIntent.DelegateOff;
+                return VoiceCommandIntent.DelegateOn;
+            }
+        }
+
         // ── Summarize terminal ──
         // Both keywords must appear (in either order). Korean: 터미널 + 요약.
         // English fallback: terminal + (summarize|summary). The English path
@@ -80,6 +132,15 @@ public static class VoiceCommandInterceptor
             if (haystack.IndexOf(n, StringComparison.OrdinalIgnoreCase) < 0) return false;
         }
         return true;
+    }
+
+    private static bool ContainsAny(string haystack, params string[] needles)
+    {
+        foreach (var n in needles)
+        {
+            if (haystack.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        }
+        return false;
     }
 
     private static string StripTrailingPunctuation(string s)

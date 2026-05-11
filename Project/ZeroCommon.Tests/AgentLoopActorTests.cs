@@ -244,6 +244,158 @@ public sealed class AgentBotActorAgentLoopWiringTests : TestKit
         Assert.Equal("Backend not ready", result.FailureReason);
     }
 
+    // ── M0017 후속 #5 — DONE shortcut to TTS in delegation mode ──
+
+    [Fact]
+    public void TryExtractDoneContent_unwraps_balanced_DONE_envelope()
+    {
+        Assert.Equal("hello",
+            Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("DONE(hello)"));
+        Assert.Equal("hi (with parens)",
+            Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("DONE(hi (with parens))"));
+        // Multi-line content survives.
+        Assert.Equal("line one\nline two",
+            Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("DONE(line one\nline two)"));
+        // Case-insensitive prefix.
+        Assert.Equal("ok",
+            Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("done(ok)"));
+        // Leading whitespace stripped.
+        Assert.Equal("trimmed",
+            Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("  DONE(trimmed)  "));
+    }
+
+    [Fact]
+    public void TryExtractDoneContent_returns_null_for_non_envelope_text()
+    {
+        Assert.Null(Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("just a plain reply"));
+        Assert.Null(Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("DONE()"));         // empty body
+        Assert.Null(Agent.Common.Actors.AgentBotActor.TryExtractDoneContent("DONE missing-parens"));
+        Assert.Null(Agent.Common.Actors.AgentBotActor.TryExtractDoneContent(""));
+        Assert.Null(Agent.Common.Actors.AgentBotActor.TryExtractDoneContent(null));
+    }
+
+    [Fact]
+    public void IsHandshakeAck_filters_protocol_noise_but_keeps_real_content()
+    {
+        Assert.True(Agent.Common.Actors.AgentBotActor.IsHandshakeAck("ready"));
+        Assert.True(Agent.Common.Actors.AgentBotActor.IsHandshakeAck("handshake-ok"));
+        Assert.True(Agent.Common.Actors.AgentBotActor.IsHandshakeAck("OK"));
+        Assert.True(Agent.Common.Actors.AgentBotActor.IsHandshakeAck("  Ready  "));   // trimmed/case
+        Assert.False(Agent.Common.Actors.AgentBotActor.IsHandshakeAck("오늘은 맑음입니다"));
+        Assert.False(Agent.Common.Actors.AgentBotActor.IsHandshakeAck("ready to ship"));
+        Assert.False(Agent.Common.Actors.AgentBotActor.IsHandshakeAck(""));
+    }
+
+    [Fact]
+    public void DelegationMode_DONE_message_fires_result_callback_without_agent_loop()
+    {
+        // Acceptance: in delegation mode, a DONE(...) peer signal short-circuits
+        // straight to OnResult (which the UI uses to drive AddBotMessage→TTS),
+        // skipping the agent loop entirely. No StartAgentLoop is triggered, so
+        // the LLM doesn't burn another 5-10s "summarizing" what Claude already
+        // wrapped neatly for us.
+        var (bot, _) = NewBot();
+        var resultProbe = CreateTestProbe("result");
+        bot.Tell(new SetAgentLoopCallbacks(_ => { }, r => resultProbe.Ref.Tell(r)));
+        bot.Tell(BindingsNoLlm());
+        bot.Tell(new MarkConversationActive("Claude"));
+        bot.Tell(new SetDelegationMode(true));
+
+        bot.Tell(new TerminalSentToBot("Claude", "DONE(오늘 서울은 맑음입니다.)"));
+
+        // The OnResult delegate should be invoked with the inner text.
+        var result = resultProbe.ExpectMsg<AgentLoopResult>(TimeSpan.FromSeconds(2));
+        Assert.True(result.Success);
+        Assert.Equal("오늘 서울은 맑음입니다.", result.FinalMessage);
+        Assert.Equal(0, result.TurnCount);
+    }
+
+    [Fact]
+    public void DelegationMode_pre_unwrapped_peer_text_also_fires_result_callback()
+    {
+        // M0017 후속 #10 regression: MainWindow.HandleBotChat pre-strips
+        // the DONE(...) wrapper before forwarding to the actor, so the actor
+        // only ever sees raw inner text. The shortcut must accept that shape
+        // too — otherwise the production TTS path silently dies (which is
+        // exactly what operator hit after 후속 #9).
+        var (bot, _) = NewBot();
+        var resultProbe = CreateTestProbe("result");
+        bot.Tell(new SetAgentLoopCallbacks(_ => { }, r => resultProbe.Ref.Tell(r)));
+        bot.Tell(BindingsNoLlm());
+        bot.Tell(new MarkConversationActive("Claude"));
+        bot.Tell(new SetDelegationMode(true));
+
+        // No DONE(...) wrapper — peer signal text is already the inner content
+        // because the IPC layer extracted it for its own UI display path.
+        bot.Tell(new TerminalSentToBot("Claude", "오늘 서울은 맑음입니다."));
+
+        var result = resultProbe.ExpectMsg<AgentLoopResult>(TimeSpan.FromSeconds(2));
+        Assert.True(result.Success);
+        Assert.Equal("오늘 서울은 맑음입니다.", result.FinalMessage);
+        Assert.Equal(0, result.TurnCount);
+    }
+
+    [Fact]
+    public void DelegationMode_pre_unwrapped_handshake_ack_is_silent()
+    {
+        // Handshake-ack filter must still apply to pre-unwrapped peer text,
+        // not just DONE(...) wrapped form. Operator shouldn't hear "ready"
+        // out loud after the delegation handshake bootstrap.
+        var (bot, _) = NewBot();
+        var resultProbe = CreateTestProbe("result");
+        bot.Tell(new SetAgentLoopCallbacks(_ => { }, r => resultProbe.Ref.Tell(r)));
+        bot.Tell(BindingsNoLlm());
+        bot.Tell(new MarkConversationActive("Claude"));
+        bot.Tell(new SetDelegationMode(true));
+
+        bot.Tell(new TerminalSentToBot("Claude", "ready"));
+        bot.Tell(new TerminalSentToBot("Claude", "handshake-ok"));
+
+        resultProbe.ExpectNoMsg(TimeSpan.FromMilliseconds(500));
+    }
+
+    [Fact]
+    public void DelegationMode_DONE_handshake_ack_is_silent()
+    {
+        // Acceptance: DONE(ready) / DONE(handshake-ok) are protocol noise, not
+        // user-facing replies — the voice user shouldn't hear "ready". The
+        // shortcut path swallows them silently, and no agent loop fires either.
+        var (bot, _) = NewBot();
+        var resultProbe = CreateTestProbe("result");
+        bot.Tell(new SetAgentLoopCallbacks(_ => { }, r => resultProbe.Ref.Tell(r)));
+        bot.Tell(BindingsNoLlm());
+        bot.Tell(new MarkConversationActive("Claude"));
+        bot.Tell(new SetDelegationMode(true));
+
+        bot.Tell(new TerminalSentToBot("Claude", "DONE(ready)"));
+        bot.Tell(new TerminalSentToBot("Claude", "DONE(handshake-ok)"));
+
+        resultProbe.ExpectNoMsg(TimeSpan.FromMilliseconds(500));
+    }
+
+    [Fact]
+    public void DelegationMode_off_DONE_falls_back_to_agent_loop_continuation()
+    {
+        // Acceptance: without delegation mode the shortcut must NOT fire — the
+        // normal Mode 2 behaviour (wake the agent loop with the peer signal
+        // as user prompt) still applies. Guards regression: a future operator
+        // pattern that depends on continuation cycles for non-delegation
+        // chat shouldn't break.
+        var (bot, _) = NewBot();
+        var resultProbe = CreateTestProbe("result");
+        bot.Tell(new SetAgentLoopCallbacks(_ => { }, r => resultProbe.Ref.Tell(r)));
+        bot.Tell(BindingsNoLlm());
+        bot.Tell(new MarkConversationActive("Claude"));
+        // NOTE: SetDelegationMode is intentionally NOT sent.
+
+        bot.Tell(new TerminalSentToBot("Claude", "DONE(any content)"));
+
+        // Agent loop fires; with no bindings it returns the friendly failure.
+        var result = resultProbe.ExpectMsg<AgentLoopResult>(TimeSpan.FromSeconds(2));
+        Assert.False(result.Success);
+        Assert.Equal("Backend not ready", result.FailureReason);
+    }
+
     [Fact]
     public void ResetAgentLoopMemory_also_clears_active_and_handshakes()
     {

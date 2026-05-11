@@ -32,8 +32,11 @@ public interface IAgentToolbelt
 
     /// <summary>
     /// Sends a control-key sequence (one of <c>cr</c>, <c>lf</c>, <c>crlf</c>,
-    /// <c>esc</c>, <c>tab</c>, <c>backspace</c>, <c>del</c>, <c>ctrlc</c>,
-    /// <c>ctrld</c>, <c>up</c>, <c>down</c>, <c>left</c>, <c>right</c>).
+    /// <c>esc</c>, <c>tab</c>, <c>shifttab</c> (alias <c>backtab</c>),
+    /// <c>backspace</c>, <c>del</c>, <c>ctrlc</c>, <c>ctrld</c>, <c>up</c>,
+    /// <c>down</c>, <c>left</c>, <c>right</c>).
+    /// <c>shifttab</c> emits <c>ESC[Z</c> — Claude Code uses it to cycle
+    /// accept-mode (default ↔ auto-accept ↔ plan).
     /// </summary>
     Task<bool> SendKeyAsync(int group, int tab, string key, CancellationToken ct);
 

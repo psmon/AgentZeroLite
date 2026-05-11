@@ -588,6 +588,11 @@ public partial class MainWindow : Window
                 "crlf" => "\r\n",
                 "esc" => "\x1B",
                 "tab" => "\t",
+                // Shift+Tab — ESC[Z. Either "shifttab" or the more readline-
+                // idiomatic "backtab" alias works. Claude Code's mode cycle
+                // and bash reverse-completion both consume this sequence.
+                "shifttab" => "\x1b[Z",
+                "backtab"  => "\x1b[Z",
                 "backspace" => "\x08",
                 "del" => "\x7F",
                 "ctrlc" => "\x03",
@@ -1918,8 +1923,19 @@ public partial class MainWindow : Window
 
             if (e.Key == System.Windows.Input.Key.Tab)
             {
-                terminal.ConPTYTerm?.WriteToTerm("\t".AsSpan());
+                // Differentiate Tab vs Shift+Tab. WPF reports both as
+                // `Key.Tab`; the modifier flag distinguishes them. We must
+                // intercept Tab here (HwndHost's built-in Tab traversal
+                // disrupts terminal focus/cursor state) but we have to emit
+                // the right ANSI sequence so the underlying CLI sees the
+                // intended keystroke. Claude Code uses Shift+Tab to cycle
+                // its modes; readline binds it to reverse-completion.
+                bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+                var seq = shift ? "\x1b[Z" : "\t";
+                terminal.ConPTYTerm?.WriteToTerm(seq.AsSpan());
                 e.Handled = true;
+                if (shift)
+                    AppLogger.Log($"[CLI-Input-DIAG] BackTab→PTY | tab={tab.Title} seq=ESC[Z");
             }
 
             // PTY-FREEZE-DIAG: route this keystroke through the session's

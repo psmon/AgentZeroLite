@@ -113,6 +113,18 @@ public partial class AgentBotWindow : Window
     private ITerminalSession? _currentSession;
 
     private bool _autoApprove;
+
+    // M0017 후속 #9 — UI-side mirror of AgentBotActor._delegationMode.
+    // While ON, user voice utterances in AI mode bypass the on-device LLM
+    // entirely and are written directly to the Claude session. The agent
+    // loop's wrap+tool-call orchestration (followups #1–#5) was redundant
+    // for this flow — Claude already wraps its reply as DONE(...) which
+    // AgentBotActor's DONE shortcut (followup #5) speaks via TTS without
+    // touching the LLM. Bypassing the loop on the send side too closes
+    // the round-trip: voice → terminal write → Claude work → DONE → TTS,
+    // zero LLM cycles, no risk of the wrap directive colliding with the
+    // model's own tool-calling habits.
+    private bool _delegationMode;
     private int _autoApproveDelaySec = 5;
 
     public AgentBotWindow(
@@ -958,7 +970,23 @@ public partial class AgentBotWindow : Window
         {
             var aiInput = textToSend;
             txtInput.Clear();
-            _ = SendThroughAiToolLoopAsync(aiInput, displayText);
+            // M0017 후속 #9 — delegation mode bypasses the LLM entirely.
+            // Voice user already chose "Claude as the answerer"; running
+            // the wrap+tool-call loop on top of that added a layer that
+            // (a) burned 5-10s per turn, (b) sometimes collided with the
+            // model's own tool-calling instincts, (c) failed to summarize
+            // anyway because Claude's reply was already a clean DONE(...).
+            // Direct pipe: write to Claude session, let DONE callback
+            // shortcut (AgentBotActor followup #5) speak the result.
+            if (_delegationMode)
+            {
+                if (!TryRelayDirectlyToClaude(aiInput, displayText))
+                    AppLogger.Log("[AIMODE] delegation direct-relay failed — see prior log");
+            }
+            else
+            {
+                _ = SendThroughAiToolLoopAsync(aiInput, displayText);
+            }
             _clipboardAttachment = null;
             pnlClipboardTag.Visibility = Visibility.Collapsed;
             return;
@@ -1091,7 +1119,13 @@ public partial class AgentBotWindow : Window
             AddSystemMessage("AI mode is not wired (host did not provide a groups callback).");
             return;
         }
-        if (_botActorRef is null)
+        // M0017 후속 #3 — bot actor ref resilience. The MainWindow wires
+        // _botActorRef via a deferred Stage.Ask<BotCreated> ContinueWith
+        // callback; if the user fires AI mode before that lands (or the
+        // Ask timed out) we used to surface "AI mode is not wired" and
+        // strand the user. Now we try to recover via ActorSelection
+        // before giving up.
+        if (await EnsureBotActorRefAsync() is null)
         {
             AddSystemMessage("AI mode is not wired (bot actor reference missing).");
             return;
@@ -2220,11 +2254,85 @@ public partial class AgentBotWindow : Window
         _aiSendStopwatch = null;
         try
         {
-            (_botActorRef ?? ActorSystemManager.System.ActorSelection("/user/stage/bot").Anchor)
-                .Tell(new Agent.Common.Actors.ResetAgentLoopMemory());
+            BotTell(new Agent.Common.Actors.ResetAgentLoopMemory());
         }
         catch { /* actor may already be torn down on app exit */ }
         AppLogger.Log($"[AIMODE] session reset requested ({reason})");
+    }
+
+    // ── M0017 후속 #3 — bot actor reference resilience ──────────────
+    //
+    // MainWindow wires <see cref="_botActorRef"/> via
+    // <c>Stage.Ask&lt;BotCreated&gt;(...).ContinueWith(... SetBotActorRef ...)</c>
+    // — a deferred call that can fail to land if (a) the Ask times out
+    // (3s default), (b) the user opens AIMODE before the Ask completes,
+    // or (c) the user toggles embed mode between bot-window instances.
+    //
+    // The pre-#3 fallback used <c>ActorSelection(path).Anchor</c> which
+    // returns the SYSTEM root guardian, not the actor at the path —
+    // Tell-ing the root guardian silently goes nowhere. These two helpers
+    // replace that with a proper ActorSelection-based recovery:
+    //   • <see cref="EnsureBotActorRefAsync"/> — async, real IActorRef
+    //     (needed for paths that follow up with Tell sequences or
+    //     EnsureAgentLoopWiring). Times out at 2s.
+    //   • <see cref="BotTell"/> — synchronous fire-and-forget. Uses the
+    //     cached ref if present, otherwise sends via ActorSelection
+    //     (which routes to whatever actor lives at the path at that
+    //     instant, no resolution step needed for Tell).
+
+    /// <summary>
+    /// Resolves <c>/user/stage/bot</c> and caches it into
+    /// <see cref="_botActorRef"/>. Returns the cached ref on hit, the
+    /// freshly resolved ref on success, null on resolution failure.
+    /// </summary>
+    private async Task<IActorRef?> EnsureBotActorRefAsync()
+    {
+        if (_botActorRef is not null) return _botActorRef;
+        try
+        {
+            var resolved = await ActorSystemManager.System
+                .ActorSelection("/user/stage/bot")
+                .ResolveOne(TimeSpan.FromSeconds(2));
+            _botActorRef = resolved;
+            AppLogger.Log("[AIMODE] _botActorRef recovered via ActorSelection (MainWindow wiring was missing)");
+            return _botActorRef;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[AIMODE] EnsureBotActorRefAsync — /user/stage/bot not resolvable", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Synchronous Tell that prefers the cached <see cref="_botActorRef"/>
+    /// and falls back to <c>ActorSelection</c> (which routes to whatever
+    /// actor exists at the path at send time). Use this for
+    /// fire-and-forget signals where a quick recovery from a missed
+    /// SetBotActorRef call is more important than a typed IActorRef.
+    /// </summary>
+    private void BotTell(object message)
+    {
+        if (_botActorRef is not null)
+        {
+            _botActorRef.Tell(message);
+            return;
+        }
+        try
+        {
+            // ActorSelection.Tell routes through the system's selection
+            // resolver — no ResolveOne required. If no actor exists at
+            // the path the message goes to dead letters (logged by Akka,
+            // not surfaced to the user) — same failure mode as Tell-ing
+            // a stopped IActorRef, so this isn't a regression.
+            ActorSystemManager.System
+                .ActorSelection("/user/stage/bot")
+                .Tell(message);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[AIMODE] BotTell ActorSelection fallback failed", ex);
+        }
     }
 
     /// <summary>
