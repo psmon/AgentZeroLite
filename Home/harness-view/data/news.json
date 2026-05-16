@@ -1,63 +1,71 @@
 {
   "_description": "Recent Updates surface — bilingual EN/KO. Default audience: English. `headline`, `narrative`, `highlights[].label/text`, `prompts[].tag/text` use `{ en, ko }` shape. Scalars (updatedAt, tone) stay language-neutral.",
-  "updatedAt": "2026-05-03",
+  "updatedAt": "2026-05-16",
   "headline": {
-    "en": "v0.5.1 — Token Monitor plugin and multi-profile telemetry",
-    "ko": "v0.5.1 — Token Monitor 플러그인과 멀티 프로필 텔레메트리"
+    "en": "v0.9 cycle — Scrap (window spy + text capture) joins Lite, AgentBot becomes AgentCLI, Actor World gets a Korean tutorial",
+    "ko": "v0.9 사이클 — Scrap (윈도우 스파이 + 텍스트 캡처) 가 Lite 에 합류, AgentBot 이 AgentCLI 로, Actor World 에 한국어 듀토리얼"
   },
   "narrative": {
-    "en": "The WebDev plugin platform welcomed its second official plugin. Token Monitor incrementally ingests the JSONL transcripts that Claude Code and Codex CLI leave on disk via a host-side collector running every 10 minutes, and surfaces them on a per-vendor / per-account / per-project dashboard. After a user pointed out that the first cut watched only ~/.claude/, we hardened it on the spot with multi-profile auto-discovery (CLAUDE_CONFIG_DIR-branched ~/.claude*) and AccountKey-per-file pinning — half the data was actually missing. In the same cycle the Install Plugin dialog was rewritten to discover official plugins at runtime via the GitHub Trees API, and a full re-template of the dark-theme ComboBox pool led us to codify the WPF trap 'Background/Foreground alone is not enough' as Pitfall 6 in the harness.",
-    "ko": "WebDev 플러그인 플랫폼이 두 번째 공식 플러그인을 받아들였다. Token Monitor 는 Claude Code 와 Codex CLI 가 디스크에 남기는 JSONL 트랜스크립트를 호스트 측 collector 가 10분 주기로 incremental 흡수하고, 벤더/계정/프로젝트 단위 대시보드로 노출한다. 첫 구현이 ~/.claude/ 한 디렉토리만 본다는 사실을 사용자가 지적해 곧장 멀티-profile (CLAUDE_CONFIG_DIR 분기된 ~/.claude*) 자동 탐색 + AccountKey-per-file pinning 으로 보강 — 실제로는 절반의 데이터가 누락되어 있었다. 같은 사이클에 Install Plugin 다이얼로그가 GitHub Trees API 로 official 플러그인을 런타임 탐색하도록 바뀌었고, 다크테마 ComboBox 풀 재템플릿이 도입되면서 'Background/Foreground 만 으로 부족' 이라는 WPF 함정이 harness 의 Pitfall 6 으로 codify 됐다."
+    "en": "Lite was repositioned as the standalone full-spec edition (multi-device / cluster moves to AgentZero PRO), which immediately changed what belongs in this codebase. The 2026-04-27 origin snapshot's REJECT-3 verdict on ScrapPanel was superseded by REVISED-3 and shipped in the same mission. M0019 imported the full Origin capture pipeline — 6 leaf files totalling ~1745 lines (TextCaptureService, ChromiumTextCapture, ScrapWriter, WindowInfo, WpfWindowPicker, TargetHighlightOverlay) — and wrapped it in a new ScrapPagePanel overlay alongside WebDev. The first smoke test against IntelliJ (a Swing/AWT app) exposed that UIA exposes no ScrollPattern there, so a Strategy 2.5 clipboard-scroll fallback (Ctrl+Home → loop Ctrl+A/C + PageDown, with live ChunkWritten emit and original-clipboard restore on finish) was added in the follow-up round and now covers IntelliJ, browsers, and other UIA-blind editors. The chat icon next to it renamed user-visible 'Agent Bot' → 'AgentCLI' with a CommandPrompt glyph, while internal types and the Akka actor path `/user/stage/bot` were intentionally left alone. In parallel, M0018 added a Korean Akka.NET tutorial behind `#actor-world/tutorial`, with 10 ComfyUI Z-Image-Turbo hero cards generated in the background while the body was being written.",
+    "ko": "Lite 가 단독 풀스펙 에디션으로 재정의되면서 (멀티-디바이스 / 클러스터는 AgentZero PRO 로 분리), 본 코드베이스의 스코프가 즉시 바뀌었다. 2026-04-27 오리진 스냅샷의 REJECT-3 (ScrapPanel) 판단은 REVISED-3 으로 보정되어 같은 미션에서 출시. M0019 가 Origin 의 캡처 파이프라인 전체 — 6 파일 약 1745 줄 (TextCaptureService, ChromiumTextCapture, ScrapWriter, WindowInfo, WpfWindowPicker, TargetHighlightOverlay) — 을 import 해 WebDev 옆의 새 ScrapPagePanel 오버레이로 감쌌다. IntelliJ (Swing/AWT) 대상 첫 smoke test 가 UIA 의 ScrollPattern 부재를 노출 → Strategy 2.5 클립보드 스크롤 폴백 (Ctrl+Home → Ctrl+A/C + PageDown 루프, 라이브 ChunkWritten emit + 원본 클립보드 복원) 이 후속 라운드로 추가되어 이제 IntelliJ, 브라우저, 그 외 UIA-blind 에디터까지 커버한다. 옆자리 챗 아이콘은 user-visible 'Agent Bot' → 'AgentCLI' + CommandPrompt 글리프로 리브랜드, 내부 타입과 Akka 액터 경로 `/user/stage/bot` 은 의도적으로 그대로. 병렬로 M0018 이 `#actor-world/tutorial` 뒤에 한국어 Akka.NET 듀토리얼을 추가 — 본문 작성 중 ComfyUI Z-Image-Turbo 로 히어로 카드 10장을 백그라운드 생성."
   },
   "highlights": [
     {
-      "label": { "en": "Token Monitor", "ko": "Token Monitor" },
+      "label": { "en": "Scrap is back",      "ko": "Scrap 합류" },
       "text":  {
-        "en": "Per-vendor / per-account / per-project dashboards + alias rename + Reset & Re-scan",
-        "ko": "벤더/계정/프로젝트 분리 대시보드 + alias rename + Reset & Re-scan"
+        "en": "ActivityBar overlay with crosshair picker / HWND input / WINDOW_INFO + ELEMENT_TREE / scroll options / live captured-text preview",
+        "ko": "ActivityBar 오버레이에 크로스헤어 픽커 / HWND 입력 / WINDOW_INFO + ELEMENT_TREE / 스크롤 옵션 / 라이브 캡처 미리보기"
       },
       "tone": "blue"
     },
     {
-      "label": { "en": "Multi-profile",      "ko": "멀티 프로필" },
+      "label": { "en": "Strategy 2.5",       "ko": "Strategy 2.5" },
       "text":  {
-        "en": "~/.claude* directories pinned to AccountKey by folder name (race-free)",
-        "ko": "~/.claude*, profile 디렉토리명을 AccountKey 로 pin (race-free)"
+        "en": "Clipboard-scroll fallback — Ctrl+Home → loop Ctrl+A/C + PageDown, diffs new text per round, restores original clipboard on exit",
+        "ko": "클립보드 스크롤 폴백 — Ctrl+Home → Ctrl+A/C + PageDown 루프, 라운드별 신규 텍스트 diff, 종료 시 원본 클립보드 복원"
       },
       "tone": "purple"
     },
     {
-      "label": { "en": "Official plugin combo", "ko": "공식 콤보" },
+      "label": { "en": "AgentCLI rebrand",   "ko": "AgentCLI 리브랜드" },
       "text":  {
-        "en": "Install dialog discovers official plugins via Trees API at runtime — zero hardcoding",
-        "ko": "Install 다이얼로그가 Trees API 로 런타임 탐색 — 하드코딩 zero"
+        "en": "User-visible label only — actor path `/user/stage/bot` and AgentBotActor class names stay (stable contracts)",
+        "ko": "사용자에게 보이는 라벨만 변경 — 액터 경로 `/user/stage/bot` 과 AgentBotActor 클래스명은 그대로 (안정 contract)"
       },
       "tone": "green"
+    },
+    {
+      "label": { "en": "Actor tutorial (KO)", "ko": "액터 듀토리얼 (KO)" },
+      "text":  {
+        "en": "#actor-world/tutorial — 5 mermaid diagrams, 10 ComfyUI hero cards, 6-step 'build your own actor' appendix",
+        "ko": "#actor-world/tutorial — mermaid 5 블록, ComfyUI 히어로 카드 10장, '액터 직접 만들기' 6단계 부록"
+      },
+      "tone": "blue"
     }
   ],
   "prompts": [
     {
-      "tag":  { "en": "Token tracking", "ko": "토큰 추적" },
+      "tag":  { "en": "Scrap drive",        "ko": "Scrap 드라이브" },
       "tone": "blue",
       "text": {
-        "en": "In WebDev → Token Monitor, compare last week's usage by project (cwd leaf folder)",
-        "ko": "WebDev → Token Monitor 에서 1주일치 사용량을 프로젝트(cwd 리프 폴더)별로 비교"
+        "en": "Open Scrap from the ActivityBar, drag the crosshair onto a long Chrome / IntelliJ / VSCode window, press CAPTURE — watch the preview fill live as Strategy 2.5 scrolls",
+        "ko": "ActivityBar 의 Scrap 열기 → 크로스헤어를 긴 Chrome / IntelliJ / VSCode 창에 드래그 → CAPTURE — Strategy 2.5 가 스크롤하며 프리뷰가 라이브로 채워지는 것 관찰"
       }
     },
     {
-      "tag":  { "en": "Profile labels", "ko": "프로필 라벨" },
+      "tag":  { "en": "Korean Akka tutor",  "ko": "한국어 Akka 듀토" },
       "tone": "purple",
       "text": {
-        "en": "On the By-account table, click each account cell and set a friendly alias (a/b/c)",
-        "ko": "By account 표에서 각 계정 셀 클릭 → 별칭(a/b/c) 입력해 친화 이름 매핑"
+        "en": "Open Actor World → click '액터모델 듀토리얼 (KO)' top-right, or jump straight to #actor-world/tutorial",
+        "ko": "Actor World → 우상단 '액터모델 듀토리얼 (KO)' 클릭, 또는 #actor-world/tutorial 로 직행"
       }
     },
     {
-      "tag":  { "en": "Official plugins", "ko": "공식 플러그인" },
+      "tag":  { "en": "AgentCLI check",     "ko": "AgentCLI 확인" },
       "tone": "green",
       "text": {
-        "en": "Install voice-note / token-monitor right from the OFFICIAL combo on the + Install Plugin dialog",
-        "ko": "+ Install Plugin 다이얼로그의 OFFICIAL 콤보에서 voice-note / token-monitor 즉시 설치"
+        "en": "ActivityBar's chat icon should now show a `>` CommandPrompt glyph with tooltip 'AgentCLI'; the bottom tab reads AGENT CLI",
+        "ko": "ActivityBar 의 챗 아이콘이 `>` CommandPrompt 글리프 + 툴팁 'AgentCLI', 하단 탭은 AGENT CLI 로 보여야 함"
       }
     }
   ]

@@ -1,121 +1,111 @@
 {
   "_description": "PDSA Learning surface — bilingual EN/KO. Default audience: English. `sources[].title`, `tried[]`, `solved[]`, `remaining[]`, `learned.lead`, `learned.body` use `{ en, ko }` shape. Scalars (date/time/category/file/analyzedAt/windowDays) stay language-neutral. PDSA UPDATE mode in the harness-view-build skill must emit both languages.",
-  "analyzedAt": "2026-05-12",
+  "analyzedAt": "2026-05-16",
   "windowDays": 14,
   "sources": [
     {
-      "date": "2026-05-11", "time": "22:00", "category": "mission-records",
-      "file": "harness/logs/mission-records/M0017-수행결과.md",
+      "date": "2026-05-16", "time": "19:30", "category": "mission-records",
+      "file": "harness/logs/mission-records/M0019-수행결과.md",
       "title": {
-        "en": "Mission M0017 — Accessibility voice mode: hands-free delegation to Claude for web surfing + 10 follow-up fixes (handshake suppression, LLM bypass, DONE→TTS data contract alignment)",
-        "ko": "Mission M0017 — 시각장애인용 보이스 모드: 핸즈프리로 Claude 에 위임해 웹서핑 + 10 후속 fix (핸드셰이크 억제, LLM 우회, DONE→TTS 데이터 계약 정렬)"
+        "en": "Mission M0019 — Port Origin Scrap (window spy + UIA text capture) into Lite; rebrand AgentBot → AgentCLI; add Strategy 2.5 clipboard-scroll fallback after IntelliJ smoke test exposed missing UIA ScrollPattern coverage",
+        "ko": "Mission M0019 — Origin Scrap (윈도우 스파이 + UIA 텍스트 캡처) 을 Lite 로 포팅 + AgentBot → AgentCLI 리브랜드 + IntelliJ smoke test 에서 UIA ScrollPattern 부재 확인 후 Strategy 2.5 클립보드 스크롤 폴백 추가"
       }
     },
     {
-      "date": "2026-05-10", "time": "07:51", "category": "code-coach",
-      "file": "harness/logs/code-coach/2026-05-10-07-51-cli-block-recurrence-rca.md",
+      "date": "2026-05-16", "time": "18:30", "category": "mission-records",
+      "file": "harness/logs/mission-records/M0018-수행결과.md",
       "title": {
-        "en": "CLI block recurrence RCA — SendMessageW IPC has no timeout, so any busy UI thread freezes the CLI wrapper. Design flaw, not a regression.",
-        "ko": "CLI 블록 재발 RCA — SendMessageW IPC 가 타임아웃 없어서 UI 스레드가 잠깐만 바빠도 CLI 가 영구 블록. 회귀가 아니라 영구적 설계 결함."
+        "en": "Mission M0018 — Korean Akka.NET actor model tutorial under Actor World sub-route, with 10 ComfyUI hero cards and 5 mermaid diagrams; ComfyUI batch ran in background while writing the body",
+        "ko": "Mission M0018 — Actor World 서브 라우트에 Akka.NET 액터모델 한국어 듀토리얼 + ComfyUI 히어로 카드 10장 + mermaid 5블록; 본문 작성 중 ComfyUI 배치를 백그라운드로 병렬 실행"
+      }
+    },
+    {
+      "date": "2026-05-10", "time": "15:30", "category": "tamer",
+      "file": "harness/logs/tamer/2026-05-10-15-30-webnori-a1-a2-model-survey.md",
+      "title": {
+        "en": "Webnori a1/a2 live catalog survey — operator-driven re-shuffle put a1 = workhorse (gemma-4-e4b + gpt-oss-20b + nomic embed), a2 = experimental (qwen3.6-27b + nemotron-3-nano-4b); origin snapshot doc is now stale",
+        "ko": "Webnori a1/a2 라이브 카탈로그 조사 — operator 가 재정렬해 a1 = 워크호스 (gemma-4-e4b + gpt-oss-20b + nomic embed), a2 = 실험군 (qwen3.6-27b + nemotron-3-nano-4b); 오리진 스냅샷 문서는 이제 오래됨"
       }
     },
     {
       "date": "2026-05-10", "time": "10:31", "category": "kakashi-copy",
       "file": "harness/logs/kakashi-copy/2026-05-10-10-31-pencil-design-from-pencil-creator.md",
       "title": {
-        "en": "Pencil-design skill ingested from sibling pencil-creator repo — Gemini + ComfyUI image gen for M0016 Actor World textures",
-        "ko": "형제 레포 pencil-creator 에서 pencil-design 스킬 흡수 — Gemini + ComfyUI 이미지 생성으로 M0016 Actor World 텍스처 준비"
+        "en": "Pencil-design skill ingested from sibling pencil-creator repo — Gemini + ComfyUI image gen pipeline; secrets gate (`.secret/` gitignored) verified clean",
+        "ko": "형제 레포 pencil-creator 에서 pencil-design 스킬 흡수 — Gemini + ComfyUI 이미지 생성 파이프라인; secrets 게이트 (`.secret/` gitignored) 통과 확인"
       }
     },
     {
-      "date": "2026-05-09", "time": "15:30", "category": "code-coach",
-      "file": "harness/logs/code-coach/2026-05-09-15-30-akka-wasm-feasibility-research.md",
+      "date": "2026-05-10", "time": "07:51", "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-05-10-07-51-cli-block-recurrence-rca.md",
       "title": {
-        "en": "Akka.NET → WASM feasibility research for browser-side harness viewer actors",
-        "ko": "Akka.NET → WASM 가능성 조사 — 브라우저-사이드 하네스 뷰어 액터 후보"
-      }
-    },
-    {
-      "date": "2026-05-05", "time": "07:15", "category": "tamer",
-      "file": "harness/logs/tamer/2026-05-05-07-15-nodejs-bash-stream-io-knowledge.md",
-      "title": {
-        "en": "Node.js / Bash stream-IO patterns captured into the harness — feeds the harness-view dev server preflight design",
-        "ko": "Node.js / Bash 스트림-IO 패턴을 하네스 지식으로 적재 — harness-view dev 서버 preflight 설계 자양분"
+        "en": "CLI block recurrence RCA — SendMessageW has no timeout, so any busy UI thread freezes the CLI wrapper. Design flaw, not a regression. Diagnosis logged, patch pending.",
+        "ko": "CLI 블록 재발 RCA — SendMessageW 가 타임아웃 없어서 UI 스레드가 잠깐만 바빠도 CLI 가 영구 블록. 회귀가 아니라 영구적 설계 결함. 진단은 완료, 패치는 보류."
       }
     }
   ],
   "tried": [
     {
-      "en": "Stand up a voice delegation mode in AgentBot so the user can say '에이전트 큐' once and have every subsequent utterance route to a Claude tab — answer comes back via the existing TTS path. No new tool, no new LLM function-call surface.",
-      "ko": "AgentBot 에 음성 위임 모드를 도입 — 사용자가 한 번 '에이전트 큐' 라고 발화하면 이후 발화가 모두 Claude 탭으로 라우팅되고 응답은 기존 TTS 경로로 돌아옴. 새 도구나 LLM 펑션콜 추가 없음.",
-      "kind": "plan"
+      "en": "Port AgentZero Origin's Scrap module (window picker + UIA capture + ScrollWriter pipeline, ~1745 lines across 6 files) into Lite as a new ActivityBar overlay, after the operator clarified Lite = standalone full-spec and superseded the 2026-04-27 snapshot's REJECT-3 verdict",
+      "ko": "AgentZero Origin 의 Scrap 모듈 (윈도우 픽커 + UIA 캡처 + ScrollWriter 파이프라인, 6 파일 약 1745 줄) 을 Lite ActivityBar 오버레이로 포팅 — operator 가 Lite = 단독 풀스펙 정책을 확정하면서 2026-04-27 스냅샷의 REJECT-3 판단이 폐기됨"
     },
     {
-      "en": "Iterate on the Whisper STT trigger word three times — '위임' → '에이전트큐' → anchor 'agent / 에이전트' + alias set {큐, Q, 위임, weim, cue, queue, delegate} — because the same speaker's same phrase transcribed differently across runs.",
-      "ko": "Whisper STT 트리거 단어를 세 번 반복 — '위임' → '에이전트큐' → anchor 'agent / 에이전트' + alias set {큐, Q, 위임, weim, cue, queue, delegate} — 같은 사용자의 같은 발화가 매번 다르게 transcribe 되어서.",
-      "kind": "do"
+      "en": "Build a Korean-only Akka.NET tutorial under the Actor World sub-route with 10 ComfyUI hero cards (Z-Image-Turbo, 16:9, cyberpunk) and 5 mermaid diagrams; run ComfyUI batch in background while authoring the markdown to absorb image-gen latency into write time",
+      "ko": "Actor World 서브 라우트에 Akka.NET 한국어 듀토리얼 + ComfyUI 히어로 카드 10장 (Z-Image-Turbo, 16:9, 사이버펑크) + mermaid 5블록 작성; ComfyUI 배치를 백그라운드로 굴려 이미지 생성 대기시간을 본문 작성 시간에 흡수"
     },
     {
-      "en": "Suppress the 1.5KB Mode-2 first-contact handshake that buried the user's actual question, then replace it with a 280-char focused handshake that teaches only the bot-chat DONE() reverse channel.",
-      "ko": "사용자 질문을 묻어버리던 1.5KB Mode-2 첫-접촉 핸드셰이크를 억제하고, bot-chat DONE() 응답 채널만 가르치는 280자짜리 집중 핸드셰이크로 교체.",
-      "kind": "do"
+      "en": "Probe Webnori a1/a2 endpoints directly via OpenAI-compatible `/v1/models` to confirm which models are actually live, rather than trusting the origin snapshot doc's catalog",
+      "ko": "Webnori a1/a2 엔드포인트를 OpenAI 호환 `/v1/models` 로 직접 조회해 실제 라이브 모델을 확인 — 오리진 스냅샷 문서의 카탈로그를 그대로 믿지 않음"
     },
     {
-      "en": "Add per-turn timeout (60s default) to ExternalAgentLoop streaming so a stalled Webnori SSE connection doesn't hang the agent loop indefinitely. Surface as TimeoutException → existing transient-retry path engages.",
-      "ko": "ExternalAgentLoop 스트리밍에 per-turn 타임아웃(기본 60s) 추가 — 멈춘 Webnori SSE 가 agent loop 를 영원히 잡지 않게. TimeoutException 으로 surface 해서 기존 transient-retry 경로 발동.",
-      "kind": "do"
+      "en": "Diagnose recurring CLI block by tracing the actual SendMessageW → WndProc → WriteAndSubmit chain and confirming the IPC layer has no timeout protection at all (a 5s polling timeout exists only on the MMF read side)",
+      "ko": "재발하는 CLI 블록을 SendMessageW → WndProc → WriteAndSubmit 체인 추적으로 진단 — IPC 송신 단계에 타임아웃 보호가 전혀 없고 (5초 타임아웃은 MMF 읽기 단계에만) 설계 자체의 결함을 확인"
     },
     {
-      "en": "After the operator's 'AI 가 별도 해석하지 말고 DONE 만 읽어주면 된다' insight, drop the wrap+tool-call orchestration entirely for delegation — write voice directly to the Claude session and short-circuit DONE callbacks straight to TTS.",
-      "ko": "operator 의 'AI 가 별도 해석하지 말고 DONE 만 읽어주면 된다' 인사이트 후 — 위임에서 wrap+tool-call 오케스트레이션을 통째로 제거. 음성을 Claude 세션에 직접 쓰고 DONE 콜백은 단축경로로 곧장 TTS.",
-      "kind": "do"
+      "en": "Use Kakashi-Copy mode to ingest the `pencil-design` skill from the sibling `pencil-creator` repo as an in-repo snapshot, with provenance recorded in `harness/knowledge/_shared/` instead of a git submodule",
+      "ko": "Kakashi-Copy 모드로 형제 레포 `pencil-creator` 의 `pencil-design` 스킬을 in-repo 스냅샷으로 흡수; provenance 는 git submodule 대신 `harness/knowledge/_shared/` 에 기록"
     }
   ],
   "solved": [
     {
-      "en": "Voice → Claude → TTS round-trip working end-to-end at ~50ms latency send + ~50ms receive (no LLM cycles, no token cost). Operator-verified hands-free flow: 'open Coupang and find gifts liked by men in their 40s' → spoken answer.",
-      "ko": "음성 → Claude → TTS 왕복이 ~50ms 송신 + ~50ms 수신 latency 로 end-to-end 동작 (LLM 사이클 없음, 토큰 비용 0). operator 가 핸즈프리 흐름 확인: '쿠팡에서 40대 남자가 좋아하는 선물 찾아줘' → 음성 답변."
+      "en": "M0019 Stages 1+2 landed in one session — AgentBot/AgentCLI rebrand, ActivityBar Scrap entry, full Scrap UI ported, Strategy 2.5 clipboard-scroll fallback for Swing/AWT and other UIA-blind apps. Debug build green with zero new warnings.",
+      "ko": "M0019 Stage 1+2 한 세션에 완료 — AgentBot/AgentCLI 리브랜드, ActivityBar Scrap 엔트리, 전체 Scrap UI 포팅, Swing/AWT 등 UIA-blind 앱용 Strategy 2.5 클립보드 스크롤 폴백. Debug 빌드 0 errors, 신규 경고 0."
     },
     {
-      "en": "Cross-layer data contract bug fixed: MainWindow.HandleBotChat pre-unwraps DONE() for UI display, but AgentBotActor's TTS shortcut was matching the wrapper. Shortcut now accepts wrapper OR raw inner text, handshake-acks (ready/handshake-ok/ok/ack) still filtered."
-,
-      "ko": "레이어 간 데이터 계약 버그 수정: MainWindow.HandleBotChat 가 UI 표시용으로 DONE() 을 미리 벗기는데, AgentBotActor 의 TTS 단축경로는 래퍼 있는 거 기대. 이제 래퍼/raw 둘 다 수용, 핸드셰이크 ack(ready/handshake-ok/ok/ack) 는 여전히 필터링."
+      "en": "M0018 shipped end-to-end — Korean tutorial body live behind `#actor-world/tutorial`, 10/10 ComfyUI images load at naturalWidth=1024 in browser, 5/5 mermaid blocks render to SVG, zero console errors at runtime",
+      "ko": "M0018 전구간 출시 — 한국어 듀토리얼 본문이 `#actor-world/tutorial` 뒤에서 라이브, ComfyUI 이미지 10/10 이 브라우저에서 naturalWidth=1024 로 로드, mermaid 5/5 블록이 SVG 렌더, 런타임 콘솔 에러 0"
     },
     {
-      "en": "Shift+Tab now reaches Claude Code's accept-mode cycle via terminal. New TerminalControl.BackTab enum → ESC[Z; MainWindow PreviewKeyDown branches on Shift modifier; CLI terminal-key and AIMODE send_key accept 'shifttab'/'backtab' aliases.",
-      "ko": "터미널 안에서 Shift+Tab 이 Claude Code 의 accept-mode 순환에 도달. 신규 TerminalControl.BackTab enum → ESC[Z; MainWindow PreviewKeyDown 이 Shift 모디파이어 분기; CLI terminal-key 와 AIMODE send_key 가 'shifttab'/'backtab' 별칭 수용."
+      "en": "Snapshot doc `Docs/agent-origin/` corrected in-place — REJECT-3 → REVISED-3 + P3-3 → P1-x(M0019), so future sessions don't have to re-derive the policy change. Same pattern usable for any other reversed verdict.",
+      "ko": "스냅샷 문서 `Docs/agent-origin/` 를 in-place 보정 — REJECT-3 → REVISED-3 + P3-3 → P1-x(M0019), 향후 세션이 정책 변경을 다시 추론할 필요 없음. 다른 뒤집힌 판단도 같은 패턴 적용 가능."
     },
     {
-      "en": "Auto-approve pattern coverage extended (v1): MCP/tool/workspace-trust keywords ('Allow Claude to use', 'Use this tool', 'Trust this folder/directory') and Unicode pointer separators (❯/▶/•/◆) for newer Claude Code builds.",
-      "ko": "자동승인 패턴 확장 (v1): MCP/도구/워크스페이스-신뢰 키워드 ('Allow Claude to use', 'Use this tool', 'Trust this folder/directory') 와 유니코드 포인터 (❯/▶/•/◆) — 최신 Claude Code 빌드 대응."
+      "en": "Pencil-design skill copy-ingestion proven clean — secrets stay outside the repo (`.secret/` already gitignored), provenance is one MD note, no submodule complexity",
+      "ko": "Pencil-design 스킬 카카시 복사가 깨끗하게 확인됨 — secrets 는 레포 밖 (`.secret/` 이미 gitignored), provenance 는 MD 1장, 서브모듈 없는 단순 구조"
     }
   ],
   "remaining": [
     {
-      "en": "CLI block (SendMessageW with no timeout) is a separate, pre-existing IPC design flaw — code-coach RCA 2026-05-10 — not addressed by M0017. Replace with PostMessage + MMF-only response, or SendMessageTimeout, to make CLI wrappers immune to UI-thread spikes.",
-      "ko": "CLI 블록 (타임아웃 없는 SendMessageW) 은 별개의 기존 IPC 설계 결함 — code-coach 2026-05-10 RCA. M0017 범위 밖. PostMessage + MMF-only 응답 또는 SendMessageTimeout 으로 교체해 UI-스레드 스파이크 immune 화 필요."
+      "en": "M0019 Stages 4+5 — `AgentZeroLite.exe -cli scrap …` verb group and AIMODE function-call surface (`scrap_capture`, `scrap_read`) for the on-device LLM. Backend (TextCaptureService) is already in place, only the CLI + Gbnf surfaces remain.",
+      "ko": "M0019 Stage 4+5 — `AgentZeroLite.exe -cli scrap …` verb 그룹 + 온디바이스 LLM 용 AIMODE 함수콜 표면 (`scrap_capture`, `scrap_read`). 백엔드 (TextCaptureService) 는 이미 있음, CLI + Gbnf 표면만 남음."
     },
     {
-      "en": "Pre-condition automation deferred — playwright capability probe, auto-install, and approval-prompt Enter relay are still manual. Candidate for M0018.",
-      "ko": "사전 조건 자동화 보류 — playwright capability 프로브, 자동 설치, 승인 프롬프트 엔터 중계는 아직 수동. M0018 후보."
+      "en": "CLI block fix — diagnosis is in `code-coach/2026-05-10-...rca.md` but the actual patch (swap `SendMessageW` for `SendMessageTimeoutW` with SMTO_ABORTIFHUNG + 5s budget) hasn't shipped; recurrence is now inevitable",
+      "ko": "CLI 블록 수정 — 진단은 `code-coach/2026-05-10-...rca.md` 에 있지만 실제 패치 (`SendMessageW` 를 `SendMessageTimeoutW` + SMTO_ABORTIFHUNG + 5초 예산 으로 교체) 미반영; 재발은 시간문제"
     },
     {
-      "en": "Whisper STT truncation on Korean tail syllables (observed: '오늘의 날씨 어때?' → '오늘의 날씨는' missing tail) — likely VAD hangover too aggressive. Candidate for M0021.",
-      "ko": "Whisper STT 가 한국어 끝 음절을 자르는 경향 (관측: '오늘의 날씨 어때?' → '오늘의 날씨는' 으로 끝 사라짐) — VAD hangover 가 너무 공격적. M0021 후보."
-    },
-    {
-      "en": "ExternalAgentLoop on Webnori occasionally emits {\"message\":...} envelopes without the 'tool' key, breaking GBNF-less external parsing. Auto-wrap top-level {message:...} as done() — M0022 candidate.",
-      "ko": "ExternalAgentLoop 가 Webnori 위에서 가끔 'tool' 키 없는 {\"message\":...} envelope 을 emit — GBNF 없는 외부 백엔드의 파싱이 깨짐. top-level {message:...} 을 done() 으로 자동 wrapping — M0022 후보."
+      "en": "Origin snapshot doc still labels Webnori a2 as `default` (it was at the 2026-04-27 cut) but the live runtime now points to a1 — needs a follow-up edit in `Docs/agent-origin/01-stack-comparison.md` and `02-architecture-comparison.md`",
+      "ko": "Origin 스냅샷 문서가 아직 Webnori a2 를 `기본` 으로 라벨 (2026-04-27 시점) 하지만 라이브 런타임은 a1 로 옮겨감 — `Docs/agent-origin/01-stack-comparison.md` 와 `02-architecture-comparison.md` 후속 수정 필요"
     }
   ],
   "learned": {
     "lead": {
-      "en": "Accessibility-first voice agents work best when the on-device LLM gets out of the way: route, don't interpret — and make every layer agree on the same wire envelope.",
-      "ko": "접근성 우선의 보이스 에이전트는 온디바이스 LLM 이 비켜설 때 가장 잘 동작한다 — 해석하지 말고 라우팅하라, 그리고 모든 레이어가 같은 와이어 envelope 에 동의하게 하라."
+      "en": "Large architecture-port missions should ship in operator-visible stages with explicit fallthrough hooks, not as one heroic session. Each stage gives the operator a smoke surface, and each follow-up redirect names its own root cause before any edit.",
+      "ko": "대형 아키텍처 포팅 미션은 한 세션 영웅극이 아니라 *operator-visible* stage 로 쪼개고 explicit fallthrough 훅을 둬야 한다. 각 stage 는 operator 에게 스모크 표면을 주고, 각 후속 redirect 는 *수정 전에* 자기 root cause 를 먼저 명명한다."
     },
     "body": {
-      "en": "Ten iterative follow-ups on M0017 converged on the same lesson three times: every time we added an LLM cycle ('summarize Claude's reply', 'wrap the user's question with Mode-2 directives', 'continuation cycle on peer signal') the on-device Gemma either rephrased away meaning, collided with its own tool-calling habits, or stalled on the external API. The cleanest fix was always to delete that cycle — direct WriteAndSubmit on the send side (followup #9) and a DONE shortcut on the receive side (followup #5/#10). The trickiest bug was the silent one: IPC layer pre-unwrapped DONE() for UI display but the actor's matcher still expected the wrapper, so TTS just never fired in production despite passing all tests written against the wrapper-only shape. Lesson for next time: when two layers transform the same envelope, write a contract test that uses the SAME bytes both layers see. Next concrete actions are M0018 (playwright auto-install), M0021 (Whisper Korean tail-syllable fix), and M0022 (ExternalAgentLoop envelope auto-wrap) — all candidates already filed in the M0017 record.",
-      "ko": "M0017 의 10번 반복 후속 fix 들이 같은 교훈에 세 번 수렴했다 — LLM 사이클을 추가할 때마다 ('Claude 응답을 요약하라', '사용자 질문을 Mode-2 지시문으로 wrap 하라', 'peer signal 에 continuation cycle') 온디바이스 Gemma 가 의미를 풀어 헤치거나, 자기 tool-calling 본능과 충돌하거나, 외부 API 에서 stall 했다. 가장 깨끗한 fix 는 늘 그 사이클을 삭제하는 것 — 송신 측 직접 WriteAndSubmit (후속 #9) 와 수신 측 DONE 단축경로 (후속 #5/#10). 가장 까다로웠던 버그는 '조용한 것' — IPC 레이어가 UI 표시용으로 DONE() 을 미리 벗겼는데 actor 매처는 여전히 래퍼를 기대해서, 래퍼 전용 모양으로 작성된 모든 테스트는 통과하는데도 운영에서 TTS 가 그냥 안 나왔다. 다음 교훈: 두 레이어가 같은 envelope 을 변환할 땐 두 레이어가 실제로 보는 동일 바이트로 계약 테스트를 써라. 다음 구체 액션은 M0018 (playwright 자동 설치), M0021 (Whisper 한국어 끝 음절 fix), M0022 (ExternalAgentLoop envelope 자동 wrap) — 모두 M0017 수행결과에 후보로 정리해둠."
+      "en": "M0019 made the pattern visible: Stage 1 (rebrand + scaffold) → operator redirects 'bring the actual UI' → follow-up #1 (real UI + 6-file capture pipeline) → operator redirects 'no preview, no scroll' → follow-up #2 (Strategy 2.5 clipboard-scroll, rooted in the app-log line `[FocusedArea] 스크롤 가능 자식 영역 없음`). Each round started from a named hypothesis. M0018 instances the same idea in the time dimension: ComfyUI batch ran in the background while the tutorial body was written, so a ~60-second image-gen delay disappeared into write time. The two missions also expose the same recurring trap: 14-day-window PDSA misses today's mission records because the indexer leaves their `date` field null — the windowing should fall back to mission frontmatter `started`/`finished` when present.",
+      "ko": "M0019 가 그 패턴을 가시화 — Stage 1 (리브랜드 + 스캐폴드) → operator 가 '실제 UI 도입해' 로 redirect → 후속 수정 #1 (실제 UI + 6 파일 캡처 파이프라인) → operator 가 '프리뷰 없고 스크롤 안 됨' 으로 redirect → 후속 수정 #2 (Strategy 2.5 클립보드 스크롤, app-log 의 `[FocusedArea] 스크롤 가능 자식 영역 없음` 줄에서 근거 추출). 각 라운드가 명명된 가설에서 출발. M0018 은 시간 축에서 같은 아이디어를 실증 — ComfyUI 배치를 듀토리얼 본문 작성과 병렬로 굴려 ~60초 이미지 생성 지연을 본문 작성 시간에 흡수. 두 미션 모두 같은 함정을 노출: 14일 윈도우 PDSA 가 오늘의 mission record 를 못 잡는다 — 인덱서가 mission-record 의 `date` 필드를 null 로 두기 때문. window 판정이 mission frontmatter 의 `started`/`finished` 로 폴백되어야 한다."
     }
   }
 }
