@@ -189,7 +189,8 @@ footer a:hover{color:var(--mint)}
     <a class="btn" href="#live-demo"><span class="ko">▶ 웹에서 만져보기</span><span class="en">▶ Try the live demo</span></a>
     <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
     <a class="btn" href="#voice"><span class="ko">🎙 음성으로 듀얼 멀티태스크</span><span class="en">🎙 Voice — dual multitask</span></a>
-    <a class="btn" href="#webdev"><span class="ko">🌐 WebDev + 플러그인 <span style="color:var(--mint)">NEW</span></span><span class="en">🌐 WebDev + Plugins <span style="color:var(--mint)">NEW</span></span></a>
+    <a class="btn" href="#webdev"><span class="ko">🌐 WebDev + 플러그인</span><span class="en">🌐 WebDev + Plugins</span></a>
+    <a class="btn" href="#scrap"><span class="ko">🔎 Scrap — 윈도우 캡처 <span style="color:var(--mint)">NEW</span></span><span class="en">🔎 Scrap — window capture <span style="color:var(--mint)">NEW</span></span></a>
     <a class="btn" href="#install"><span class="ko">🛠 설치 옵션</span><span class="en">🛠 Install options</span></a>
     <a class="btn" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">GitHub</span><span class="en">GitHub</span></a>
   </div>
@@ -541,6 +542,73 @@ footer a:hover{color:var(--mint)}
   </p>
   <p class="en" style="color:var(--text-dim);font-size:13px;max-width:820px;margin-top:14px">
     voice-note is the <strong>existence proof that the surface is enough</strong> — the next plugins (transcript export, multi-note search, …) build on the same bridge. To roll your own, start from the manifest contract + dual-channel install guide in <a href="https://github.com/psmon/AgentZeroLite/tree/main/Project/Plugins">Project/Plugins/README.md</a>.
+  </p>
+</section>
+
+<!-- ═════════════════════ Scrap — window spy + text capture (v0.9.1) ═════════════════════ -->
+<section class="section" id="scrap">
+  <h2 class="ko">🔎 Scrap — 윈도우 스파이 + 텍스트 캡처 <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.9.1</span></h2>
+  <h2 class="en">🔎 Scrap — window spy + text capture <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.9.1</span></h2>
+
+  <p class="ko" style="color:var(--text-soft);max-width:820px">
+    ActivityBar 의 새 <strong>Scrap 아이콘</strong>을 누르면 풀스크린 캡처 도구가 열립니다. 크로스헤어를 드래그해서 아무 보이는 창에 떨어뜨리거나, HWND 를 직접 입력하면 — 그 창의 <em>읽을 수 있는 텍스트</em>를 <strong>자동 스크롤하며</strong> 잡아옵니다. 코드 에디터의 긴 파일, 브라우저의 무한 스크롤 페이지, 채팅 로그까지. 각 캡처는 <code>logs/scrap/yyyy-MM-dd-HH-mm-ss-scrap.txt</code> 로 저장되며 프리뷰 패널이 <strong style="color:var(--mint)">라이브로</strong> 채워집니다.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px">
+    Click the new <strong>Scrap icon</strong> on the ActivityBar — full-window capture tool opens. Drag the crosshair onto any visible window (or type an HWND) and Scrap pulls the <em>readable text</em> out, <strong>auto-scrolling</strong> through long content: long source files, infinite-scroll web pages, chat logs. Each capture lands as <code>logs/scrap/yyyy-MM-dd-HH-mm-ss-scrap.txt</code> while the preview pane fills <strong style="color:var(--mint)">live</strong>.
+  </p>
+
+  <div class="ascii">
+<span class="src">┌─ Scrap toolbar ──────────────────────────────────────┐</span>
+│ [⊕ <span class="cmd">crosshair</span>] [HWND…] [SELECT]                       │
+<span class="src">├─ WINDOW_INFO ───────────┬─ ELEMENT_TREE (Flutter/CEF) ┤</span>
+│ Handle · Class · Title  │  Pane "code-editor"         │
+│ Rect · PID · Framework  │   ├─ Edit "main.cs"         │
+<span class="src">├─────────────────────────┴─────────────────────────────┤</span>
+│ [▶ <span class="cmd">CAPTURE</span>] CLR CPY DIR  READY  RANGE [..]~[..] DLY  │
+<span class="src">├────────────────────────────────────────────────────────┤</span>
+│  captured text streams in here as the scroll advances …
+<span class="src">└────────────────────────────────────────────────────────┘</span>
+  </div>
+
+  <div class="grid" style="margin-top:18px">
+    <div class="card accent-cyan">
+      <span class="tag">PICKER</span>
+      <h4 class="ko">크로스헤어 드래그 + HWND 입력</h4>
+      <h4 class="en">Drag crosshair + HWND input</h4>
+      <p class="ko">툴바의 크로스헤어 위젯을 마우스로 잡아 드래그해서 다른 창 위에 놓으면 root HWND 가 자동 인식됩니다. 직접 <code>0x...</code> 핸들 입력도 가능. 선택 즉시 클래스/타이틀/프로세스/스타일/프레임워크 (Native · Flutter · Electron) 가 WINDOW_INFO 패널에 채워집니다.</p>
+      <p class="en">Grab the crosshair widget and drag it onto another window — the root HWND auto-detects. Or type a <code>0x...</code> handle directly. WINDOW_INFO fills instantly with class / title / process / style / framework (Native · Flutter · Electron).</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">4 STRATEGIES</span>
+      <h4 class="ko">4단계 폴백 캡처 체인</h4>
+      <h4 class="en">4-strategy fallback chain</h4>
+      <p class="ko">UIA <code>TextPattern</code> → 포커스 영역 UIA 스크롤 → <strong style="color:var(--mint)">클립보드 스크롤 (v0.9.1 신규)</strong> → <code>ScrollPattern</code> 트리워크 → <code>WM_VSCROLL</code> 폴백 순서로 첫 성공까지 진행. 한 앱에 막혀도 다음 전략이 받아냅니다.</p>
+      <p class="en">UIA <code>TextPattern</code> → focused-area UIA scroll → <strong style="color:var(--mint)">clipboard scroll (new in v0.9.1)</strong> → <code>ScrollPattern</code> tree-walk → <code>WM_VSCROLL</code> fallback, in priority order. If one app blocks a strategy, the next one picks up.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">CLIPBOARD SCROLL</span>
+      <h4 class="ko">IntelliJ · Chrome · VSCode 도 캡처</h4>
+      <h4 class="en">Works on IntelliJ · Chrome · VSCode</h4>
+      <p class="ko">Swing/AWT (IntelliJ) 처럼 UIA <code>ScrollPattern</code> 을 노출하지 않는 앱도 잡힙니다. <code>Ctrl+Home</code> → 루프 <code>Ctrl+A</code> → <code>Ctrl+C</code> → 클립보드 읽기 → <code>PageDown</code>, 라운드별로 새 텍스트 diff 만 emit. 캡처 끝나면 <strong>원본 클립보드 복원</strong>.</p>
+      <p class="en">Even apps that don't expose UIA <code>ScrollPattern</code> (Swing / AWT like IntelliJ) get captured. <code>Ctrl+Home</code> → loop <code>Ctrl+A</code> → <code>Ctrl+C</code> → read clipboard → <code>PageDown</code>, emitting only the new tail per round. <strong>Restores the original clipboard</strong> on finish.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">LIVE PREVIEW</span>
+      <h4 class="ko">라이브 미리보기 + 파일 저장</h4>
+      <h4 class="en">Live preview + file output</h4>
+      <p class="ko">캡처 진행 중 미리보기 패널이 새 텍스트만 받아 누적 — 화면 깜빡임 없음. 동시에 <code>logs/scrap/*.txt</code> 에 실시간 append. STOP 누르면 즉시 종료 + 부분 결과 보존.</p>
+      <p class="en">The preview pane receives only the new tail per round — no flicker. Concurrently appends to <code>logs/scrap/*.txt</code> in real time. STOP cancels instantly and preserves the partial result.</p>
+    </div>
+  </div>
+
+  <p class="ko" style="color:var(--text-dim);font-size:13px;max-width:820px;margin-top:14px">
+    Origin (AgentWin) 의 Scrap 모듈을 Lite 의 오버레이 모델에 맞춰 포팅. 2026-04-27 스냅샷 문서가 <em>"REJECT-3 — 경량 정체성 충돌"</em> 로 거절했던 컴포넌트지만, Lite 가 <strong>standalone 풀스펙</strong> 으로 재정의되면서 (멀티-디바이스/클러스터는 AgentZero PRO 로 분리) M0019 로 정식 채택. 후속 단계로 <code>AgentZeroLite.exe -cli scrap …</code> verb 그룹과 AIMODE 함수콜 (<code>scrap_capture</code>, <code>scrap_read</code>) 이 예정.
+  </p>
+  <p class="en" style="color:var(--text-dim);font-size:13px;max-width:820px;margin-top:14px">
+    Ported from Origin (AgentWin)'s Scrap module, adapted to Lite's overlay-panel model. The 2026-04-27 snapshot doc had marked it <em>"REJECT-3 — conflicts with the lightweight identity"</em>; after Lite was repositioned as <strong>standalone full-spec</strong> (multi-device / cluster moves to AgentZero PRO), M0019 brought it in. Next up: an <code>AgentZeroLite.exe -cli scrap …</code> verb group and AIMODE function calls (<code>scrap_capture</code>, <code>scrap_read</code>).
   </p>
 </section>
 

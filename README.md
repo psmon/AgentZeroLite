@@ -45,9 +45,12 @@ macros to whichever terminal is in focus — nothing more, nothing less.
   pretending. Powered by `EasyWindowsTerminalControl` / `CI.Microsoft.Terminal.Wpf`.
 - **Workspaces** — group tabs by folder so each project keeps its own set of CLIs
   (one click = `cd` context and a fresh Claude).
-- **AgentChatBot** — a dockable chat pane that forwards whatever you type into the
-  **active** terminal. `CHT` mode types text, `KEY` mode forwards raw keystrokes
-  (Ctrl+C, arrows, Tab). It is **not** an AI; it is an input broker.
+- **AgentChatBot** (labelled **AgentCLI** in the UI from v0.9.1) — a dockable chat
+  pane that forwards whatever you type into the **active** terminal. `CHT` mode
+  types text, `KEY` mode forwards raw keystrokes (Ctrl+C, arrows, Tab). It is
+  **not** an AI; it is an input broker. *The rebrand is user-visible only — the
+  underlying actor path `/user/stage/bot` and `AgentBotActor` class names are
+  unchanged, so external scripts and skill macros keep working.*
 - **AI ↔ AI conversation (the headline trick)** — teach `AgentZeroLite.ps1` to a
   Claude tab or a Codex tab *once* ("learn `AgentZeroLite.ps1 help` and use it for
   cross-terminal talk"), and from that point on either AI can greet the other
@@ -99,6 +102,16 @@ macros to whichever terminal is in focus — nothing more, nothing less.
   voice journal with VAD-gated capture, sensitivity slider, pause/resume, LLM
   summary (length-chunked recursive), and IndexedDB note storage. See the
   [WebDev section](#-webdev--in-app-sandbox--plugin-system) below.
+- **🔎 Scrap — window spy + scroll-aware text capture (v0.9.1)** — drag a
+  crosshair onto any visible window (or paste an HWND) and Scrap pulls the
+  readable text out, including auto-scroll for long content. Four capture
+  strategies in order: UIA `TextPattern`, focused-area UIA scroll, **clipboard
+  scroll** (Ctrl+Home → Ctrl+A/C + PageDown loop, works on IntelliJ / Chrome /
+  VS Code / anywhere Ctrl+A is supported), and a `WM_VSCROLL` fallback. Each
+  capture lands as a timestamped `logs/scrap/*.txt` and the preview pane fills
+  *live* as the scroll advances. The original clipboard is restored when the
+  capture finishes. See the [Scrap section](#-scrap--window-spy--text-capture)
+  below.
 - **Notes with live rendering** — a second bottom panel with a Markdown viewer that
   also renders Mermaid diagrams and Pencil files, scoped to the active workspace
   folder.
@@ -650,6 +663,83 @@ Features:
 The plugin is the existence proof that the surface is enough to
 build something useful. M0008 builds the next ones (transcription
 export, multi-note search) on top of the same bridge.
+
+---
+
+## 🔎 Scrap — window spy + text capture
+
+Top-level Scrap icon next to AgentCLI / WebDev (mission **M0019**, v0.9.1).
+Imported from AgentZero Origin and adapted to Lite's overlay-panel model.
+The pitch is simple: drag a crosshair onto any visible window — terminal,
+browser, IDE, chat client, IDE log pane, anything that paints text — and
+Scrap captures the readable text *including content past the current
+viewport*. Each capture lands as a timestamped file under
+`logs/scrap/yyyy-MM-dd-HH-mm-ss-scrap.txt` and the preview pane fills
+live as the scroll advances.
+
+```
+┌─ Scrap toolbar ─────────────────────────────────────────────────┐
+│ [⊕ crosshair] [HWND…] [SELECT]                                  │
+├─ WINDOW_INFO ────────────────┬─ ELEMENT_TREE (Flutter/Electron) ┤
+│ Handle / Class / Title /     │  Pane "code-editor" …            │
+│ Rect / Process / Framework   │   ├─ Edit "main.cs" …            │
+├──────────────────────────────┴──────────────────────────────────┤
+│ [▶ CAPTURE] CLR CPY DIR PS   READY   RANGE [...]~[...] DLY ... │
+├─────────────────────────────────────────────────────────────────┤
+│  captured text streams in here as the scroll advances …          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Capture strategy — four fallbacks in priority order
+
+| # | Strategy | When it wins |
+|---|----------|--------------|
+| 1 | UIA `TextPattern` | Native WPF, WinForms, anything that exposes a single TextPattern provider — instant, full text. |
+| 2 | Focused-area UIA scroll | Apps where a child element exposes `ScrollPatternAvailable` (Notepad++, many editors). Iterates `wheel` events while collecting visible text. |
+| **2.5** | **Clipboard scroll (v0.9.1)** | **Anything that supports Ctrl+A — IntelliJ / Swing, Chrome, VS Code, terminals**. Foregrounds the target, presses Ctrl+Home, then loops Ctrl+A → Ctrl+C → read-clipboard → PageDown, diffing new content per round and emitting it to the preview pane via `ChunkWritten`. Restores the original clipboard on finish. |
+| 3 | `ScrollPattern` + TreeWalk | A more aggressive UIA traversal that can find non-text leaves. |
+| 4 | `WM_VSCROLL` fallback | Old-style win32 scrollbars (some Win32 dialogs, legacy apps). |
+
+The chain runs strategies in order and stops at the first one that
+returns text. The new **Strategy 2.5** was added in M0019 follow-up #2
+because IntelliJ smoke-testing exposed that Swing/AWT exposes *no*
+UIA ScrollPattern at all — Strategies 1, 2 and 3 each came back with
+~80 characters of window title + "System". The keyboard-driven
+approach covers that gap with no UIA dependency.
+
+### Why it lives alongside `os` (M0014) instead of replacing it
+
+`os <verb>` is the **shell-shaped** automation surface: a single CLI
+call returns one JSON result, fits inside an LLM `os_*` tool call,
+and is read-only by default. Scrap is the **UI-shaped** capture
+surface: long-running, scroll-driven, with a live preview pane and
+date-range filtering. They share `Project/AgentZeroWpf/NativeMethods.cs`,
+`Module/ElementTreeScanner.cs`, and the same UIA primitives — but
+their interaction shape (one-shot vs interactive) is genuinely
+different, so they coexist.
+
+### Files
+
+```
+Project/AgentZeroWpf/
+├── ChromiumTextCapture.cs       Chrome/Electron-specific path
+├── ScrapWriter.cs               logs/scrap/*.txt + ChunkWritten event
+├── TargetHighlightOverlay.cs    red border overlay around the target
+├── TextCaptureService.cs        the 4-strategy capture chain
+├── WindowInfo.cs                HWND → class/title/pid record
+├── WpfWindowPicker.cs           drag-crosshair window picker
+└── UI/Components/
+    ├── ScrapPagePanel.xaml      the full overlay UI
+    └── ScrapPagePanel.xaml.cs   ~340 lines of event wiring
+```
+
+### Roadmap (M0019 stages 4–5, follow-up missions)
+
+- **Stage 4** — `AgentZeroLite.exe -cli scrap capture/read/list` verb
+  group (mirrors the `os` verb pattern).
+- **Stage 5** — AIMODE function calls `scrap_capture` and `scrap_read`
+  added to `AgentToolGrammar.Gbnf` so the on-device LLM can grab text
+  from any window mid-conversation.
 
 ---
 
