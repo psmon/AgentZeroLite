@@ -1362,6 +1362,7 @@ public partial class MainWindow : Window
 
         DumpDockLayout("settings-open-before");
         CloseWebDev();
+        CloseScrap();
         EnterOverlayMode();
         SettingsPanel.Visibility = Visibility.Visible;
         DumpDockLayout("settings-open-after");
@@ -2827,10 +2828,11 @@ public partial class MainWindow : Window
 
     private void OnActivityBotClick(object sender, RoutedEventArgs e)
     {
-        // Bot icon must take over from any active overlay (WebDev / Settings).
-        // Both overlays collapse CliPanel + BotDockArea, and a bot toggle
+        // Bot icon must take over from any active overlay (WebDev / Settings / Scrap).
+        // All overlays collapse CliPanel + BotDockArea, and a bot toggle
         // would otherwise be invisible until the overlay closes.
         CloseWebDev();
+        CloseScrap();
         CloseSettings();
         OnSidebarBotClick(sender, e);
     }
@@ -2838,6 +2840,23 @@ public partial class MainWindow : Window
 
     private void OnActivitySettingsClick(object sender, RoutedEventArgs e)
         => OnSidebarSettingsClick(sender, e);
+
+    /// <summary>
+    /// Toggle the Scrap full-overlay (M0019). Mirrors OnActivityWebDevClick.
+    /// Stage 1 = scaffold only; the real Scrap UI lands in Stages 2~5.
+    /// </summary>
+    private void OnActivityScrapClick(object sender, RoutedEventArgs e)
+    {
+        if (ScrapPage.Visibility == Visibility.Visible)
+        {
+            CloseScrap();
+            return;
+        }
+        CloseWebDev();
+        CloseSettings();
+        EnterOverlayMode();
+        ScrapPage.Visibility = Visibility.Visible;
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     //  Full-overlay panels (WebDev, Settings)
@@ -2886,6 +2905,7 @@ public partial class MainWindow : Window
             return;
         }
         CloseSettings();
+        CloseScrap();
         EnterOverlayMode();
         WebDevPage.Visibility = Visibility.Visible;
     }
@@ -2893,13 +2913,14 @@ public partial class MainWindow : Window
     /// <summary>
     /// Tear down the WebDev overlay. Idempotent. Restores CLI + bot only
     /// when no other overlay is also active (so closing WebDev while
-    /// Settings is up doesn't accidentally re-show the CLI).
+    /// Settings or Scrap is up doesn't accidentally re-show the CLI).
     /// </summary>
     private void CloseWebDev()
     {
         if (WebDevPage.Visibility != Visibility.Visible) return;
         WebDevPage.Visibility = Visibility.Collapsed;
-        if (SettingsPanel.Visibility != Visibility.Visible)
+        if (SettingsPanel.Visibility != Visibility.Visible &&
+            ScrapPage.Visibility != Visibility.Visible)
             ExitOverlayMode();
     }
 
@@ -2911,7 +2932,21 @@ public partial class MainWindow : Window
     {
         if (SettingsPanel.Visibility != Visibility.Visible) return;
         SettingsPanel.Visibility = Visibility.Collapsed;
-        if (WebDevPage.Visibility != Visibility.Visible)
+        if (WebDevPage.Visibility != Visibility.Visible &&
+            ScrapPage.Visibility != Visibility.Visible)
+            ExitOverlayMode();
+    }
+
+    /// <summary>
+    /// Tear down the Scrap overlay (M0019). Idempotent. Restores CLI + bot
+    /// only when no other overlay is also active.
+    /// </summary>
+    private void CloseScrap()
+    {
+        if (ScrapPage.Visibility != Visibility.Visible) return;
+        ScrapPage.Visibility = Visibility.Collapsed;
+        if (WebDevPage.Visibility != Visibility.Visible &&
+            SettingsPanel.Visibility != Visibility.Visible)
             ExitOverlayMode();
     }
 

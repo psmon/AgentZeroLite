@@ -108,10 +108,10 @@
                 </LinearGradientBrush>
             </Border.Background>
             <DockPanel Margin="8,0">
-                <TextBlock Text="&#xE99A;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                <TextBlock Text="&#xE756;" FontFamily="Segoe MDL2 Assets" FontSize="14"
                            Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
-                <TextBlock Text="AGENT BOT" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                <TextBlock Text="AGENT CLI" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
                            Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Button Content="&#xE8A7;" Style="{StaticResource TitleBarButton}"

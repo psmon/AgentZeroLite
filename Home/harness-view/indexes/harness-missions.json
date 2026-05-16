@@ -10,15 +10,32 @@
     "cancelled"
   ],
   "counts": {
-    "all": 19,
+    "all": 20,
     "inbox": 1,
-    "in_progress": 1,
+    "in_progress": 2,
     "done": 17,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0019",
+      "file": "harness/missions/M0019-WIN스크랩툴.md",
+      "title": "WIN 스크랩툴 영입 + AgentBot → AgentCLI 리브랜드",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "in_progress",
+      "priority": "medium",
+      "created": "2026-05-16",
+      "recordFile": "harness/logs/mission-records/M0019-수행결과.md",
+      "recordStatus": "partial",
+      "recordStarted": "2026-05-16T19:30:00+09:00",
+      "recordFinished": "2026-05-16T19:45:00+09:00",
+      "designFile": null,
+      "modified": "2026-05-16",
+      "size": 5115
+    },
     {
       "id": "M0018",
       "file": "harness/missions/M0018-액터모델듀토리얼.md",

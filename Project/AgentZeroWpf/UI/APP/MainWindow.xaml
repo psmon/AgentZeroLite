@@ -584,9 +584,13 @@
 
                             <!-- Top icons -->
                             <StackPanel Orientation="Vertical" VerticalAlignment="Top" Margin="4,8,0,0">
-                                <!-- Bot Icon -->
+                                <!-- AgentCLI Icon (CommandPrompt) — M0019 rename:
+                                     "Agent Bot" → "AgentCLI" + CLI icon. The internal
+                                     actor / window types keep their AgentBot* names
+                                     (stable Akka path /user/stage/bot); only the
+                                     user-visible label changes. -->
                                 <Button x:Name="btnActivityBot" Style="{StaticResource ActivityBarIcon}"
-                                        Content="&#xE99A;" ToolTip="Agent Bot"
+                                        Content="&#xE756;" ToolTip="AgentCLI"
                                         Click="OnActivityBotClick"/>
 
                                 <!-- WebDev Icon (Globe) — opens the WebDev workspace
@@ -595,6 +599,13 @@
                                 <Button x:Name="btnActivityWebDev" Style="{StaticResource ActivityBarIcon}"
                                         Content="&#xE774;" ToolTip="WebDev — plugin sandbox"
                                         Click="OnActivityWebDevClick"/>
+
+                                <!-- Scrap Icon (M0019) — window spy + UIA text capture.
+                                     Stage 1 = scaffold only; Stage 2~5 ports the
+                                     Origin Scrap module piece by piece. -->
+                                <Button x:Name="btnActivityScrap" Style="{StaticResource ActivityBarIcon}"
+                                        Content="&#xE70F;" ToolTip="Scrap — window spy + text capture"
+                                        Click="OnActivityScrapClick"/>
 
                             </StackPanel>
                         </DockPanel>
@@ -757,7 +768,7 @@
 
                                 <!-- Tabs -->
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button x:Name="btnBottomTabBot" Content="AGENT BOT"
+                                    <Button x:Name="btnBottomTabBot" Content="AGENT CLI"
                                             Click="OnBottomTabBotClick"
                                             Style="{StaticResource FlatButton}"
                                             Background="{StaticResource EditorBg}"
@@ -840,6 +851,17 @@
                                                 Grid.Column="1" Grid.ColumnSpan="3"
                                                 Grid.Row="0" Grid.RowSpan="3"
                                                 Visibility="Collapsed"/>
+
+                    <!-- ===== Scrap Page (full overlay) — M0019 =====
+                         Same overlay pattern as WebDev. Stage 1 = scaffold only;
+                         the real Scrap UI (window picker / element tree /
+                         captured text) lands in Stage 3 after the core capture
+                         pipeline is ported in Stage 2. Toggled from
+                         OnActivityScrapClick. -->
+                    <components:ScrapPagePanel x:Name="ScrapPage"
+                                               Grid.Column="1" Grid.ColumnSpan="3"
+                                               Grid.Row="0" Grid.RowSpan="3"
+                                               Visibility="Collapsed"/>
 
                 </Grid> <!-- /Sidebar + Content Row 1 -->
 

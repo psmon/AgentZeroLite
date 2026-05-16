@@ -336,11 +336,17 @@ synth.SpeakAsync("응답 텍스트");
 
 ---
 
-### P3-3: ScrapPanel (윈도우 스파이) [비용: L]
+### ~~P3-3~~ → **P1-x (M0019)**: ScrapPanel (윈도우 스파이) [비용: L]
 
-P1-2 자동화 명령과 함께 채택. UI 패널 형태로 자동화 결과 시각화.
+> **우선순위 이동 (2026-05-16)** — Lite = 풀스펙 standalone 정책 확정 후
+> P3 (보류) 에서 P1 (즉시 채택) 로 승급. M0019 에서 실행. 자세한 변경 사유는
+> 본 문서 하단 **REVISED-3** 참고.
 
-**Trade-off**: WPF 컴포넌트 추가. P1-2 없이는 의미 없음.
+기존 메모: P1-2 자동화 명령(`os` verb group, M0014 로 이미 완료)과 함께 사용.
+UI 패널 형태로 자동화 결과 시각화 + LLM AIMODE 함수콜 표면 추가.
+
+**Trade-off**: WPF 컴포넌트 추가 (Lite 의 메뉴 구조에 *Scrap* 항목 신설).
+P1-2 가 이미 완료된 상태이므로 즉시 진행 가능.
 
 ---
 
@@ -383,16 +389,26 @@ Origin은 `.cer` 보유하지만 CI 미적용. Lite는 `.cer` 미발견.
 - 신규 엔티티(P2-4)는 새 마이그레이션 1개로 추가
 - Origin 스키마 그대로 import 시 31개 .cs 파일 + Designer 31개 → 62개 파일 noise
 
-### REJECT-3: NoteWindow / HarnessMonitorWindow / ScrapPanel 통째 채택
+### ~~REJECT-3~~ → **REVISED-3** (2026-05-16): ScrapPanel 채택 (Lite 풀스펙 정책)
 
-**Origin 보유**: 데스크톱 허브 정체성의 풍부한 윈도우 자산.
+**원래 판단 (2026-04-27)**: "경량 다중 셸 + 봇" 정체성과 충돌하므로 통째 채택 금지.
 
-**Lite 결정**: "경량 다중 셸 + 봇" 단순 정체성.
+**정책 변경 (2026-05-16, operator)**: Lite = 단독 작동 풀스펙. PRO 가 멀티 디바이스
+(AkkaStacks Remote/Cluster) 를 담당. 따라서 ScrapPanel (윈도우 스파이 + 캡처 + UIA 트리)
+은 Lite 의 정상 스코프다.
 
-**유지 사유**:
-- Lite의 README.md가 명시한 정체성: *"Windows-native multi-CLI shell with on-device LLM experiments"*
-- 채택 시 Origin 회귀 — 차별점 소실
-- **부분 채택은 가능** (Markdown/Pencil 미리보기는 이미 Lite가 보유, NoteWindow의 파일 브라우저는 P3로 검토)
+**현재 결정**: **M0019 로 채택**한다. 단 "통째 카피"가 아니라:
+- WPF 트리는 Origin XAML 을 참고하되 Lite 의 현재 ActorStage / WebDev 메뉴 구조와 통합
+- 텍스트/UIA 캡처 코어 (`TextCaptureService`, `ChromiumTextCapture`, `ScrapWriter`) 는
+  WPF/Win32 의존이 적은 부분을 `ZeroCommon` 으로 끌고, WPF UI 는 `AgentZeroWpf` 에 둠
+- 신규 LLM 도구 (예: `scrap_capture`, `scrap_read`) 는 `IAgentToolbelt` 확장 +
+  `AgentToolGrammar.Gbnf` 갱신으로 AIMODE 함수콜 surface 에 합류
+- CLI 는 `scrap` verb group (`AgentZeroLite.exe -cli scrap capture …`) 으로
+  대칭 노출 — `os` verb 패턴 그대로
+
+**NoteWindow / HarnessMonitorWindow** 는 이 정책 변경 *범위 밖* 이다. 별도 미션에서
+재평가한다 (Lite 가 풀스펙이라고 해서 그 두 윈도우까지 자동 채택되지는 않음 —
+NoteWindow 의 파일 브라우저는 이미 Lite 의 Notes 패널과 중복).
 
 ---
 

@@ -6,6 +6,19 @@
 >
 > 비교 원칙: **"오리진이 더 낫다면 채택"** — 단, 채택 시 Lite의 경량성 철학과 충돌하는 부분은
 > 각 권고 항목의 *Trade-off* 섹션에서 명시한다.
+>
+> 🔄 **정책 변경 (2026-05-16, operator clarification)** — Lite의 정체성이
+> *"경량 다중 셸 + 봇"* 에서 **"단독 작동 풀스펙 데스크톱 (standalone full-spec)"**
+> 으로 명시 조정되었다. 분기는 다음과 같이 갈린다:
+> - **Lite** = 단일 디바이스에서 데스크톱 자동화 / 윈도우 스파이 / OS 자동화 풀세트
+> - **PRO** = 멀티 디바이스 (AkkaStacks — Remote / Cluster)
+>
+> 결과: 본 문서의 P3 / REJECT 판단 중 "경량 정체성 충돌" 을 이유로 보류했던
+> 항목 (대표적으로 **REJECT-3 — ScrapPanel 통째 채택 금지**) 은 **무효화**된다.
+> 해당 기능들은 PRO 가 아닌 Lite 의 정상 스코프다 — 새 미션 (예: **M0019**) 으로
+> 정식 채택한다. 본 문서가 "REJECT"라고 부른 표현은 분기 시점의 합의이며,
+> 정책 변경 시점부터 *"옮길 때 단순히 옮기지 말고 Lite 의 현재 액터/CLI/AIMODE
+> 구조와 통합하라"* 는 가이드로 의미가 좁아진다.
 
 ---
 
@@ -71,7 +84,7 @@
 
 - **LLamaSharp 제거** — Origin이 포기한 결정. Lite의 self-built DLL 우회를 유지한다.
 - **31개 마이그레이션 누적** — Origin 스키마를 그대로 import하지 말고, 필요한 엔티티(예: `LlmSettings`, `ClipboardEntry`)만 새 마이그레이션으로 추가.
-- **WPF UI 거대화 (NoteWindow + HarnessMonitorWindow + ScrapPanel)** — Lite의 "경량 다중 셸" 정체성과 충돌. 채택 시 별도 빌드 구성 분리 검토.
+- ~~**WPF UI 거대화 (NoteWindow + HarnessMonitorWindow + ScrapPanel)** — Lite의 "경량 다중 셸" 정체성과 충돌.~~ ← **2026-05-16 무효화**: Lite = 풀스펙 standalone 정책 확정. ScrapPanel 채택은 M0019 로 진행. 단, "통째 카피" 가 아니라 현재 액터/CLI/AIMODE 구조에 맞춰 통합한다.
 
 ---
 
