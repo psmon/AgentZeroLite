@@ -2,6 +2,15 @@
   "base": "harness/knowledge",
   "items": [
     {
+      "id": "harness/knowledge/_shared/actor-model-tutorial-ko.md",
+      "file": "harness/knowledge/_shared/actor-model-tutorial-ko.md",
+      "name": "actor-model-tutorial-ko.md",
+      "title": "actor-model-tutorial-ko",
+      "heading": "Akka.NET 액터모델 듀토리얼 — AgentZero Lite 의 시선으로",
+      "size": 25693,
+      "modified": "2026-05-16"
+    },
+    {
       "id": "harness/knowledge/_shared/agent-architecture.md",
       "file": "harness/knowledge/_shared/agent-architecture.md",
       "name": "agent-architecture.md",
@@ -367,6 +376,13 @@
       "name": "_shared",
       "path": "_shared",
       "children": [
+        {
+          "type": "file",
+          "name": "actor-model-tutorial-ko.md",
+          "path": "_shared/actor-model-tutorial-ko.md",
+          "size": 25693,
+          "modified": "2026-05-16"
+        },
         {
           "type": "file",
           "name": "agent-architecture.md",

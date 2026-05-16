@@ -8,19 +8,29 @@
     "pre-commit-review",
     "release-build-pipeline",
     "security-guard",
-    "tamer"
+    "tamer",
+    "test-runs"
   ],
   "counts": {
     "build-doctor": 6,
     "code-coach": 23,
     "kakashi-copy": 1,
-    "mission-records": 16,
+    "mission-records": 18,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
-    "tamer": 17
+    "tamer": 18,
+    "test-runs": 0
   },
   "items": [
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-05-10-15-30-webnori-a1-a2-model-survey.md",
+      "date": "2026-05-10",
+      "time": "15:30",
+      "title": "webnori a1 a2 model survey",
+      "size": 5390
+    },
     {
       "category": "kakashi-copy",
       "file": "harness/logs/kakashi-copy/2026-05-10-10-31-pencil-design-from-pencil-creator.md",
@@ -699,7 +709,23 @@
       "date": null,
       "time": null,
       "title": "M0016-수행결과",
-      "size": 5902
+      "size": 20324
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0017-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0017-수행결과",
+      "size": 58457
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0018-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0018-수행결과",
+      "size": 8836
     }
   ]
 }

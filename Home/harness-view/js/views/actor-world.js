@@ -22,6 +22,8 @@
 
 import { h, mount } from '../utils/dom.js';
 import { renderTopBar, emptyState, loadingState } from './_common.js';
+import { loadMd } from '../utils/loader.js';
+import { createMdViewer } from '../components/md-viewer.js';
 
 const THREE_VERSION = '0.160.0';
 
@@ -228,12 +230,21 @@ const CORE_FRAG = /* glsl */`
 `;
 
 export async function render(ctx) {
-  const { viewEl, topbarEl } = ctx;
+  const { viewEl, topbarEl, params, menu } = ctx;
+
+  if (params === 'tutorial') return renderTutorial(ctx);
+
+  const tutorialBtn = h('button', {
+    class: 'btn',
+    onclick: () => { location.hash = `#${menu.id}/tutorial`; },
+    title: 'Akka.NET 액터모델 듀토리얼 (한국어)',
+  }, '📖 액터모델 듀토리얼 (KO)');
 
   renderTopBar(topbarEl, {
     title: 'Actor World',
     subtitle: 'ActorStage runtime model - LLM tool calls, voice, CLI IPC, terminal actors',
     badge: { kind: 'readonly', text: 'Model view' },
+    extra: tutorialBtn,
   });
 
   mount(viewEl, loadingState('Loading ActorStage model...'));
@@ -266,6 +277,37 @@ export async function render(ctx) {
   requestAnimationFrame(() => {
     if (!ac.signal.aborted) runScene({ THREE, OrbitControls, stage, tooltip, eventstream, ac });
   });
+}
+
+async function renderTutorial(ctx) {
+  const { viewEl, topbarEl, menu } = ctx;
+  const path = 'harness/knowledge/_shared/actor-model-tutorial-ko.md';
+
+  renderTopBar(topbarEl, {
+    title: 'Actor Model Tutorial (KO)',
+    subtitle: 'Akka.NET 액터모델 — AgentZero Lite 의 시선으로 (한국어 전용)',
+    badge: { kind: 'readonly', text: 'Tutorial' },
+    extra: h('button', {
+      class: 'btn',
+      onclick: () => { location.hash = `#${menu.id}`; },
+    }, '← Back to Actor World'),
+  });
+
+  mount(viewEl, loadingState('듀토리얼 로딩 중...'));
+  const raw = await loadMd(path);
+  if (raw == null) {
+    mount(viewEl, emptyState(`Tutorial markdown not found at ${path}.`));
+    return;
+  }
+
+  // Strip YAML frontmatter so the meta block doesn't leak into the rendered MD.
+  const body = raw.replace(/^---\n[\s\S]*?\n---\n/, '');
+
+  mount(viewEl, createMdViewer({
+    content: body,
+    readOnly: true,
+    breadcrumb: path.split('/'),
+  }));
 }
 
 function runScene({ THREE, OrbitControls, stage, tooltip, eventstream, ac }) {
