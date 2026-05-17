@@ -224,8 +224,8 @@
       "tone": "amber",
       "label": { "en": "Text-to-Speech (TTS)", "ko": "음성 합성 (TTS)" },
       "lead": {
-        "en": "TtsTextCleaner first sanitizes the LLM reply (strips markdown, emoji, code fences) before sending to the TTS engine. NAudio handles playback; mute-while-playing prevents the loop talking to itself.",
-        "ko": "TtsTextCleaner 가 먼저 LLM 응답을 정제(마크다운/이모지/코드 펜스 제거)한 뒤 TTS 엔진으로 전달. 재생은 NAudio 가 담당하며, mute-while-playing 으로 루프가 자기 자신에게 말하는 것을 방지."
+        "en": "TtsTextCleaner first sanitizes the LLM reply (strips markdown, emoji, code fences) before sending to the TTS engine. NAudio handles playback; mute-while-playing prevents the loop talking to itself. The TTS lane spans three tiers — Windows SAPI for instant offline, OpenAI TTS for cloud-grade quality, and as of v0.9.2 Supertone Inc's Supertonic — the first AgentZero provider that drives a pip-installed Python ONNX library through a subprocess seam, opening the door to the wider Python on-device model ecosystem.",
+        "ko": "TtsTextCleaner 가 먼저 LLM 응답을 정제(마크다운/이모지/코드 펜스 제거)한 뒤 TTS 엔진으로 전달. 재생은 NAudio 가 담당하며, mute-while-playing 으로 루프가 자기 자신에게 말하는 것을 방지. TTS 레인은 세 단계 — Windows SAPI (즉시 오프라인), OpenAI TTS (클라우드 품질), 그리고 v0.9.2 부터 Supertone Inc 의 Supertonic — pip 설치된 Python ONNX 라이브러리를 서브프로세스 시암으로 구동하는 AgentZero 첫 사례로, 더 넓은 Python 온디바이스 모델 생태계로의 문을 연다."
       },
       "models": [
         {
@@ -252,6 +252,19 @@
           "summary": {
             "en": "Cloud TTS. Eleven voice options ranging from neutral (alloy) to expressive (fable, nova). Speed controllable 0.25–4.0× (default 1.0). User-provided API key.",
             "ko": "클라우드 TTS. 중립적인 alloy 부터 표현력 있는 fable, nova 까지 11 가지 보이스. 속도 0.25–4.0× 조절 가능(기본 1.0). 사용자가 API 키 제공."
+          }
+        },
+        {
+          "name": "Supertonic",
+          "variant": "supertonic 1.2.x · 10 builtin voices (M1–M5 / F1–F5) · 31 languages incl. Korean",
+          "vendor": "Supertone Inc",
+          "size": "~400 MB cached locally",
+          "params": "~99M (ONNX)",
+          "badges": ["on-device", "pip-onnx", "new"],
+          "tone": "blue",
+          "summary": {
+            "en": "Lightning-fast on-device TTS (RTF ~0.012 on M4 Pro CPU, well under real time). First AgentZero provider that shells out to a pip-installed Python package — `pip install supertonic` in the chosen interpreter, then the app drives the library via a `python -c <script>` subprocess seam. Two-phase install probe (`python -V` + `pip show supertonic`) tells multi-Python machines exactly which interpreter the package landed in. Settings → Voice → Supertonic exposes a Python picker (auto-discovered via `py -0p` + filesystem fallback), an explicit Download Model dialog with live tqdm progress + cancel + Start fresh, and a Check Install probe with actionable error hints (cache lock, HF rate limit, network, disk). Model + code license OpenRAIL-M / MIT.",
+            "ko": "초고속 온디바이스 TTS (M4 Pro CPU 에서 RTF ~0.012, 실시간 대비 한참 빠름). AgentZero 첫 'pip 설치 패키지를 서브프로세스로 구동' 사례 — 선택한 인터프리터에 `pip install supertonic` 후 앱이 `python -c <script>` 시암으로 라이브러리를 구동. 2-phase 설치 probe (`python -V` + `pip show supertonic`) 가 멀티-Python 환경에서 패키지가 깔린 인터프리터를 정확히 짚어 준다. Settings → Voice → Supertonic 에서 Python 피커 (`py -0p` + filesystem 폴백 자동 탐지), 라이브 tqdm 진행률 + Cancel + Start fresh 가 있는 명시적 Download Model 다이얼로그, 실행 가능한 에러 힌트(캐시 잠금 / HF rate limit / 네트워크 / 디스크)가 붙은 Check Install probe 를 노출. 모델/코드 라이선스는 OpenRAIL-M / MIT."
           }
         }
       ]

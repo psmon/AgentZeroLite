@@ -1114,15 +1114,55 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Python" FontFamily="Consolas" FontSize="10"
+                                    <TextBlock Text="Python Picker" FontFamily="Consolas" FontSize="10"
+                                               Foreground="#888899" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="cbSupertonicPython" Grid.Column="1"
+                                              Style="{StaticResource DarkComboBox}"
+                                              SelectionChanged="OnSupertonicPythonPickerChanged"
+                                              ToolTip="Detected Python interpreters (py -0p + well-known paths). Picking one auto-fills the Path field below."/>
+                                    <Button x:Name="btnSupertonicDetectPythons" Grid.Column="2"
+                                            Content="Detect" Padding="10,3" Margin="6,0,0,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnSupertonicDetectPythons"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Python Path" FontFamily="Consolas" FontSize="10"
                                                Foreground="#888899" VerticalAlignment="Center"/>
                                     <TextBox x:Name="tbSupertonicPython" Grid.Column="1"
                                              Style="{StaticResource DarkTextBox}"
-                                             ToolTip="Python interpreter — leave empty to use 'python' from PATH; point at a venv for isolation."/>
+                                             TextChanged="OnSupertonicFieldChanged"
+                                             ToolTip="Full path to python.exe — autofilled from the picker above, but free to edit. Leave empty for PATH 'python'."/>
                                     <Button x:Name="btnSupertonicProbe" Grid.Column="2"
                                             Content="Check Install" Padding="10,3" Margin="6,0,0,0"
                                             Style="{StaticResource DarkButton}"
                                             Click="OnSupertonicProbe"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Model" FontFamily="Consolas" FontSize="10"
+                                               Foreground="#888899" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" FontFamily="Consolas" FontSize="10"
+                                               Foreground="#808080" TextWrapping="Wrap" LineHeight="14"
+                                               VerticalAlignment="Center">
+                                        <Run>First synthesis pulls ~400 MB. Click </Run>
+                                        <Run FontWeight="Bold" Foreground="#00FFAA">Download Model</Run>
+                                        <Run> once so real TTS calls don't hit network I/O.</Run>
+                                    </TextBlock>
+                                    <Button x:Name="btnSupertonicDownloadModel" Grid.Column="2"
+                                            Content="Download Model" Padding="10,3" Margin="6,0,0,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnSupertonicDownloadModel"/>
                                 </Grid>
 
                                 <Grid Margin="0,0,0,6">
@@ -1134,7 +1174,8 @@
                                     <TextBlock Text="Language" FontFamily="Consolas" FontSize="10"
                                                Foreground="#888899" VerticalAlignment="Center"/>
                                     <ComboBox x:Name="cbSupertonicLang" Grid.Column="1"
-                                              Style="{StaticResource DarkComboBox}">
+                                              Style="{StaticResource DarkComboBox}"
+                                              SelectionChanged="OnSupertonicFieldChanged">
                                         <ComboBoxItem Content="Korean  (ko)" Tag="ko"/>
                                         <ComboBoxItem Content="English  (en)" Tag="en"/>
                                         <ComboBoxItem Content="Japanese  (ja)" Tag="ja"/>
@@ -1143,6 +1184,7 @@
                                     </ComboBox>
                                     <TextBox x:Name="tbSupertonicSteps" Grid.Column="2" Margin="6,0,0,0"
                                              Style="{StaticResource DarkTextBox}"
+                                             TextChanged="OnSupertonicFieldChanged"
                                              ToolTip="ONNX steps 5..12 (default 8). Higher = better quality, lower = faster."/>
                                 </Grid>
 

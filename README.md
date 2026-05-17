@@ -76,9 +76,15 @@ macros to whichever terminal is in focus — nothing more, nothing less.
   AgentBot pipeline, just a different input channel. Backend ships **CPU +
   Vulkan** so AMD / Intel / NVIDIA all accelerate the same binary; multi-GPU
   systems get an auto-best heuristic plus a manual override in Voice settings.
-  **Voice output (TTS reply) is still in development** — the SAPI / OpenAI
-  TTS plumbing is wired up but the response-streaming pipeline isn't
-  shipping yet, so today voice is input-only.
+  **TTS reply** ships three backends — Windows SAPI (instant, offline),
+  OpenAI TTS (cloud, byok), and as of v0.9.2 **Supertonic** (Supertone Inc's
+  on-device ONNX, ~99M params, 10 voices, 31 languages incl. Korean) — the
+  first AgentZero provider that drives a **pip-installed Python package**
+  via a subprocess seam, opening up the wider Python on-device model
+  ecosystem for future adoption. Settings → Voice → Supertonic auto-discovers
+  installed Pythons (`py -0p` + filesystem fallback), exposes a Download
+  Model dialog with live progress + cancel + Start fresh, and a Check
+  Install probe that diagnoses multi-Python machines.
 - **AgentBot `[+]` menu — 3 ways to arm a terminal AI** —
   - **`AgentZeroCLI Helper`** — drops a ready-made briefing into the chat input that
     teaches any terminal AI (Claude, Codex, shell-hosted model) how to call
@@ -542,14 +548,26 @@ extends here into tiki-taka between **your own two input modalities**.
   factor / similarity, so you can verify the Vulkan runtime
   actually loaded on your machine.
 
-### Status: input ✓ · output 🚧
+### Status: input ✓ · output ✓ (3 backends as of v0.9.2)
 
 - ✅ **STT (you → terminal AI)** — shipping. Mic → AgentBot →
   active terminal.
-- 🚧 **TTS (terminal AI → spoken reply)** — settings (Off / Windows
-  SAPI / OpenAI tts-1) are wired up, but the response-streaming
-  pipeline that pipes terminal AI output into the speaker is still
-  under development. Today voice is input-only.
+- ✅ **TTS (terminal AI → spoken reply)** — shipping. Three
+  backends in Settings → Voice:
+  - **Windows SAPI** — instant, offline, uses OS-installed voices.
+  - **OpenAI TTS** — `tts-1`, 11 voices, byok.
+  - **Supertonic** *(new in v0.9.2)* — Supertone Inc's on-device
+    ONNX TTS, ~99M params, 10 voices (M1–M5 / F1–F5), 31
+    languages incl. Korean. **First AgentZero provider that
+    drives a pip-installed Python library** through a
+    `python -c <script>` subprocess seam — opens the door to
+    the wider Python on-device model ecosystem.
+    Settings → Voice → Supertonic auto-discovers installed
+    Pythons (`py -0p` + filesystem fallback), exposes a
+    Download Model dialog with live tqdm progress + cancel +
+    Start fresh, and a Check Install probe with actionable
+    error hints (cache lock, HF rate limit, network, disk).
+    Model + code license OpenRAIL-M / MIT.
 
 ---
 
