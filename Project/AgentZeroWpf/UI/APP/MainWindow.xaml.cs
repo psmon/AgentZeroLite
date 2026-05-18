@@ -886,13 +886,26 @@ public partial class MainWindow : Window
 
             foreach (var tab in grp.Tabs)
             {
-                // Don't activate any tab during restore — we'll activate the last active one below
+                // Don't activate any tab during restore — we'll activate the last active one below.
+                // M0021: resolve SSH-augmented args before the tab spawns the PTY.
+                var resolvedArgs = Agent.Common.Module.SshCommandBuilder.ComposeArguments(
+                    tab.ExePath,
+                    tab.Arguments,
+                    new Agent.Common.Module.SshLaunchSettings(
+                        IsRemote: tab.IsRemote,
+                        Host: tab.SshHost,
+                        User: tab.SshUser,
+                        AuthMode: Agent.Common.Module.SshCommandBuilder.ParseAuthMethod(tab.SshAuthMethod),
+                        KeyPath: tab.SshKeyPath));
                 AddConsoleTab(
                     tab.Title,
                     tab.ExePath,
-                    tab.Arguments,
+                    resolvedArgs,
                     tab.CliDefinitionId,
-                    activate: false);
+                    activate: false,
+                    encryptedPasswordForLaunch: tab.IsRemote &&
+                        string.Equals(tab.SshAuthMethod, Agent.Common.Module.SshCommandBuilder.AuthMethodPassword, StringComparison.OrdinalIgnoreCase)
+                        ? tab.EncryptedPassword : null);
             }
         }
 
@@ -919,8 +932,23 @@ public partial class MainWindow : Window
             var defId = def.Id;
             var name = def.Name;
             var exe = def.ExePath;
-            var args = def.Arguments;
-            item.Click += (_, _) => AddConsoleTab(name, exe, args, defId);
+            // M0021: resolve SSH-augmented args + capture the encrypted password
+            // for password-mode definitions. Plaintext stays inside DPAPI until
+            // InitializeTerminal drops it onto the clipboard for paste.
+            var resolvedArgs = Agent.Common.Module.SshCommandBuilder.ComposeArguments(
+                def.ExePath,
+                def.Arguments,
+                new Agent.Common.Module.SshLaunchSettings(
+                    IsRemote: def.IsRemote,
+                    Host: def.SshHost,
+                    User: def.SshUser,
+                    AuthMode: Agent.Common.Module.SshCommandBuilder.ParseAuthMethod(def.SshAuthMethod),
+                    KeyPath: def.SshKeyPath));
+            string? encryptedPw = def.IsRemote &&
+                string.Equals(def.SshAuthMethod, Agent.Common.Module.SshCommandBuilder.AuthMethodPassword, StringComparison.OrdinalIgnoreCase)
+                ? def.EncryptedPassword : null;
+            item.Click += (_, _) => AddConsoleTab(name, exe, resolvedArgs, defId,
+                encryptedPasswordForLaunch: encryptedPw);
             ctxConsoleType.Items.Add(item);
         }
     }
@@ -1733,6 +1761,7 @@ public partial class MainWindow : Window
     // CLI 메뉴는 DB에서 동적으로 구성됨 (RebuildCliContextMenu)
 
     private void AddConsoleTab(string title, string exe, string? arguments = null, int cliDefinitionId = 0, bool activate = true,
+        string? encryptedPasswordForLaunch = null,
         [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
         [System.Runtime.CompilerServices.CallerLineNumber] int callerLine = 0)
     {
@@ -1773,6 +1802,7 @@ public partial class MainWindow : Window
             Title = title, Document = doc, TerminalHost = termHost,
             CliDefinitionId = cliDefinitionId,
             ExePath = exe, Arguments = arguments,
+            EncryptedPasswordForLaunch = encryptedPasswordForLaunch,
             Terminal = null, IsInitialized = false,
         };
 
@@ -1849,6 +1879,34 @@ public partial class MainWindow : Window
         AppLogger.Log($"[CLI] InitializeTerminal | title={tab.Title} tabHash=#{tabHash:X8} isInit={tab.IsInitialized} isStarted={tab.IsTerminalStarted} caller={caller}:{callerLine}");
         if (tab.IsInitialized) return;
         tab.IsInitialized = true;  // Set immediately to prevent re-entrant calls from OnDockActiveContentChanged
+
+        // M0021 (follow-up #4): password-mode tabs decrypt the stored
+        // ciphertext now, arm the SshPasswordAutofill watcher (waits for
+        // "Password:" on the PTY stream then writes plaintext + Enter after a
+        // 500 ms settle delay), AND drop the plaintext onto the clipboard as
+        // a belt-and-braces fallback in case the prompt format doesn't match.
+        // Best-effort — never block tab startup.
+        if (!string.IsNullOrEmpty(tab.EncryptedPasswordForLaunch))
+        {
+            try
+            {
+                var plaintext = AgentZeroWpf.Security.DpapiSecretProtector.Unprotect(tab.EncryptedPasswordForLaunch);
+                if (!string.IsNullOrEmpty(plaintext))
+                {
+                    _ = new AgentZeroWpf.Services.SshPasswordAutofill(tab, plaintext);
+                    try { System.Windows.Clipboard.SetText(plaintext); } catch { /* clipboard fallback only */ }
+                    AppLogger.Log($"[Ssh] Auto-fill armed for tab \"{tab.Title}\" — will write password to PTY when ssh prompts; clipboard copy as fallback.");
+                }
+                else
+                {
+                    AppLogger.Log($"[Ssh] WARN: failed to decrypt stored password for tab \"{tab.Title}\" (DPAPI returned null).");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Log($"[Ssh] WARN: password autofill setup failed for tab \"{tab.Title}\": {ex.GetType().Name}: {ex.Message}");
+            }
+        }
 
         string workDir = _cliGroups[_activeGroupIndex].DirectoryPath;
         // cmd /c otherwise parses only the first whitespace-delimited token as the

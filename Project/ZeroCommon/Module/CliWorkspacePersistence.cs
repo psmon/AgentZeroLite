@@ -18,13 +18,25 @@ public sealed record CliDefinitionSnapshot(
     int Id,
     string Name,
     string ExePath,
-    string? Arguments);
+    string? Arguments,
+    bool IsRemote = false,
+    string? SshHost = null,
+    string? SshUser = null,
+    string? SshAuthMethod = null,
+    string? SshKeyPath = null,
+    string? EncryptedPassword = null);
 
 public sealed record CliTabSnapshot(
     string Title,
     int CliDefinitionId,
     string ExePath,
-    string? Arguments);
+    string? Arguments,
+    bool IsRemote = false,
+    string? SshHost = null,
+    string? SshUser = null,
+    string? SshAuthMethod = null,
+    string? SshKeyPath = null,
+    string? EncryptedPassword = null);
 
 public sealed record CliGroupSnapshot(
     string DirectoryPath,
@@ -131,7 +143,13 @@ public static class CliWorkspacePersistence
                         tab.Title,
                         tab.CliDefinitionId,
                         tab.CliDefinition.ExePath,
-                        tab.CliDefinition.Arguments))
+                        tab.CliDefinition.Arguments,
+                        tab.CliDefinition.IsRemote,
+                        tab.CliDefinition.SshHost,
+                        tab.CliDefinition.SshUser,
+                        tab.CliDefinition.SshAuthMethod,
+                        tab.CliDefinition.SshKeyPath,
+                        tab.CliDefinition.EncryptedPassword))
                     .ToList()))
             .ToList();
     }
@@ -145,7 +163,13 @@ public static class CliWorkspacePersistence
                 definition.Id,
                 definition.Name,
                 definition.ExePath,
-                definition.Arguments))
+                definition.Arguments,
+                definition.IsRemote,
+                definition.SshHost,
+                definition.SshUser,
+                definition.SshAuthMethod,
+                definition.SshKeyPath,
+                definition.EncryptedPassword))
             .ToList();
     }
 }

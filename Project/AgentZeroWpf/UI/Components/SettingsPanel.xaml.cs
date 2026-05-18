@@ -153,6 +153,15 @@ public partial class SettingsPanel : UserControl
             entity.Name = dlg.Result.Name;
             entity.ExePath = dlg.Result.ExePath;
             entity.Arguments = dlg.Result.Arguments;
+            // M0021: ssh fields — copy through. EncryptedPassword stays as-is
+            // when dlg.Result.EncryptedPassword equals _existingEncryptedPassword
+            // (handled inside the dialog), so this assignment is always safe.
+            entity.IsRemote = dlg.Result.IsRemote;
+            entity.SshHost = dlg.Result.SshHost;
+            entity.SshUser = dlg.Result.SshUser;
+            entity.SshAuthMethod = dlg.Result.SshAuthMethod;
+            entity.SshKeyPath = dlg.Result.SshKeyPath;
+            entity.EncryptedPassword = dlg.Result.EncryptedPassword;
             db.SaveChanges();
             RefreshList();
             CliDefinitionsChanged?.Invoke();
@@ -163,17 +172,44 @@ public partial class SettingsPanel : UserControl
     {
         if (lvCliDefs.SelectedItem is not CliDefinition selected || selected.IsBuiltIn) return;
 
+        // M0021 follow-up #2: CliTab → CliDefinition FK uses OnDelete.Restrict,
+        // so deleting a definition that has live tabs throws DbUpdateException.
+        // Detect the usage up front, offer cascade-delete (remove tabs too),
+        // and wrap SaveChanges in try/catch so any residual error surfaces as
+        // a MessageBox instead of an unhandled crash.
+        using var db = new AppDbContext();
+        var entity = db.CliDefinitions.Find(selected.Id);
+        if (entity is null) return;
+
+        var referencingTabs = db.CliTabs
+            .Where(t => t.CliDefinitionId == selected.Id)
+            .ToList();
+
+        var prompt = referencingTabs.Count == 0
+            ? $"Delete CLI definition '{selected.Name}'?"
+            : $"Delete CLI definition '{selected.Name}'?\n\n" +
+              $"{referencingTabs.Count} tab(s) currently use this definition and will be removed as well.";
         var result = System.Windows.MessageBox.Show(
-            $"Delete CLI definition '{selected.Name}'?",
+            prompt,
             "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes) return;
 
-        using var db = new AppDbContext();
-        var entity = db.CliDefinitions.Find(selected.Id);
-        if (entity is not null)
+        try
         {
+            if (referencingTabs.Count > 0)
+                db.CliTabs.RemoveRange(referencingTabs);
             db.CliDefinitions.Remove(entity);
             db.SaveChanges();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Settings] Delete CLI def '{selected.Name}' failed: {ex.GetType().Name}: {ex.Message}");
+            System.Windows.MessageBox.Show(
+                $"Could not delete '{selected.Name}':\n\n{ex.Message}",
+                "Delete Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return;
         }
         RefreshList();
         CliDefinitionsChanged?.Invoke();

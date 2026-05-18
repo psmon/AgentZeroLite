@@ -19,6 +19,15 @@ public sealed class ConsoleTabInfo : IConsoleTabInfo
     public bool IsTerminalStarted { get; set; }
     public string ExePath { get; init; } = "";
     public string? Arguments { get; init; }
+
+    /// <summary>
+    /// M0021: when the CliDefinition is Remote+Password, this carries the DPAPI
+    /// ciphertext through to InitializeTerminal so the launcher can decrypt
+    /// once and copy onto the clipboard. Plaintext never lives in
+    /// ConsoleTabInfo — only the encrypted blob, which is useless without
+    /// the current Windows user's DPAPI key.
+    /// </summary>
+    public string? EncryptedPasswordForLaunch { get; init; }
     public ConPtyTerminalSession? Session { get; set; }
 
     /// <summary>
