@@ -1,111 +1,119 @@
 {
   "_description": "PDSA Learning surface — bilingual EN/KO. Default audience: English. `sources[].title`, `tried[]`, `solved[]`, `remaining[]`, `learned.lead`, `learned.body` use `{ en, ko }` shape. Scalars (date/time/category/file/analyzedAt/windowDays) stay language-neutral. PDSA UPDATE mode in the harness-view-build skill must emit both languages.",
-  "analyzedAt": "2026-05-16",
+  "analyzedAt": "2026-05-19",
   "windowDays": 14,
   "sources": [
     {
-      "date": "2026-05-16", "time": "19:30", "category": "mission-records",
+      "date": "2026-05-18", "time": "23:54", "category": "mission-records",
+      "file": "harness/logs/mission-records/M0021-수행결과.md",
+      "title": {
+        "en": "Mission M0021 — Per-CLI-definition Remote Shell (SSH) with DPAPI-encrypted password storage and a poll-based auto-fill watcher; 5-round iteration arc (clipboard → event watcher → plink experiment → revert → final polling) ending in operator-verified auto-login",
+        "ko": "Mission M0021 — CLI 정의별 Remote Shell (SSH) + DPAPI 암호화 비번 저장 + 폴링 기반 autofill; 5라운드 iteration (clipboard → event watcher → plink 실험 → revert → 폴링 정착) 끝에 operator 확인 통과"
+      }
+    },
+    {
+      "date": "2026-05-17", "time": "14:26", "category": "mission-records",
+      "file": "harness/logs/mission-records/M0020-수행결과.md",
+      "title": {
+        "en": "Mission M0020 — SuperTonic TTS as the first pip-installed Python subprocess provider; generalised the subprocess-as-provider pattern (IProcessRunner + IProcessStreamingRunner + Settings-time prewarm) into a reusable substrate for any external CLI binary",
+        "ko": "Mission M0020 — SuperTonic TTS 를 pip 기반 Python 서브프로세스 첫 사례로 영입; 서브프로세스-as-provider 패턴 (IProcessRunner + IProcessStreamingRunner + Settings 시점 prewarm) 을 재사용 가능한 substrate 로 일반화"
+      }
+    },
+    {
+      "date": "2026-05-16", "time": "20:16", "category": "mission-records",
       "file": "harness/logs/mission-records/M0019-수행결과.md",
       "title": {
-        "en": "Mission M0019 — Port Origin Scrap (window spy + UIA text capture) into Lite; rebrand AgentBot → AgentCLI; add Strategy 2.5 clipboard-scroll fallback after IntelliJ smoke test exposed missing UIA ScrollPattern coverage",
-        "ko": "Mission M0019 — Origin Scrap (윈도우 스파이 + UIA 텍스트 캡처) 을 Lite 로 포팅 + AgentBot → AgentCLI 리브랜드 + IntelliJ smoke test 에서 UIA ScrollPattern 부재 확인 후 Strategy 2.5 클립보드 스크롤 폴백 추가"
-      }
-    },
-    {
-      "date": "2026-05-16", "time": "18:30", "category": "mission-records",
-      "file": "harness/logs/mission-records/M0018-수행결과.md",
-      "title": {
-        "en": "Mission M0018 — Korean Akka.NET actor model tutorial under Actor World sub-route, with 10 ComfyUI hero cards and 5 mermaid diagrams; ComfyUI batch ran in background while writing the body",
-        "ko": "Mission M0018 — Actor World 서브 라우트에 Akka.NET 액터모델 한국어 듀토리얼 + ComfyUI 히어로 카드 10장 + mermaid 5블록; 본문 작성 중 ComfyUI 배치를 백그라운드로 병렬 실행"
-      }
-    },
-    {
-      "date": "2026-05-10", "time": "15:30", "category": "tamer",
-      "file": "harness/logs/tamer/2026-05-10-15-30-webnori-a1-a2-model-survey.md",
-      "title": {
-        "en": "Webnori a1/a2 live catalog survey — operator-driven re-shuffle put a1 = workhorse (gemma-4-e4b + gpt-oss-20b + nomic embed), a2 = experimental (qwen3.6-27b + nemotron-3-nano-4b); origin snapshot doc is now stale",
-        "ko": "Webnori a1/a2 라이브 카탈로그 조사 — operator 가 재정렬해 a1 = 워크호스 (gemma-4-e4b + gpt-oss-20b + nomic embed), a2 = 실험군 (qwen3.6-27b + nemotron-3-nano-4b); 오리진 스냅샷 문서는 이제 오래됨"
-      }
-    },
-    {
-      "date": "2026-05-10", "time": "10:31", "category": "kakashi-copy",
-      "file": "harness/logs/kakashi-copy/2026-05-10-10-31-pencil-design-from-pencil-creator.md",
-      "title": {
-        "en": "Pencil-design skill ingested from sibling pencil-creator repo — Gemini + ComfyUI image gen pipeline; secrets gate (`.secret/` gitignored) verified clean",
-        "ko": "형제 레포 pencil-creator 에서 pencil-design 스킬 흡수 — Gemini + ComfyUI 이미지 생성 파이프라인; secrets 게이트 (`.secret/` gitignored) 통과 확인"
+        "en": "Mission M0019 — Port Origin Scrap (window spy + UIA text capture) into Lite as a heterogeneous text source for AIMODE; Strategy 2.5 clipboard-scroll fallback after IntelliJ smoke test exposed missing UIA ScrollPattern coverage",
+        "ko": "Mission M0019 — Origin Scrap (윈도우 스파이 + UIA 캡처) 을 Lite 로 포팅 — AIMODE 의 이기종 텍스트 소스; IntelliJ smoke 테스트에서 UIA ScrollPattern 부재 확인 후 Strategy 2.5 클립보드 스크롤 폴백 추가"
       }
     },
     {
       "date": "2026-05-10", "time": "07:51", "category": "code-coach",
       "file": "harness/logs/code-coach/2026-05-10-07-51-cli-block-recurrence-rca.md",
       "title": {
-        "en": "CLI block recurrence RCA — SendMessageW has no timeout, so any busy UI thread freezes the CLI wrapper. Design flaw, not a regression. Diagnosis logged, patch pending.",
-        "ko": "CLI 블록 재발 RCA — SendMessageW 가 타임아웃 없어서 UI 스레드가 잠깐만 바빠도 CLI 가 영구 블록. 회귀가 아니라 영구적 설계 결함. 진단은 완료, 패치는 보류."
+        "en": "CLI block recurrence RCA — SendMessageW (the IPC primitive that bridges external -cli invocations and the running GUI's terminal pool) has no timeout. A busy UI thread permanently freezes the heterogeneous-CLI substrate. Design flaw, not regression.",
+        "ko": "CLI block 재발 RCA — SendMessageW (외부 -cli 호출과 GUI 터미널 풀을 잇는 IPC 프리미티브) 가 타임아웃 없음. UI 스레드가 잠깐만 바빠도 이기종 CLI substrate 가 영구 동결. 회귀가 아니라 설계 결함."
+      }
+    },
+    {
+      "date": "2026-05-10", "time": "15:30", "category": "tamer",
+      "file": "harness/logs/tamer/2026-05-10-15-30-webnori-a1-a2-model-survey.md",
+      "title": {
+        "en": "Webnori a1/a2 live catalog survey — confirmed a1 = workhorse (gemma-4-e4b + gpt-oss-20b + nomic embed), a2 = experimental (qwen3.6-27b + nemotron-3-nano-4b). The brain endpoint that drives ExternalAgentLoop today: gemma-4-e4b on a1.",
+        "ko": "Webnori a1/a2 라이브 카탈로그 조사 — a1 = 워크호스 (gemma-4-e4b + gpt-oss-20b + nomic embed), a2 = 실험군 (qwen3.6-27b + nemotron-3-nano-4b). 오늘 ExternalAgentLoop 를 구동한 brain 엔드포인트가 바로 a1 의 gemma-4-e4b."
       }
     }
   ],
   "tried": [
     {
-      "en": "Port AgentZero Origin's Scrap module (window picker + UIA capture + ScrollWriter pipeline, ~1745 lines across 6 files) into Lite as a new ActivityBar overlay, after the operator clarified Lite = standalone full-spec and superseded the 2026-04-27 snapshot's REJECT-3 verdict",
-      "ko": "AgentZero Origin 의 Scrap 모듈 (윈도우 픽커 + UIA 캡처 + ScrollWriter 파이프라인, 6 파일 약 1745 줄) 을 Lite ActivityBar 오버레이로 포팅 — operator 가 Lite = 단독 풀스펙 정책을 확정하면서 2026-04-27 스냅샷의 REJECT-3 판단이 폐기됨"
+      "en": "Stand up a single `ITerminalSession` abstraction over ConPTY (M0013 vocabulary rename) so cmd / pwsh / claude / codex / ssh all expose the same `Write` / `WriteAndSubmit` / `OutputReceived` / `ReadOutput` contract to the actor layer above",
+      "ko": "ConPTY 위에 단일 `ITerminalSession` 추상화를 세움 (M0013 vocabulary rename) — cmd / pwsh / claude / codex / ssh 가 위쪽 액터 계층에 동일한 `Write` / `WriteAndSubmit` / `OutputReceived` / `ReadOutput` 계약 노출"
     },
     {
-      "en": "Build a Korean-only Akka.NET tutorial under the Actor World sub-route with 10 ComfyUI hero cards (Z-Image-Turbo, 16:9, cyberpunk) and 5 mermaid diagrams; run ComfyUI batch in background while authoring the markdown to absorb image-gen latency into write time",
-      "ko": "Actor World 서브 라우트에 Akka.NET 한국어 듀토리얼 + ComfyUI 히어로 카드 10장 (Z-Image-Turbo, 16:9, 사이버펑크) + mermaid 5블록 작성; ComfyUI 배치를 백그라운드로 굴려 이미지 생성 대기시간을 본문 작성 시간에 흡수"
+      "en": "Promote `send_to_terminal` / `read_terminal` / `wait` / `done` to first-class AIMODE function-call tools so any GBNF- or JSON-schema-constrained LLM brain can drive any tab without per-CLI shimming",
+      "ko": "`send_to_terminal` / `read_terminal` / `wait` / `done` 을 1급 AIMODE 펑션콜 도구로 승격 — GBNF / JSON-schema 로 구속된 어떤 LLM brain 이든 per-CLI 시암 없이 어느 탭이든 구동 가능"
     },
     {
-      "en": "Probe Webnori a1/a2 endpoints directly via OpenAI-compatible `/v1/models` to confirm which models are actually live, rather than trusting the origin snapshot doc's catalog",
-      "ko": "Webnori a1/a2 엔드포인트를 OpenAI 호환 `/v1/models` 로 직접 조회해 실제 라이브 모델을 확인 — 오리진 스냅샷 문서의 카탈로그를 그대로 믿지 않음"
+      "en": "Add OpenAI-compatible REST client (ExternalAgentLoop) so the brain stays model-agnostic — Webnori a1's gemma-4-e4b drove today's 3-CLI discussion but the same loop accepts any model at the same endpoint shape",
+      "ko": "OpenAI 호환 REST 클라이언트 (ExternalAgentLoop) 추가 — brain 을 모델-agnostic 으로 유지. 오늘 3인 CLI 토론은 Webnori a1 의 gemma-4-e4b 가 구동했지만 같은 루프가 같은 엔드포인트 형태의 어떤 모델이든 받음"
     },
     {
-      "en": "Diagnose recurring CLI block by tracing the actual SendMessageW → WndProc → WriteAndSubmit chain and confirming the IPC layer has no timeout protection at all (a 5s polling timeout exists only on the MMF read side)",
-      "ko": "재발하는 CLI 블록을 SendMessageW → WndProc → WriteAndSubmit 체인 추적으로 진단 — IPC 송신 단계에 타임아웃 보호가 전혀 없고 (5초 타임아웃은 MMF 읽기 단계에만) 설계 자체의 결함을 확인"
+      "en": "Extend the heterogeneous-CLI surface from local processes to remote SSH endpoints (M0021) with DPAPI-encrypted password storage and a UI-thread polling autofill — the same `ITerminalSession` now covers `ssh user@host` tabs identical to local cmd / pwsh",
+      "ko": "이기종 CLI 표면을 로컬 프로세스에서 원격 SSH 엔드포인트로 확장 (M0021) — DPAPI 암호화 비번 저장 + UI 스레드 폴링 autofill. 동일한 `ITerminalSession` 이 `ssh user@host` 탭을 로컬 cmd / pwsh 와 똑같이 커버"
     },
     {
-      "en": "Use Kakashi-Copy mode to ingest the `pencil-design` skill from the sibling `pencil-creator` repo as an in-repo snapshot, with provenance recorded in `harness/knowledge/_shared/` instead of a git submodule",
-      "ko": "Kakashi-Copy 모드로 형제 레포 `pencil-creator` 의 `pencil-design` 스킬을 in-repo 스냅샷으로 흡수; provenance 는 git submodule 대신 `harness/knowledge/_shared/` 에 기록"
+      "en": "Add SuperTonic (M0020) and Scrap UIA (M0019) as further heterogeneous providers — pip-installed Python subprocess and out-of-process UIA text source — to validate that the substrate accepts shapes beyond just PTY-hosted CLIs",
+      "ko": "SuperTonic (M0020) 와 Scrap UIA (M0019) 를 추가 이기종 provider 로 영입 — pip 설치 Python 서브프로세스 + 외부 프로세스 UIA 텍스트 소스. substrate 가 PTY-호스팅 CLI 이외의 형태도 받는다는 사실 입증"
     }
   ],
   "solved": [
     {
-      "en": "M0019 Stages 1+2 landed in one session — AgentBot/AgentCLI rebrand, ActivityBar Scrap entry, full Scrap UI ported, Strategy 2.5 clipboard-scroll fallback for Swing/AWT and other UIA-blind apps. Debug build green with zero new warnings.",
-      "ko": "M0019 Stage 1+2 한 세션에 완료 — AgentBot/AgentCLI 리브랜드, ActivityBar Scrap 엔트리, 전체 Scrap UI 포팅, Swing/AWT 등 UIA-blind 앱용 Strategy 2.5 클립보드 스크롤 폴백. Debug 빌드 0 errors, 신규 경고 0."
+      "en": "3-CLI cross-talk demonstration landed (2026-05-19 00:26→00:30): Gemma-4-e4b via Webnori orchestrated Claude + Hermes + Codex inside a single HermesAgent group, 6+6 turns ≈ 114s, ~234KB into Claude / ~77KB into Hermes / Codex thinner — function-call → IPC → PTY write → output growth → re-read loop working end-to-end",
+      "ko": "3인 CLI 교차 대화 완성 (2026-05-19 00:26→00:30): Webnori 의 Gemma-4-e4b 가 HermesAgent 그룹 안의 Claude + Hermes + Codex 를 6+6 턴 ≈ 114초 오케스트레이션 — Claude 로 ~234KB / Hermes 로 ~77KB / Codex 는 더 적게 — 펑션콜 → IPC → PTY write → 출력 증가 → 재조회 루프가 end-to-end 작동"
     },
     {
-      "en": "M0018 shipped end-to-end — Korean tutorial body live behind `#actor-world/tutorial`, 10/10 ComfyUI images load at naturalWidth=1024 in browser, 5/5 mermaid blocks render to SVG, zero console errors at runtime",
-      "ko": "M0018 전구간 출시 — 한국어 듀토리얼 본문이 `#actor-world/tutorial` 뒤에서 라이브, ComfyUI 이미지 10/10 이 브라우저에서 naturalWidth=1024 로 로드, mermaid 5/5 블록이 SVG 렌더, 런타임 콘솔 에러 0"
+      "en": "M0021 Remote SSH shipped after 5-round iteration arc — operator-verified auto-login through a poll-based autofill (no event dependency, no thread races, 500ms settle delay before write, clipboard fallback)",
+      "ko": "M0021 Remote SSH 가 5라운드 iteration 끝에 출시 — operator 가 폴링 기반 autofill (이벤트 의존 없음, 스레드 race 없음, write 전 500ms settle, clipboard 폴백) 으로 auto-login 확인"
     },
     {
-      "en": "Snapshot doc `Docs/agent-origin/` corrected in-place — REJECT-3 → REVISED-3 + P3-3 → P1-x(M0019), so future sessions don't have to re-derive the policy change. Same pattern usable for any other reversed verdict.",
-      "ko": "스냅샷 문서 `Docs/agent-origin/` 를 in-place 보정 — REJECT-3 → REVISED-3 + P3-3 → P1-x(M0019), 향후 세션이 정책 변경을 다시 추론할 필요 없음. 다른 뒤집힌 판단도 같은 패턴 적용 가능."
+      "en": "M0020 + M0019 cemented the provider-factory pattern: SuperTonic via `IProcessRunner` shim and Scrap via UIA + clipboard fallback both slot into the same factory surface that BuildTts / Scrap launcher use — heterogeneous providers compose without per-provider plumbing inside the actor layer",
+      "ko": "M0020 + M0019 가 provider 팩토리 패턴을 굳힘 — SuperTonic 은 `IProcessRunner` 시암으로, Scrap 은 UIA + 클립보드 폴백으로 동일한 BuildTts / Scrap launcher 팩토리 표면에 끼움. 이기종 provider 가 액터 계층 안에서 per-provider 배관 없이 합성됨"
     },
     {
-      "en": "Pencil-design skill copy-ingestion proven clean — secrets stay outside the repo (`.secret/` already gitignored), provenance is one MD note, no submodule complexity",
-      "ko": "Pencil-design 스킬 카카시 복사가 깨끗하게 확인됨 — secrets 는 레포 밖 (`.secret/` 이미 gitignored), provenance 는 MD 1장, 서브모듈 없는 단순 구조"
+      "en": "Mission-dispatch tamer engine validated again — M0021's 5 follow-up rounds each opened with a named root-cause hypothesis before any edit (clipboard UX → GetConsoleText bug → DispatcherTimer-on-ThreadPool → OutputReceived silent-non-fire → polling), preventing speculation thrash and producing a single commit that captures the full arc",
+      "ko": "Mission-dispatch tamer 엔진 재검증 — M0021 의 5개 후속 라운드가 각각 *수정 전에* 명명된 root cause 가설로 시작 (clipboard UX → GetConsoleText 버그 → DispatcherTimer-on-ThreadPool → OutputReceived silent-non-fire → 폴링). 추측 thrash 방지 + 전체 arc 를 단일 커밋이 캡처"
     }
   ],
   "remaining": [
     {
-      "en": "M0019 Stages 4+5 — `AgentZeroLite.exe -cli scrap …` verb group and AIMODE function-call surface (`scrap_capture`, `scrap_read`) for the on-device LLM. Backend (TextCaptureService) is already in place, only the CLI + Gbnf surfaces remain.",
-      "ko": "M0019 Stage 4+5 — `AgentZeroLite.exe -cli scrap …` verb 그룹 + 온디바이스 LLM 용 AIMODE 함수콜 표면 (`scrap_capture`, `scrap_read`). 백엔드 (TextCaptureService) 는 이미 있음, CLI + Gbnf 표면만 남음."
+      "en": "`ConPtyTerminalSession.OutputReceived` has a silent-non-fire failure mode that M0021 #4 documented (frames=0 over 111s while ConsoleOutputLog grew from 471 to 502 chars). Polling fallback shipped in autofill but the event itself is now suspect for every consumer; needs a fix or formal deprecation note",
+      "ko": "`ConPtyTerminalSession.OutputReceived` 가 silent-non-fire 실패 모드를 가짐 — M0021 #4 가 기록 (ConsoleOutputLog 가 471→502 로 자라는데도 111초 동안 frames=0). autofill 은 폴링 폴백으로 회피했지만 이벤트 자체가 모든 컨슈머에게 의심 대상. 수정 또는 공식 deprecation 노트 필요"
     },
     {
-      "en": "CLI block fix — diagnosis is in `code-coach/2026-05-10-...rca.md` but the actual patch (swap `SendMessageW` for `SendMessageTimeoutW` with SMTO_ABORTIFHUNG + 5s budget) hasn't shipped; recurrence is now inevitable",
-      "ko": "CLI 블록 수정 — 진단은 `code-coach/2026-05-10-...rca.md` 에 있지만 실제 패치 (`SendMessageW` 를 `SendMessageTimeoutW` + SMTO_ABORTIFHUNG + 5초 예산 으로 교체) 미반영; 재발은 시간문제"
+      "en": "AgentBot's `read_terminal` polls every 5s during `wait` even when no output growth — the 3-CLI log shows multiple identical-length reads (`returned=4930` repeating). Switch to growth-edge trigger so longer discussions fit within the 6-turn ExternalAgentLoop budget instead of burning turns on no-op reads",
+      "ko": "AgentBot 의 `read_terminal` 이 `wait` 중 5초마다 폴링하는데 출력 grow 가 없어도 호출 — 3인 토론 로그에 동일 길이 read 가 반복 (`returned=4930` 반복). growth-edge 트리거로 전환 — 긴 토론이 6-턴 ExternalAgentLoop 예산 안에 들어가게, no-op read 로 턴 소모 안 하게"
     },
     {
-      "en": "Origin snapshot doc still labels Webnori a2 as `default` (it was at the 2026-04-27 cut) but the live runtime now points to a1 — needs a follow-up edit in `Docs/agent-origin/01-stack-comparison.md` and `02-architecture-comparison.md`",
-      "ko": "Origin 스냅샷 문서가 아직 Webnori a2 를 `기본` 으로 라벨 (2026-04-27 시점) 하지만 라이브 런타임은 a1 로 옮겨감 — `Docs/agent-origin/01-stack-comparison.md` 와 `02-architecture-comparison.md` 후속 수정 필요"
+      "en": "CLI block RCA (code-coach/2026-05-10) — SendMessageW has no timeout; the patch (swap to SendMessageTimeoutW + SMTO_ABORTIFHUNG + 5s budget) hasn't shipped. Now that multi-CLI conversation amplifies IPC surface, this becomes a higher-blast-radius latent bug",
+      "ko": "CLI block RCA (code-coach/2026-05-10) — SendMessageW 가 타임아웃 없음, 패치 (SendMessageTimeoutW + SMTO_ABORTIFHUNG + 5초 예산 으로 교체) 미반영. 다중 CLI 대화가 IPC 표면을 증폭시키므로 blast radius 가 커진 잠재 버그"
+    },
+    {
+      "en": "Codex's participation in today's 3-way discussion was thin — the supervisor (Gemma) explicitly noted `코덱스는 시스템 상태 보고서 형태로만 응답했습니다`. Before marketing this as a '3-way debate' capability, needs prompt-engineering and possibly per-CLI persona injection so each agent contributes its model strengths instead of degrading to status reports",
+      "ko": "오늘 3인 토론에서 Codex 참여는 빈약 — supervisor (Gemma) 가 `코덱스는 시스템 상태 보고서 형태로만 응답했습니다` 라고 명시. '3-way debate' 기능으로 마케팅하기 전에 prompt-engineering + per-CLI 페르소나 주입 필요 — 각 에이전트가 자기 모델 강점을 살리게, 상태 보고서로 degrade 하지 않게"
+    },
+    {
+      "en": "Mission-records folder still missing from `harness-logs.json` indexer — M0018/19/20/21 don't surface in the 14-day window selector, so the PDSA generator has to scan the folder directly. Carryover from prior PDSA; deserves a one-line fix in the indexer to read `harness/logs/mission-records/M*.md` as first-class log entries",
+      "ko": "mission-records 폴더가 여전히 `harness-logs.json` 인덱서에서 누락 — M0018/19/20/21 가 14일 윈도우 선택기에 안 잡혀서 PDSA 생성기가 폴더 직접 스캔 필요. 이전 PDSA 에서 carryover; 인덱서가 `harness/logs/mission-records/M*.md` 를 1급 로그로 읽도록 한 줄 수정 필요"
     }
   ],
   "learned": {
     "lead": {
-      "en": "Large architecture-port missions should ship in operator-visible stages with explicit fallthrough hooks, not as one heroic session. Each stage gives the operator a smoke surface, and each follow-up redirect names its own root cause before any edit.",
-      "ko": "대형 아키텍처 포팅 미션은 한 세션 영웅극이 아니라 *operator-visible* stage 로 쪼개고 explicit fallthrough 훅을 둬야 한다. 각 stage 는 operator 에게 스모크 표면을 주고, 각 후속 redirect 는 *수정 전에* 자기 root cause 를 먼저 명명한다."
+      "en": "Today's 3-CLI cross-talk — Gemma-4-e4b on Webnori orchestrating Claude + Hermes + Codex for 6+6 turns ≈ 114s — is not a feature we shipped. It's the emergent payoff of stacking heterogeneous-CLI primitives behind a single function-call surface. The substrate revealed it; we didn't build it.",
+      "ko": "오늘 발생한 3인 CLI 교차 대화 — Webnori 의 Gemma-4-e4b 가 Claude + Hermes + Codex 를 6+6 턴 ≈ 114초 오케스트레이션 — 은 우리가 출시한 기능이 아니다. 이기종 CLI 프리미티브를 단일 펑션콜 표면 뒤에 쌓아온 결과로 substrate 가 드러낸 emergent 산출물. substrate 가 발견했고, 우리는 만든 게 아니다."
     },
     "body": {
-      "en": "M0019 made the pattern visible: Stage 1 (rebrand + scaffold) → operator redirects 'bring the actual UI' → follow-up #1 (real UI + 6-file capture pipeline) → operator redirects 'no preview, no scroll' → follow-up #2 (Strategy 2.5 clipboard-scroll, rooted in the app-log line `[FocusedArea] 스크롤 가능 자식 영역 없음`). Each round started from a named hypothesis. M0018 instances the same idea in the time dimension: ComfyUI batch ran in the background while the tutorial body was written, so a ~60-second image-gen delay disappeared into write time. The two missions also expose the same recurring trap: 14-day-window PDSA misses today's mission records because the indexer leaves their `date` field null — the windowing should fall back to mission frontmatter `started`/`finished` when present.",
-      "ko": "M0019 가 그 패턴을 가시화 — Stage 1 (리브랜드 + 스캐폴드) → operator 가 '실제 UI 도입해' 로 redirect → 후속 수정 #1 (실제 UI + 6 파일 캡처 파이프라인) → operator 가 '프리뷰 없고 스크롤 안 됨' 으로 redirect → 후속 수정 #2 (Strategy 2.5 클립보드 스크롤, app-log 의 `[FocusedArea] 스크롤 가능 자식 영역 없음` 줄에서 근거 추출). 각 라운드가 명명된 가설에서 출발. M0018 은 시간 축에서 같은 아이디어를 실증 — ComfyUI 배치를 듀토리얼 본문 작성과 병렬로 굴려 ~60초 이미지 생성 지연을 본문 작성 시간에 흡수. 두 미션 모두 같은 함정을 노출: 14일 윈도우 PDSA 가 오늘의 mission record 를 못 잡는다 — 인덱서가 mission-record 의 `date` 필드를 null 로 두기 때문. window 판정이 mission frontmatter 의 `started`/`finished` 로 폴백되어야 한다."
+      "en": "Trace the stack that made it possible. (1) `ITerminalSession` (M0013 vocabulary) unified the CLI-process surface so cmd / pwsh / claude / codex / ssh present identical `Write` / `WriteAndSubmit` / `OutputReceived` / `ReadOutput` contracts. (2) AIMODE promoted `send_to_terminal` / `read_terminal` / `wait` / `done` to function-call tools — the brain talks to the substrate through a 4-verb vocabulary instead of process-level RPC. (3) `ExternalAgentLoop` made the brain model-agnostic via OpenAI-compat REST — today's brain is gemma-4-e4b on Webnori a1, but the loop accepts any conformant endpoint (gpt-oss-20b, qwen3.6-27b, nemotron, …). (4) M0021 extended the surface from local processes to remote SSH endpoints with DPAPI-encrypted credentials, and (5) M0019/20 demonstrated that even non-PTY providers (UIA capture, pip-subprocess TTS) slot into the same factory pattern. The 2026-05-19 00:26→00:30 app-log shows the composition working at the byte level: `[AIMODE] send_to_terminal [2:0] len=104` → ConPtyTerminalSession.Write → ConsoleOutputLog grows → `terminal-read` IPC → Gemma's next turn. Two follow-ups are now explicit and named: (a) `OutputReceived` silent-non-fire (M0021 evidence) shouldn't be left as polling-only forever, and (b) Codex's thin participation suggests prompt-tuning + persona injection before marketing this as a `3-way debate` capability — today proved the *plumbing*, not yet the *content quality*.",
+      "ko": "이걸 가능하게 한 스택을 추적. (1) `ITerminalSession` (M0013 vocabulary) 가 CLI 프로세스 표면을 통일 — cmd / pwsh / claude / codex / ssh 가 동일한 `Write` / `WriteAndSubmit` / `OutputReceived` / `ReadOutput` 계약 제시. (2) AIMODE 가 `send_to_terminal` / `read_terminal` / `wait` / `done` 을 펑션콜 도구로 승격 — brain 이 프로세스 단위 RPC 가 아니라 4개 동사 vocabulary 로 substrate 와 대화. (3) `ExternalAgentLoop` 가 brain 을 모델-agnostic 으로 (OpenAI 호환 REST) — 오늘 brain 은 Webnori a1 의 gemma-4-e4b 였지만 루프는 어떤 적합한 엔드포인트도 받음 (gpt-oss-20b, qwen3.6-27b, nemotron, …). (4) M0021 이 표면을 로컬 프로세스에서 DPAPI 암호화 자격증명을 가진 원격 SSH 엔드포인트로 확장, (5) M0019/20 이 PTY 가 아닌 provider (UIA 캡처, pip 서브프로세스 TTS) 도 동일 팩토리 패턴에 끼움을 입증. 2026-05-19 00:26→00:30 app-log 가 합성을 바이트 단위로 보여줌: `[AIMODE] send_to_terminal [2:0] len=104` → ConPtyTerminalSession.Write → ConsoleOutputLog grow → `terminal-read` IPC → Gemma 의 다음 턴. 두 후속이 명시적으로 명명: (a) `OutputReceived` silent-non-fire (M0021 증거) 를 영구 폴링으로 두면 안 되고, (b) Codex 의 빈약한 참여는 prompt-tuning + 페르소나 주입 필요 — `3-way debate` 마케팅 전에. 오늘 입증된 건 *배관*이지 *콘텐츠 품질*이 아니다."
     }
   }
 }
