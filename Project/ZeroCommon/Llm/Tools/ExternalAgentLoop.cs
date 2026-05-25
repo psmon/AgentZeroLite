@@ -34,9 +34,13 @@ public sealed class ExternalAgentLoop : IAgentLoop
     private readonly List<LlmMessage> _messages = [];
     private bool _isFirstUserSend = true;
     private int _userSendCount;
+    private bool _envelopeRepairUsed;
     private bool _disposed;
 
     public int UserSendCount => _userSendCount;
+
+    /// <summary>Whether the once-per-session inner-args repair has fired.</summary>
+    internal bool EnvelopeRepairUsed => _envelopeRepairUsed;
 
     public ExternalAgentLoop(ILlmProvider provider, string model, IAgentToolbelt host,
         AgentLoopOptions? opts = null)
@@ -98,8 +102,32 @@ public sealed class ExternalAgentLoop : IAgentLoop
             }
             catch (JsonException ex)
             {
-                failure = $"model returned unparseable JSON at iteration {iter}: {ex.Message}; raw=\"{Truncate(rawJson, 200)}\"";
-                break;
+                // Gemma-4 mimic-the-example regression: the model copies the
+                // inner args of `done` verbatim (e.g. {"message":"안녕…"}) and
+                // drops the {"tool":"done","args":...} envelope. Once per
+                // session — and only if the payload looks unambiguously like
+                // a `done` body — wrap it ourselves and re-parse so the turn
+                // can still terminate cleanly. Cap is per-instance to avoid
+                // masking persistent schema drift; the second occurrence
+                // surfaces as a hard failure.
+                if (!_envelopeRepairUsed && TryRepairAsDoneEnvelope(rawJson, out var repaired))
+                {
+                    _envelopeRepairUsed = true;
+                    try
+                    {
+                        call = LocalAgentLoop.ParseToolCall(repaired);
+                    }
+                    catch (JsonException ex2)
+                    {
+                        failure = $"model returned unparseable JSON at iteration {iter} (post-repair): {ex2.Message}; raw=\"{Truncate(rawJson, 200)}\"";
+                        break;
+                    }
+                }
+                else
+                {
+                    failure = $"model returned unparseable JSON at iteration {iter}: {ex.Message}; raw=\"{Truncate(rawJson, 200)}\"";
+                    break;
+                }
             }
 
             if (!AgentToolGrammar.KnownTools.Contains(call.Tool))
@@ -270,6 +298,34 @@ public sealed class ExternalAgentLoop : IAgentLoop
     /// commentary. Returns null when no opening brace is found or the object
     /// is unterminated.
     /// </summary>
+    /// <summary>
+    /// Detects the Gemma-4 inner-args-only payload (an object that lacks a
+    /// <c>tool</c> field but carries a string <c>message</c> field) and wraps
+    /// it as <c>{"tool":"done","args":&lt;original&gt;}</c>. Returns false if
+    /// the payload doesn't unambiguously match the done-body shape — we don't
+    /// guess for any other tool because the other tools have required args
+    /// the model didn't supply.
+    /// </summary>
+    internal static bool TryRepairAsDoneEnvelope(string rawJson, out string repaired)
+    {
+        repaired = "";
+        try
+        {
+            using var doc = JsonDocument.Parse(rawJson);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return false;
+            if (root.TryGetProperty("tool", out _)) return false;
+            if (!root.TryGetProperty("message", out var msg)) return false;
+            if (msg.ValueKind != JsonValueKind.String) return false;
+            repaired = $"{{\"tool\":\"done\",\"args\":{rawJson}}}";
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     internal static string? ExtractFirstJsonObject(string text)
     {
         var start = text.IndexOf('{');

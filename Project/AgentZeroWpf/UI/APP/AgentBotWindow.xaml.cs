@@ -1140,6 +1140,23 @@ public partial class AgentBotWindow : Window
             _aiActiveChatFamily = entry.ChatFamily;
             displayName = entry.DisplayName;
 
+            // Save Options only persists JSON; LlmService.CurrentSettings is
+            // captured at LoadAsync time. If the user changed the model in
+            // Settings and clicked Save without Unload + Load, AIMODE keeps
+            // using the previously-loaded weights — the most reported "model
+            // didn't change" symptom. Surface the mismatch so the user knows
+            // to reload, then proceed with the loaded model (we can't infer
+            // against weights that aren't loaded).
+            if (!string.Equals(savedSettings.ModelId, LlmService.CurrentSettings.ModelId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                var savedEntry = LlmModelCatalog.FindById(savedSettings.ModelId);
+                AddSystemMessage(
+                    $"⚠️ Saved model is '{savedEntry.DisplayName}' but '{entry.DisplayName}' is currently loaded. " +
+                    "Save Options only writes to disk — open Settings → LLM and click Unload → Load to apply the new model.");
+                AppLogger.Log($"[AIMODE] Saved/loaded model mismatch: saved={savedSettings.ModelId} loaded={entry.Id}");
+            }
+
             if (entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
                 && LlmService.CurrentSettings.Backend == Agent.Common.Llm.LocalLlmBackend.Vulkan)
             {

@@ -193,9 +193,11 @@ Hard rules (apply to BOTH modes):
     Summarize what happened in your own words.
   - Do NOT embed nested JSON, code blocks, or escaped quotes in the message.
     Plain prose only. The grammar cannot reliably escape nested JSON.
-  - Bad:  done({"message": "Claude said: '{\"foo\":\"bar\",...long paste...'"})
-  - Good: done({"message": "Claude greeted you back and asked what to do."})
-  - Good: done({"message": "안녕하세요! 무엇을 도와드릴까요?"})
+  - Examples are shown in the EXACT envelope you must emit. Copy the
+    SHAPE — do NOT drop the outer {"tool":"done","args":{...}} wrapper.
+  - Bad:  {"tool":"done","args":{"message":"Claude said: '{\"foo\":\"bar\",...long paste...'"}}
+  - Good: {"tool":"done","args":{"message":"Claude greeted you back and asked what to do."}}
+  - Good: {"tool":"done","args":{"message":"안녕하세요! 무엇을 도와드릴까요?"}}
 """;
 
     /// <summary>

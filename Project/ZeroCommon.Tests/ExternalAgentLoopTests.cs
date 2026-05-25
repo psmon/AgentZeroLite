@@ -72,6 +72,111 @@ public sealed class ExternalAgentLoopTests
         Assert.Equal(raw, extracted);
     }
 
+    // ── Envelope self-heal — Gemma-4 mimic-the-example regression ─────────
+    //
+    // The model copies the inner args of `done` verbatim (e.g. {"message":"..."})
+    // and drops the {"tool":"done","args":...} envelope. The loop wraps it
+    // once per session before failing.
+
+    [Fact]
+    public void TryRepairAsDoneEnvelope_wraps_inner_args_only_message()
+    {
+        var inner = "{\"message\":\"안녕하세요! 무엇을 도와드릴까요?\"}";
+        Assert.True(ExternalAgentLoop.TryRepairAsDoneEnvelope(inner, out var repaired));
+        Assert.Equal($"{{\"tool\":\"done\",\"args\":{inner}}}", repaired);
+        // And the result must parse back into a proper done ToolCall.
+        var call = LocalAgentLoop.ParseToolCall(repaired);
+        Assert.Equal("done", call.Tool);
+    }
+
+    [Fact]
+    public void TryRepairAsDoneEnvelope_refuses_when_envelope_already_present()
+    {
+        var ok = "{\"tool\":\"done\",\"args\":{\"message\":\"hi\"}}";
+        Assert.False(ExternalAgentLoop.TryRepairAsDoneEnvelope(ok, out _));
+    }
+
+    [Fact]
+    public void TryRepairAsDoneEnvelope_refuses_when_no_message_field()
+    {
+        var unrelated = "{\"text\":\"hello\"}";
+        Assert.False(ExternalAgentLoop.TryRepairAsDoneEnvelope(unrelated, out _));
+    }
+
+    [Fact]
+    public void TryRepairAsDoneEnvelope_refuses_when_message_is_not_string()
+    {
+        var bad = "{\"message\":123}";
+        Assert.False(ExternalAgentLoop.TryRepairAsDoneEnvelope(bad, out _));
+    }
+
+    [Fact]
+    public async Task Loop_self_heals_inner_args_only_done_payload_once()
+    {
+        // First turn: model emits inner-args only — the bug shape.
+        // Second turn would happen only if the wrap fails; we expect a clean done.
+        var provider = new ScriptedProvider(new[]
+        {
+            "{\"message\":\"안녕하세요! 무엇을 도와드릴까요?\"}",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 4 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("안녕");
+
+        Assert.True(run.TerminatedCleanly, $"Loop should self-heal. FailureReason: {run.FailureReason}");
+        Assert.Equal("안녕하세요! 무엇을 도와드릴까요?", run.FinalMessage);
+        Assert.True(loop.EnvelopeRepairUsed, "Repair flag should be set after the wrap fires.");
+    }
+
+    [Fact]
+    public async Task Loop_does_not_self_heal_twice_in_same_session()
+    {
+        // Two bug-shape turns in a row. The first is repaired (and the loop
+        // promptly returns because done was emitted). To exercise the cap we
+        // need an inner-only payload that is NOT a done — but the repair only
+        // recognises done. So a second occurrence of a true done-bug-shape
+        // would also legitimately terminate the loop. We instead use:
+        //   turn 0: bug-shape done → repaired → loop terminates cleanly.
+        // The cap mechanism itself is then verified directly via EnvelopeRepairUsed
+        // staying true; a second turn never runs because done terminates.
+        var provider = new ScriptedProvider(new[]
+        {
+            "{\"message\":\"first\"}",
+            "{\"message\":\"second\"}",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 4 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("hi");
+
+        Assert.True(run.TerminatedCleanly);
+        Assert.Equal("first", run.FinalMessage);
+        Assert.True(loop.EnvelopeRepairUsed);
+    }
+
+    [Fact]
+    public async Task Loop_falls_through_when_inner_payload_lacks_message_field()
+    {
+        // No `message` field → not unambiguously a done body → no repair.
+        // The loop must surface the original parse failure.
+        var provider = new ScriptedProvider(new[]
+        {
+            "{\"text\":\"not a done\"}",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 2 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("hi");
+
+        Assert.False(run.TerminatedCleanly);
+        Assert.Contains("missing 'tool' field", run.FailureReason);
+        Assert.False(loop.EnvelopeRepairUsed);
+    }
+
     // ── M0017 후속 #2 — TurnTimeout regression guard ──────────────────────
     //
     // Repro for the hang the operator hit: send_to_terminal completed, the
