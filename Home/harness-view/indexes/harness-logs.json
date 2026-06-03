@@ -8,8 +8,7 @@
     "pre-commit-review",
     "release-build-pipeline",
     "security-guard",
-    "tamer",
-    "test-runs"
+    "tamer"
   ],
   "counts": {
     "build-doctor": 6,
@@ -19,8 +18,7 @@
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
-    "tamer": 19,
-    "test-runs": 0
+    "tamer": 19
   },
   "items": [
     {
@@ -29,7 +27,7 @@
       "date": "2026-05-25",
       "time": "21:55",
       "title": "agentbot gemma toolcall rca",
-      "size": 11598
+      "size": 11843
     },
     {
       "category": "tamer",
@@ -37,7 +35,7 @@
       "date": "2026-05-23",
       "time": "07:42",
       "title": "relax unit test policy author verify",
-      "size": 6016
+      "size": 6117
     },
     {
       "category": "tamer",
@@ -45,7 +43,7 @@
       "date": "2026-05-10",
       "time": "15:30",
       "title": "webnori a1 a2 model survey",
-      "size": 5390
+      "size": 5490
     },
     {
       "category": "kakashi-copy",
@@ -53,7 +51,7 @@
       "date": "2026-05-10",
       "time": "10:31",
       "title": "pencil design from pencil creator",
-      "size": 3272
+      "size": 3349
     },
     {
       "category": "code-coach",
@@ -61,7 +59,7 @@
       "date": "2026-05-10",
       "time": "07:51",
       "title": "cli block recurrence rca",
-      "size": 9350
+      "size": 9557
     },
     {
       "category": "code-coach",
@@ -69,7 +67,7 @@
       "date": "2026-05-09",
       "time": "15:30",
       "title": "akka wasm feasibility research",
-      "size": 3404
+      "size": 3454
     },
     {
       "category": "code-coach",
@@ -77,7 +75,7 @@
       "date": "2026-05-05",
       "time": "10:46",
       "title": "actor llm agent naming research",
-      "size": 10598
+      "size": 10777
     },
     {
       "category": "tamer",
@@ -85,7 +83,7 @@
       "date": "2026-05-05",
       "time": "07:15",
       "title": "nodejs bash stream io knowledge",
-      "size": 3426
+      "size": 3500
     },
     {
       "category": "code-coach",
@@ -93,7 +91,7 @@
       "date": "2026-05-04",
       "time": "23:06",
       "title": "precommit m0012 phase2",
-      "size": 7103
+      "size": 7241
     },
     {
       "category": "code-coach",
@@ -101,7 +99,7 @@
       "date": "2026-05-04",
       "time": "22:16",
       "title": "token remaining active session research",
-      "size": 11087
+      "size": 11297
     },
     {
       "category": "build-doctor",
@@ -109,7 +107,7 @@
       "date": "2026-05-03",
       "time": "20:46",
       "title": "M0009 prerelease",
-      "size": 1649
+      "size": 1686
     },
     {
       "category": "release-build-pipeline",
@@ -117,7 +115,7 @@
       "date": "2026-05-03",
       "time": "20:46",
       "title": "M0009 patch",
-      "size": 831
+      "size": 857
     },
     {
       "category": "security-guard",
@@ -125,7 +123,7 @@
       "date": "2026-05-03",
       "time": "20:45",
       "title": "M0009 token monitor",
-      "size": 5531
+      "size": 5603
     },
     {
       "category": "code-coach",
@@ -133,7 +131,7 @@
       "date": "2026-05-03",
       "time": "02:01",
       "title": "webdev chat test mode",
-      "size": 3997
+      "size": 4090
     },
     {
       "category": "build-doctor",
@@ -141,7 +139,7 @@
       "date": "2026-05-03",
       "time": "01:23",
       "title": "release gate v0 3 2",
-      "size": 2315
+      "size": 2377
     },
     {
       "category": "release-build-pipeline",
@@ -149,7 +147,7 @@
       "date": "2026-05-03",
       "time": "01:23",
       "title": "v0 3 2",
-      "size": 1252
+      "size": 1285
     },
     {
       "category": "security-guard",
@@ -157,7 +155,7 @@
       "date": "2026-05-03",
       "time": "01:22",
       "title": "release gate v0 3 2",
-      "size": 2303
+      "size": 2366
     },
     {
       "category": "code-coach",
@@ -165,7 +163,7 @@
       "date": "2026-05-03",
       "time": "01:19",
       "title": "webdev reload disposal",
-      "size": 2560
+      "size": 2630
     },
     {
       "category": "code-coach",
@@ -173,7 +171,7 @@
       "date": "2026-05-02",
       "time": "22:55",
       "title": "precommit m0005 webdev tab",
-      "size": 4728
+      "size": 4819
     },
     {
       "category": "pre-commit-review",
@@ -181,7 +179,7 @@
       "date": "2026-05-02",
       "time": "22:55",
       "title": "m0005 webdev tab",
-      "size": 1072
+      "size": 1106
     },
     {
       "category": "build-doctor",
@@ -189,7 +187,7 @@
       "date": "2026-05-02",
       "time": "17:50",
       "title": "release gate v0 3 1",
-      "size": 7061
+      "size": 7230
     },
     {
       "category": "release-build-pipeline",
@@ -197,7 +195,7 @@
       "date": "2026-05-02",
       "time": "17:50",
       "title": "release gate v0 3 1",
-      "size": 2378
+      "size": 2430
     },
     {
       "category": "security-guard",
@@ -205,7 +203,7 @@
       "date": "2026-05-02",
       "time": "17:49",
       "title": "release gate v0 3 1",
-      "size": 10342
+      "size": 10472
     },
     {
       "category": "code-coach",
@@ -213,7 +211,7 @@
       "date": "2026-05-02",
       "time": "16:41",
       "title": "m0002 ui improvements",
-      "size": 5771
+      "size": 5898
     },
     {
       "category": "tamer",
@@ -221,7 +219,7 @@
       "date": "2026-05-02",
       "time": "08:43",
       "title": "unit test trigger policy rewrite",
-      "size": 5134
+      "size": 5237
     },
     {
       "category": "code-coach",
@@ -229,7 +227,7 @@
       "date": "2026-05-01",
       "time": "22:49",
       "title": "pr 7 perf and exepath quoting review",
-      "size": 10998
+      "size": 11243
     },
     {
       "category": "build-doctor",
@@ -237,7 +235,7 @@
       "date": "2026-05-01",
       "time": "12:15",
       "title": "pre v0.3.0 release",
-      "size": 3558
+      "size": 3629
     },
     {
       "category": "release-build-pipeline",
@@ -245,7 +243,7 @@
       "date": "2026-05-01",
       "time": "12:15",
       "title": "v0.3.0",
-      "size": 2499
+      "size": 2548
     },
     {
       "category": "security-guard",
@@ -253,7 +251,7 @@
       "date": "2026-05-01",
       "time": "12:00",
       "title": "pre v0.3.0 release",
-      "size": 17225
+      "size": 17607
     },
     {
       "category": "build-doctor",
@@ -261,7 +259,7 @@
       "date": "2026-04-30",
       "time": "22:10",
       "title": "pre v0.2.1 release",
-      "size": 3340
+      "size": 3412
     },
     {
       "category": "release-build-pipeline",
@@ -269,7 +267,7 @@
       "date": "2026-04-30",
       "time": "22:10",
       "title": "v0.2.1",
-      "size": 1340
+      "size": 1377
     },
     {
       "category": "security-guard",
@@ -277,7 +275,7 @@
       "date": "2026-04-30",
       "time": "22:03",
       "title": "pre v0.2.1 release",
-      "size": 8571
+      "size": 8782
     },
     {
       "category": "build-doctor",
@@ -285,7 +283,7 @@
       "date": "2026-04-30",
       "time": "02:34",
       "title": "pre v0.2.0 release",
-      "size": 4192
+      "size": 4273
     },
     {
       "category": "release-build-pipeline",
@@ -293,7 +291,7 @@
       "date": "2026-04-30",
       "time": "02:34",
       "title": "v0.2.0",
-      "size": 2159
+      "size": 2218
     },
     {
       "category": "security-guard",
@@ -301,7 +299,7 @@
       "date": "2026-04-30",
       "time": "02:34",
       "title": "pre v0.2.0 release",
-      "size": 8878
+      "size": 9107
     },
     {
       "category": "tamer",
@@ -309,7 +307,7 @@
       "date": "2026-04-29",
       "time": "18:15",
       "title": "voice roundtrip testing knowledge",
-      "size": 4933
+      "size": 5004
     },
     {
       "category": "tamer",
@@ -317,7 +315,7 @@
       "date": "2026-04-29",
       "time": "15:12",
       "title": "wpf pitfalls knowledge update",
-      "size": 3841
+      "size": 3918
     },
     {
       "category": "tamer",
@@ -325,7 +323,7 @@
       "date": "2026-04-29",
       "time": "13:50",
       "title": "p2 p3 output graph and bargein",
-      "size": 8946
+      "size": 9113
     },
     {
       "category": "tamer",
@@ -333,7 +331,7 @@
       "date": "2026-04-29",
       "time": "13:00",
       "title": "p1 input graph",
-      "size": 5128
+      "size": 5210
     },
     {
       "category": "tamer",
@@ -341,7 +339,7 @@
       "date": "2026-04-29",
       "time": "12:30",
       "title": "p0 akka streams bump",
-      "size": 2245
+      "size": 2298
     },
     {
       "category": "tamer",
@@ -349,7 +347,7 @@
       "date": "2026-04-29",
       "time": "12:04",
       "title": "akka streams voice pipeline design",
-      "size": 5565
+      "size": 5660
     },
     {
       "category": "security-guard",
@@ -357,7 +355,7 @@
       "date": "2026-04-28",
       "time": "10:15",
       "title": "voice subsystem review",
-      "size": 9378
+      "size": 9564
     },
     {
       "category": "tamer",
@@ -365,7 +363,7 @@
       "date": "2026-04-28",
       "time": "09:30",
       "title": "dotnet test execution canon",
-      "size": 4426
+      "size": 4511
     },
     {
       "category": "code-coach",
@@ -373,7 +371,7 @@
       "date": "2026-04-27",
       "time": "22:00",
       "title": "precommit layout preservation",
-      "size": 3240
+      "size": 3332
     },
     {
       "category": "code-coach",
@@ -381,7 +379,7 @@
       "date": "2026-04-27",
       "time": "20:10",
       "title": "precommit path cli debuggability",
-      "size": 4553
+      "size": 4646
     },
     {
       "category": "tamer",
@@ -389,7 +387,7 @@
       "date": "2026-04-27",
       "time": "15:50",
       "title": "issue handoff policy",
-      "size": 7170
+      "size": 7294
     },
     {
       "category": "code-coach",
@@ -397,7 +395,7 @@
       "date": "2026-04-27",
       "time": "15:45",
       "title": "precommit react actor guards",
-      "size": 6012
+      "size": 6159
     },
     {
       "category": "tamer",
@@ -405,7 +403,7 @@
       "date": "2026-04-27",
       "time": "15:30",
       "title": "react actor guard implementation",
-      "size": 9265
+      "size": 9403
     },
     {
       "category": "tamer",
@@ -413,7 +411,7 @@
       "date": "2026-04-27",
       "time": "15:00",
       "title": "react actor guard analysis",
-      "size": 9445
+      "size": 9587
     },
     {
       "category": "tamer",
@@ -421,7 +419,7 @@
       "date": "2026-04-27",
       "time": "14:15",
       "title": "flow update agent origin reference",
-      "size": 7203
+      "size": 7324
     },
     {
       "category": "tamer",
@@ -429,7 +427,7 @@
       "date": "2026-04-27",
       "time": "14:04",
       "title": "agent origin comparison doc",
-      "size": 6603
+      "size": 6712
     },
     {
       "category": "code-coach",
@@ -437,7 +435,7 @@
       "date": "2026-04-26",
       "time": "01:42",
       "title": "aimode reactor actor plan",
-      "size": 26907
+      "size": 27437
     },
     {
       "category": "code-coach",
@@ -445,7 +443,7 @@
       "date": "2026-04-26",
       "time": "01:10",
       "title": "aimode nemotron failure rca",
-      "size": 9472
+      "size": 9674
     },
     {
       "category": "code-coach",
@@ -453,7 +451,7 @@
       "date": "2026-04-25",
       "time": "19:30",
       "title": "precommit nemotron backend",
-      "size": 3922
+      "size": 4024
     },
     {
       "category": "pre-commit-review",
@@ -461,7 +459,7 @@
       "date": "2026-04-25",
       "time": "19:30",
       "title": "nemotron backend",
-      "size": 1133
+      "size": 1172
     },
     {
       "category": "code-coach",
@@ -469,7 +467,7 @@
       "date": "2026-04-25",
       "time": "19:00",
       "title": "precommit aimode wireup",
-      "size": 3726
+      "size": 3823
     },
     {
       "category": "pre-commit-review",
@@ -477,7 +475,7 @@
       "date": "2026-04-25",
       "time": "19:00",
       "title": "aimode wireup",
-      "size": 1544
+      "size": 1593
     },
     {
       "category": "code-coach",
@@ -485,7 +483,7 @@
       "date": "2026-04-25",
       "time": "18:45",
       "title": "precommit toolhost",
-      "size": 2353
+      "size": 2421
     },
     {
       "category": "pre-commit-review",
@@ -493,7 +491,7 @@
       "date": "2026-04-25",
       "time": "18:45",
       "title": "toolhost",
-      "size": 707
+      "size": 733
     },
     {
       "category": "code-coach",
@@ -501,7 +499,7 @@
       "date": "2026-04-25",
       "time": "18:30",
       "title": "precommit chatmode ai",
-      "size": 2318
+      "size": 2385
     },
     {
       "category": "pre-commit-review",
@@ -509,7 +507,7 @@
       "date": "2026-04-25",
       "time": "18:30",
       "title": "chatmode ai",
-      "size": 999
+      "size": 1036
     },
     {
       "category": "code-coach",
@@ -517,7 +515,7 @@
       "date": "2026-04-25",
       "time": "17:40",
       "title": "precommit t3g t4g",
-      "size": 3554
+      "size": 3653
     },
     {
       "category": "pre-commit-review",
@@ -525,7 +523,7 @@
       "date": "2026-04-25",
       "time": "17:40",
       "title": "t3g t4g",
-      "size": 1137
+      "size": 1177
     },
     {
       "category": "code-coach",
@@ -533,7 +531,7 @@
       "date": "2026-04-25",
       "time": "17:20",
       "title": "precommit tools layer",
-      "size": 4227
+      "size": 4326
     },
     {
       "category": "pre-commit-review",
@@ -541,7 +539,7 @@
       "date": "2026-04-25",
       "time": "17:20",
       "title": "tools layer",
-      "size": 1545
+      "size": 1594
     },
     {
       "category": "code-coach",
@@ -549,7 +547,7 @@
       "date": "2026-04-25",
       "time": "16:40",
       "title": "precommit nemotron catalog",
-      "size": 2263
+      "size": 2329
     },
     {
       "category": "pre-commit-review",
@@ -557,7 +555,7 @@
       "date": "2026-04-25",
       "time": "16:40",
       "title": "nemotron catalog",
-      "size": 1254
+      "size": 1291
     },
     {
       "category": "code-coach",
@@ -565,7 +563,7 @@
       "date": "2026-04-25",
       "time": "16:20",
       "title": "aimode research",
-      "size": 6366
+      "size": 6492
     },
     {
       "category": "security-guard",
@@ -573,7 +571,7 @@
       "date": "2026-04-25",
       "time": "16:00",
       "title": "baseline full pass",
-      "size": 16874
+      "size": 17255
     },
     {
       "category": "tamer",
@@ -581,7 +579,7 @@
       "date": "2026-04-25",
       "time": "15:30",
       "title": "fill msys2 resolution",
-      "size": 3622
+      "size": 3706
     },
     {
       "category": "tamer",
@@ -589,7 +587,7 @@
       "date": "2026-04-25",
       "time": "15:00",
       "title": "designate crash dump owner",
-      "size": 4115
+      "size": 4208
     },
     {
       "category": "tamer",
@@ -597,7 +595,7 @@
       "date": "2026-04-25",
       "time": "14:40",
       "title": "plant four specialists",
-      "size": 4308
+      "size": 4410
     },
     {
       "category": "mission-records",
@@ -605,7 +603,7 @@
       "date": null,
       "time": null,
       "title": "M0001-수행결과",
-      "size": 7454
+      "size": 7583
     },
     {
       "category": "mission-records",
@@ -613,7 +611,7 @@
       "date": null,
       "time": null,
       "title": "M0002-수행결과",
-      "size": 22084
+      "size": 22477
     },
     {
       "category": "mission-records",
@@ -621,7 +619,7 @@
       "date": null,
       "time": null,
       "title": "M0003-수행결과",
-      "size": 17647
+      "size": 17926
     },
     {
       "category": "mission-records",
@@ -629,7 +627,7 @@
       "date": null,
       "time": null,
       "title": "M0004-execution-result",
-      "size": 15488
+      "size": 15735
     },
     {
       "category": "mission-records",
@@ -637,7 +635,7 @@
       "date": null,
       "time": null,
       "title": "M0005-수행결과",
-      "size": 7190
+      "size": 7328
     },
     {
       "category": "mission-records",
@@ -645,7 +643,7 @@
       "date": null,
       "time": null,
       "title": "M0006-수행결과",
-      "size": 19812
+      "size": 20160
     },
     {
       "category": "mission-records",
@@ -653,7 +651,7 @@
       "date": null,
       "time": null,
       "title": "M0007-수행결과",
-      "size": 10811
+      "size": 11019
     },
     {
       "category": "mission-records",
@@ -661,7 +659,7 @@
       "date": null,
       "time": null,
       "title": "M0008-수행결과",
-      "size": 10731
+      "size": 10931
     },
     {
       "category": "mission-records",
@@ -669,7 +667,7 @@
       "date": null,
       "time": null,
       "title": "M0009-수행결과",
-      "size": 10094
+      "size": 10269
     },
     {
       "category": "mission-records",
@@ -677,7 +675,7 @@
       "date": null,
       "time": null,
       "title": "M0010-수행결과",
-      "size": 22278
+      "size": 22688
     },
     {
       "category": "mission-records",
@@ -685,7 +683,7 @@
       "date": null,
       "time": null,
       "title": "M0011-수행결과",
-      "size": 17618
+      "size": 17915
     },
     {
       "category": "mission-records",
@@ -693,7 +691,7 @@
       "date": null,
       "time": null,
       "title": "M0012-수행결과",
-      "size": 12562
+      "size": 12777
     },
     {
       "category": "mission-records",
@@ -701,7 +699,7 @@
       "date": null,
       "time": null,
       "title": "M0013-수행결과",
-      "size": 4359
+      "size": 4436
     },
     {
       "category": "mission-records",
@@ -709,7 +707,7 @@
       "date": null,
       "time": null,
       "title": "M0014-수행결과",
-      "size": 13461
+      "size": 13717
     },
     {
       "category": "mission-records",
@@ -717,7 +715,7 @@
       "date": null,
       "time": null,
       "title": "M0015-수행결과",
-      "size": 23511
+      "size": 23985
     },
     {
       "category": "mission-records",
@@ -725,7 +723,7 @@
       "date": null,
       "time": null,
       "title": "M0016-수행결과",
-      "size": 20324
+      "size": 20665
     },
     {
       "category": "mission-records",
@@ -733,7 +731,7 @@
       "date": null,
       "time": null,
       "title": "M0017-수행결과",
-      "size": 58457
+      "size": 59340
     },
     {
       "category": "mission-records",
@@ -741,7 +739,7 @@
       "date": null,
       "time": null,
       "title": "M0018-수행결과",
-      "size": 8836
+      "size": 8963
     },
     {
       "category": "mission-records",
@@ -749,7 +747,7 @@
       "date": null,
       "time": null,
       "title": "M0019-수행결과",
-      "size": 17203
+      "size": 17517
     },
     {
       "category": "mission-records",
@@ -757,7 +755,7 @@
       "date": null,
       "time": null,
       "title": "M0020-수행결과",
-      "size": 48702
+      "size": 49535
     },
     {
       "category": "mission-records",
@@ -765,7 +763,7 @@
       "date": null,
       "time": null,
       "title": "M0021-수행결과",
-      "size": 42732
+      "size": 43432
     },
     {
       "category": "mission-records",
@@ -773,7 +771,7 @@
       "date": null,
       "time": null,
       "title": "M0022-수행결과",
-      "size": 7958
+      "size": 8094
     },
     {
       "category": "mission-records",
@@ -781,7 +779,7 @@
       "date": null,
       "time": null,
       "title": "M0023-수행결과",
-      "size": 8207
+      "size": 8313
     }
   ]
 }

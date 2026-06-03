@@ -7,8 +7,8 @@
       "name": "actor-model-tutorial-ko.md",
       "title": "actor-model-tutorial-ko",
       "heading": "Akka.NET 액터모델 듀토리얼 — AgentZero Lite 의 시선으로",
-      "size": 25693,
-      "modified": "2026-05-16"
+      "size": 26309,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/_shared/agent-architecture.md",
@@ -16,8 +16,8 @@
       "name": "agent-architecture.md",
       "title": "agent-architecture",
       "heading": "Agent architecture — canonical vocabulary",
-      "size": 9021,
-      "modified": "2026-05-05"
+      "size": 9163,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/_shared/agentzerolite-architecture.md",
@@ -25,8 +25,8 @@
       "name": "agentzerolite-architecture.md",
       "title": "agentzerolite-architecture",
       "heading": "AgentZero Lite — Architecture Map (for harness agents)",
-      "size": 4583,
-      "modified": "2026-04-25"
+      "size": 4682,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/_shared/os-control.md",
@@ -34,8 +34,8 @@
       "name": "os-control.md",
       "title": "os-control",
       "heading": "OS Control Surface (M0014) — CLI verbs + LLM tools",
-      "size": 6639,
-      "modified": "2026-05-07"
+      "size": 6794,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/_shared/pencil-design-skill-origin.md",
@@ -43,8 +43,8 @@
       "name": "pencil-design-skill-origin.md",
       "title": "pencil-design-skill-origin",
       "heading": "pencil-design skill — provenance & local conventions",
-      "size": 4260,
-      "modified": "2026-05-10"
+      "size": 4342,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/_shared/threejs-actor-world-primer.md",
@@ -52,8 +52,8 @@
       "name": "threejs-actor-world-primer.md",
       "title": "threejs-actor-world-primer",
       "heading": "Three.js Actor World — viewer primer",
-      "size": 6241,
-      "modified": "2026-05-10"
+      "size": 6355,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/akka-net-wasm-feasibility.md",
@@ -61,8 +61,8 @@
       "name": "akka-net-wasm-feasibility.md",
       "title": "akka-net-wasm-feasibility",
       "heading": "Akka.NET in Blazor WASM — Feasibility Survey (no-WebSocket)",
-      "size": 9596,
-      "modified": "2026-05-09"
+      "size": 9742,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/avalondock-float-redock-patterns.md",
@@ -70,8 +70,8 @@
       "name": "avalondock-float-redock-patterns.md",
       "title": "avalondock-float-redock-patterns",
       "heading": "AvalonDock — Multi-View Terminal Float / Redock Patterns",
-      "size": 10731,
-      "modified": "2026-05-02"
+      "size": 11018,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
@@ -79,8 +79,8 @@
       "name": "2026-04-22-msys2-bash-crash-llamacpp-build.md",
       "title": "2026-04-22-msys2-bash-crash-llamacpp-build",
       "heading": "2026-04-22 — MSYS2 `bash.exe` crash during llama.cpp / Gemma 4 build",
-      "size": 8640,
-      "modified": "2026-04-25"
+      "size": 8809,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/llm-prompt-conventions.md",
@@ -89,7 +89,7 @@
       "title": "llm-prompt-conventions",
       "heading": "LLM Prompt Conventions",
       "size": 4469,
-      "modified": "2026-05-03"
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/nodejs-bash-and-stream-io-pitfalls.md",
@@ -97,8 +97,8 @@
       "name": "nodejs-bash-and-stream-io-pitfalls.md",
       "title": "nodejs-bash-and-stream-io-pitfalls",
       "heading": "Node.js Wrapper Pitfalls — bash · child_process · file & stream IO on Windows",
-      "size": 17566,
-      "modified": "2026-05-04"
+      "size": 18106,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/ondevice-tool-calling-survey.md",
@@ -106,8 +106,8 @@
       "name": "ondevice-tool-calling-survey.md",
       "title": "ondevice-tool-calling-survey",
       "heading": "On-Device Tool Calling — Gemma 4 vs Nemotron Nano (2026-04 survey)",
-      "size": 8930,
-      "modified": "2026-04-25"
+      "size": 9061,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/terminal-wedge-triage.md",
@@ -115,8 +115,8 @@
       "name": "terminal-wedge-triage.md",
       "title": "terminal-wedge-triage",
       "heading": "Terminal Wedge Triage — \"this CLI tab is frozen\"",
-      "size": 8105,
-      "modified": "2026-05-09"
+      "size": 8277,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/wm-copydata-ipc-pitfalls.md",
@@ -124,8 +124,8 @@
       "name": "wm-copydata-ipc-pitfalls.md",
       "title": "wm-copydata-ipc-pitfalls",
       "heading": "WM_COPYDATA IPC Pitfalls — CLI ↔ GUI in AgentZero Lite",
-      "size": 8910,
-      "modified": "2026-05-09"
+      "size": 9139,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/code-coach/wpf-xaml-resource-and-window-pitfalls.md",
@@ -133,8 +133,8 @@
       "name": "wpf-xaml-resource-and-window-pitfalls.md",
       "title": "wpf-xaml-resource-and-window-pitfalls",
       "heading": "WPF XAML Resource Scope & Window Lifecycle Pitfalls",
-      "size": 18507,
-      "modified": "2026-05-03"
+      "size": 18952,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/README.md",
@@ -142,8 +142,8 @@
       "name": "README.md",
       "title": "README",
       "heading": "harness/knowledge — per-agent expert knowledge",
-      "size": 4121,
-      "modified": "2026-05-03"
+      "size": 4210,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/security-guard/crash-dump-forensics.md",
@@ -151,8 +151,8 @@
       "name": "crash-dump-forensics.md",
       "title": "crash-dump-forensics",
       "heading": "Crash Dump Forensics — Playbook",
-      "size": 7441,
-      "modified": "2026-05-03"
+      "size": 7632,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/security-guard/security-surface.md",
@@ -160,8 +160,8 @@
       "name": "security-surface.md",
       "title": "security-surface",
       "heading": "Security Surface — Prompt Injection → OS Exec Map",
-      "size": 4836,
-      "modified": "2026-04-25"
+      "size": 4942,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/tamer/agent-origin-reference.md",
@@ -169,8 +169,8 @@
       "name": "agent-origin-reference.md",
       "title": "agent-origin-reference",
       "heading": "Agent Origin (AgentWin) Reference Protocol",
-      "size": 3700,
-      "modified": "2026-05-03"
+      "size": 3788,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/tamer/missions-protocol.md",
@@ -179,7 +179,7 @@
       "title": "missions-protocol",
       "heading": "Missions protocol — file-based request management",
       "size": 12278,
-      "modified": "2026-05-04"
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/test-runner/dotnet-test-execution.md",
@@ -187,8 +187,8 @@
       "name": "dotnet-test-execution.md",
       "title": "dotnet-test-execution",
       "heading": "dotnet test 실행 규칙 — 정전(canon)",
-      "size": 4940,
-      "modified": "2026-04-27"
+      "size": 5039,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/test-runner/unit-test-policy.md",
@@ -196,8 +196,8 @@
       "name": "unit-test-policy.md",
       "title": "unit-test-policy",
       "heading": "Unit-test execution policy",
-      "size": 5485,
-      "modified": "2026-05-22"
+      "size": 5586,
+      "modified": "2026-05-28"
     },
     {
       "id": "harness/knowledge/test-sentinel/voice-roundtrip-testing.md",
@@ -205,8 +205,8 @@
       "name": "voice-roundtrip-testing.md",
       "title": "voice-roundtrip-testing",
       "heading": "Voice TTS↔STT Round-Trip Testing — Methodology",
-      "size": 10034,
-      "modified": "2026-04-29"
+      "size": 10274,
+      "modified": "2026-05-28"
     }
   ],
   "tree": [
@@ -219,15 +219,15 @@
           "type": "file",
           "name": "akka-net-wasm-feasibility.md",
           "path": "code-coach/akka-net-wasm-feasibility.md",
-          "size": 9596,
-          "modified": "2026-05-09"
+          "size": 9742,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "avalondock-float-redock-patterns.md",
           "path": "code-coach/avalondock-float-redock-patterns.md",
-          "size": 10731,
-          "modified": "2026-05-02"
+          "size": 11018,
+          "modified": "2026-05-28"
         },
         {
           "type": "dir",
@@ -238,8 +238,8 @@
               "type": "file",
               "name": "2026-04-22-msys2-bash-crash-llamacpp-build.md",
               "path": "code-coach/cases/2026-04-22-msys2-bash-crash-llamacpp-build.md",
-              "size": 8640,
-              "modified": "2026-04-25"
+              "size": 8809,
+              "modified": "2026-05-28"
             }
           ]
         },
@@ -248,42 +248,42 @@
           "name": "llm-prompt-conventions.md",
           "path": "code-coach/llm-prompt-conventions.md",
           "size": 4469,
-          "modified": "2026-05-03"
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "nodejs-bash-and-stream-io-pitfalls.md",
           "path": "code-coach/nodejs-bash-and-stream-io-pitfalls.md",
-          "size": 17566,
-          "modified": "2026-05-04"
+          "size": 18106,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "ondevice-tool-calling-survey.md",
           "path": "code-coach/ondevice-tool-calling-survey.md",
-          "size": 8930,
-          "modified": "2026-04-25"
+          "size": 9061,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "terminal-wedge-triage.md",
           "path": "code-coach/terminal-wedge-triage.md",
-          "size": 8105,
-          "modified": "2026-05-09"
+          "size": 8277,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "wm-copydata-ipc-pitfalls.md",
           "path": "code-coach/wm-copydata-ipc-pitfalls.md",
-          "size": 8910,
-          "modified": "2026-05-09"
+          "size": 9139,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "wpf-xaml-resource-and-window-pitfalls.md",
           "path": "code-coach/wpf-xaml-resource-and-window-pitfalls.md",
-          "size": 18507,
-          "modified": "2026-05-03"
+          "size": 18952,
+          "modified": "2026-05-28"
         }
       ]
     },
@@ -291,8 +291,8 @@
       "type": "file",
       "name": "README.md",
       "path": "README.md",
-      "size": 4121,
-      "modified": "2026-05-03"
+      "size": 4210,
+      "modified": "2026-05-28"
     },
     {
       "type": "dir",
@@ -303,15 +303,15 @@
           "type": "file",
           "name": "crash-dump-forensics.md",
           "path": "security-guard/crash-dump-forensics.md",
-          "size": 7441,
-          "modified": "2026-05-03"
+          "size": 7632,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "security-surface.md",
           "path": "security-guard/security-surface.md",
-          "size": 4836,
-          "modified": "2026-04-25"
+          "size": 4942,
+          "modified": "2026-05-28"
         }
       ]
     },
@@ -324,15 +324,15 @@
           "type": "file",
           "name": "agent-origin-reference.md",
           "path": "tamer/agent-origin-reference.md",
-          "size": 3700,
-          "modified": "2026-05-03"
+          "size": 3788,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "missions-protocol.md",
           "path": "tamer/missions-protocol.md",
           "size": 12278,
-          "modified": "2026-05-04"
+          "modified": "2026-05-28"
         }
       ]
     },
@@ -345,15 +345,15 @@
           "type": "file",
           "name": "dotnet-test-execution.md",
           "path": "test-runner/dotnet-test-execution.md",
-          "size": 4940,
-          "modified": "2026-04-27"
+          "size": 5039,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "unit-test-policy.md",
           "path": "test-runner/unit-test-policy.md",
-          "size": 5485,
-          "modified": "2026-05-22"
+          "size": 5586,
+          "modified": "2026-05-28"
         }
       ]
     },
@@ -366,8 +366,8 @@
           "type": "file",
           "name": "voice-roundtrip-testing.md",
           "path": "test-sentinel/voice-roundtrip-testing.md",
-          "size": 10034,
-          "modified": "2026-04-29"
+          "size": 10274,
+          "modified": "2026-05-28"
         }
       ]
     },
@@ -380,43 +380,43 @@
           "type": "file",
           "name": "actor-model-tutorial-ko.md",
           "path": "_shared/actor-model-tutorial-ko.md",
-          "size": 25693,
-          "modified": "2026-05-16"
+          "size": 26309,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "agent-architecture.md",
           "path": "_shared/agent-architecture.md",
-          "size": 9021,
-          "modified": "2026-05-05"
+          "size": 9163,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "agentzerolite-architecture.md",
           "path": "_shared/agentzerolite-architecture.md",
-          "size": 4583,
-          "modified": "2026-04-25"
+          "size": 4682,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "os-control.md",
           "path": "_shared/os-control.md",
-          "size": 6639,
-          "modified": "2026-05-07"
+          "size": 6794,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "pencil-design-skill-origin.md",
           "path": "_shared/pencil-design-skill-origin.md",
-          "size": 4260,
-          "modified": "2026-05-10"
+          "size": 4342,
+          "modified": "2026-05-28"
         },
         {
           "type": "file",
           "name": "threejs-actor-world-primer.md",
           "path": "_shared/threejs-actor-world-primer.md",
-          "size": 6241,
-          "modified": "2026-05-10"
+          "size": 6355,
+          "modified": "2026-05-28"
         }
       ]
     }

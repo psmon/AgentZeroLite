@@ -31,6 +31,17 @@ const TABS = {
 
 const STATE = { tab: 'core', current: { core: null, task: null } };
 
+// Mermaid orientation defaults to horizontal (graph LR / flowchart LR) which
+// becomes unreadable on a phone — the SVG just overflows. On narrow screens
+// rewrite the orientation token to its vertical equivalent so the diagram
+// flows top-to-bottom instead. sequenceDiagram / stateDiagram are already
+// stack-friendly, so they pass through untouched.
+const MOBILE_MQ = window.matchMedia('(max-width: 768px)');
+function verticalize(src) {
+  if (!src || !MOBILE_MQ.matches) return src;
+  return src.replace(/^(\s*(?:graph|flowchart))\s+LR\b/m, '$1 TB');
+}
+
 export async function render(ctx) {
   const { viewEl, topbarEl, params } = ctx;
 
@@ -48,6 +59,13 @@ export async function render(ctx) {
     STATE.current.task = engineIdx.items[0].file;
 
   drawTabs();
+
+  // Re-render the active tab when crossing the mobile breakpoint so the
+  // mermaid orientation (LR vs TB) and the list/detail stacking re-flow.
+  const onMqChange = () => drawBody();
+  MOBILE_MQ.addEventListener('change', onMqChange);
+  viewEl.__wfCleanup?.();
+  viewEl.__wfCleanup = () => MOBILE_MQ.removeEventListener('change', onMqChange);
 
   function drawTabs() {
     renderTopBar(topbarEl, {
@@ -75,7 +93,7 @@ function drawCore(viewEl, data) {
     return;
   }
 
-  const cont = h('div', { style: { display: 'grid', gridTemplateColumns: '260px 1fr', gap: '16px', alignItems: 'start' } });
+  const cont = h('div', { class: 'wf-layout' });
   const listPane = h('div', { class: 'tree' });
   const detailPane = h('div');
   cont.append(listPane, detailPane);
@@ -100,7 +118,7 @@ function drawCore(viewEl, data) {
       h('h2', {}, wf.label),
       h('p', {}, wf.description),
       h('div', { class: 'wf-flow-label' }, 'High-level flow'),
-      h('div', { class: 'mermaid', html: wf.mermaid }),
+      h('div', { class: 'mermaid', html: verticalize(wf.mermaid) }),
     ];
     if (wf.sourceMermaid) {
       children.push(h('div', { class: 'wf-source-panel' }, [
@@ -108,7 +126,7 @@ function drawCore(viewEl, data) {
           h('span', { class: 'wf-source-title' }, 'Source files & classes'),
           h('span', { class: 'wf-source-sub' }, 'in-repo references — open by Ctrl+click in your IDE'),
         ]),
-        h('div', { class: 'mermaid', html: wf.sourceMermaid }),
+        h('div', { class: 'mermaid', html: verticalize(wf.sourceMermaid) }),
       ]));
     }
     const box = h('div', { class: 'md-viewer' }, children);
@@ -129,7 +147,7 @@ function drawTask(viewEl, engineIdx) {
     return;
   }
 
-  const cont = h('div', { style: { display: 'grid', gridTemplateColumns: '260px 1fr', gap: '16px', alignItems: 'start' } });
+  const cont = h('div', { class: 'wf-layout' });
   const listPane = h('div', { class: 'tree' });
   const detailPane = h('div');
   cont.append(listPane, detailPane);
@@ -159,7 +177,13 @@ function drawTask(viewEl, engineIdx) {
     // description / auto_invoke_on). Parse it out so the MD viewer doesn't
     // render the YAML as a stray bulleted list, and surface the bits that
     // matter as a header.
-    const { meta, body } = parseFrontmatter(raw);
+    const { meta, body: rawBody } = parseFrontmatter(raw);
+    // Flip horizontal mermaid fences inside the engine MD body to vertical
+    // on mobile so they don't overflow the phone viewport.
+    const body = MOBILE_MQ.matches
+      ? rawBody.replace(/(```mermaid\s*\n)([\s\S]*?)(\n```)/g,
+          (_, open, src, close) => open + verticalize(src) + close)
+      : rawBody;
     const description = meta?.description || '';
     const triggers = Array.isArray(meta?.triggers) ? meta.triggers : [];
     const agents = Array.isArray(meta?.agents) ? meta.agents : [];

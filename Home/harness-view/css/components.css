@@ -446,6 +446,32 @@
 .wf-source-sub   { font-size: 11px; color: #6B7280; }
 .wf-source-panel .mermaid { background: #FFFFFF; border-radius: 6px; padding: 12px; }
 
+/* Workflow page layout — list (260px) + detail (1fr) on desktop, stacks on mobile. */
+.wf-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+/* Mermaid renders inline SVGs sized to the source diagram — let them shrink. */
+.wf-layout .mermaid { overflow-x: auto; }
+.wf-layout .mermaid svg { max-width: 100%; height: auto; }
+
+@media (max-width: 768px) {
+  .wf-layout { grid-template-columns: 1fr; gap: 12px; }
+  /* On mobile the tree becomes a horizontal chip-row above the detail —
+     keeps it out of the way without losing navigation. */
+  .wf-layout > .tree {
+    flex-direction: row; flex-wrap: wrap; gap: 6px;
+    padding: 8px; background: #FFFFFF;
+    border: 1px solid #E5E7EB; border-radius: 8px;
+  }
+  .wf-layout > .tree .tree-node { padding: 6px 10px; font-size: 12px; border: 1px solid #E5E7EB; }
+  .wf-layout > .tree .tree-node.active { border-color: #2563EB; }
+  .wf-source-panel { padding: 10px 12px 12px; }
+  .wf-source-panel .mermaid { padding: 8px; }
+}
+
 /* ── 4) 릴리즈 노트 ── */
 .release-grid {
   display: grid; gap: 12px;

@@ -33,8 +33,8 @@
       "recordStarted": "2026-05-25T00:00:00+09:00",
       "recordFinished": "2026-05-25T00:00:00+09:00",
       "designFile": "Docs/design/M0023-architecture.pen",
-      "modified": "2026-05-25",
-      "size": 1799
+      "modified": "2026-05-28",
+      "size": 1832
     },
     {
       "id": "M0022",
@@ -50,8 +50,8 @@
       "recordStarted": "2026-05-22T00:00:00+09:00",
       "recordFinished": "2026-05-22T06:00:00+09:00",
       "designFile": "Docs/design/M0022-ui-refresh.pen",
-      "modified": "2026-05-21",
-      "size": 2819
+      "modified": "2026-05-28",
+      "size": 2869
     },
     {
       "id": "M0021",
@@ -67,8 +67,8 @@
       "recordStarted": "2026-05-18T10:00:00+09:00",
       "recordFinished": "2026-05-18T11:30:00+09:00",
       "designFile": null,
-      "modified": "2026-05-18",
-      "size": 1747
+      "modified": "2026-05-28",
+      "size": 1788
     },
     {
       "id": "M0020",
@@ -84,8 +84,8 @@
       "recordStarted": "2026-05-17T10:00:00+09:00",
       "recordFinished": "2026-05-17T11:30:00+09:00",
       "designFile": null,
-      "modified": "2026-05-17",
-      "size": 1354
+      "modified": "2026-05-28",
+      "size": 1393
     },
     {
       "id": "M0019",
@@ -101,7 +101,7 @@
       "recordStarted": "2026-05-16T19:30:00+09:00",
       "recordFinished": "2026-05-16T19:45:00+09:00",
       "designFile": null,
-      "modified": "2026-05-16",
+      "modified": "2026-05-28",
       "size": 5115
     },
     {
@@ -118,7 +118,7 @@
       "recordStarted": "2026-05-16T18:30:00+09:00",
       "recordFinished": "2026-05-16T19:10:00+09:00",
       "designFile": null,
-      "modified": "2026-05-16",
+      "modified": "2026-05-28",
       "size": 878
     },
     {
@@ -135,8 +135,8 @@
       "recordStarted": "2026-05-11T21:00:00+09:00",
       "recordFinished": "2026-05-11T22:00:00+09:00",
       "designFile": null,
-      "modified": "2026-05-11",
-      "size": 2335
+      "modified": "2026-05-28",
+      "size": 2383
     },
     {
       "id": "M0016",
@@ -152,8 +152,8 @@
       "recordStarted": "2026-05-10T10:30:00+09:00",
       "recordFinished": "2026-05-10T11:20:00+09:00",
       "designFile": null,
-      "modified": "2026-05-10",
-      "size": 2287
+      "modified": "2026-05-28",
+      "size": 2333
     },
     {
       "id": "M0015",
@@ -169,8 +169,8 @@
       "recordStarted": "2026-05-09T00:00:00+09:00",
       "recordFinished": "2026-05-09T00:00:00+09:00",
       "designFile": null,
-      "modified": "2026-05-10",
-      "size": 1636
+      "modified": "2026-05-28",
+      "size": 1674
     },
     {
       "id": "M0014",
@@ -186,8 +186,8 @@
       "recordStarted": "2026-05-07T11:30:00+09:00",
       "recordFinished": "2026-05-07T22:30:00+09:00",
       "designFile": null,
-      "modified": "2026-05-07",
-      "size": 2620
+      "modified": "2026-05-28",
+      "size": 2672
     },
     {
       "id": "M0013",
@@ -203,8 +203,8 @@
       "recordStarted": null,
       "recordFinished": null,
       "designFile": null,
-      "modified": "2026-05-05",
-      "size": 5574
+      "modified": "2026-05-28",
+      "size": 5690
     },
     {
       "id": "M0012",
@@ -220,8 +220,8 @@
       "recordStarted": "2026-05-04T22:30:00+09:00",
       "recordFinished": "2026-05-04T23:10:00+09:00",
       "designFile": "Docs/design/M0012-active-session-panel.pen",
-      "modified": "2026-05-04",
-      "size": 4921
+      "modified": "2026-05-28",
+      "size": 5027
     },
     {
       "id": "M0011",
@@ -237,7 +237,7 @@
       "recordStarted": "2026-05-04T17:50:00+09:00",
       "recordFinished": "2026-05-05T07:10:00+09:00",
       "designFile": "Docs/design/M0011-token-remaining-widget.pen",
-      "modified": "2026-05-04",
+      "modified": "2026-05-28",
       "size": 2489
     },
     {
@@ -254,7 +254,7 @@
       "recordStarted": "2026-05-04T13:30:00+09:00",
       "recordFinished": "2026-05-04T13:49:33+09:00",
       "designFile": "Docs/design/M0010-webdev-detach-docking.pen",
-      "modified": "2026-05-04",
+      "modified": "2026-05-28",
       "size": 3136
     },
     {
@@ -271,7 +271,7 @@
       "recordStarted": "2026-05-03T19:30:00+09:00",
       "recordFinished": "2026-05-03T20:41:28+09:00",
       "designFile": null,
-      "modified": "2026-05-03",
+      "modified": "2026-05-28",
       "size": 1204
     },
     {
@@ -288,8 +288,8 @@
       "recordStarted": "2026-05-03T11:45:00+09:00",
       "recordFinished": "2026-05-03T12:57:47+09:00",
       "designFile": "Docs/design/M0008-architecture.pen",
-      "modified": "2026-05-03",
-      "size": 2301
+      "modified": "2026-05-28",
+      "size": 2355
     },
     {
       "id": "M0007",
@@ -305,8 +305,8 @@
       "recordStarted": "2026-05-03T10:30:00+09:00",
       "recordFinished": "2026-05-03T11:17:38+09:00",
       "designFile": null,
-      "modified": "2026-05-03",
-      "size": 3395
+      "modified": "2026-05-28",
+      "size": 3451
     },
     {
       "id": "M0006",
@@ -322,8 +322,8 @@
       "recordStarted": "2026-05-03T07:30:00+09:00",
       "recordFinished": "2026-05-03T08:35:00+09:00",
       "designFile": "Docs/design/M0006-webdev-mainmenu.pen",
-      "modified": "2026-05-02",
-      "size": 1837
+      "modified": "2026-05-28",
+      "size": 1868
     },
     {
       "id": "M0005",
@@ -339,7 +339,7 @@
       "recordStarted": "2026-05-02T22:00:00+09:00",
       "recordFinished": "2026-05-02T22:49:00+09:00",
       "designFile": null,
-      "modified": "2026-05-02",
+      "modified": "2026-05-28",
       "size": 1158
     },
     {
@@ -356,7 +356,7 @@
       "recordStarted": "2026-05-02T10:50:00+09:00",
       "recordFinished": "2026-05-02T20:35:00+09:00",
       "designFile": null,
-      "modified": "2026-05-02",
+      "modified": "2026-05-28",
       "size": 3435
     },
     {
@@ -373,7 +373,7 @@
       "recordStarted": "2026-05-02T09:00:00+09:00",
       "recordFinished": "2026-05-02T10:45:00+09:00",
       "designFile": null,
-      "modified": "2026-05-02",
+      "modified": "2026-05-28",
       "size": 1873
     },
     {
@@ -390,8 +390,8 @@
       "recordStarted": "2026-05-02T11:00:00+09:00",
       "recordFinished": "2026-05-02T11:35:00+09:00",
       "designFile": null,
-      "modified": "2026-05-02",
-      "size": 3111
+      "modified": "2026-05-28",
+      "size": 3151
     },
     {
       "id": "M001",
@@ -407,7 +407,7 @@
       "recordStarted": null,
       "recordFinished": null,
       "designFile": null,
-      "modified": "2026-05-02",
+      "modified": "2026-05-28",
       "size": 1283
     },
     {
@@ -424,8 +424,8 @@
       "recordStarted": "2026-05-02T08:50:00+09:00",
       "recordFinished": "2026-05-02T09:25:00+09:00",
       "designFile": null,
-      "modified": "2026-05-02",
-      "size": 2665
+      "modified": "2026-05-28",
+      "size": 2725
     }
   ]
 }
