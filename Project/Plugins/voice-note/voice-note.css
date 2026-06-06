@@ -279,6 +279,43 @@ body { font-size: 13px; }
 }
 .vn-line.live .vn-line-text { color: var(--accent-hi); }
 
+/* M0024 Phase 3 — speaker chip + partial line. The .vn-line-main wrapper
+   sits in the right grid column with chip + text side by side so the chip
+   doesn't push text into a second row when speakers change. */
+.vn-line-main {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; line-height: 1.55; color: var(--text);
+  word-break: break-word;
+}
+.vn-line-spk-chip {
+  display: inline-block;
+  padding: 1px 7px; border-radius: 9px;
+  font-family: Consolas, monospace;
+  font-size: 10px; font-weight: 600;
+  background: rgba(120, 120, 130, 0.20);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+/* Per-speaker accents — first four mirror the Music tab spectrum gradient
+   (cyan → magenta → mint → amber), then cool/warm follow-ups for 4..7. */
+.vn-line-spk-0 .vn-line-spk-chip { background: rgba(0, 229, 255, 0.18);   color: #4ecaff; }
+.vn-line-spk-1 .vn-line-spk-chip { background: rgba(197, 134, 192, 0.22); color: #d995d4; }
+.vn-line-spk-2 .vn-line-spk-chip { background: rgba(124, 253, 176, 0.18); color: #90ffb4; }
+.vn-line-spk-3 .vn-line-spk-chip { background: rgba(255, 184, 0, 0.22);   color: #ffcb47; }
+.vn-line-spk-4 .vn-line-spk-chip { background: rgba(255, 110, 110, 0.22); color: #ff9999; }
+.vn-line-spk-5 .vn-line-spk-chip { background: rgba(159, 220, 137, 0.22); color: #b9e3a8; }
+.vn-line-spk-6 .vn-line-spk-chip { background: rgba(190, 160, 255, 0.22); color: #c2a8ff; }
+.vn-line-spk-7 .vn-line-spk-chip { background: rgba(255, 196, 138, 0.22); color: #ffd0a0; }
+
+/* Partial rolling-preview row — dimmed, italic, no bottom border so it
+   reads as transient rather than committed history. */
+.vn-line-partial {
+  opacity: 0.6; border-bottom: 0;
+}
+.vn-line-partial .vn-line-main { font-style: italic; color: var(--text-muted); }
+.vn-line-partial .vn-line-ts   { color: var(--text-muted); }
+
 .vn-summary, .vn-meta-json {
   margin: 0; padding: 0;
   background: transparent; color: var(--text);

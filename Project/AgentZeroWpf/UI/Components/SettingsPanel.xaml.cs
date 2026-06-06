@@ -21,6 +21,7 @@ public partial class SettingsPanel : UserControl
             RefreshPathStatus();
             InitializeLlmTab();
             InitializeVoiceTab();
+            InitializeDiarizationTab();
             InitializeMusicTab();
         };
     }

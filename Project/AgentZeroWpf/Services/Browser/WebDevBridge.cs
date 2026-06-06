@@ -115,7 +115,20 @@ public sealed class WebDevBridge
             error        = s.Error,
         });
 
-    private void OnNoteTranscript(string text)        => PostEvent("note.transcript", new { text });
+    /// <summary>
+    /// M0024 Phase 3 — bridge payload extended with speaker fields and a
+    /// partial flag. Backward compatible: pre-Phase-3 plugins ignore the new
+    /// fields and behave exactly as before. New plugins read
+    /// <c>speakerLabel</c> for display and <c>isPartial</c> to dim the line.
+    /// </summary>
+    private void OnNoteTranscript(NoteTranscriptInfo info) =>
+        PostEvent("note.transcript", new
+        {
+            text         = info.Text,
+            speakerId    = info.SpeakerId,
+            speakerLabel = info.SpeakerLabel,
+            isPartial    = info.IsPartial,
+        });
     private void OnNoteUtteranceStarted()             => PostEvent("note.utterance-start", new { });
     private void OnNoteUtteranceEnded()               => PostEvent("note.utterance-end", new { });
     private void OnNoteError(string message)          => PostEvent("note.error", new { message });

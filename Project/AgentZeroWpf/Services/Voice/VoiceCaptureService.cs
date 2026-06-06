@@ -97,6 +97,21 @@ public sealed class VoiceCaptureService : IDisposable
     }
 
     /// <summary>
+    /// Non-destructive snapshot of the current buffer — used by the Voice
+    /// Test partial-transcript timer (M0024 Phase 2.5) to peek mid-utterance
+    /// without disturbing the final ConsumePcmBuffer that fires on
+    /// UtteranceEnded / STOP. Returns an empty array when nothing has been
+    /// accumulated yet.
+    /// </summary>
+    public byte[] PeekPcmBuffer()
+    {
+        lock (_pcmBuffer)
+        {
+            return _pcmBuffer.Count == 0 ? Array.Empty<byte>() : _pcmBuffer.ToArray();
+        }
+    }
+
+    /// <summary>
     /// Reset the segment buffer and seed it with the pre-roll ring (the last
     /// <see cref="PreRollSeconds"/> of audio). Call on UtteranceStarted so
     /// the segment begins with the ~1 s preceding the VAD trigger.

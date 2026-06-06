@@ -45,6 +45,13 @@
          add Microsoft.ML.OnnxRuntime.DirectML alongside if a GPU toggle
          lands later. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.0" />
+    <!-- Speaker diarization (M0024) — k2-fsa Sherpa-ONNX with C# bindings.
+         Pure ONNX, no Python dependency. Models (pyannote-segmentation-3-0
+         + 3D-Speaker embedding, ~50 MB total) downloaded via
+         Agent.Common.Voice.Diarization.SherpaDiarizationModelDownloader
+         using the shared ModelDownloadDialog contract — same UX as AST
+         AudioSet (Music tab). -->
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.10.46" />
   </ItemGroup>
 
   <!-- Self-built llama.cpp natives: CPU baseline + Vulkan GPU variant.

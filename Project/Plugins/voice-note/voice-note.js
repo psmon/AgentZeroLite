@@ -111,6 +111,10 @@
     activeTab: 'raw',
     busy: false,
     transcribing: false,
+    // M0024 Phase 3 — transient partial transcript (10s rolling preview).
+    // Cleared whenever a final utterance lands or capture stops. Shape:
+    // { text: string, speakerId: number|null, speakerLabel: string|null }
+    partial: null,
   };
 
   // Currently-subscribed bridge handlers (returned by zero.on(...)).
@@ -234,28 +238,59 @@
     const slack = 24;
     const wasAtBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < slack;
 
-    if (!n.raw || !n.raw.length) {
+    const hasRaw = n.raw && n.raw.length;
+    const hasPartial = state.partial && state.partial.text;
+    if (!hasRaw && !hasPartial) {
       refs.raw.innerHTML = '<div class="vn-raw-empty">Press <strong>Start</strong> and speak. Each utterance lands here as a timestamped line.</div>';
       return;
     }
-    const startMs = state.captureStartedMs || new Date(n.raw[0].ts).getTime();
-    refs.raw.replaceChildren(...n.raw.map(line => {
-      const row = document.createElement('div');
-      row.className = 'vn-line';
-      const ts = document.createElement('div');
-      ts.className = 'vn-line-ts';
-      ts.textContent = fmtElapsed(startMs, line);
-      const text = document.createElement('div');
-      text.className = 'vn-line-text';
-      text.textContent = line.text;
-      row.appendChild(ts); row.appendChild(text);
-      return row;
-    }));
+
+    const startMs = state.captureStartedMs
+      || (hasRaw ? new Date(n.raw[0].ts).getTime() : Date.now());
+    const rows = (n.raw || []).map(line => buildLineRow(line, startMs, false));
+    if (hasPartial) {
+      rows.push(buildLineRow(state.partial, startMs, true));
+    }
+    refs.raw.replaceChildren(...rows);
 
     if (wasAtBottom) {
       // Defer one frame so the new rows are laid out before we measure.
       requestAnimationFrame(() => { scroller.scrollTop = scroller.scrollHeight; });
     }
+  }
+
+  // M0024 Phase 3 — row builder that handles speaker chips + partial styling.
+  // Pre-Phase-3 lines (no speakerId/speakerLabel) render exactly as before;
+  // the chip span is just omitted.
+  function buildLineRow(line, startMs, isPartial) {
+    const row = document.createElement('div');
+    row.className = 'vn-line';
+    if (isPartial) row.classList.add('vn-line-partial');
+    if (typeof line.speakerId === 'number' && line.speakerId >= 0) {
+      // Cap at 7 speaker tones; anything beyond uses the generic "other" colour.
+      row.classList.add(`vn-line-spk-${Math.min(line.speakerId, 7)}`);
+    }
+
+    const ts = document.createElement('div');
+    ts.className = 'vn-line-ts';
+    ts.textContent = isPartial ? '…' : fmtElapsed(startMs, line);
+
+    const main = document.createElement('div');
+    main.className = 'vn-line-main';
+    if (line.speakerLabel) {
+      const chip = document.createElement('span');
+      chip.className = 'vn-line-spk-chip';
+      chip.textContent = line.speakerLabel;
+      main.appendChild(chip);
+    }
+    const text = document.createElement('span');
+    text.className = 'vn-line-text';
+    text.textContent = line.text;
+    main.appendChild(text);
+
+    row.appendChild(ts);
+    row.appendChild(main);
+    return row;
   }
 
   function renderSummary() {
@@ -359,15 +394,40 @@
       if (!d || typeof d.text !== 'string' || !d.text) return;
       const n = activeNote();
       if (!n) return;
+
+      // M0024 Phase 3 — partial transcripts (10s rolling preview from
+      // WebDevHost's partial timer) live in `state.partial` as a transient
+      // ghost line. They never get persisted; the final utterance replaces
+      // them and lands in n.raw with its speaker info.
+      if (d.isPartial) {
+        state.partial = {
+          text: d.text,
+          speakerId: typeof d.speakerId === 'number' ? d.speakerId : null,
+          speakerLabel: d.speakerLabel || null,
+        };
+        renderRaw();
+        setVuState('listening');
+        setStatus(`partial · ${d.text.length} chars`);
+        return;
+      }
+
+      // Final utterance — clear the partial ghost and persist the real line.
+      state.partial = null;
       n.raw = n.raw || [];
-      n.raw.push({ ts: nowIso(), text: d.text });
+      n.raw.push({
+        ts: nowIso(),
+        text: d.text,
+        speakerId: typeof d.speakerId === 'number' ? d.speakerId : null,
+        speakerLabel: d.speakerLabel || null,
+      });
       persist(n);
       renderRaw();
       renderList(); // line count update
       refs.btnSummarize.disabled = false;
       state.transcribing = false;
       setVuState('captured');
-      setStatus(`captured · ${n.raw.length} ${n.raw.length === 1 ? 'line' : 'lines'}`);
+      const spkSuffix = d.speakerLabel ? ` (${d.speakerLabel})` : '';
+      setStatus(`captured${spkSuffix} · ${n.raw.length} ${n.raw.length === 1 ? 'line' : 'lines'}`);
     });
     unsubUttStart = window.zero.note.onUtteranceStart(() => {
       state.transcribing = true;
@@ -483,6 +543,9 @@
     try { await window.zero.note.stop(); } catch (_) {}
     state.capturing = false;
     state.paused = false;
+    // M0024 Phase 3 — drop the transient partial when capture stops so the
+    // ghost line doesn't linger after the user pressed Stop.
+    state.partial = null;
     unbindBridge();
     const n = activeNote();
     if (n) {
@@ -491,6 +554,7 @@
     }
     renderRecButton();
     renderList();
+    renderRaw();
     showVu(false);
     setVuSpeaking(false);
     refs.vuFill.style.width = '0%';

@@ -32,9 +32,25 @@ public partial class SettingsPanel
     // Voice Test runtime state — instance scoped so we can stop/dispose on
     // panel unload. Created lazily on first START click.
     private VoiceCaptureService? _voiceCapture;
+    // M0024 — loopback capture path runs alongside mic, picked by InputSource.
+    // Same WASAPI service the Music tab uses; we share the conversion chain
+    // (16 kHz mono PCM16) rather than re-implementing.
+    private AgentZeroWpf.Services.Music.LoopbackCaptureService? _voiceLoopback;
     private VoicePlaybackService? _voicePlayback;
     private CancellationTokenSource? _pipelineCts;
     private bool _pipelineBusy;
+
+    // M0024 Phase 2.5 — partial transcript timer. Fires every 10s during
+    // active capture and runs STT on the *peeked* (non-destructive) buffer
+    // so the user sees that the recording is working before STOP / silence.
+    // The cached _partialStt instance is reused tick-to-tick to avoid
+    // re-warming Whisper on every partial.
+    private DispatcherTimer? _partialTimer;
+    private int _partialBusy; // interlocked single-flight gate
+    private int _partialLastBytes;
+    private ISpeechToText? _partialStt;
+    private const int PartialIntervalSec = 10;
+    private const int PartialMinBytes = 16_000 * 2 * 2; // 2 s of 16 kHz mono PCM16
 
     private void InitializeVoiceTab()
     {
@@ -80,7 +96,8 @@ public partial class SettingsPanel
 
             tbVoiceLlmMaxTokens.Text = v.LlmMaxTokens.ToString();
 
-            RefreshVoiceInputDevices(v.InputDeviceId);
+            SelectComboTag(cbVoiceInputSource, v.InputSource);
+            RepopulateVoiceDevicePicker(v);
             UpdateVoiceTestActiveLlmLabel();
 
             // Stop & dispose capture/playback when the panel unloads so we
@@ -95,13 +112,102 @@ public partial class SettingsPanel
 
     private void DisposeVoiceRuntime()
     {
+        StopPartialTimer();
         try { _pipelineCts?.Cancel(); } catch { }
         try { _voiceCapture?.Dispose(); } catch { }
+        try { _voiceLoopback?.Dispose(); } catch { }
         try { _voicePlayback?.Dispose(); } catch { }
+        try { (_partialStt as IDisposable)?.Dispose(); } catch { }
         _pipelineCts = null;
         _voiceCapture = null;
+        _voiceLoopback = null;
         _voicePlayback = null;
+        _partialStt = null;
         _pipelineBusy = false;
+    }
+
+    /// <summary>
+    /// Repopulate the device picker based on the active capture source.
+    /// Mirrors the Music tab pattern so the two stay symmetric — switching
+    /// Source between Microphone and System Output swaps the device list
+    /// AND swaps the persisted device-id field that gets read on Save.
+    /// </summary>
+    private void RepopulateVoiceDevicePicker(VoiceSettings v)
+    {
+        var source = ReadVoiceSourceTag();
+        if (source == VoiceInputSourceNames.SystemLoopback)
+        {
+            tbVoiceDeviceLabel.Text = "Render Endpoint";
+            RefreshVoiceLoopbackDevices(v.LoopbackDeviceId);
+        }
+        else
+        {
+            tbVoiceDeviceLabel.Text = "Mic Device";
+            RefreshVoiceInputDevices(v.InputDeviceId);
+        }
+    }
+
+    private string ReadVoiceSourceTag()
+        => (cbVoiceInputSource.SelectedItem as ComboBoxItem)?.Tag as string
+           ?? VoiceInputSourceNames.Microphone;
+
+    private void RefreshVoiceLoopbackDevices(string selectedDeviceId)
+    {
+        cbVoiceInputDevice.Items.Clear();
+        try
+        {
+            var devices = AgentZeroWpf.Services.Music.LoopbackCaptureService.ListDevices();
+            if (devices.Count == 0)
+            {
+                cbVoiceInputDevice.Items.Add(new ComboBoxItem
+                {
+                    Content = "(no render endpoints detected)",
+                    Tag = "",
+                });
+                cbVoiceInputDevice.SelectedIndex = 0;
+                return;
+            }
+            cbVoiceInputDevice.Items.Add(new ComboBoxItem
+            {
+                Content = "(Default — current Windows playback device)",
+                Tag = "",
+            });
+            foreach (var d in devices)
+                cbVoiceInputDevice.Items.Add(new ComboBoxItem
+                {
+                    Content = d.IsDefault ? $"★ {d.Name}" : d.Name,
+                    Tag = d.Id,
+                });
+
+            if (!string.IsNullOrEmpty(selectedDeviceId))
+            {
+                foreach (var obj in cbVoiceInputDevice.Items)
+                    if (obj is ComboBoxItem ci && (ci.Tag as string) == selectedDeviceId)
+                    {
+                        cbVoiceInputDevice.SelectedItem = ci;
+                        return;
+                    }
+            }
+            cbVoiceInputDevice.SelectedIndex = 0;
+        }
+        catch (Exception ex)
+        {
+            cbVoiceInputDevice.Items.Add(new ComboBoxItem
+            {
+                Content = $"(enumeration failed: {ex.Message})",
+                Tag = "",
+            });
+            cbVoiceInputDevice.SelectedIndex = 0;
+            AppLogger.LogError("[Voice-Loopback] Render-endpoint enumeration failed", ex);
+        }
+    }
+
+    private void OnVoiceInputSourceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_voiceInitializing) return;
+        RepopulateVoiceDevicePicker(VoiceSettingsStore.Load());
+        SetVoiceTestStatus("Source changed — click Save STT to persist (the picked source applies on next START).",
+            System.Windows.Media.Brushes.Goldenrod);
     }
 
     // ── helpers ────────────────────────────────────────────────────────
@@ -253,7 +359,16 @@ public partial class SettingsPanel
         if (int.TryParse(tbSupertonicSteps.Text, out var st) && st >= 5 && st <= 12)
             v.SupertonicSteps = st;
 
-        v.InputDeviceId = (cbVoiceInputDevice.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        // M0024 — source picker swaps which device-id field gets the dropdown
+        // tag. Per-source ids are persisted independently so toggling back
+        // and forth doesn't lose the user's prior pick.
+        var source = ReadVoiceSourceTag();
+        v.InputSource = source;
+        var deviceTag = (cbVoiceInputDevice.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        if (source == VoiceInputSourceNames.SystemLoopback)
+            v.LoopbackDeviceId = deviceTag;
+        else
+            v.InputDeviceId = deviceTag;
         v.VadThreshold = 100 - (int)slVoiceSensitivity.Value;
         v.VoiceTestAutoMode = rbVoiceModeAuto.IsChecked == true;
         if (int.TryParse(tbVoiceLlmMaxTokens.Text, out var maxTok) && maxTok > 0)
@@ -293,6 +408,28 @@ public partial class SettingsPanel
 
     private static int ParseDeviceNumber(string id) => VoiceRuntimeFactory.ParseDeviceNumber(id);
 
+    /// <summary>
+    /// Pick the speaker that occupies the most time across a diarization
+    /// result, return their human-readable label ("Speaker A" / "Speaker B"
+    /// / …). Used by the single-utterance Voice test merge — multi-speaker
+    /// within one Whisper transcript requires word-level timestamps and is
+    /// Phase 3 work.
+    /// </summary>
+    private static string MajoritySpeakerLabel(IReadOnlyList<Agent.Common.Voice.Diarization.SpeakerSegment> segments)
+    {
+        var totals = new Dictionary<int, double>();
+        foreach (var s in segments)
+        {
+            totals.TryGetValue(s.SpeakerId, out var sum);
+            totals[s.SpeakerId] = sum + s.DurationSec;
+        }
+        int bestId = -1;
+        double bestDur = -1;
+        foreach (var kv in totals)
+            if (kv.Value > bestDur) { bestDur = kv.Value; bestId = kv.Key; }
+        return new Agent.Common.Voice.Diarization.SpeakerSegment(0, 0, bestId).SpeakerLabel;
+    }
+
     /// <summary>Origin sensitivity-curve parity. See <see cref="VoiceRuntimeFactory.SensitivityToThreshold"/>.</summary>
     private static float SensitivityToThreshold(double sensitivityPercent)
         => VoiceRuntimeFactory.SensitivityToThreshold(sensitivityPercent);
@@ -320,13 +457,103 @@ public partial class SettingsPanel
     private void StopAllVoiceActivity(string reason)
     {
         AppLogger.Log($"[Voice] Stop all activity ({reason})");
+        StopPartialTimer();
         try { _voiceCapture?.Stop(); } catch { }
+        try { _voiceLoopback?.Stop(); } catch { }
         try { _pipelineCts?.Cancel(); } catch { }
         try { _voicePlayback?.Stop(); } catch { }
         if (_voiceCapture is not null) _voiceCapture.Muted = false;
         btnVoiceTestStart.Content = "START";
         btnVoiceInterrupt.IsEnabled = false;
         SetVoiceTestStatus("Stopped.", System.Windows.Media.Brushes.SkyBlue);
+    }
+
+    // ── M0024 Phase 2.5 — partial transcript timer ─────────────────────
+
+    private void StartPartialTimer()
+    {
+        StopPartialTimer();
+        _partialLastBytes = 0;
+        Interlocked.Exchange(ref _partialBusy, 0);
+        _partialTimer = new DispatcherTimer(
+            TimeSpan.FromSeconds(PartialIntervalSec),
+            DispatcherPriority.Background,
+            OnPartialTimerTick,
+            Dispatcher);
+        _partialTimer.Start();
+        AppLogger.Log($"[Voice-Partial] timer started, interval={PartialIntervalSec}s");
+    }
+
+    private void StopPartialTimer()
+    {
+        try { _partialTimer?.Stop(); } catch { }
+        _partialTimer = null;
+    }
+
+    private void OnPartialTimerTick(object? sender, EventArgs e)
+    {
+        if (_pipelineBusy) return;
+        if (Interlocked.CompareExchange(ref _partialBusy, 1, 0) != 0) return;
+
+        // Peek whichever capture is active. Returns empty when nothing has
+        // accumulated yet (e.g. Auto VAD waiting for first utterance).
+        byte[] pcm;
+        if (_voiceLoopback is { IsCapturing: true })
+            pcm = _voiceLoopback.PeekPcmBuffer();
+        else if (_voiceCapture is { IsCapturing: true })
+            pcm = _voiceCapture.PeekPcmBuffer();
+        else
+        {
+            Interlocked.Exchange(ref _partialBusy, 0);
+            return;
+        }
+
+        if (pcm.Length < PartialMinBytes)
+        {
+            Interlocked.Exchange(ref _partialBusy, 0);
+            return;
+        }
+
+        // Skip when buffer hasn't grown since last partial — same audio
+        // would just yield the same transcript and burn CPU for nothing.
+        if (pcm.Length == _partialLastBytes)
+        {
+            Interlocked.Exchange(ref _partialBusy, 0);
+            return;
+        }
+        _partialLastBytes = pcm.Length;
+
+        var pcmRef = pcm;
+        var ct = _pipelineCts?.Token ?? CancellationToken.None;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var v = VoiceSettingsStore.Load();
+                _partialStt ??= CreateSttProvider(v);
+                if (_partialStt is null) return;
+
+                var ready = await _partialStt.EnsureReadyAsync(null, ct).ConfigureAwait(false);
+                if (!ready) return;
+                ct.ThrowIfCancellationRequested();
+
+                var partial = await _partialStt.TranscribeAsync(pcmRef, v.SttLanguage, ct).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(partial)) return;
+
+                var seconds = pcmRef.Length / 32_000.0;
+                AppendTranscript($"  … (partial @ {seconds:F0}s) {partial.Trim()}");
+                AppLogger.Log($"[Voice-Partial] ok | bytes={pcmRef.Length} sec={seconds:F1} chars={partial.Length}");
+            }
+            catch (OperationCanceledException) { /* expected on STOP */ }
+            catch (Exception ex)
+            {
+                AppLogger.Log($"[Voice-Partial] tick failed: {ex.GetType().Name}: {ex.Message}");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _partialBusy, 0);
+            }
+        });
     }
 
     /// <summary>
@@ -646,19 +873,28 @@ public partial class SettingsPanel
         var isStopping = (btnVoiceTestStart.Content as string) == "STOP";
         if (isStopping)
         {
-            // Manual mode: drain any buffered PCM and run the pipeline once
-            // BEFORE tearing capture down. Auto mode never reaches this path
-            // with pending audio because UtteranceEnded already kicked the
-            // pipeline. If capture is already stopped (pipeline-only stop),
-            // there's nothing to drain.
+            // Manual mode (mic OR loopback): drain any buffered PCM and run
+            // the pipeline once BEFORE tearing capture down. Auto-VAD mic mode
+            // never reaches this path with pending audio because
+            // UtteranceEnded already kicked the pipeline.
             var manual = rbVoiceModeManual.IsChecked == true;
+            var loopbackActive = _voiceLoopback is { IsCapturing: true };
             byte[]? pendingPcm = null;
-            if (manual && _voiceCapture is { IsCapturing: true })
+            if (loopbackActive)
+            {
+                // Loopback always behaves as manual (system audio is continuous;
+                // VAD is meaningless on speaker output). On STOP, drain whatever
+                // accumulated since START.
+                pendingPcm = _voiceLoopback?.ConsumePcmBuffer();
+            }
+            else if (manual && _voiceCapture is { IsCapturing: true })
+            {
                 pendingPcm = _voiceCapture.ConsumePcmBuffer();
+            }
 
             StopAllVoiceActivity("user pressed STOP");
 
-            if (manual && pendingPcm is { Length: > 0 } && !_pipelineBusy)
+            if (pendingPcm is { Length: > 0 } && !_pipelineBusy && (manual || loopbackActive))
             {
                 var pcmRef = pendingPcm;
                 // Manual STOP needs a fresh cts because StopAllVoiceActivity
@@ -667,7 +903,7 @@ public partial class SettingsPanel
                 _pipelineCts = new CancellationTokenSource();
                 _ = Task.Run(async () =>
                 {
-                    AppLogger.Log($"[Voice] Task.Run transcribe start (manual) | thread=#{Environment.CurrentManagedThreadId} pcm={pcmRef.Length}");
+                    AppLogger.Log($"[Voice] Task.Run transcribe start (manual{(loopbackActive ? "/loopback" : "")}) | thread=#{Environment.CurrentManagedThreadId} pcm={pcmRef.Length}");
                     try { await RunPipelineOnceAsync(pcmRef); }
                     catch (Exception ex) { AppLogger.LogError("[Voice] Manual pipeline crashed", ex); }
                     AppLogger.Log("[Voice] Task.Run transcribe done (manual)");
@@ -680,26 +916,50 @@ public partial class SettingsPanel
         var v = ReadVoiceFromUi();
         VoiceSettingsStore.Save(v); // round-trip current UI state so Save STT/TTS isn't a prerequisite
 
-        _voiceCapture ??= new VoiceCaptureService();
         _voicePlayback ??= new VoicePlaybackService();
         _pipelineCts = new CancellationTokenSource();
 
-        _voiceCapture.VadThreshold = SensitivityToThreshold(slVoiceSensitivity.Value);
-        _voiceCapture.BufferPcm = true;
-        AppLogger.Log($"[Voice] VAD threshold = {_voiceCapture.VadThreshold:F4} (sensitivity {(int)slVoiceSensitivity.Value}/100)");
-
-        // Marshal events back to the UI thread — NAudio fires them from its
-        // own capture thread.
-        _voiceCapture.AmplitudeChanged -= OnAmplitudeChanged;
-        _voiceCapture.UtteranceStarted -= OnUtteranceStarted;
-        _voiceCapture.UtteranceEnded -= OnUtteranceEndedAsync;
-        _voiceCapture.AmplitudeChanged += OnAmplitudeChanged;
-        _voiceCapture.UtteranceStarted += OnUtteranceStarted;
-        if (rbVoiceModeAuto.IsChecked == true)
-            _voiceCapture.UtteranceEnded += OnUtteranceEndedAsync;
-
         try
         {
+            if (v.InputSource == VoiceInputSourceNames.SystemLoopback)
+            {
+                // ── M0024 — WASAPI loopback path ─────────────────────
+                // System audio is continuous; VAD is meaningless and would
+                // either fire constantly (loud track) or never (quiet
+                // section). Force a manual-style capture: START → record
+                // continuously → STOP drains the buffer for one pipeline pass.
+                try { _voiceLoopback?.Dispose(); } catch { }
+                _voiceLoopback = new AgentZeroWpf.Services.Music.LoopbackCaptureService { BufferPcm = true };
+                _voiceLoopback.AmplitudeChanged -= OnAmplitudeChanged;
+                _voiceLoopback.AmplitudeChanged += OnAmplitudeChanged;
+                _voiceLoopback.ConsumePcmBuffer();
+                _voiceLoopback.Start(v.LoopbackDeviceId);
+
+                btnVoiceTestStart.Content = "STOP";
+                btnVoiceInterrupt.IsEnabled = true;
+                SetVoiceTestStatus(
+                    "Capturing system output (WASAPI loopback) — press STOP to transcribe.",
+                    System.Windows.Media.Brushes.LightGreen);
+                StartPartialTimer();
+                return;
+            }
+
+            // ── Existing mic path ────────────────────────────────────
+            _voiceCapture ??= new VoiceCaptureService();
+            _voiceCapture.VadThreshold = SensitivityToThreshold(slVoiceSensitivity.Value);
+            _voiceCapture.BufferPcm = true;
+            AppLogger.Log($"[Voice] VAD threshold = {_voiceCapture.VadThreshold:F4} (sensitivity {(int)slVoiceSensitivity.Value}/100)");
+
+            // Marshal events back to the UI thread — NAudio fires them from its
+            // own capture thread.
+            _voiceCapture.AmplitudeChanged -= OnAmplitudeChanged;
+            _voiceCapture.UtteranceStarted -= OnUtteranceStarted;
+            _voiceCapture.UtteranceEnded -= OnUtteranceEndedAsync;
+            _voiceCapture.AmplitudeChanged += OnAmplitudeChanged;
+            _voiceCapture.UtteranceStarted += OnUtteranceStarted;
+            if (rbVoiceModeAuto.IsChecked == true)
+                _voiceCapture.UtteranceEnded += OnUtteranceEndedAsync;
+
             var deviceNumber = ParseDeviceNumber(v.InputDeviceId);
             _voiceCapture.Start(deviceNumber);
             btnVoiceTestStart.Content = "STOP";
@@ -709,6 +969,7 @@ public partial class SettingsPanel
                     ? "Listening (Auto VAD) — speak; press STOP to end, INTERRUPT to cut off the AI."
                     : "Recording (Manual) — press STOP to transcribe.",
                 System.Windows.Media.Brushes.LightGreen);
+            StartPartialTimer();
         }
         catch (Exception ex)
         {
@@ -803,7 +1064,45 @@ public partial class SettingsPanel
                 AppendTranscript("[STT] (empty transcript)");
                 return;
             }
-            AppendTranscript($"You: {transcript}");
+
+            // ─── Diarization (M0024, optional) ─────────────────────
+            // Layered ON TOP of STT — runs on the same PCM buffer. When
+            // provider is Off (default) this is a no-op and the legacy
+            // "You: <text>" format ships unchanged.
+            string speakerPrefix = "";
+            try
+            {
+                var diarizer = await GetReadyDiarizerAsync(
+                    new Progress<string>(msg => SetVoiceTestStatus(msg, System.Windows.Media.Brushes.SkyBlue)),
+                    ct).ConfigureAwait(false);
+                if (diarizer is not null)
+                {
+                    SetVoiceTestStatus($"Diarization ({diarizer.ProviderName})…", System.Windows.Media.Brushes.SkyBlue);
+                    var diarResult = await diarizer.DiarizeAsync(
+                        pcm,
+                        Agent.Common.Voice.Diarization.DiarizationSettingsStore.Load().ExpectedSpeakerCount,
+                        ct).ConfigureAwait(false);
+
+                    // Single-utterance pipeline: pick the majority speaker for
+                    // this PCM clip and prepend its label. Multi-speaker
+                    // segmentation within a single Whisper transcript is
+                    // Phase 3 work (needs word-level timestamps).
+                    if (diarResult.Segments.Count > 0)
+                    {
+                        var majority = MajoritySpeakerLabel(diarResult.Segments);
+                        speakerPrefix = $"[{majority}] ";
+                        AppLogger.Log($"[Voice-Diar] segments={diarResult.Segments.Count} speakers={diarResult.SpeakerCount} pick={majority} inferMs={diarResult.InferenceTime.TotalMilliseconds:F0}");
+                    }
+                }
+            }
+            catch (OperationCanceledException) { _ = ShouldBailOut(ct, "Diarize cancel"); return; }
+            catch (Exception ex)
+            {
+                // Diarization is best-effort — log but don't block the LLM step.
+                AppLogger.LogError("[Voice-Diar] Inference failed (continuing without speaker label)", ex);
+            }
+
+            AppendTranscript($"You: {speakerPrefix}{transcript}");
             if (ShouldBailOut(ct, "after STT")) return;
 
             // ─── LLM (whatever's selected on the LLM tab) ──────────

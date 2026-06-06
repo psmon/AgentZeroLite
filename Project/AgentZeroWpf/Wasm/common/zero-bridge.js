@@ -109,6 +109,12 @@
       resume: () => invoke('note.resume'),
       setSensitivity: (value) => invoke('note.set-sensitivity', { value }),
       status: () => invoke('note.status'),
+      // M0024 Phase 3 — payload extended:
+      //   { text: string,
+      //     speakerId: number|null,      // 0-based; null when diarization is Off
+      //     speakerLabel: string|null,   // "Speaker A" / "Speaker B" / …
+      //     isPartial: boolean }         // true = 10s rolling preview; false = committed utterance
+      // Pre-Phase-3 plugins ignore the new fields and behave as before.
       onTranscript:       (handler) => on('note.transcript', handler),
       onUtteranceStart:   (handler) => on('note.utterance-start', handler),
       onUtteranceEnd:     (handler) => on('note.utterance-end', handler),

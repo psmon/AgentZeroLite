@@ -94,6 +94,20 @@ public sealed class LoopbackCaptureService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Non-destructive snapshot of the rolling buffer — used by the Voice
+    /// Test partial-transcript timer (M0024 Phase 2.5) and any other live
+    /// preview consumer that needs to see what's been captured so far
+    /// without consuming it. Returns empty when nothing accumulated.
+    /// </summary>
+    public byte[] PeekPcmBuffer()
+    {
+        lock (_pcmBuffer)
+        {
+            return _pcmBuffer.Count == 0 ? Array.Empty<byte>() : _pcmBuffer.ToArray();
+        }
+    }
+
     public void Start(string? deviceId = null)
     {
         if (_isCapturing) return;

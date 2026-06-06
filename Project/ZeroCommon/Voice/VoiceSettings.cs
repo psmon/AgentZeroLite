@@ -54,6 +54,20 @@ public static class TtsProviderNames
 }
 
 /// <summary>
+/// Capture sources for the Voice tab test pipeline. <c>Microphone</c> uses
+/// NAudio <c>WaveInEvent</c> (the historical path Voice has always used);
+/// <c>SystemLoopback</c> uses WASAPI loopback against a render endpoint —
+/// added in M0024 for symmetry with the Music tab and to allow diarization
+/// smoke tests against recorded meeting clips played back through the
+/// speakers.
+/// </summary>
+public static class VoiceInputSourceNames
+{
+    public const string Microphone = "Microphone";
+    public const string SystemLoopback = "SystemLoopback";
+}
+
+/// <summary>
 /// Voice (STT/TTS + microphone capture) configuration. Persisted as JSON next
 /// to the LLM settings — see <see cref="VoiceSettingsStore"/>. Voice prompts
 /// are routed to the LLM that the user picked on the LLM tab via
@@ -133,8 +147,22 @@ public sealed class VoiceSettings
 
     // ── Capture / VAD ────────────────────────────────────────────────────
 
-    /// <summary>NAudio device index serialised as string. Empty → system default.</summary>
+    /// <summary>
+    /// Where audio comes from for the Voice test (M0024). One of
+    /// <see cref="VoiceInputSourceNames"/>. Defaults to Microphone so
+    /// every pre-M0024 install keeps working without a settings migration.
+    /// </summary>
+    public string InputSource { get; set; } = VoiceInputSourceNames.Microphone;
+
+    /// <summary>NAudio device index serialised as string. Empty → system default mic.</summary>
     public string InputDeviceId { get; set; } = "";
+
+    /// <summary>
+    /// MMDevice render-endpoint ID used when <see cref="InputSource"/> is
+    /// <c>SystemLoopback</c>. Empty → current Windows default playback
+    /// device. Reuses the same MMDevice ID format the Music tab persists.
+    /// </summary>
+    public string LoopbackDeviceId { get; set; } = "";
 
     /// <summary>
     /// Amplitude threshold (0–100) below which audio is treated as silence.

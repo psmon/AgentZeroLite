@@ -2,11 +2,26 @@ using Agent.Common;
 using Agent.Common.Browser;
 using Agent.Common.Llm;
 using Agent.Common.Voice;
+using Agent.Common.Voice.Diarization;
 using AgentZeroWpf.Services.Voice;
 
 namespace AgentZeroWpf.Services.Browser;
 
 public sealed record SummarizeResult(bool Ok, string? Summary, int InputChars, int Chunks, string? Error);
+
+/// <summary>
+/// One transcript line emitted by the voice-note pipeline (M0024 Phase 3).
+/// <see cref="Text"/> is the recognised speech; speaker fields are optional
+/// (null when diarization is Off). <see cref="IsPartial"/> distinguishes
+/// the 10 s rolling preview from the final utterance — partials reuse the
+/// same event so plugins that don't care about the distinction render them
+/// as ordinary lines.
+/// </summary>
+public sealed record NoteTranscriptInfo(
+    string Text,
+    int? SpeakerId,
+    string? SpeakerLabel,
+    bool IsPartial);
 
 /// <summary>
 /// Default <see cref="IZeroBrowser"/> implementation. Reuses the existing
@@ -31,7 +46,24 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     private string               _noteLanguage = "auto";
     private CancellationTokenSource? _noteCts;
 
-    public event Action<string>? NoteTranscript;     // (text)
+    // M0024 Phase 3 — diarizer for speaker labels on the note pipeline.
+    // Lazily created on first utterance; null when DiarizationSettings is Off.
+    // Independent ONNX session from Settings/Voice/Test (each runs its own
+    // inference; the model file on disk is shared).
+    private SherpaSpeakerDiarizer? _noteDiarizer;
+
+    // M0024 Phase 3 — partial transcript timer for the note pipeline. Mirrors
+    // the Settings/Voice/Test pattern (Phase 2.5): every 10 s during active
+    // capture, peek the buffer and emit a partial NoteTranscript with
+    // IsPartial=true. Plugins render the partial dimmer so the user sees
+    // recording is alive before the silence-segmented utterance closes.
+    private System.Threading.Timer? _notePartialTimer;
+    private int _notePartialBusy;
+    private int _notePartialLastBytes;
+    private const int NotePartialIntervalMs = 10_000;
+    private const int NotePartialMinBytes = 16_000 * 2 * 2; // 2 s of 16 kHz mono PCM16
+
+    public event Action<NoteTranscriptInfo>? NoteTranscript;  // M0024 Phase 3 — rich payload
     public event Action?         NoteUtteranceStarted;
     public event Action?         NoteUtteranceEnded;
     public event Action<string>? NoteError;          // (message)
@@ -296,6 +328,11 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
             // was working on the same mic.
             _noteLanguage = string.IsNullOrWhiteSpace(v.SttLanguage) ? "auto" : v.SttLanguage;
             AppLogger.Log($"[WebDev:Note] capture started | sens={effectiveSens} threshold={threshold:F4} lang={_noteLanguage} muted={cap.Muted} device={v.InputDeviceId}");
+
+            // M0024 Phase 3 — 10s partial timer (公통화 of the Settings/Voice
+            // Phase 2.5 pattern). Reuses the same _noteStt instance so we don't
+            // re-warm Whisper every tick.
+            StartNotePartialTimer();
             return new { ok = true, capturing = true, sensitivity = effectiveSens, threshold };
         }
         finally { _noteLock.Release(); }
@@ -385,8 +422,39 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
                     AppLogger.Log($"[WebDev:Note] hallucination dropped | chars={trimmed.Length}");
                     return;
                 }
-                AppLogger.Log($"[WebDev:Note] STT ok | chars={trimmed.Length}");
-                NoteTranscript?.Invoke(trimmed);
+
+                // M0024 Phase 3 — run Sherpa diarization on the same PCM
+                // when a diarization provider is configured. Majority speaker
+                // gets attached to the transcript; plugins render it as a
+                // chip. If diarization is Off, model file missing, or the
+                // run fails, fall through with null speaker — same as
+                // Settings/Voice/Test (Phase 2 best-effort merge).
+                int? speakerId = null;
+                string? speakerLabel = null;
+                try
+                {
+                    var diar = await GetReadyNoteDiarizerAsync(ctsToken).ConfigureAwait(false);
+                    if (diar is not null)
+                    {
+                        var dSettings = DiarizationSettingsStore.Load();
+                        var dResult = await diar.DiarizeAsync(pcm, dSettings.ExpectedSpeakerCount, ctsToken).ConfigureAwait(false);
+                        if (dResult.Segments.Count > 0)
+                        {
+                            var label = MajoritySpeaker(dResult.Segments, out var id);
+                            speakerId = id;
+                            speakerLabel = label;
+                            AppLogger.Log($"[WebDev:Note-Diar] segments={dResult.Segments.Count} speakers={dResult.SpeakerCount} pick={label} inferMs={dResult.InferenceTime.TotalMilliseconds:F0}");
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { /* expected */ }
+                catch (Exception dx)
+                {
+                    AppLogger.Log($"[WebDev:Note-Diar] inference failed (continuing without speaker label): {dx.GetType().Name}: {dx.Message}");
+                }
+
+                AppLogger.Log($"[WebDev:Note] STT ok | chars={trimmed.Length} speaker={(speakerLabel ?? "—")}");
+                NoteTranscript?.Invoke(new NoteTranscriptInfo(trimmed, speakerId, speakerLabel, IsPartial: false));
             }
             catch (Exception ex)
             {
@@ -394,6 +462,112 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
                 NoteError?.Invoke("Transcribe failed: " + ex.Message);
             }
         });
+    }
+
+    /// <summary>
+    /// Get-or-create the cached note-side diarizer. Returns null when the
+    /// user has DiarizationSettings.Provider = Off OR the model files
+    /// aren't present yet. Each WebDevHost instance owns its own diarizer
+    /// (separate from the Settings/Voice/Test diarizer) so the two pipelines
+    /// don't share session state.
+    /// </summary>
+    private async Task<SherpaSpeakerDiarizer?> GetReadyNoteDiarizerAsync(CancellationToken ct)
+    {
+        var s = DiarizationSettingsStore.Load();
+        if (s.Provider == DiarizationProviderNames.Off) return null;
+
+        _noteDiarizer ??= new SherpaSpeakerDiarizer(s);
+        var ok = await _noteDiarizer.EnsureReadyAsync(null, ct).ConfigureAwait(false);
+        return ok ? _noteDiarizer : null;
+    }
+
+    private static string MajoritySpeaker(IReadOnlyList<SpeakerSegment> segments, out int speakerId)
+    {
+        var totals = new Dictionary<int, double>();
+        foreach (var s in segments)
+        {
+            totals.TryGetValue(s.SpeakerId, out var sum);
+            totals[s.SpeakerId] = sum + s.DurationSec;
+        }
+        int bestId = -1;
+        double bestDur = -1;
+        foreach (var kv in totals)
+            if (kv.Value > bestDur) { bestDur = kv.Value; bestId = kv.Key; }
+        speakerId = bestId;
+        return new SpeakerSegment(0, 0, bestId).SpeakerLabel;
+    }
+
+    // ── M0024 Phase 3 — note partial timer ───────────────────────────────
+
+    private void StartNotePartialTimer()
+    {
+        StopNotePartialTimer();
+        _notePartialLastBytes = 0;
+        System.Threading.Interlocked.Exchange(ref _notePartialBusy, 0);
+        // System.Threading.Timer instead of DispatcherTimer — WebDevHost has
+        // no Dispatcher (it lives in the service layer, not WPF). Callback
+        // fires on the threadpool which is exactly what we want (STT is
+        // CPU-bound; no UI marshalling needed because we emit via the
+        // existing NoteTranscript event which the bridge already marshals).
+        _notePartialTimer = new System.Threading.Timer(OnNotePartialTick, null,
+            NotePartialIntervalMs, NotePartialIntervalMs);
+        AppLogger.Log($"[WebDev:Note-Partial] timer started, interval={NotePartialIntervalMs / 1000}s");
+    }
+
+    private void StopNotePartialTimer()
+    {
+        try { _notePartialTimer?.Dispose(); } catch { }
+        _notePartialTimer = null;
+    }
+
+    private void OnNotePartialTick(object? _)
+    {
+        if (System.Threading.Interlocked.CompareExchange(ref _notePartialBusy, 1, 0) != 0) return;
+        try
+        {
+            var cap = _noteCapture; var stt = _noteStt;
+            var ctsToken = _noteCts?.Token ?? CancellationToken.None;
+            var lang = _noteLanguage;
+            if (cap is null || stt is null || ctsToken.IsCancellationRequested)
+            {
+                System.Threading.Interlocked.Exchange(ref _notePartialBusy, 0);
+                return;
+            }
+
+            var pcm = cap.PeekPcmBuffer();
+            if (pcm.Length < NotePartialMinBytes || pcm.Length == _notePartialLastBytes)
+            {
+                System.Threading.Interlocked.Exchange(ref _notePartialBusy, 0);
+                return;
+            }
+            _notePartialLastBytes = pcm.Length;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var text = await stt.TranscribeAsync(pcm, lang, ctsToken).ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(text)) return;
+                    var trimmed = text.Trim();
+                    if (WhisperHallucinationFilter.IsLikelyHallucination(trimmed)) return;
+                    AppLogger.Log($"[WebDev:Note-Partial] ok | bytes={pcm.Length} chars={trimmed.Length}");
+                    NoteTranscript?.Invoke(new NoteTranscriptInfo(trimmed, SpeakerId: null, SpeakerLabel: null, IsPartial: true));
+                }
+                catch (OperationCanceledException) { /* expected on STOP */ }
+                catch (Exception ex)
+                {
+                    AppLogger.Log($"[WebDev:Note-Partial] tick failed: {ex.GetType().Name}: {ex.Message}");
+                }
+                finally
+                {
+                    System.Threading.Interlocked.Exchange(ref _notePartialBusy, 0);
+                }
+            });
+        }
+        catch
+        {
+            System.Threading.Interlocked.Exchange(ref _notePartialBusy, 0);
+        }
     }
 
     // Throttled amplitude relay — VoiceCaptureService fires ~20 Hz which
@@ -410,6 +584,7 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
 
     private void TearDownNoteCaptureLocked()
     {
+        StopNotePartialTimer();
         var cap = _noteCapture; _noteCapture = null;
         if (cap is not null)
         {
@@ -424,6 +599,10 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
         _noteCts?.Dispose();
         _noteCts = null;
         _noteStt = null;
+        // Diarizer disposes its native ONNX sessions on next process exit.
+        // Keep the instance across capture sessions so a second Start
+        // doesn't re-load the ~50 MB model files — same caching pattern
+        // _noteStt uses.
         AppLogger.Log("[WebDev:Note] capture stopped");
     }
 
