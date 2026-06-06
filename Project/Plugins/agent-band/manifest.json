@@ -2,7 +2,7 @@
   "id": "agent-band",
   "name": "Agent Band",
   "entry": "index.html",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "icon": "🎻",
-  "description": "AST AudioSet 라이브 음악단 — 시스템 사운드를 듣고 가수/악기를 무대 위에 동적으로 소환합니다. v0.2: 30Hz 스펙트럼 스트림, 히스테리시스, 가수 중앙 레인, 카테고리 fallback."
+  "description": "AST AudioSet 라이브 음악단 — 시스템 사운드를 듣고 가수/악기를 무대 위에 동적으로 소환합니다. v0.2: 30Hz 스펙트럼 스트림, 히스테리시스, 가수 중앙 레인, 카테고리 fallback, 스프라이트 chroma-key (녹색 배경 알파 제거)."
 }

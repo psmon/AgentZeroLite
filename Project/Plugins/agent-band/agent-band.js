@@ -97,19 +97,75 @@
     return null;
   }
 
-  // ── Sprite frame cache ───────────────────────────────────────────────
-  const spriteCache = new Map(); // key="id|state" -> {frames:[HTMLImageElement]}
+  // ── Sprite frame cache + chroma-key ──────────────────────────────────
+  //
+  // Source PNGs ship with a solid bright-green background (classic chroma
+  // key, ~rgb(40, 220, 50)). We key it out at load time onto an off-screen
+  // canvas — that canvas replaces the HTMLImageElement in the cache, so
+  // the render loop just `drawImage`'s the keyed result with zero per-frame
+  // cost. Two-tier threshold:
+  //   • hard key — pure background → alpha = 0
+  //   • soft key — anti-aliased edge → alpha attenuated + green despill
+  //     (subtract the excess green so the kept silhouette doesn't have a
+  //     green halo)
+  // The character's dark-green clothing is preserved because the test
+  // requires both G dominance AND high overall green value — dark greens
+  // sit well below the threshold.
+  const spriteCache = new Map(); // key="id|state" -> { frames: [HTMLCanvasElement|null] }
+
+  function chromaKey(img) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const px = data.data;
+
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const gMinusR = g - r;
+      const gMinusB = g - b;
+
+      // Hard key — pure bright green background
+      if (g > 170 && gMinusR > 55 && gMinusB > 55) {
+        px[i + 3] = 0;
+        continue;
+      }
+      // Soft key — anti-aliased edge: still mostly green but dimmer
+      if (g > 110 && gMinusR > 28 && gMinusB > 28) {
+        const greenness = Math.min(gMinusR, gMinusB); // 28..55 range
+        const t = Math.min(1, (greenness - 28) / 27);  // 0..1
+        px[i + 3] = px[i + 3] * (1 - t * 0.85);
+        // Despill — pull the excess green back so the silhouette edge
+        // doesn't read as a green halo. Replace excess G with the avg
+        // of R and B (neutralises the cast).
+        const spill = Math.max(0, g - Math.max(r, b));
+        if (spill > 0) px[i + 1] = g - spill * t * 0.7;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+    return canvas;
+  }
 
   function ensureSpriteSet(id, state) {
     const key = id + '|' + state;
     let entry = spriteCache.get(key);
     if (entry) return entry;
-    entry = { frames: new Array(PERFORMER_FRAMES) };
+    entry = { frames: new Array(PERFORMER_FRAMES).fill(null) };
     for (let i = 0; i < PERFORMER_FRAMES; i++) {
       const img = new Image();
+      const frameIdx = i;
+      img.onload = () => {
+        try { entry.frames[frameIdx] = chromaKey(img); }
+        catch (ex) {
+          console.warn('[agent-band] chroma key failed for', img.src, ex);
+          // Fall back to the raw image so something at least renders
+          entry.frames[frameIdx] = img;
+        }
+      };
       img.onerror = () => console.warn('[agent-band] sprite missing:', img.src);
       img.src = `${SPRITE_BASE}${id}-${state}-f${i}.png`;
-      entry.frames[i] = img;
     }
     spriteCache.set(key, entry);
     return entry;
@@ -304,10 +360,15 @@
   function drawPerformer(p, x, baseY, slotW, slotH, now) {
     const set = ensureSpriteSet(p.id, p.state);
     const frameIdx = Math.floor(now / 1000 * (p.state === 'play' ? PLAY_FPS : IDLE_FPS)) % PERFORMER_FRAMES;
-    const img = set.frames[frameIdx];
-    if (!img || !img.complete || img.naturalWidth === 0) return;
+    const tex = set.frames[frameIdx];
+    if (!tex) return; // still loading / keying
+    // Canvas exposes width/height; Image exposes naturalWidth/naturalHeight.
+    // Both work as drawImage sources, just probe the right size property.
+    const srcW = tex.naturalWidth || tex.width;
+    const srcH = tex.naturalHeight || tex.height;
+    if (!srcW || !srcH) return;
 
-    const aspect = img.naturalHeight / img.naturalWidth;
+    const aspect = srcH / srcW;
     let drawW = slotW;
     let drawH = drawW * aspect;
     if (drawH > slotH) { drawH = slotH; drawW = drawH / aspect; }
@@ -331,7 +392,7 @@
       stageCtx.shadowColor = `rgba(0, 229, 255, ${0.32 * alpha})`;
       stageCtx.shadowBlur = 22;
     }
-    stageCtx.drawImage(img, dx, dy + bob, drawW, drawH);
+    stageCtx.drawImage(tex, dx, dy + bob, drawW, drawH);
     stageCtx.restore();
   }
 
