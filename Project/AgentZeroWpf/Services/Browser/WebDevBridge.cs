@@ -60,6 +60,9 @@ public sealed class WebDevBridge
             _noteHost.NoteError             += OnNoteError;
             _noteHost.NoteAmplitude         += OnNoteAmplitude;
             _noteHost.NoteSpeaking          += OnNoteSpeaking;
+            // M0025 — Agent Band live music ticks.
+            _noteHost.MusicTick             += OnMusicTick;
+            _noteHost.MusicAmplitude        += OnMusicAmplitude;
         }
 
         TokenUsageCollector.Instance.TickCompleted += OnTokenTick;
@@ -78,6 +81,8 @@ public sealed class WebDevBridge
             try { _noteHost.NoteError            -= OnNoteError;           } catch { }
             try { _noteHost.NoteAmplitude        -= OnNoteAmplitude;       } catch { }
             try { _noteHost.NoteSpeaking         -= OnNoteSpeaking;        } catch { }
+            try { _noteHost.MusicTick            -= OnMusicTick;           } catch { }
+            try { _noteHost.MusicAmplitude       -= OnMusicAmplitude;      } catch { }
         }
         try { TokenUsageCollector.Instance.TickCompleted -= OnTokenTick; } catch { }
         try { TokenRemainingCollector.Instance.TickCompleted -= OnTokenRemainingTick; } catch { }
@@ -137,6 +142,20 @@ public sealed class WebDevBridge
     // marker on the meter — the user can immediately see whether their
     // voice is above/below the line and adjust the slider accordingly.
     private void OnNoteAmplitude(float rms)           => PostEvent("note.amplitude", new { rms, threshold = _noteHost?.CurrentVadThreshold ?? 0f });
+
+    // ─── Agent Band (M0025) — live AST tick + amplitude ─────────────
+    private void OnMusicTick(WebDevHost.MusicTickInfo t) =>
+        PostEvent("music.tick", new
+        {
+            labels = t.Labels.Select(l => new { name = l.Name, score = l.Score, index = l.Index }).ToArray(),
+            spectrum = t.Spectrum,
+            frames = t.Frames,
+            bins = t.Bins,
+            inferMs = t.InferMs,
+        });
+
+    private void OnMusicAmplitude(float rms) =>
+        PostEvent("music.amplitude", new { rms });
 
     private async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
@@ -270,6 +289,31 @@ public sealed class WebDevBridge
                 int maxChars = args?.TryGetProperty("maxChars", out var mc) == true && mc.TryGetInt32(out var mci) && mci > 0
                     ? mci : 6000;
                 return await _noteHost!.SummarizeAsync(text, maxChars);
+            }
+
+            // ─── Agent Band (M0025) — live music classifier surface ─────
+            case "music.start":
+            {
+                EnsureNoteHost();
+                string? source = args?.TryGetProperty("source", out var srcEl) == true
+                                 && srcEl.ValueKind == JsonValueKind.String
+                    ? srcEl.GetString() : null;
+                string? deviceId = args?.TryGetProperty("deviceId", out var dEl) == true
+                                   && dEl.ValueKind == JsonValueKind.String
+                    ? dEl.GetString() : null;
+                int? topK = TryGetInt(args, "topK");
+                int? cadence = TryGetInt(args, "cadenceMs");
+                return await _noteHost!.StartMusicAsync(source, deviceId, topK, cadence);
+            }
+            case "music.stop":
+            {
+                EnsureNoteHost();
+                return await _noteHost!.StopMusicAsync();
+            }
+            case "music.status":
+            {
+                EnsureNoteHost();
+                return _noteHost!.GetMusicStatus();
             }
 
             // ─── Token-monitor plugin surface (read-only) ───────────────

@@ -1,0 +1,7 @@
+{
+  "id": "agent-band",
+  "name": "Agent Band",
+  "entry": "index.html",
+  "version": "0.1.0",
+  "description": "AST AudioSet 기반 라이브 음악단 — 시스템 사운드를 듣고 가수/악기를 무대 위에 동적으로 소환합니다."
+}

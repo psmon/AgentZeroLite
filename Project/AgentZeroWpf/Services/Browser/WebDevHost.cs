@@ -51,7 +51,7 @@ public sealed record NoteStartOptions(
 /// VoiceRuntimeFactory + VoicePlaybackService so the WebDev sandbox shares
 /// the same TTS/STT pipeline the Settings/Voice tab already drives.
 /// </summary>
-public sealed class WebDevHost : IZeroBrowser, IDisposable
+public sealed partial class WebDevHost : IZeroBrowser, IDisposable
 {
     private readonly VoicePlaybackService _playback = new();
 
@@ -830,7 +830,9 @@ public sealed class WebDevHost : IZeroBrowser, IDisposable
     public void Dispose()
     {
         try { TearDownNoteCaptureLocked(); } catch { }
+        try { TearDownMusicLocked(); } catch { }
         _noteLock.Dispose();
+        _musicLock.Dispose();
         _playback.Dispose();
         try { _chatSession?.DisposeAsync().AsTask().GetAwaiter().GetResult(); } catch { }
         _chatSession = null;

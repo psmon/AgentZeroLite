@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Agent Band — M0025</title>
+  <link rel="stylesheet" href="agent-band.css" />
+</head>
+<body>
+  <header id="band-header">
+    <div class="left">
+      <h1>Agent Band <span class="tag">M0025</span></h1>
+      <span class="hint" id="band-hint">시스템 사운드를 듣고 보컬/악기를 자동 소환합니다.</span>
+    </div>
+    <div class="right">
+      <label class="ctrl">
+        <span>Stage</span>
+        <select id="stagePicker">
+          <option value="concert-hall">Concert Hall</option>
+          <option value="garden-pavilion">Garden Pavilion</option>
+          <option value="moonlit-castle">Moonlit Castle</option>
+        </select>
+      </label>
+      <label class="ctrl">
+        <span>Source</span>
+        <select id="sourcePicker">
+          <option value="SystemLoopback">System Loopback</option>
+          <option value="Microphone">Microphone</option>
+        </select>
+      </label>
+      <label class="ctrl">
+        <span>Top-K</span>
+        <input id="topkInput" type="number" min="1" max="20" value="6" />
+      </label>
+      <button id="startBtn" class="primary">▶ Start</button>
+      <button id="stopBtn" class="ghost" disabled>⏹ Stop</button>
+      <span class="status" id="bandStatus">idle</span>
+    </div>
+  </header>
+
+  <main id="stage-wrap">
+    <canvas id="stage"></canvas>
+    <div id="overlay">
+      <div id="label-strip"><span class="empty">대기 중 …</span></div>
+    </div>
+  </main>
+
+  <footer id="band-footer">
+    <div id="spectrum-wrap">
+      <canvas id="spectrum"></canvas>
+    </div>
+    <div id="diag">
+      <span id="diag-source">—</span>
+      <span id="diag-tick">tick 0</span>
+      <span id="diag-infer">— ms</span>
+      <span id="diag-mel">— × —</span>
+    </div>
+  </footer>
+
+  <!-- Bridge JS is shipped with the host (built-in Wasm/common/zero-bridge.js,
+       virtual-mapped to https://zero.local/). Load it across the virtual-host
+       boundary so user-plugin installs stay zero-copy and always pick up the
+       host's current bridge surface (music.*, note.*, tokens.*, …). -->
+  <script src="https://zero.local/common/zero-bridge.js"></script>
+  <script src="agent-band.js"></script>
+</body>
+</html>

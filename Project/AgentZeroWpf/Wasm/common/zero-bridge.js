@@ -142,6 +142,29 @@
       onSpeaking:         (handler) => on('note.speaking', handler),
     },
 
+    // Agent Band plugin surface (M0025) — live AST AudioSet classifier +
+    // log-banded spectrum. start() boots WASAPI loopback (or mic) + the
+    // ONNX session and emits `music.tick` every ~1.5 s with the top-K
+    // labels and a 32-bin spectrum snapshot. Plugins subscribe via
+    // onTick / onAmplitude.
+    music: {
+      // opts: { source?, deviceId?, topK?, cadenceMs? }
+      //   source:    "Microphone" | "SystemLoopback" (default: SystemLoopback)
+      //   deviceId:  MMDevice ID for SystemLoopback, NAudio device # for mic
+      //   topK:      1..20 (default 5)
+      //   cadenceMs: inference cadence (currently fixed host-side at 1500)
+      // Returns { ok, capturing, source, topK, cadenceMs } or
+      // { ok: false, error, modelPath? } when the AST model isn't installed.
+      start: (opts) => invoke('music.start', opts || {}),
+      stop:  () => invoke('music.stop'),
+      status: () => invoke('music.status'),
+      // Tick payload: { labels: [{name, score, index}], spectrum: float[32],
+      //                 frames, bins, inferMs }
+      onTick:      (handler) => on('music.tick', handler),
+      // Amplitude: { rms } — throttled ~10 Hz.
+      onAmplitude: (handler) => on('music.amplitude', handler),
+    },
+
     // LLM-backed text summarization. maxChars defaults to 6000 host-side;
     // longer inputs are halved on a sentence boundary, summarized
     // recursively, then merged. Returns { ok, summary, inputChars, chunks, error }.
