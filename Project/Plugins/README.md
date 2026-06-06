@@ -226,6 +226,7 @@ refresh();
 |---|---|---|
 | `voice-note/` | shipped (M0008) | `note.*` VAD-gated capture + `summarize` chunked recursion. 3-tier IndexedDB storage (raw timeline / summary / meta). Per-utterance auto-transcript stream. |
 | `token-monitor/` | shipped (M0009) | `tokens.*` read-only dashboard. Cards, vanilla-canvas time-series chart, by-vendor/account/project tables, alias inline rename, Reset & Re-scan, `tokens.tick` auto-refresh. |
+| `agent-band/` | shipped (M0025) | `music.*` live AST AudioSet classifier + log-banded spectrum. Vanilla Canvas 2D stage with performer sprite registry (4-frame idle/play animation), label→sprite regex mapping (19 performers: strings/woodwinds/brass/keys/percussion/vocals), 3 selectable backgrounds. ~330 LOC plugin code, ~250 LOC host bridge. |
 
 ## Built-in reference samples (in-app, not in `Project/Plugins/`)
 
