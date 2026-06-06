@@ -139,14 +139,88 @@ footer a:hover{color:var(--mint)}
 .demo-help kbd{display:inline-block;padding:1px 6px;background:#0F0F1A;color:var(--mint);border:1px solid var(--border-accent);border-radius:3px;font-size:11px}
 
 /* ─── Responsive ─── */
-@media (max-width:640px){
-  .hero{padding-top:32px}
-  .topbar .inner{padding:10px 14px}
-  .hero-card{padding:0 14px}
+/* tablet — light compaction */
+@media (max-width:900px){
+  .topbar .inner{padding:10px 18px;gap:10px}
+  .hero{padding:40px 18px 20px}
+  .hero-card,.demo-wrap{padding:0 18px}
   .hero-pitch,.section{padding:0 18px}
-  .recipe{padding:16px 18px}
-  .recipe li{padding-left:38px}
-  .demo-frame{aspect-ratio:auto;min-height:560px}
+  .cta-row{gap:8px}
+  .btn{padding:9px 14px;font-size:12.5px}
+  h2{margin-top:2.4em}
+}
+
+/* phone — tight layout */
+@media (max-width:640px){
+  /* topbar — wrap items, drop the flex spacer so they pack tight */
+  .topbar .inner{padding:10px 12px;gap:8px;flex-wrap:wrap;justify-content:space-between}
+  .topbar .spacer{display:none}
+  .wordmark{font-size:13px}
+  .wordmark .lite{margin-left:6px}
+  .lang-toggle{order:2}
+  .topbar a.gh{order:3;padding:4px 8px}
+
+  /* hero */
+  .hero{padding:24px 14px 14px}
+  .hero .big-mark{margin-bottom:14px}
+  .hero .tagline{font-size:15px}
+  .hero .sub{font-size:13px;margin-bottom:20px}
+  .hero-card,.demo-wrap,.section,.hero-pitch{padding-left:14px;padding-right:14px}
+  .hero-card{margin-bottom:8px}
+  .hero-card .frame{box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .hero-pitch{margin-top:18px;font-size:14px;line-height:1.7}
+  .hero-pitch p{font-size:14px}
+
+  /* cta */
+  .cta-row{gap:6px;margin-top:20px}
+  .btn{padding:8px 12px;font-size:12px}
+
+  /* sections / headings */
+  h2{margin-top:1.8em;font-size:20px}
+  h3{font-size:16px;margin-top:1.4em}
+
+  /* feature grid — single column on phone */
+  .grid{grid-template-columns:1fr;gap:10px;margin-top:14px}
+  .card{padding:16px 14px 14px;min-width:0}
+  .card h4{font-size:14px;overflow-wrap:anywhere}
+  .card p{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+  /* long inline tokens (paths, URLs, mono identifiers) must break */
+  .hero-pitch,.section p,.section li,.section a,.card a,.card code{overflow-wrap:anywhere;word-break:break-word}
+
+  /* recipe */
+  .recipe{padding:16px 14px}
+  .recipe li{padding:10px 0 10px 38px}
+  .recipe li::before{top:12px;width:26px;height:26px;font-size:12px}
+
+  /* ascii / pre — tighter, still self-scroll */
+  .ascii{padding:12px;font-size:11px;line-height:1.5}
+  pre{padding:12px;font-size:12px}
+
+  /* tables — scroll inside the table so the page doesn't side-scroll */
+  .cmd-table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:12px}
+  .cmd-table thead,.cmd-table tbody{display:table;width:100%;min-width:520px}
+  .cmd-table th,.cmd-table td{padding:8px 10px}
+  .cmd-table td:first-child{font-size:11.5px}
+
+  /* demo frames — override inline aspect-ratio so width can't blow past viewport */
+  .demo-frame{aspect-ratio:auto !important;min-height:420px !important;width:100%}
+  .demo-head h2{font-size:18px}
+  .demo-head .lede{font-size:12px}
+  .demo-help{font-size:11px;gap:12px}
+
+  /* footer — stack tighter */
+  footer{margin:40px 14px 30px;padding:18px 0;gap:12px;font-size:12px}
+}
+
+/* very narrow phones — extra compaction */
+@media (max-width:380px){
+  .wordmark{font-size:12px}
+  .wordmark .logo{width:11px;height:11px;margin-right:6px}
+  .lang-toggle button{font-size:10px;padding:3px 6px}
+  .topbar a.gh{font-size:10px;padding:3px 6px}
+  .hero .big-mark{font-size:30px}
+  .btn{font-size:11.5px;padding:7px 10px}
+  .ascii{font-size:10.5px;padding:10px}
 }
 </style>
 </head>
