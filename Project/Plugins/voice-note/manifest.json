@@ -2,7 +2,7 @@
   "id": "voice-note",
   "name": "Voice Note",
   "entry": "index.html",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "icon": "🎙",
-  "description": "STT voice journal — speaker diarization chips, 10s rolling partial preview, dual capture source (mic / WASAPI loopback for system audio), compact single-row header. v0.3.0 (M0024 Phase 3.5)."
+  "description": "STT voice journal — speaker chips, 10s partial preview, dual source (mic / WASAPI loopback), compact header. v0.3.1 fixes null-safe start args + collapses empty state to a one-line hint."
 }

@@ -696,6 +696,12 @@
       // pick most-recently-updated
       state.notes.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
       state.activeId = state.notes[0].id;
+    } else {
+      // M0024 Phase 3.5f — auto-create a starter note on first boot so the
+      // user lands directly in the working surface instead of the (now
+      // compact) "No note selected" hint. Saves one extra click for every
+      // fresh install and never blocks the user from deleting it later.
+      newNote();
     }
     renderList();
     renderActive();

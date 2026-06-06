@@ -26,10 +26,14 @@
 
     <!-- Right: active note -->
     <main id="vn-main" class="vn-main">
+      <!-- M0024 Phase 3.5f — empty state is now a one-line compact hint
+           (was a centered fullscreen block that ate 50% of the pane). On
+           boot voice-note.js auto-creates a note if none exist, so this
+           hint is rarely visible at all. -->
       <section id="vn-empty" class="vn-empty">
-        <div class="vn-empty-icon">🎙</div>
-        <div class="vn-empty-title">No note selected</div>
-        <div class="vn-empty-sub">Pick a note on the left, or hit <strong>+ New Note</strong> to start a fresh recording.</div>
+        <span class="vn-empty-icon">🎙</span>
+        <span class="vn-empty-title">No note selected.</span>
+        <span class="vn-empty-sub">Pick one on the left, or click <strong>+ New Note</strong>.</span>
       </section>
 
       <section id="vn-note" class="vn-note" hidden>

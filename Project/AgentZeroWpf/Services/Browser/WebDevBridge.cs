@@ -217,17 +217,21 @@ public sealed class WebDevBridge
             case "note.start":
             {
                 EnsureNoteHost();
-                int? sens = args?.TryGetProperty("sensitivity", out var sv) == true && sv.TryGetInt32(out var si)
-                    ? si : (int?)null;
-                // M0024 Phase 3.5 — accept source / loopbackDeviceId / chunkSec.
-                // Missing fields fall through to defaults (Microphone source,
-                // 30 s chunk, Windows default render endpoint when loopback).
+                // M0024 Phase 3.5e fix — JsonElement.TryGetInt32 throws
+                // InvalidOperationException when the element's ValueKind is
+                // anything other than Number (Null included). JS sends
+                // {sensitivity: null, ...} on first start, so route through
+                // the existing TryGetInt helper which gates on ValueKind ==
+                // Number first. Same for loopbackChunkSec. Strings get an
+                // analogous ValueKind == String guard inline.
+                int? sens = TryGetInt(args, "sensitivity");
                 string? source = args?.TryGetProperty("source", out var srcEl) == true
+                                 && srcEl.ValueKind == JsonValueKind.String
                     ? srcEl.GetString() : null;
                 string? loopbackDeviceId = args?.TryGetProperty("loopbackDeviceId", out var ldEl) == true
+                                           && ldEl.ValueKind == JsonValueKind.String
                     ? ldEl.GetString() : null;
-                int? chunkSec = args?.TryGetProperty("loopbackChunkSec", out var csEl) == true && csEl.TryGetInt32(out var csi)
-                    ? csi : (int?)null;
+                int? chunkSec = TryGetInt(args, "loopbackChunkSec");
                 // Returns { ok, capturing, sensitivity, threshold, source }
                 // so JS can sync its slider + source dropdown to the
                 // effective values.

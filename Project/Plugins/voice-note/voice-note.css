@@ -94,15 +94,24 @@ body { font-size: 13px; }
 
 .vn-main { display: flex; flex-direction: column; min-height: 0; }
 
+/* M0024 Phase 3.5f — compact empty state. Used to be a full-pane
+   center-aligned 🎙 + "No note selected" block taking 50% of the right
+   pane. Reduced to a small inline hint at top so the user isn't paying
+   a fullscreen cost for a state that on boot auto-resolves anyway
+   (auto-create-first-note logic in voice-note.js lands the user
+   directly in the working surface). */
 .vn-empty {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  color: var(--text-muted); padding: 40px;
-  text-align: center;
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #0F0F22;
+  color: var(--text-muted);
+  font-size: 12px;
 }
-.vn-empty-icon { font-size: 56px; opacity: .35; margin-bottom: 18px; }
-.vn-empty-title { font-size: 16px; color: var(--text-dim); margin-bottom: 6px; }
-.vn-empty-sub { font-size: 12px; color: var(--text-muted); max-width: 360px; line-height: 1.5; }
+.vn-empty-icon { font-size: 16px; opacity: .55; }
+.vn-empty-title { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+.vn-empty-sub { font-size: 11px; color: var(--text-muted); }
 
 .vn-note { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 
