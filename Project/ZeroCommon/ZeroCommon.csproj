@@ -39,6 +39,12 @@
          ABI are controlled here rather than inherited from NuGet-bundled natives.
          DLLs built from llama.cpp commit 3f7c29d (= LLamaSharp 0.26.0 ABI + Gemma 4). -->
     <PackageReference Include="LLamaSharp" Version="0.26.0" />
+    <!-- Music classifier (AST AudioSet) inference — CPU-only ONNX Runtime.
+         Used by Agent.Common.Music.OnnxAstClassifier. DirectML/GPU variants
+         are intentionally not added yet to keep the installer footprint flat;
+         add Microsoft.ML.OnnxRuntime.DirectML alongside if a GPU toggle
+         lands later. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.0" />
   </ItemGroup>
 
   <!-- Self-built llama.cpp natives: CPU baseline + Vulkan GPU variant.

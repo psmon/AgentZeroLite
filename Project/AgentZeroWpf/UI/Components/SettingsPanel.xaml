@@ -1349,6 +1349,220 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Music LLM Tab — instrument classification + log-mel spectrum
+                 via AST AudioSet ONNX. Mirrors the Voice tab layout: provider
+                 block → test block. Provider is locked to a single fixed
+                 model for the first iteration; the field stays as a ComboBox
+                 so MERT / CLAP can be added later without UI churn. -->
+            <TabItem Header="&#x1F3B5; Music" Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,0,0">
+
+                    <!-- Model -->
+                    <Border Background="#1A1A2E" BorderBrush="#3E3E42"
+                            BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Rectangle Width="3" Height="10" Fill="#B388FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                <TextBlock Text="MODEL  (AUDIO &#x2192; INSTRUMENT + SPECTRUM)" FontSize="11" FontWeight="Bold"
+                                           Foreground="#B388FF" FontFamily="Consolas"/>
+                                <TextBlock x:Name="tbMusicModelStatus" Text="" FontFamily="Consolas"
+                                           FontSize="10" Foreground="#556677" Margin="12,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Provider" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="cbMusicProvider" Grid.Column="1"
+                                          Style="{StaticResource DarkComboBox}" IsEnabled="False">
+                                    <ComboBoxItem Content="AST AudioSet  (MIT, 86.6M, 527 labels — locked)" Tag="ASTAudioSet" IsSelected="True"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Model Path" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center"/>
+                                <TextBox x:Name="tbMusicModelPath" Grid.Column="1"
+                                         Background="#2A2A3E" Foreground="#C8C8D8"
+                                         BorderBrush="#3E3E42" Padding="6,3"
+                                         FontFamily="Consolas" FontSize="10"
+                                         ToolTip="Absolute path to the AST ONNX model. Empty = use convention path under %LOCALAPPDATA%\AgentZeroLite\models\ast-audioset\model.onnx"/>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,0">
+                                    <Button x:Name="btnMusicCheckModel"
+                                            Content="Check" Padding="10,3" Margin="0,0,4,0"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnMusicCheckModel"/>
+                                    <Button x:Name="btnMusicDownload"
+                                            Content="Download" Padding="10,3"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnMusicDownloadModel"
+                                            ToolTip="Pull model.onnx (~347 MB) + AudioSet labels from HuggingFace into the path above."/>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Labels CSV" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center"/>
+                                <TextBox x:Name="tbMusicLabelsPath" Grid.Column="1"
+                                         Background="#2A2A3E" Foreground="#C8C8D8"
+                                         BorderBrush="#3E3E42" Padding="6,3"
+                                         FontFamily="Consolas" FontSize="10"
+                                         ToolTip="Path to Google's class_labels_indices.csv (AudioSet 527). Missing = numeric class indices instead of names."/>
+                            </Grid>
+
+                            <Border Background="#0F0F1A" BorderBrush="#2A2A3E"
+                                    BorderThickness="1" CornerRadius="2" Padding="8,6" Margin="0,4,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="HOW TO INSTALL THE MODEL" FontSize="9" FontWeight="Bold"
+                                               Foreground="#6688AA" FontFamily="Consolas" Margin="0,0,0,4"/>
+                                    <TextBlock FontFamily="Consolas" FontSize="10" Foreground="#888899"
+                                               TextWrapping="Wrap">
+                                        <Run Text="1. pip install optimum[onnxruntime]"/>
+                                        <LineBreak/>
+                                        <Run Text="2. optimum-cli export onnx --model MIT/ast-finetuned-audioset-10-10-0.4593 ast-audioset/"/>
+                                        <LineBreak/>
+                                        <Run Text="3. Drop model.onnx into the path above (~346 MB)"/>
+                                        <LineBreak/>
+                                        <Run Text="4. (Optional) class_labels_indices.csv from Google's AudioSet release"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <DockPanel Margin="0,8,0,0">
+                                <Button x:Name="btnMusicSave" DockPanel.Dock="Right"
+                                        Content="Save Music" Padding="14,5"
+                                        Style="{StaticResource DarkButton}"
+                                        Click="OnMusicSave"/>
+                                <TextBlock x:Name="tbMusicSaveStatus" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#556677" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Test -->
+                    <Border Background="#1A1A2E" BorderBrush="#3E3E42"
+                            BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Rectangle Width="3" Height="10" Fill="#00E5FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                <TextBlock Text="MUSIC TEST" FontSize="11" FontWeight="Bold"
+                                           Foreground="#00E5FF" FontFamily="Consolas"/>
+                                <TextBlock x:Name="tbMusicTestStatus" Text="" FontFamily="Consolas"
+                                           FontSize="10" Foreground="#556677" Margin="12,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Source" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="cbMusicInputSource" Grid.Column="1"
+                                          Style="{StaticResource DarkComboBox}"
+                                          SelectionChanged="OnMusicInputSourceChanged"
+                                          ToolTip="Microphone = NAudio WaveIn (mic input). System Output = WASAPI loopback (whatever is playing on your speakers — Spotify, YouTube, game audio).">
+                                    <ComboBoxItem Content="Microphone  (mic input)" Tag="Microphone"/>
+                                    <ComboBoxItem Content="System Output  (WASAPI loopback — what's playing on your speakers)" Tag="SystemLoopback"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="tbMusicDeviceLabel" Text="Input Device" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="cbMusicInputDevice" Grid.Column="1"
+                                          Style="{StaticResource DarkComboBox}"/>
+                                <Button x:Name="btnMusicRefreshDevices" Grid.Column="2"
+                                        Content="Refresh" Padding="10,3" Margin="6,0,0,0"
+                                        Style="{StaticResource DarkButton}"
+                                        Click="OnMusicRefreshDevices"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="60"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Window (s)" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center"/>
+                                <TextBox x:Name="tbMusicDuration" Grid.Column="1"
+                                         Background="#2A2A3E" Foreground="#C8C8D8"
+                                         BorderBrush="#3E3E42" Padding="6,3"
+                                         FontFamily="Consolas" FontSize="10"
+                                         ToolTip="Sliding window — how many seconds of recent audio AST sees on each inference tick. AST is trained on 10s clips; shorter windows infer faster but lose accuracy. 1..30."/>
+                                <TextBlock Grid.Column="2" Text=""/>
+                                <TextBlock Grid.Column="3" Text="Top-K" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,6,0"/>
+                                <TextBox x:Name="tbMusicTopK" Grid.Column="4"
+                                         Background="#2A2A3E" Foreground="#C8C8D8"
+                                         BorderBrush="#3E3E42" Padding="6,3"
+                                         FontFamily="Consolas" FontSize="10"
+                                         ToolTip="Number of top labels to show. 1..20."/>
+                            </Grid>
+
+                            <DockPanel Margin="0,4,0,6">
+                                <Button x:Name="btnMusicTest" DockPanel.Dock="Right"
+                                        Content="START TEST" Padding="14,5"
+                                        Style="{StaticResource DarkButton}"
+                                        Click="OnMusicTestStartStop"/>
+                                <ProgressBar x:Name="pbMusicLevel" Height="14" Margin="0,0,8,0"
+                                             Background="#0F0F1A" Foreground="#00E5FF"
+                                             Minimum="0" Maximum="100" Value="0"/>
+                            </DockPanel>
+
+                            <TextBlock Text="SPECTRUM  (30 Hz – 8 kHz, log-frequency)" FontSize="9" FontWeight="Bold"
+                                       Foreground="#6688AA" FontFamily="Consolas" Margin="0,4,0,2"/>
+                            <Border Background="#080812" BorderBrush="#2A2A3E"
+                                    BorderThickness="1" CornerRadius="2" Height="120" Margin="0,0,0,6">
+                                <Canvas x:Name="cvMusicSpectrum"
+                                        ClipToBounds="True" SnapsToDevicePixels="True"
+                                        SizeChanged="OnMusicSpectrumSizeChanged"/>
+                            </Border>
+
+                            <TextBlock Text="TOP LABELS  (live · sliding 10 s window)" FontSize="9" FontWeight="Bold"
+                                       Foreground="#6688AA" FontFamily="Consolas" Margin="0,2,0,2"/>
+                            <Border Background="#0F0F1A" BorderBrush="#2A2A3E"
+                                    BorderThickness="1" CornerRadius="2" MinHeight="140">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="220">
+                                    <TextBox x:Name="tbMusicResults" IsReadOnly="True"
+                                             BorderThickness="0" Background="Transparent"
+                                             Foreground="#C8C8D8" FontFamily="Consolas"
+                                             FontSize="11" Padding="8" TextWrapping="NoWrap"/>
+                                </ScrollViewer>
+                            </Border>
+
+                        </StackPanel>
+                    </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- WebDev Tab — moved to MainWindow activity bar (M0006).
                  What used to be a cramped 480-px-wide WebView2 tab now lives
                  as a top-level main menu (globe icon next to Agent Bot).
