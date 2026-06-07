@@ -1,0 +1,319 @@
+{
+  "version": "2.7.0",
+  "characters": {
+    "kpop-1": {
+      "style": "kpop",
+      "row": 0,
+      "col": 0,
+      "sheet": "kpop/kpop-1.png",
+      "json": "kpop/kpop-1.json",
+      "frames": 4
+    },
+    "kpop-2": {
+      "style": "kpop",
+      "row": 0,
+      "col": 1,
+      "sheet": "kpop/kpop-2.png",
+      "json": "kpop/kpop-2.json",
+      "frames": 4
+    },
+    "kpop-3": {
+      "style": "kpop",
+      "row": 0,
+      "col": 2,
+      "sheet": "kpop/kpop-3.png",
+      "json": "kpop/kpop-3.json",
+      "frames": 4
+    },
+    "kpop-4": {
+      "style": "kpop",
+      "row": 0,
+      "col": 3,
+      "sheet": "kpop/kpop-4.png",
+      "json": "kpop/kpop-4.json",
+      "frames": 4
+    },
+    "kpop-5": {
+      "style": "kpop",
+      "row": 0,
+      "col": 4,
+      "sheet": "kpop/kpop-5.png",
+      "json": "kpop/kpop-5.json",
+      "frames": 4
+    },
+    "kpop-6": {
+      "style": "kpop",
+      "row": 0,
+      "col": 5,
+      "sheet": "kpop/kpop-6.png",
+      "json": "kpop/kpop-6.json",
+      "frames": 4
+    },
+    "hiphop-1": {
+      "style": "hiphop",
+      "row": 1,
+      "col": 0,
+      "sheet": "hiphop/hiphop-1.png",
+      "json": "hiphop/hiphop-1.json",
+      "frames": 4
+    },
+    "hiphop-2": {
+      "style": "hiphop",
+      "row": 1,
+      "col": 1,
+      "sheet": "hiphop/hiphop-2.png",
+      "json": "hiphop/hiphop-2.json",
+      "frames": 4
+    },
+    "hiphop-3": {
+      "style": "hiphop",
+      "row": 1,
+      "col": 2,
+      "sheet": "hiphop/hiphop-3.png",
+      "json": "hiphop/hiphop-3.json",
+      "frames": 4
+    },
+    "hiphop-4": {
+      "style": "hiphop",
+      "row": 1,
+      "col": 3,
+      "sheet": "hiphop/hiphop-4.png",
+      "json": "hiphop/hiphop-4.json",
+      "frames": 4
+    },
+    "hiphop-5": {
+      "style": "hiphop",
+      "row": 1,
+      "col": 4,
+      "sheet": "hiphop/hiphop-5.png",
+      "json": "hiphop/hiphop-5.json",
+      "frames": 4
+    },
+    "hiphop-6": {
+      "style": "hiphop",
+      "row": 1,
+      "col": 5,
+      "sheet": "hiphop/hiphop-6.png",
+      "json": "hiphop/hiphop-6.json",
+      "frames": 4
+    },
+    "jazz-1": {
+      "style": "jazz",
+      "row": 2,
+      "col": 0,
+      "sheet": "jazz/jazz-1.png",
+      "json": "jazz/jazz-1.json",
+      "frames": 4
+    },
+    "jazz-2": {
+      "style": "jazz",
+      "row": 2,
+      "col": 1,
+      "sheet": "jazz/jazz-2.png",
+      "json": "jazz/jazz-2.json",
+      "frames": 4
+    },
+    "jazz-3": {
+      "style": "jazz",
+      "row": 2,
+      "col": 2,
+      "sheet": "jazz/jazz-3.png",
+      "json": "jazz/jazz-3.json",
+      "frames": 4
+    },
+    "jazz-4": {
+      "style": "jazz",
+      "row": 2,
+      "col": 3,
+      "sheet": "jazz/jazz-4.png",
+      "json": "jazz/jazz-4.json",
+      "frames": 4
+    },
+    "jazz-5": {
+      "style": "jazz",
+      "row": 2,
+      "col": 4,
+      "sheet": "jazz/jazz-5.png",
+      "json": "jazz/jazz-5.json",
+      "frames": 4
+    },
+    "jazz-6": {
+      "style": "jazz",
+      "row": 2,
+      "col": 5,
+      "sheet": "jazz/jazz-6.png",
+      "json": "jazz/jazz-6.json",
+      "frames": 4
+    },
+    "ballet-1": {
+      "style": "ballet",
+      "row": 3,
+      "col": 0,
+      "sheet": "ballet/ballet-1.png",
+      "json": "ballet/ballet-1.json",
+      "frames": 4
+    },
+    "ballet-2": {
+      "style": "ballet",
+      "row": 3,
+      "col": 1,
+      "sheet": "ballet/ballet-2.png",
+      "json": "ballet/ballet-2.json",
+      "frames": 4
+    },
+    "ballet-3": {
+      "style": "ballet",
+      "row": 3,
+      "col": 2,
+      "sheet": "ballet/ballet-3.png",
+      "json": "ballet/ballet-3.json",
+      "frames": 4
+    },
+    "ballet-4": {
+      "style": "ballet",
+      "row": 3,
+      "col": 3,
+      "sheet": "ballet/ballet-4.png",
+      "json": "ballet/ballet-4.json",
+      "frames": 4
+    },
+    "ballet-5": {
+      "style": "ballet",
+      "row": 3,
+      "col": 4,
+      "sheet": "ballet/ballet-5.png",
+      "json": "ballet/ballet-5.json",
+      "frames": 4
+    },
+    "ballet-6": {
+      "style": "ballet",
+      "row": 3,
+      "col": 5,
+      "sheet": "ballet/ballet-6.png",
+      "json": "ballet/ballet-6.json",
+      "frames": 4
+    },
+    "cheer-1": {
+      "style": "cheer",
+      "row": 4,
+      "col": 0,
+      "sheet": "cheer/cheer-1.png",
+      "json": "cheer/cheer-1.json",
+      "frames": 4
+    },
+    "cheer-2": {
+      "style": "cheer",
+      "row": 4,
+      "col": 1,
+      "sheet": "cheer/cheer-2.png",
+      "json": "cheer/cheer-2.json",
+      "frames": 4
+    },
+    "cheer-3": {
+      "style": "cheer",
+      "row": 4,
+      "col": 2,
+      "sheet": "cheer/cheer-3.png",
+      "json": "cheer/cheer-3.json",
+      "frames": 4
+    },
+    "cheer-4": {
+      "style": "cheer",
+      "row": 4,
+      "col": 3,
+      "sheet": "cheer/cheer-4.png",
+      "json": "cheer/cheer-4.json",
+      "frames": 4
+    },
+    "cheer-5": {
+      "style": "cheer",
+      "row": 4,
+      "col": 4,
+      "sheet": "cheer/cheer-5.png",
+      "json": "cheer/cheer-5.json",
+      "frames": 4
+    },
+    "cheer-6": {
+      "style": "cheer",
+      "row": 4,
+      "col": 5,
+      "sheet": "cheer/cheer-6.png",
+      "json": "cheer/cheer-6.json",
+      "frames": 4
+    },
+    "waacking-1": {
+      "style": "waacking",
+      "row": 5,
+      "col": 0,
+      "sheet": "waacking/waacking-1.png",
+      "json": "waacking/waacking-1.json",
+      "frames": 4
+    },
+    "waacking-2": {
+      "style": "waacking",
+      "row": 5,
+      "col": 1,
+      "sheet": "waacking/waacking-2.png",
+      "json": "waacking/waacking-2.json",
+      "frames": 4
+    },
+    "waacking-3": {
+      "style": "waacking",
+      "row": 5,
+      "col": 2,
+      "sheet": "waacking/waacking-3.png",
+      "json": "waacking/waacking-3.json",
+      "frames": 4
+    },
+    "waacking-4": {
+      "style": "waacking",
+      "row": 5,
+      "col": 3,
+      "sheet": "waacking/waacking-4.png",
+      "json": "waacking/waacking-4.json",
+      "frames": 4
+    },
+    "waacking-5": {
+      "style": "waacking",
+      "row": 5,
+      "col": 4,
+      "sheet": "waacking/waacking-5.png",
+      "json": "waacking/waacking-5.json",
+      "frames": 4
+    },
+    "waacking-6": {
+      "style": "waacking",
+      "row": 5,
+      "col": 5,
+      "sheet": "waacking/waacking-6.png",
+      "json": "waacking/waacking-6.json",
+      "frames": 4
+    }
+  },
+  "styles": [
+    "kpop",
+    "hiphop",
+    "jazz",
+    "ballet",
+    "cheer",
+    "waacking"
+  ],
+  "actions": [
+    "dance"
+  ],
+  "master_sheet": "_master/dance-master.png",
+  "frame_size": [
+    192,
+    192
+  ],
+  "padding": 8,
+  "frames_per_character": 4,
+  "grid": {
+    "rows": 6,
+    "cols": 6,
+    "cell": [
+      808,
+      208
+    ]
+  }
+}

@@ -1,5 +1,19 @@
 // agent-band.js — M0025 Agent Band plugin.
 //
+// v0.6 changelog:
+//   • dance: migrated to a single 5.6 MB master sheet (assets/dancers/
+//     _master/dance-master.png) + index.json. The master is a 6×6 grid
+//     where rows are styles (kpop / hiphop / jazz / ballet / cheer /
+//     waacking) and columns are 6 distinct sub-characters per style.
+//     Each cell is 808×208 holding 4 × 192×192 frames laid out
+//     horizontally with 8 px padding — same shape as the band cells.
+//     One image fetch covers every dancer; the per-style PNGs from v0.5
+//     (36 loose files) are gone.
+//   • Frame cycling is back — these are proper animation sheets.
+//     Each new dancer picks a random characterIdx 0..5 and a random
+//     framePhase 0..3 at spawn for visual variety; subsequent ticks
+//     keep that character but advance frames at DANCE_FPS.
+//
 // v0.5 changelog:
 //   • new band sprite system — TexturePacker-style sheet+JSON per
 //     performer (assets/sprites/{id}/{idle|play}.{png,json}). One ~50KB
@@ -62,13 +76,30 @@
   const SPRITE_BASE     = 'assets/sprites/';
   const STAGE_BASE      = 'assets/stages/';
   const DANCER_BASE     = 'assets/dancers/';
+  const DANCE_MASTER_PNG  = `${DANCER_BASE}_master/dance-master.png`;
+  const DANCE_MASTER_JSON = `${DANCER_BASE}_master/index.json`;
   const PLAY_FPS        = 9;
   const IDLE_FPS        = 4;
   // Band sprites: actual frame count is read from each sheet's JSON so
   // the loader doesn't care if a future performer ships 4, 6, or 8
-  // frames. Dance sprites still use a fixed-count loose-PNG layout.
-  const DANCE_FRAMES    = 6;
-  const DANCE_FPS       = 8;
+  // frames.
+  //
+  // Dance master sheet layout (v0.6+):
+  //   • single PNG, 6 rows × 6 cols of 808×208 cells
+  //   • each cell = 4 frames horizontally, 192×192, 8 px padding
+  //   • rows index: kpop 0 / hiphop 1 / jazz 2 / ballet 3 / cheer 4 / waacking 5
+  const DANCE_FRAMES         = 4;
+  const DANCE_FPS            = 8;
+  const DANCE_CHARS_PER_STYLE = 6;
+  const DANCE_CELL_W         = 808;
+  const DANCE_CELL_H         = 208;
+  const DANCE_FRAME_W        = 192;
+  const DANCE_FRAME_H        = 192;
+  const DANCE_FRAME_PAD      = 8;
+  const DANCE_FRAME_STRIDE   = DANCE_FRAME_W + DANCE_FRAME_PAD; // 200
+  const DANCE_STYLE_ROW = {
+    kpop: 0, hiphop: 1, jazz: 2, ballet: 3, cheer: 4, waacking: 5,
+  };
 
   // Dance gating — genre labels in AudioSet typically score 0.10–0.30
   // even for confident hits (and labels in the same family stack via
@@ -409,7 +440,8 @@
    *    score: number,
    *    addedAt: number,
    *    lastSeenTick: number,
-   *    framePhase: number,    // randomised so 2+ dancers don't sync
+   *    characterIdx: number,  // 0..5, which sub-character in the style row
+   *    framePhase: number,    // 0..3, randomised so simultaneous dancers desync
    *    fading: boolean,
    *    fadeAt: number,
    *  }} Dancer
@@ -449,6 +481,10 @@
           score,
           addedAt: now,
           lastSeenTick: tickCounter,
+          // Random sub-character pick at spawn so the same style brings
+          // visual variety across sessions. 1/6 chance of immediate
+          // repeat is acceptable for the troupe context.
+          characterIdx: Math.floor(Math.random() * DANCE_CHARS_PER_STYLE),
           framePhase: Math.floor(Math.random() * DANCE_FRAMES),
           fading: false,
           fadeAt: 0,
@@ -460,7 +496,7 @@
         d.fading = false;
         d.fadeAt = 0;
       }
-      ensureDancerSet(style);
+      ensureDanceMaster();
     }
 
     for (const [style, d] of dancers) {
@@ -475,29 +511,35 @@
     }
   }
 
-  // ── Dancer sprite cache (shares chromaKey with performers) ───────────
-  const dancerCache = new Map();   // style → { frames: [HTMLCanvasElement|null] }
+  // ── Dance master sheet (singleton, loaded on first dancer demand) ────
+  //
+  // One PNG + one JSON, fetched lazily the first time any dancer needs
+  // to draw. Subsequent draws hit the cached image directly. Until both
+  // resources resolve, `drawDancer` skips the slot — the dancer is
+  // already in the registry, it just doesn't render yet.
+  let danceMaster = null;       // HTMLImageElement
+  let danceIndex  = null;       // parsed index.json (kept for future flexibility)
+  let danceMasterLoading = false;
 
-  function ensureDancerSet(style) {
-    let entry = dancerCache.get(style);
-    if (entry) return entry;
-    entry = { frames: new Array(DANCE_FRAMES).fill(null) };
-    for (let i = 0; i < DANCE_FRAMES; i++) {
-      const img = new Image();
-      const frameIdx = i;
-      img.onload = () => {
-        try { entry.frames[frameIdx] = chromaKey(img); }
-        catch (ex) {
-          console.warn('[agent-band] dancer chroma key failed for', img.src, ex);
-          entry.frames[frameIdx] = img;
-        }
-      };
-      img.onerror = () => console.warn('[agent-band] dancer sprite missing:', img.src);
-      // raw_dance/{style}/{style}-{1..6}.png — 1-indexed per source
-      img.src = `${DANCER_BASE}${style}/${style}-${i + 1}.png`;
-    }
-    dancerCache.set(style, entry);
-    return entry;
+  function ensureDanceMaster() {
+    if (danceMaster || danceMasterLoading) return;
+    danceMasterLoading = true;
+
+    fetch(DANCE_MASTER_JSON)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(idx => { danceIndex = idx; })
+      .catch(err => console.warn(`[agent-band] dance index failed: ${DANCE_MASTER_JSON}`, err.message));
+
+    const img = new Image();
+    img.onload = () => {
+      danceMaster = img;
+      danceMasterLoading = false;
+    };
+    img.onerror = () => {
+      danceMasterLoading = false;
+      console.warn('[agent-band] dance master sheet missing:', DANCE_MASTER_PNG);
+    };
+    img.src = DANCE_MASTER_PNG;
   }
 
   // ── Stage layout — vocals center, instruments wings ──────────────────
@@ -679,22 +721,24 @@
   }
 
   function drawDancer(d, x, baseY, slotW, slotH, now) {
-    const set = ensureDancerSet(d.style);
-    // v0.5 — temporary: the current dance assets are 6 distinct
-    // characters per style, not animation frames. Cycling makes the
-    // sprite morph between characters each frame. Lock to the
-    // per-dancer framePhase chosen at spawn so each dancer is a stable
-    // character for its lifetime. When proper dance animation sheets
-    // arrive, swap back to the cycling expression below.
-    //   const idx = (Math.floor(now / 1000 * DANCE_FPS) + d.framePhase) % DANCE_FRAMES;
-    const idx = d.framePhase;
-    const tex = set.frames[idx];
-    if (!tex) return;
-    const srcW = tex.naturalWidth || tex.width;
-    const srcH = tex.naturalHeight || tex.height;
-    if (!srcW || !srcH) return;
+    if (!danceMaster) {
+      ensureDanceMaster();  // idempotent; kicks off load on first call
+      return;
+    }
+    const row = DANCE_STYLE_ROW[d.style];
+    if (row === undefined) return;
 
-    const aspect = srcH / srcW;
+    // Source rect in the master sheet:
+    //   cell origin = (col * CELL_W, row * CELL_H)
+    //   frame origin = cell + (PAD + frame * STRIDE, PAD)
+    const frameIdx = (Math.floor(now / 1000 * DANCE_FPS) + d.framePhase) % DANCE_FRAMES;
+    const cellX = d.characterIdx * DANCE_CELL_W;
+    const cellY = row * DANCE_CELL_H;
+    const srcX = cellX + DANCE_FRAME_PAD + frameIdx * DANCE_FRAME_STRIDE;
+    const srcY = cellY + DANCE_FRAME_PAD;
+
+    // Square aspect — sub-frames are 192×192. Fit into the slot.
+    const aspect = DANCE_FRAME_H / DANCE_FRAME_W;
     let drawW = slotW;
     let drawH = drawW * aspect;
     if (drawH > slotH) { drawH = slotH; drawW = drawH / aspect; }
@@ -709,9 +753,8 @@
       const since = now - d.addedAt;
       if (since < 360) alpha = Math.max(0.1, since / 360);
     }
-    // Dancers in row 2 also feel slightly behind by being a touch
-    // dimmer — keeps the band as the visual focus while making the
-    // troupe clearly present.
+    // Dancers in row 2 sit a touch dimmer so the band stays the visual
+    // focus while the troupe is still clearly present.
     alpha *= 0.92;
 
     const bob = Math.sin(now / 110 + x * 0.7) * 4;
@@ -720,7 +763,10 @@
     stageCtx.globalAlpha = alpha;
     stageCtx.shadowColor = `rgba(255, 45, 149, ${0.28 * alpha})`;
     stageCtx.shadowBlur = 18;
-    stageCtx.drawImage(tex, dx, dy + bob, drawW, drawH);
+    stageCtx.drawImage(
+      danceMaster,
+      srcX, srcY, DANCE_FRAME_W, DANCE_FRAME_H,
+      dx, dy + bob, drawW, drawH);
     stageCtx.restore();
   }
 

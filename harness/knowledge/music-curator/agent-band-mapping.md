@@ -2,7 +2,7 @@
 
 **Owner**: music-curator
 **Lifecycle**: convention — binding for any change to `Project/Plugins/agent-band/agent-band.js` `labelToPerformer()` / `labelToDance()` or to the classifier model that produces the labels
-**Last updated**: 2026-06-07 (v0.5.0 — band sprites moved to TexturePacker sheet+JSON; chroma-key skipped for band, dance held on static frame until new dance assets land)
+**Last updated**: 2026-06-07 (v0.6.0 — dance migrated to a single master sheet + grid index; frame cycling restored)
 **Related**: [ast-audioset-model-serving.md](ast-audioset-model-serving.md) (the upstream model whose top-K we consume)
 
 ## Why this doc exists
@@ -336,26 +336,46 @@ Total band assets: 19 performers × 2 states × (PNG + JSON) =
 ~40× shrink). Install-limit pressure (max 200 files) is now mostly
 from the dance assets.
 
-### Dance (legacy until new assets arrive) — loose PNGs + chroma-key
+### Dance (v0.6.0+) — single master sheet + grid index
 
 ```
 Project/Plugins/agent-band/assets/dancers/
-├── ballet/    ballet-1.png … ballet-6.png
-├── cheer/     cheer-1.png … cheer-6.png
-├── hiphop/    hiphop-1.png … hiphop-6.png
-├── jazz/      jazz-1.png … jazz-6.png
-├── kpop/      kpop-1.png … kpop-6.png
-└── waacking/  waacking-1.png … waacking-6.png
+└── _master/
+    ├── dance-master.png   (~5.6 MB, 4848 × 1248 — 6 rows × 6 cols)
+    └── index.json         catalogue of every character with row/col + frame count
 ```
 
-These are **6 distinct characters per style**, not animation frames.
-v0.5.0 holds each spawned dancer on a single `framePhase` chosen at
-spawn — character stays consistent, motion comes from the bob effect
-only. When proper dance animation sheets arrive (same TexturePacker
-shape as the band), drop the freeze and reuse the band loader.
+**Layout**:
+- Rows = dance styles (fixed order in code's `DANCE_STYLE_ROW`):
+  `kpop` = 0, `hiphop` = 1, `jazz` = 2, `ballet` = 3, `cheer` = 4, `waacking` = 5
+- Columns = 6 distinct sub-characters per style (e.g. `hiphop-1` …
+  `hiphop-6` are 6 different hip-hop dancers, all properly animated)
+- Each **cell** = 808 × 208 px containing 4 animation frames of
+  192 × 192 each, laid out horizontally with 8 px padding (same as the
+  band-sprite cell shape — single mental model across both rows)
+- Master PNG has a proper alpha channel — **no chroma-key**
 
-Bright-green chroma background (~rgb(40, 220, 50)) — runtime
-`chromaKey()` strips it to transparent.
+**Loader** (`ensureDanceMaster()`): fires the PNG and JSON fetches in
+parallel the first time any dancer needs to draw. Cached as module
+singletons (`danceMaster`, `danceIndex`). Until both resolve, the
+dancer is already in the registry but `drawDancer` skips its slot.
+
+**Renderer** (`drawDancer`):
+```
+srcX = characterIdx * 808 + 8 + frameIdx * 200
+srcY = styleRow      * 208 + 8
+ctx.drawImage(danceMaster, srcX, srcY, 192, 192, dx, dy, drawW, drawH)
+```
+
+`characterIdx` is randomly picked once at spawn (0..5) — successive
+re-spawns of the same style cycle through different dancers across
+sessions. `framePhase` (0..3) is also randomised so simultaneous
+dancers desync from the beat. 4 frames × 8 FPS = 500 ms loop.
+
+**File count contribution**: dance assets are now just 2 files
+(`dance-master.png` + `index.json`), down from 36 loose PNGs. Plugin
+total: 85 files / ~10 MB — comfortably below the 200-file install
+limit and dwarfed by the band's chunky old layout.
 
 ## Change-trigger list
 
@@ -373,11 +393,11 @@ Re-read this doc when you are about to:
 - Add a new dance style — needs a new folder under
   `assets/dancers/`, a `labelToDance()` regex line, and a row-2 layout
   consideration (3-style cap)
-- Migrate dance sprites from loose-PNG-with-chroma to the
-  TexturePacker sheet+JSON layout — drop the single-frame freeze in
-  `drawDancer` and reuse the band-side `ensureSpriteSet()` loader (it's
-  already generic — just point `DANCER_BASE` at `assets/dancers/{style}/`
-  and ship `idle.png` + `idle.json`)
+- Migrate dance sprites again — current master is a flat 6×6 grid.
+  If a future asset bundle splits styles into separate sheets or
+  adds new actions (e.g. an "idle" stance distinct from "dance"),
+  generalise the loader the same way the band side does it (per-state
+  sheet + JSON instead of one master)
 - Add a new band performer / state — drop a folder with `idle.png`,
   `idle.json`, `play.png`, `play.json` under `assets/sprites/{id}/`;
   no code change needed (loader reads frame count from JSON)

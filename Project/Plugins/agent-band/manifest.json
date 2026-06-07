@@ -2,7 +2,7 @@
   "id": "agent-band",
   "name": "Agent Band",
   "entry": "index.html",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "icon": "🎻",
-  "description": "AST AudioSet 라이브 음악단 — 시스템 사운드를 듣고 가수/악기/댄서를 무대 위에 동적으로 소환합니다. v0.5: 새 악단 스프라이트 (TexturePacker sheet+JSON, 알파 채널 내장 — chroma-key 불필요). 댄스 스프라이트는 임시 고정 프레임 (새 댄스 자산 대기 중)."
+  "description": "AST AudioSet 라이브 음악단 — 시스템 사운드를 듣고 가수/악기/댄서를 무대 위에 동적으로 소환합니다. v0.6: 댄스 단일 마스터 시트 통합 (6 스타일 × 6 캐릭터 그리드, PNG 1장 + index.json 1장). 댄스 프레임 애니메이션 복귀."
 }
