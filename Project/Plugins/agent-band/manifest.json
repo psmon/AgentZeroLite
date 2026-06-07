@@ -2,7 +2,7 @@
   "id": "agent-band",
   "name": "Agent Band",
   "entry": "index.html",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "icon": "🎻",
-  "description": "AST AudioSet 라이브 음악단 — 시스템 사운드를 듣고 가수/악기/댄서를 무대 위에 동적으로 소환합니다. v0.6: 댄스 단일 마스터 시트 통합 (6 스타일 × 6 캐릭터 그리드, PNG 1장 + index.json 1장). 댄스 프레임 애니메이션 복귀."
+  "description": "AST AudioSet 라이브 음악단 — 시스템 사운드를 듣고 가수/악기/댄서를 무대 위에 동적으로 소환합니다. v0.6.1: 댄스 마스터 시트 일부 깨짐 픽셀 수정 (그리드/매핑 변경 없음 — 자산만 갱신)."
 }
