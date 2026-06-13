@@ -1,5 +1,16 @@
 // agent-band.js — M0025 Agent Band plugin.
 //
+// v0.11 changelog:
+//   • climax staging by LOUDNESS — the idol group's play/dance vs idle is
+//     now gated on volume (mean spectrum energy), not the AST label score:
+//       - normal volume → "일반노래": only the main vocal performs; the
+//         backup idols hold their idle (normal-singing) sheet.
+//       - loud volume   → climax: the whole group performs together.
+//     Hysteresis (CLIMAX_VOL_ENTER > EXIT) plus a slightly-high ENTER keeps
+//     the calmer "일반노래" state held a bit longer / more often. The
+//     decision is per-frame in performState(); both sheets are preloaded so
+//     the idle↔play flip is instant.
+//
 // v0.10 changelog:
 //   • main vocal is `vocal-ex` — the idol group's lead is now a dedicated
 //     singer (idle+play sheets: she SINGS, doesn't dance). She holds slot 0
@@ -189,6 +200,21 @@
   const SPEC_GRADIENT_TO   = [0xff, 0x2d, 0x95];
   const SPEC_ATTACK  = 0.40;   // bars going UP — fast snap
   const SPEC_RELEASE = 0.10;   // bars going DOWN — smooth decay
+
+  // ── Climax gating (v0.11) ────────────────────────────────────────────
+  // Performance intensity is driven by LOUDNESS (mean spectrum energy),
+  // not the AST label score:
+  //   • normal volume  → "일반노래" — only the MAIN VOCAL performs
+  //     (play/dance); the backup idols hold their idle (normal-singing)
+  //     sheet.
+  //   • loud volume     → climax — the whole group performs together.
+  // Hysteresis (ENTER > EXIT) keeps it from flickering, and the ENTER
+  // threshold is set a touch high so the calmer "일반노래" state is held a
+  // little longer / shows up a little more often than a bare midpoint
+  // would give. volumeLevel is an eased 0..1 loudness read each frame.
+  const CLIMAX_VOL_ENTER = 0.30;  // mean smoothed-spectrum level to ENTER climax
+  const CLIMAX_VOL_EXIT  = 0.20;  // drop below this to fall back to "일반노래"
+  const CLIMAX_VOL_EASE  = 0.18;  // per-frame lerp toward the live mean level
 
   // ── Note particle effect (v0.7) ──────────────────────────────────────
   // Soft streaks rise from the band baseline; X position maps to a
@@ -567,15 +593,16 @@
 
     const members = VOCAL_FEMALE.slice(0, idolRenderedSize);
     const memberSet = new Set(members);
-    // Members "dance" at the live vocal score while present. The main vocal
-    // gets a score floor so the lead stays lively and center; during the
-    // silent ramp-down everyone idles (score 0).
-    const memberScore = present ? Math.max(fem.score, SCORE_PRESENT) : 0;
+    // Presence score keeps members on stage; the actual play/dance-vs-idle
+    // animation is decided per-frame by performState() (volume-gated), not
+    // by this score. Floor at SCORE_PRESENT so members don't fade while the
+    // group is up.
+    const memberScore = present ? Math.max(fem.score, SCORE_PRESENT) : SCORE_PRESENT;
     for (const id of members) {
-      const score = id === MAIN_VOCAL_ID
-        ? Math.max(memberScore, present ? SCORE_ACTIVE : 0)
-        : memberScore;
-      upsertPerformer(id, score, now);
+      upsertPerformer(id, memberScore, now);
+      // Preload both sheets so the climax (idle↔play/dance) flip is instant.
+      ensureSpriteSet(id, 'idle');
+      ensureSpriteSet(id, 'play');
     }
 
     // Peel-off: any female-pool member beyond the current group size fades
@@ -901,10 +928,11 @@
   }
 
   function drawPerformer(p, x, baseY, slotW, slotH, now) {
-    const set = ensureSpriteSet(p.id, p.state);
+    const state = performState(p);
+    const set = ensureSpriteSet(p.id, state);
     if (!set.sheet || !set.frames || set.frames.length === 0) return;
 
-    const fps = p.state === 'play' ? PLAY_FPS : IDLE_FPS;
+    const fps = state === 'play' ? PLAY_FPS : IDLE_FPS;
     const frameIdx = Math.floor(now / 1000 * fps) % set.frames.length;
     const fr = set.frames[frameIdx];
     if (!fr) return;
@@ -925,11 +953,11 @@
       if (since < 280) alpha = Math.max(0.1, since / 280);
     }
 
-    const bob = p.state === 'play' ? Math.sin(now / 120 + x) * 3 : 0;
+    const bob = state === 'play' ? Math.sin(now / 120 + x) * 3 : 0;
 
     stageCtx.save();
     stageCtx.globalAlpha = alpha;
-    if (p.state === 'play') {
+    if (state === 'play') {
       stageCtx.shadowColor = `rgba(0, 229, 255, ${0.32 * alpha})`;
       stageCtx.shadowBlur = 22;
     }
@@ -1010,6 +1038,42 @@
       const k = tgt > cur ? SPEC_ATTACK : SPEC_RELEASE;
       smoothed[i] = cur + (tgt - cur) * k;
     }
+  }
+
+  // ── Climax (loudness) gate ───────────────────────────────────────────
+  // volumeLevel = eased mean of the smoothed spectrum (0..1). climaxActive
+  // flips on with hysteresis: a loud passage makes the whole idol group
+  // perform; otherwise only the main vocal does.
+  let volumeLevel = 0;
+  let climaxActive = false;
+
+  function updateClimax() {
+    if (smoothed && smoothed.length) {
+      let sum = 0;
+      for (let i = 0; i < smoothed.length; i++) sum += smoothed[i];
+      const mean = sum / smoothed.length;
+      volumeLevel += (mean - volumeLevel) * CLIMAX_VOL_EASE;
+    } else {
+      volumeLevel += (0 - volumeLevel) * CLIMAX_VOL_EASE;
+    }
+    if (climaxActive) {
+      if (volumeLevel < CLIMAX_VOL_EXIT) climaxActive = false;
+    } else if (volumeLevel > CLIMAX_VOL_ENTER) {
+      climaxActive = true;
+    }
+  }
+
+  // The animation state a performer should SHOW this frame.
+  //   • fading → idle.
+  //   • female pool → volume-gated: climax means everyone performs; in the
+  //     calm "일반노래" state only the main vocal does, the rest idle.
+  //   • instruments / male vocals → their score-derived p.state, unchanged.
+  function performState(p) {
+    if (p.fading) return 'idle';
+    if (FEMALE_POOL.has(p.id)) {
+      return (climaxActive || p.id === MAIN_VOCAL_ID) ? 'play' : 'idle';
+    }
+    return p.state;
   }
 
   // ── Note particle system ─────────────────────────────────────────────
@@ -1148,6 +1212,11 @@
     const dt = Math.min(0.1, (now - lastFrameMs) / 1000);
     lastFrameMs = now;
 
+    // Update the smoothed spectrum + climax gate FIRST so this frame's
+    // performers draw with the current loudness state.
+    tickSmoothSpectrum();
+    updateClimax();
+
     // Row 2 — dancers (back row). Disabled in v0.10 (DANCE_TROUPE_ENABLED).
     const ds = DANCE_TROUPE_ENABLED ? [...dancers.values()] : [];
     if (ds.length > 0) {
@@ -1168,10 +1237,9 @@
       drawPerformer(p, pos.x, pos.baseY, pos.slotW, pos.slotH, now);
     }
 
-    tickSmoothSpectrum();
     // Drive the note particles off the SMOOTHED spectrum (already eased
-    // by the 30Hz update) so emission isn't tied to the 30Hz host event
-    // — feels continuous across the 60Hz frame clock.
+    // above) so emission isn't tied to the 30Hz host event — feels
+    // continuous across the 60Hz frame clock.
     emitNotesFromSpectrum(smoothed, w, h, now);
     updateAndDrawNotes(dt, now);
 
@@ -1266,6 +1334,8 @@
     dancers.clear();
     idolRenderedSize = 0;
     idolPresentTicks = 0;
+    volumeLevel = 0;
+    climaxActive = false;
     notes.length = 0;
     lastEmitMs.clear();
     renderLabelStrip([]);
