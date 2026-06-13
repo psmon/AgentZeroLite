@@ -1,5 +1,11 @@
 // agent-band.js — M0025 Agent Band plugin.
 //
+// v0.12.2 changelog:
+//   • per-stage layout adjustment (first introduction) — STAGE_Y_OFFSET maps
+//     a background name → vertical px nudge for the cast so performers land
+//     on that background's stage. Stadium (fifa26) raises the cast 50px;
+//     all other stages are unchanged (offset 0).
+//
 // v0.12.1 changelog:
 //   • new stage background "Stadium (FIFA 26)" (assets/stages/fifa26.png).
 //   • girl-group ('group') mode is female-only — male singers are dropped
@@ -215,6 +221,15 @@
   const MIN_GAP         = 14;
   const STAGE_BASE_Y    = 0.94;  // ground line as fraction of canvas height
   const SPRITE_TARGET_H = 0.55;  // sprite height as fraction of canvas height
+
+  // Per-stage layout adjustment (first introduced v0.12.2). Some backgrounds
+  // put the usable "floor" at a different height than the default ground
+  // line, so performers need a vertical nudge to land on the stage. Value =
+  // pixels added to the band-row baseY (negative = up). Stages not listed
+  // here use 0 (unchanged). Add entries as new backgrounds need it.
+  const STAGE_Y_OFFSET = {
+    'fifa26': -50,   // World Cup stadium — raise the cast 50px to sit on the pitch stage
+  };
 
   // Spectrum visual config.
   const SPEC_GRADIENT_FROM = [0x00, 0xe5, 0xff];
@@ -920,7 +935,7 @@
     const totalW = n * spriteW + (n - 1) * gap;
     const startX = (w - totalW) / 2;
 
-    const baseY = h * STAGE_BASE_Y;
+    const baseY = h * STAGE_BASE_Y + (STAGE_Y_OFFSET[currentStage] || 0);
     const slotH = h * SPRITE_TARGET_H;
 
     ordered.forEach((p, i) => {
@@ -978,8 +993,10 @@
   /** @type {HTMLImageElement|null} */
   let stageImg = null;
   let stageReady = false;
+  let currentStage = '';   // active background name — drives STAGE_Y_OFFSET
 
   function pickStage(name) {
+    currentStage = name;
     const img = new Image();
     img.onload = () => { stageImg = img; stageReady = true; };
     img.onerror = () => { console.warn('[agent-band] stage missing:', img.src); stageReady = false; };
