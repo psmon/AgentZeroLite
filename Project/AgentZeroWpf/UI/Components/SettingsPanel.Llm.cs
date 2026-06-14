@@ -16,6 +16,10 @@ public partial class SettingsPanel
 {
     private DispatcherTimer? _llmMonitorTimer;
     private ILocalChatSession? _llmSession;
+    // Signature (backend+model) the cached _llmSession was opened against, so
+    // EnsureSessionAsync can drop a stale session when the user switches the
+    // active LLM via Save/Load and re-open against the now-current backend.
+    private string? _llmSessionSig;
     private CancellationTokenSource? _llmDownloadCts;
     private CancellationTokenSource? _llmChatCts;
     private double _llmLastTps;
@@ -159,22 +163,27 @@ public partial class SettingsPanel
             var agentLoopMaxTok = int.Parse(tbLlmAgentLoopMaxTokens.Text, CultureInfo.InvariantCulture);
             var temp = float.Parse(tbLlmTemperature.Text, CultureInfo.InvariantCulture);
             var devIdx = ReadSelectedGpuDeviceIndex();
-            return new LlmRuntimeSettings
-            {
-                ModelId = CurrentModelEntry.Id,
-                Backend = backend,
-                GpuLayerCount = gpuLayers,
-                ContextSize = ctx,
-                MaxTokens = maxTok,
-                AgentToolLoopMaxTokens = agentLoopMaxTok,
-                Temperature = temp,
-                VulkanDeviceIndex = devIdx,
-                FlashAttention = chkLlmFlashAttn.IsChecked == true,
-                NoKqvOffload = chkLlmNoKqvOffload.IsChecked == true,
-                KvCacheTypeK = IndexToKvType(cbLlmKvTypeK.SelectedIndex),
-                KvCacheTypeV = IndexToKvType(cbLlmKvTypeV.SelectedIndex),
-                UseMemoryMap = chkLlmUseMmap.IsChecked == true
-            };
+            // Load-then-patch: this tab only owns the LOCAL runtime dials, so we
+            // must preserve everything it does NOT edit — crucially the
+            // `External` block and `ActiveBackend`. Building a fresh
+            // LlmRuntimeSettings here used to silently wipe the user's External
+            // (Webnori/OpenAI/…) provider config and reset ActiveBackend on every
+            // Local Save/Load.
+            var s = LlmSettingsStore.Load();
+            s.ModelId = CurrentModelEntry.Id;
+            s.Backend = backend;
+            s.GpuLayerCount = gpuLayers;
+            s.ContextSize = ctx;
+            s.MaxTokens = maxTok;
+            s.AgentToolLoopMaxTokens = agentLoopMaxTok;
+            s.Temperature = temp;
+            s.VulkanDeviceIndex = devIdx;
+            s.FlashAttention = chkLlmFlashAttn.IsChecked == true;
+            s.NoKqvOffload = chkLlmNoKqvOffload.IsChecked == true;
+            s.KvCacheTypeK = IndexToKvType(cbLlmKvTypeK.SelectedIndex);
+            s.KvCacheTypeV = IndexToKvType(cbLlmKvTypeV.SelectedIndex);
+            s.UseMemoryMap = chkLlmUseMmap.IsChecked == true;
+            return s;
         }
         catch
         {
@@ -510,12 +519,28 @@ public partial class SettingsPanel
 
     // ── Chat Test ────────────────────────────────────────────────────────
 
+    // Backend+model the Test chat should talk to right now. When this changes
+    // (user saved/loaded a different LLM), the cached session is stale.
+    private static string ActiveLlmSignature()
+    {
+        var s = LlmSettingsStore.Load();
+        return s.ActiveBackend == LlmActiveBackend.Local
+            ? $"Local:{s.ModelId}"
+            : $"External:{s.External.Provider}:{s.ResolveExternalModel()}";
+    }
+
     private async Task<bool> EnsureSessionAsync()
     {
-        if (_llmSession is not null) return true;
+        var sig = ActiveLlmSignature();
+        // Reuse only if the cached session matches the currently-active LLM.
+        // If the user switched backend/model since, drop the stale session so
+        // the Test chat follows the new selection instead of silently talking
+        // to the previous LLM.
+        if (_llmSession is not null && _llmSessionSig == sig) return true;
+        if (_llmSession is not null) await DisposeSessionAsync();
         if (!LlmGateway.IsActiveAvailable()) return false;
 
-        AppLogger.Log("[LLM] Opening chat session via LlmGateway");
+        AppLogger.Log($"[LLM] Opening chat session via LlmGateway ({sig})");
         try
         {
             // Session creation (KV-cache alloc for Local) can be expensive on
@@ -523,6 +548,7 @@ public partial class SettingsPanel
             // with dispatcher work. External just spins up an HttpClient and
             // is essentially instant; the Task.Run pays a negligible cost.
             _llmSession = await Task.Run(LlmGateway.OpenSession);
+            _llmSessionSig = sig;
             tbLlmChatHistory.Text = "";
             tbLlmTurnCount.Text = "turns: 0";
             AppLogger.Log("[LLM] Chat session opened");
@@ -546,6 +572,7 @@ public partial class SettingsPanel
     {
         var s = _llmSession;
         _llmSession = null;
+        _llmSessionSig = null;
         if (s is not null)
         {
             try { await s.DisposeAsync(); } catch { }

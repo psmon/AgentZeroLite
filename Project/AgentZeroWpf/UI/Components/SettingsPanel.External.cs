@@ -198,11 +198,20 @@ public partial class SettingsPanel
     private void OnExtSaveClick(object sender, RoutedEventArgs e)
     {
         var s = ReadExternalFromUi();
+        // Saving from the External tab is an explicit "use this" — activate
+        // External so the config isn't left saved-but-inactive. This was the
+        // "saved but not applied" trap: the External config persisted fine but
+        // ActiveBackend stayed Local because the radio above wasn't toggled.
+        s.ActiveBackend = LlmActiveBackend.External;
         LlmSettingsStore.Save(s);
-        tbExtStatus.Text = "✓ Saved.";
+        // Sync the radio to reflect activation. OnActiveBackendChanged
+        // early-returns when the stored backend already matches (we just saved
+        // External), so this is a pure UI sync — no double save.
+        rbBackendExternal.IsChecked = true;
+        tbExtStatus.Text = "✓ Saved & activated (External).";
         tbExtStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
         UpdateActiveBackendStatus();
-        AppLogger.Log($"[LLM-EXT] Saved provider={s.External.Provider} model={s.External.SelectedModel} maxTok={s.External.MaxTokens}");
+        AppLogger.Log($"[LLM-EXT] Saved+activated provider={s.External.Provider} model={s.External.SelectedModel} maxTok={s.External.MaxTokens}");
     }
 
     private async void OnExtTestClick(object sender, RoutedEventArgs e)
