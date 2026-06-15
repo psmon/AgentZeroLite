@@ -1,5 +1,15 @@
 // agent-band.js — M0025 Agent Band plugin.
 //
+// v0.14.1 changelog (M0026 follow-up #4 — girl-group dance distribution):
+//   • even dance distribution — the genre→backup matching now ROTATES every
+//     ~6s (ROTATE_TICKS) by dropping assignments so assignBackups re-picks
+//     the least-used idols, spreading the dance spotlight across the group
+//     instead of one member holding it while a genre sustains.
+//   • periodic climax — every 60s of live group time (CLIMAX_PERIOD_MS) the
+//     whole group does a fixed 5s all-dance burst (CLIMAX_HOLD_MS), checked
+//     per-frame in performState() so the 5s window is exact, not quantized
+//     to the 1.5s tick. Group mode only; solo is unaffected.
+//
 // v0.14.0 changelog (M0026 follow-up #3):
 //   • played list now PERSISTS to localStorage (YT_STORE_KEY) so the
 //     history survives app restarts. The playlist panel can be opened /
@@ -595,6 +605,20 @@
   const styleAssignee = new Map();   // style → backupId
   const backupUsage   = new Map();   // backupId → cumulative assignment count
 
+  // Even dance distribution + periodic climax (girl-group only).
+  //   • ROTATE the genre→backup matching every ROTATE_TICKS so the dance
+  //     duty spreads across the group instead of one member holding it while
+  //     a genre sustains — clearing styleAssignee forces assignBackups to
+  //     re-pick the LEAST-used members, which rotates the spotlight.
+  //   • CLIMAX: every CLIMAX_PERIOD_MS of live group time, hold an all-dance
+  //     burst for CLIMAX_HOLD_MS (every present member dances at once).
+  const ROTATE_TICKS     = 4;        // ~6s at the 1.5s tick — reassign least-used
+  const CLIMAX_PERIOD_MS = 60000;    // climax every 60s
+  const CLIMAX_HOLD_MS   = 5000;     // 5s all-dance hold
+  let   rotateTick   = 0;
+  let   climaxNextAt = 0;            // scheduled next climax start (0 = unscheduled)
+  let   climaxUntil  = 0;            // all-dance active while performance.now() < this
+
   // Spawn-or-refresh one performer at the given score. Marks it "seen this
   // tick" (so it won't fade) and resolves its idle/active state. Returns
   // false if the stage is full of active performers and this one couldn't
@@ -729,6 +753,20 @@
     // Center performer: SOLO → vocal-ex, GROUP → vox7-1 (the lead idol).
     const leadId = members[0];
     const presentBackups = members.filter(id => id !== leadId);
+
+    // Periodic climax — every 60s of live group time, a 5s all-dance burst.
+    // performState() reads climaxUntil per-frame so the 5s window is crisp
+    // regardless of the 1.5s tick. Reset when the group is absent / in solo.
+    if (singerMode === 'group' && present && idolRenderedSize > 0) {
+      if (climaxNextAt === 0) climaxNextAt = now + CLIMAX_PERIOD_MS;   // first climax at +60s
+      if (now >= climaxNextAt) { climaxUntil = now + CLIMAX_HOLD_MS; climaxNextAt = now + CLIMAX_PERIOD_MS; }
+    } else {
+      climaxNextAt = 0; climaxUntil = 0; rotateTick = 0;
+    }
+
+    // Rotate the matching duty so dancers take turns (even distribution):
+    // periodically drop assignments so assignBackups re-picks least-used.
+    if (++rotateTick >= ROTATE_TICKS) { rotateTick = 0; styleAssignee.clear(); }
 
     // Distribute active non-lead genres across the present backups.
     const playingBackups = assignBackups(nonLeadStyles, presentBackups);
@@ -1200,7 +1238,12 @@
   //   • instruments / male vocals → their score-derived p.state, unchanged.
   function performState(p) {
     if (p.fading) return 'idle';
-    if (FEMALE_POOL.has(p.id)) return p.playing ? 'play' : 'idle';
+    if (FEMALE_POOL.has(p.id)) {
+      // Climax window → every member dances at once (checked per-frame so the
+      // 5s hold is exact, not quantized to the 1.5s tick).
+      if (climaxUntil && performance.now() < climaxUntil) return 'play';
+      return p.playing ? 'play' : 'idle';
+    }
     return p.state;
   }
 
@@ -1463,6 +1506,9 @@
     idolPresentTicks = 0;
     styleAssignee.clear();
     backupUsage.clear();
+    rotateTick = 0;
+    climaxNextAt = 0;
+    climaxUntil = 0;
     notes.length = 0;
     lastEmitMs.clear();
     renderLabelStrip([]);
