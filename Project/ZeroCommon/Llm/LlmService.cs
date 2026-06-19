@@ -8,20 +8,33 @@ public static class LlmService
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
 
-    // On Windows, .NET's Environment.SetEnvironmentVariable updates the
-    // process environment block seen by GetEnvironmentVariable, but it does
-    // NOT propagate into the MSVC CRT's cached env block used by getenv().
+    // .NET's Environment.SetEnvironmentVariable updates the process environment
+    // block seen by GetEnvironmentVariable, but it does NOT reliably propagate
+    // into the native C runtime's cached env block used by getenv().
     // llama.cpp / ggml-vulkan read env vars via getenv(), so managed-only
     // updates are invisible to them for options set after process start.
-    // Route each env var through both paths: .NET for tooling, _putenv_s for
-    // the native CRT. See realization in Docs/gemma4-gpu-load-failures.md.
-    [DllImport("ucrtbase.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-    private static extern int _putenv_s(string name, string value);
+    // Route each env var through both paths: .NET for tooling, and the native
+    // CRT setter for the inference backend. The CRT entry point differs per OS:
+    //   • Windows : ucrtbase.dll _putenv_s(name, value)
+    //   • Unix    : libc        setenv(name, value, overwrite=1)
+    // See realization in Docs/gemma4-gpu-load-failures.md.
+    [DllImport("ucrtbase.dll", EntryPoint = "_putenv_s", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern int WindowsPutEnvS(string name, string value);
+
+    [DllImport("libc", EntryPoint = "setenv", CharSet = CharSet.Ansi)]
+    private static extern int UnixSetEnv(string name, string value, int overwrite);
 
     private static void SetNativeEnv(string name, string value)
     {
         Environment.SetEnvironmentVariable(name, value);
-        try { _putenv_s(name, value); } catch { /* fall back silently */ }
+        try
+        {
+            if (OperatingSystem.IsWindows())
+                WindowsPutEnvS(name, value);
+            else
+                UnixSetEnv(name, value, 1);
+        }
+        catch { /* fall back silently — managed env var is still set */ }
     }
 
     public static LlmServiceState State { get; private set; } = LlmServiceState.Unloaded;

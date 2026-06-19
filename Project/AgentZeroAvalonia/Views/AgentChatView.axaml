@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             xmlns:models="using:AgentZeroAvalonia.Models"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="AgentZeroAvalonia.Views.AgentChatView"
+             x:DataType="vm:AgentChatViewModel">
+
+    <Grid RowDefinitions="*,Auto,Auto" Margin="12">
+
+        <!-- 트랜스크립트 -->
+        <Border Grid.Row="0" CornerRadius="8" Padding="8"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+            <ScrollViewer x:Name="TranscriptScroller" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Messages}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:ChatMessage">
+                            <Border Margin="0,4" Padding="10,6" CornerRadius="8"
+                                    HorizontalAlignment="{Binding IsUser, Converter={x:Static vm:Converters.BoolToRightLeft}}"
+                                    MaxWidth="640"
+                                    Background="{Binding Role, Converter={x:Static vm:Converters.RoleToBrush}}">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding RoleLabel}" FontSize="11" Opacity="0.6" />
+                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- 상태줄 -->
+        <TextBlock Grid.Row="1" Margin="2,6" Opacity="0.7" FontSize="12"
+                   Text="{Binding StatusText}" />
+
+        <!-- 입력 -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Grid.Column="0"
+                     Text="{Binding InputText, Mode=TwoWay}"
+                     Watermark="메시지를 입력하세요…"
+                     AcceptsReturn="False"
+                     IsEnabled="{Binding !IsBusy}">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding SendCommand}" />
+                </TextBox.KeyBindings>
+            </TextBox>
+            <Button Grid.Column="1" Content="전송"
+                    Command="{Binding SendCommand}"
+                    IsDefault="True" MinWidth="72" />
+        </Grid>
+    </Grid>
+</UserControl>

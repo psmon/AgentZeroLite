@@ -1,0 +1,27 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dockFluent="using:Dock.Avalonia.Themes.Fluent"
+             xmlns:docking="using:AgentZeroAvalonia.Docking"
+             xmlns:views="using:AgentZeroAvalonia.Views"
+             x:Class="AgentZeroAvalonia.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.DataTemplates>
+        <!-- 도킹 도큐먼트 VM → 실제 View 매핑 -->
+        <DataTemplate DataType="docking:ChatDocument">
+            <views:AgentChatView />
+        </DataTemplate>
+        <DataTemplate DataType="docking:TerminalDocument">
+            <views:TerminalView />
+        </DataTemplate>
+        <DataTemplate DataType="docking:MarkdownDocument">
+            <views:MarkdownView DataContext="{Binding Vm}" />
+        </DataTemplate>
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme />
+        <dockFluent:DockFluentTheme />
+    </Application.Styles>
+
+</Application>

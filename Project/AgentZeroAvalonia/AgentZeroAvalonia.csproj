@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ───────────────────────────────────────────────────────────
+       AgentZeroAvalonia — cross-platform (Windows/macOS/Linux) host.
+
+       WPF 버전(Project/AgentZeroWpf)의 Windows 종속을 걷어낸 Avalonia 포트.
+       단일 TFM(net10.0)에 RID는 publish 시점에 결정(win-x64 / osx-arm64 등).
+       ZeroCommon은 WPF/Win32-free 공유 로직 — ProjectReference로만 끌어온다.
+       ─────────────────────────────────────────────────────────── -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AgentZeroAvalonia</RootNamespace>
+    <AssemblyName>AgentZeroLite</AssemblyName>
+    <!-- 솔루션(.slnx)이 선언한 빌드 타입과 일치시켜 IDE 구성 매핑 마찰 방지.
+         CLI/GUI 분기는 WPF와 동일하게 런타임 -cli 인자로 결정(구성과 무관). -->
+    <Configurations>Debug;Release;AgentCLI</Configurations>
+    <!-- Avalonia 앱: XAML 미리보기/리소스 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.17" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.17" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.17" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.17" />
+    <!-- Debug 빌드에서만 F12 개발자 도구 (Avalonia DevTools) -->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.17">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <!-- 도킹 레이아웃 (AvalonDock 대체). Avalonia 11.3.x 호환 라인. -->
+    <PackageReference Include="Dock.Avalonia" Version="11.3.12" />
+    <PackageReference Include="Dock.Model.Mvvm" Version="11.3.12" />
+    <PackageReference Include="Dock.Avalonia.Themes.Fluent" Version="11.3.12" />
+    <!-- Markdown 뷰어 (네이티브 렌더, WebView 불필요 → 완전 cross-platform).
+         Mermaid/임의 HTML 렌더(WebView)는 별도 후속. -->
+    <PackageReference Include="Markdown.Avalonia" Version="11.0.3" />
+    <!-- cross-platform PTY (Windows ConPTY / macOS·Linux forkpty 네이티브 shim).
+         WPF의 ConPTY 전용 EasyWindowsTerminalControl을 대체하는 백엔드. -->
+    <PackageReference Include="Porta.Pty" Version="1.0.7" />
+    <!-- 완전한 VT100/xterm 터미널 컨트롤 (XTerm.NET 에뮬레이션 + Porta.Pty + Avalonia 렌더러).
+         Avalonia 11.3 호환 라인. 색상·커서·TUI 앱(vim/claude CLI) 렌더 지원. -->
+    <PackageReference Include="Iciclecreek.Avalonia.Terminal" Version="1.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
+  </ItemGroup>
+
+</Project>

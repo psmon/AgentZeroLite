@@ -33,6 +33,9 @@
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- ISecretProtector의 Windows(DPAPI) 경로용. 비Windows에서는 런타임에
+         PlatformNotSupported를 던지므로 OperatingSystem.IsWindows()로 가드. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
     <!-- On-device LLM via self-compiled llama.cpp DLLs under runtimes/ loaded
          explicitly with NativeLibraryConfig.WithLibrary() — this bypasses the
          earlier ggml.dll collision with Whisper.net because the load path and

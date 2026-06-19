@@ -1,0 +1,43 @@
+using System.Collections.Generic;
+using Dock.Model.Core;
+using Dock.Model.Controls;
+using Dock.Model.Mvvm;
+using Dock.Model.Mvvm.Controls;
+
+namespace AgentZeroAvalonia.Docking;
+
+/// <summary>
+/// 초기 도킹 레이아웃 팩토리. RootDock → DocumentDock(채팅/터미널 도큐먼트).
+/// AvalonDock(WPF)의 LayoutDocumentPane 역할을 Dock.Avalonia로 대체한다.
+/// </summary>
+public sealed class DockFactory : Factory
+{
+    /// <summary>도큐먼트 추가/활성화에 쓰도록 보관(새 터미널 탭 추가용).</summary>
+    public IDocumentDock? Documents { get; private set; }
+
+    public override IRootDock CreateLayout()
+    {
+        var chat = new ChatDocument();
+        var terminal = new TerminalDocument(1);
+        var doc = new MarkdownDocument();
+
+        var documents = new DocumentDock
+        {
+            Id = "Documents",
+            Title = "Documents",
+            IsCollapsable = false,
+            CanCreateDocument = false,
+            VisibleDockables = CreateList<IDockable>(chat, terminal, doc),
+            ActiveDockable = terminal, // 터미널 중심 앱 — 시작 시 터미널 활성
+        };
+        Documents = documents;
+
+        var root = CreateRootDock();
+        root.Id = "Root";
+        root.Title = "Root";
+        root.VisibleDockables = CreateList<IDockable>(documents);
+        root.ActiveDockable = documents;
+        root.DefaultDockable = documents;
+        return root;
+    }
+}

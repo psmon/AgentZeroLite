@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:terminal="using:Iciclecreek.Terminal"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="AgentZeroAvalonia.Views.TerminalView">
+
+    <!-- 완전한 VT100/xterm 터미널 — XTerm.NET 에뮬레이션 + Porta.Pty.
+         색상·커서·TUI 앱(vim/claude CLI) 렌더링 지원. Process/디렉터리는
+         코드비하인드에서 OS별로 설정. -->
+    <terminal:TerminalControl x:Name="Term"
+                              FontFamily="Cascadia Mono,Consolas,Menlo,monospace"
+                              FontSize="13"
+                              BufferSize="2000" />
+</UserControl>
