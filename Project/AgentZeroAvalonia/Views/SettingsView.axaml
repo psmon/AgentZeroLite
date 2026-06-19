@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             xmlns:data="using:Agent.Common.Data.Entities"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="AgentZeroAvalonia.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <TabControl Margin="8">
+
+        <!-- ── External LLM ── -->
+        <TabItem Header="🤖 LLM">
+            <ScrollViewer>
+                <StackPanel Margin="14" Spacing="10" MaxWidth="560" HorizontalAlignment="Left">
+                    <TextBlock Text="External LLM (OpenAI 호환 REST)" FontWeight="Bold"
+                               Foreground="{DynamicResource CyberCyan}" />
+                    <TextBlock Text="채팅이 사용하는 백엔드. macOS/Linux에서는 이 경로로 동작합니다."
+                               FontSize="11" Foreground="{DynamicResource CyberTextDim}" TextWrapping="Wrap" />
+
+                    <TextBlock Text="Provider" FontSize="11" Foreground="{DynamicResource CyberTextDim}" Margin="0,6,0,0" />
+                    <ComboBox ItemsSource="{Binding Providers}" SelectedItem="{Binding Provider}"
+                              HorizontalAlignment="Stretch" />
+
+                    <TextBlock Text="모델 (비우면 호스트 기본값)" FontSize="11" Foreground="{DynamicResource CyberTextDim}" />
+                    <TextBox Text="{Binding SelectedModel}" Watermark="예: google/gemma-4-e4b" />
+
+                    <TextBlock Text="Max Tokens" FontSize="11" Foreground="{DynamicResource CyberTextDim}" />
+                    <NumericUpDown Value="{Binding MaxTokens}" Minimum="256" Maximum="32768" Increment="256"
+                                   HorizontalAlignment="Left" Width="160" />
+
+                    <Border Height="1" Background="{DynamicResource CyberBorder}" Margin="0,6" />
+                    <TextBlock Text="자격 증명 (해당 Provider만 채우면 됩니다)" FontSize="11"
+                               Foreground="{DynamicResource CyberTextDim}" />
+
+                    <TextBlock Text="OpenAI API Key" FontSize="11" Foreground="{DynamicResource CyberTextDim}" />
+                    <TextBox Text="{Binding OpenAIApiKey}" PasswordChar="•" />
+                    <TextBlock Text="OpenAI Base URL (비우면 기본값)" FontSize="11" Foreground="{DynamicResource CyberTextDim}" />
+                    <TextBox Text="{Binding OpenAIBaseUrl}" Watermark="https://api.openai.com/v1" />
+
+                    <TextBlock Text="LM Studio Base URL" FontSize="11" Foreground="{DynamicResource CyberTextDim}" />
+                    <TextBox Text="{Binding LmStudioBaseUrl}" Watermark="http://localhost:1234/v1" />
+                    <TextBlock Text="LM Studio API Key (선택)" FontSize="11" Foreground="{DynamicResource CyberTextDim}" />
+                    <TextBox Text="{Binding LmStudioApiKey}" PasswordChar="•" />
+
+                    <TextBlock Text="Ollama Base URL (비우면 기본값)" FontSize="11" Foreground="{DynamicResource CyberTextDim}" />
+                    <TextBox Text="{Binding OllamaBaseUrl}" Watermark="http://localhost:11434/v1" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+                        <Button Classes="accent" Content="저장" Command="{Binding SaveLlmCommand}" />
+                        <TextBlock Text="{Binding LlmStatus}" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource CyberTeal}" FontSize="11" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ── CLI 정의 ── -->
+        <TabItem Header="⚙ CLI 정의">
+            <DockPanel Margin="14">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                    <Button Content="+ 추가" Command="{Binding AddCliCommand}" />
+                    <Button Content="삭제" Command="{Binding DeleteCliCommand}" />
+                    <TextBlock Text="{Binding CliStatus}" VerticalAlignment="Center"
+                               Foreground="{DynamicResource CyberTextDim}" FontSize="11" />
+                </StackPanel>
+                <ListBox ItemsSource="{Binding CliDefinitions}"
+                         SelectedItem="{Binding SelectedCli}"
+                         Background="{DynamicResource CyberBgPanel}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="data:CliDefinition">
+                            <Grid ColumnDefinitions="160,*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="Bold"
+                                           Foreground="{DynamicResource CyberText}" />
+                                <TextBlock Grid.Column="1" FontSize="11"
+                                           Foreground="{DynamicResource CyberTextDim}" TextTrimming="CharacterEllipsis">
+                                    <Run Text="{Binding ExePath}" />
+                                    <Run Text="{Binding Arguments}" />
+                                </TextBlock>
+                                <TextBlock Grid.Column="2" Text="기본" FontSize="10"
+                                           Foreground="{DynamicResource CyberTeal}"
+                                           IsVisible="{Binding IsBuiltIn}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </TabItem>
+    </TabControl>
+</UserControl>

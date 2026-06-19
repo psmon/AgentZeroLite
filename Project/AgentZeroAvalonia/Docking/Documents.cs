@@ -37,6 +37,18 @@ public sealed class NotebookDocument : Document
     }
 }
 
+/// <summary>설정 — External LLM + CLI 정의.</summary>
+public sealed class SettingsDocument : Document
+{
+    public SettingsViewModel Vm { get; } = new();
+
+    public SettingsDocument()
+    {
+        Id = "Settings";
+        Title = "설정";
+    }
+}
+
 /// <summary>터미널 도큐먼트 — 각 탭이 독립 TerminalControl(자체 PTY)을 호스팅.</summary>
 public sealed class TerminalDocument : Document
 {

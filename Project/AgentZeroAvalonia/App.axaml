@@ -20,6 +20,9 @@
         <DataTemplate DataType="docking:NotebookDocument">
             <views:NotebookView DataContext="{Binding Vm}" />
         </DataTemplate>
+        <DataTemplate DataType="docking:SettingsDocument">
+            <views:SettingsView DataContext="{Binding Vm}" />
+        </DataTemplate>
     </Application.DataTemplates>
 
     <Application.Styles>

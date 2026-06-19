@@ -60,6 +60,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand] private void ShowChat() => Activate("Chat");
     [RelayCommand] private void ShowNotebook() => Activate("Notebook");
+    [RelayCommand] private void ShowSettings() => Activate("Settings");
 
     [RelayCommand]
     private void ToggleSidebar() => SidebarExpanded = !SidebarExpanded;

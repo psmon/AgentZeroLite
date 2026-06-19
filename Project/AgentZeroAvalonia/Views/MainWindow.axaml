@@ -60,7 +60,8 @@
                                 Command="{Binding ShowNotebookCommand}" />
                     </StackPanel>
                     <Button DockPanel.Dock="Bottom" Classes="activity" Content="⚙"
-                            ToolTip.Tip="설정 (이식 예정)" VerticalAlignment="Bottom" />
+                            ToolTip.Tip="설정" VerticalAlignment="Bottom"
+                            Command="{Binding ShowSettingsCommand}" />
                 </DockPanel>
             </Border>
 
