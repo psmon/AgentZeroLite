@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:md="using:Markdown.Avalonia"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             xmlns:models="using:AgentZeroAvalonia.Models"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+             x:Class="AgentZeroAvalonia.Views.NotebookView"
+             x:DataType="vm:NotebookViewModel">
+
+    <Grid ColumnDefinitions="260,4,*">
+
+        <!-- 파일 트리 -->
+        <Border Grid.Column="0" Background="{DynamicResource CyberBgPanel}"
+                BorderBrush="{DynamicResource CyberBorder}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <Button DockPanel.Dock="Top" Content="📂 폴더 열기" Click="OnOpenFolder"
+                        Margin="6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <TextBlock DockPanel.Dock="Top" Text="{Binding RootLabel}" FontSize="10"
+                           Foreground="{DynamicResource CyberTextDim}" TextTrimming="CharacterEllipsis"
+                           Margin="8,0,8,4" />
+                <TreeView ItemsSource="{Binding RootNodes}"
+                          SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+                          Background="Transparent">
+                    <TreeView.ItemTemplate>
+                        <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="models:FileNode">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{Binding Icon}" FontSize="12" />
+                                <TextBlock Text="{Binding Name}" FontSize="12"
+                                           Foreground="{DynamicResource CyberText}" />
+                            </StackPanel>
+                        </TreeDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </DockPanel>
+        </Border>
+
+        <GridSplitter Grid.Column="1" Background="{DynamicResource CyberBorder}" />
+
+        <!-- 문서 뷰어 -->
+        <DockPanel Grid.Column="2">
+            <Border DockPanel.Dock="Top" Background="{DynamicResource CyberBgToolbar}"
+                    BorderBrush="{DynamicResource CyberBorder}" BorderThickness="0,0,0,1" Padding="10,5">
+                <TextBlock Text="{Binding DocumentTitle}" FontWeight="Bold"
+                           Foreground="{DynamicResource CyberText}" />
+            </Border>
+
+            <Panel Margin="0">
+                <!-- 마크다운 -->
+                <md:MarkdownScrollViewer Markdown="{Binding MarkdownText}" Margin="12"
+                                         IsVisible="{Binding IsMarkdown}" />
+                <!-- 텍스트/코드 -->
+                <ScrollViewer IsVisible="{Binding IsText}">
+                    <SelectableTextBlock Text="{Binding PlainText}" Margin="12"
+                                         FontFamily="{DynamicResource CyberFont}" FontSize="12"
+                                         Foreground="{DynamicResource CyberText}" TextWrapping="NoWrap" />
+                </ScrollViewer>
+                <!-- 이미지 -->
+                <ScrollViewer IsVisible="{Binding IsImage}">
+                    <Image Source="{Binding Image}" Stretch="None" Margin="12"
+                           HorizontalAlignment="Left" VerticalAlignment="Top" />
+                </ScrollViewer>
+            </Panel>
+        </DockPanel>
+    </Grid>
+</UserControl>

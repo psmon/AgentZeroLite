@@ -53,4 +53,21 @@
     <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
   </ItemGroup>
 
+  <!-- WPF 앱과 동일한 제품 버전 표시(version.txt 단일 출처). 타이틀바 브랜딩이
+       InformationalVersion을 읽어 "vX.Y.Z" 로 표시한다. -->
+  <PropertyGroup>
+    <VersionFile>$(MSBuildProjectDirectory)\version.txt</VersionFile>
+    <AppVersion>$([System.IO.File]::ReadAllText($(VersionFile)).Trim())</AppVersion>
+    <Version>$(AppVersion)</Version>
+    <AssemblyVersion>$(AppVersion)</AssemblyVersion>
+    <FileVersion>$(AppVersion)</FileVersion>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="version.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

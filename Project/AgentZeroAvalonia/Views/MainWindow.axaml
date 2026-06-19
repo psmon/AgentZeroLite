@@ -7,26 +7,104 @@
         x:Class="AgentZeroAvalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         mc:Ignorable="d"
-        Width="1100" Height="720"
-        MinWidth="720" MinHeight="480"
-        Title="AgentZero Lite (Avalonia)">
+        Width="1180" Height="760"
+        MinWidth="820" MinHeight="520"
+        Background="{DynamicResource CyberBgDeep}"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="34"
+        Title="AgentZero Lite">
 
-    <DockPanel LastChildFill="True">
+    <Grid RowDefinitions="34,*,24">
 
-        <!-- 상단 메뉴 -->
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_파일">
-                <MenuItem Header="새 터미널" Command="{Binding NewTerminalCommand}" />
-                <Separator />
-                <MenuItem Header="종료" Click="OnExitClick" />
-            </MenuItem>
-            <MenuItem Header="_도움말">
-                <MenuItem Header="정보" Click="OnAboutClick" />
-            </MenuItem>
-        </Menu>
+        <!-- ── Row 0: 타이틀바 브랜딩 (확장 클라이언트 영역) ── -->
+        <Border Grid.Row="0" IsHitTestVisible="False">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                    <GradientStop Color="#1A1A1A" Offset="0" />
+                    <GradientStop Color="#2D2D30" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                        Margin="86,0,0,0" Spacing="2">
+                <!-- macOS 트래픽 라이트 회피용 좌측 여백(86). Windows에선 단순 들여쓰기 -->
+                <TextBlock Text="AGENT" FontWeight="Bold" FontSize="13"
+                           Foreground="{DynamicResource CyberCyan}" />
+                <TextBlock Text="ZERO" FontWeight="Bold" FontSize="13"
+                           Foreground="{DynamicResource CyberMagenta}" Margin="4,0,0,0" />
+                <TextBlock Text="LITE" FontWeight="Bold" FontSize="13"
+                           Foreground="{DynamicResource CyberMint}" Margin="4,0,0,0">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#7CFDB0" BlurRadius="10" OffsetX="0" OffsetY="0"
+                                          Opacity="0.55" />
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock Text="{Binding VersionLabel}" FontSize="10"
+                           Foreground="{DynamicResource CyberTextDim}"
+                           VerticalAlignment="Center" Margin="8,2,0,0" />
+            </StackPanel>
+        </Border>
 
-        <!-- 본문: 도킹 레이아웃 (채팅 / 터미널 도큐먼트) -->
-        <idc:DockControl Layout="{Binding Layout}" />
+        <!-- ── Row 1: 액티비티바 + 사이드바 + 도킹 콘텐츠 ── -->
+        <Grid Grid.Row="1" ColumnDefinitions="48,Auto,*">
 
-    </DockPanel>
+            <!-- 액티비티바 (좌측 아이콘 스트립) -->
+            <Border Grid.Column="0" Background="{DynamicResource CyberBgPanel}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <Button Classes="activity" Content="💬" ToolTip.Tip="채팅"
+                                Command="{Binding ShowChatCommand}" />
+                        <Button Classes="activity" Content="▦" ToolTip.Tip="사이드바 토글"
+                                Command="{Binding ToggleSidebarCommand}" />
+                        <Button Classes="activity" Content="📄" ToolTip.Tip="노트"
+                                Command="{Binding ShowNotebookCommand}" />
+                    </StackPanel>
+                    <Button DockPanel.Dock="Bottom" Classes="activity" Content="⚙"
+                            ToolTip.Tip="설정 (이식 예정)" VerticalAlignment="Bottom" />
+                </DockPanel>
+            </Border>
+
+            <!-- 사이드바 (워크스페이스/세션) -->
+            <Border Grid.Column="1" Width="220" Background="{DynamicResource CyberBgPanel}"
+                    BorderBrush="{DynamicResource CyberBorder}" BorderThickness="0,0,1,0"
+                    IsVisible="{Binding SidebarExpanded}">
+                <DockPanel Margin="0,6">
+                    <TextBlock DockPanel.Dock="Top" Text="WORKSPACES" FontSize="10" FontWeight="Bold"
+                               Foreground="{DynamicResource CyberTextDim}" Margin="12,4" />
+                    <Button DockPanel.Dock="Top" Content="+ 새 터미널"
+                            Command="{Binding NewTerminalCommand}" Margin="10,4"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                    <Border DockPanel.Dock="Top" Height="1" Background="{DynamicResource CyberBorder}"
+                            Margin="10,8" />
+                    <TextBlock DockPanel.Dock="Top" Text="SESSIONS" FontSize="10" FontWeight="Bold"
+                               Foreground="{DynamicResource CyberTextDim}" Margin="12,4" />
+                    <TextBlock Text="열린 탭은 우측 도킹 영역에 표시됩니다."
+                               TextWrapping="Wrap" FontSize="11"
+                               Foreground="{DynamicResource CyberTextDim}" Margin="12,4" />
+                </DockPanel>
+            </Border>
+
+            <!-- 도킹 콘텐츠 (채팅/터미널/문서) -->
+            <idc:DockControl Grid.Column="2" Layout="{Binding Layout}" />
+        </Grid>
+
+        <!-- ── Row 2: 상태바 ── -->
+        <Border Grid.Row="2" Background="{DynamicResource CyberBgToolbar}"
+                BorderBrush="{DynamicResource CyberBorder}" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="10,0">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
+                            VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Fill="{DynamicResource CyberTeal}" />
+                    <TextBlock Text="Ready" FontSize="11"
+                               Foreground="{DynamicResource CyberTextDim}" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding BotStatus}" FontSize="11"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource CyberTextDim}" />
+                <TextBlock Grid.Column="2" Text="{Binding VersionLabel}" FontSize="11"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource CyberTextDim}" />
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

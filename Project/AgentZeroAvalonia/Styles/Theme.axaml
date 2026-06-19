@@ -1,0 +1,108 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ───────────────────────────────────────────────────────────
+         AgentZero 사이버 다크 테마 — WPF 앱(App.xaml/MainWindow)의 팔레트와
+         타이포를 Avalonia로 옮긴 것. VS Code 풍 플랫(코너 0) 스타일.
+         ─────────────────────────────────────────────────────────── -->
+
+    <Styles.Resources>
+        <!-- 배경 -->
+        <SolidColorBrush x:Key="CyberBgDeep"    Color="#1E1E1E" />
+        <SolidColorBrush x:Key="CyberBgPanel"   Color="#252526" />
+        <SolidColorBrush x:Key="CyberBgToolbar" Color="#2D2D30" />
+        <SolidColorBrush x:Key="CyberInputBg"   Color="#1F1F1F" />
+        <!-- 액센트 -->
+        <SolidColorBrush x:Key="CyberCyan"      Color="#3794FF" />
+        <SolidColorBrush x:Key="CyberMagenta"   Color="#C586C0" />
+        <SolidColorBrush x:Key="CyberTeal"      Color="#4EC9B0" />
+        <SolidColorBrush x:Key="CyberMint"      Color="#7CFDB0" />
+        <SolidColorBrush x:Key="CyberYellow"    Color="#DCDCAA" />
+        <!-- 텍스트/보더 -->
+        <SolidColorBrush x:Key="CyberText"      Color="#D4D4D4" />
+        <SolidColorBrush x:Key="CyberTextDim"   Color="#858585" />
+        <SolidColorBrush x:Key="CyberBorder"    Color="#3E3E42" />
+        <SolidColorBrush x:Key="CyberSelection" Color="#264F78" />
+
+        <FontFamily x:Key="CyberFont">Consolas,Cascadia Mono,Menlo,monospace</FontFamily>
+    </Styles.Resources>
+
+    <!-- 창/루트 기본 -->
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource CyberBgDeep}" />
+        <Setter Property="FontFamily" Value="{DynamicResource CyberFont}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource CyberText}" />
+    </Style>
+
+    <!-- 기본(Flat) 버튼 -->
+    <Style Selector="Button">
+        <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+        <Setter Property="Foreground" Value="{DynamicResource CyberText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="FontFamily" Value="{DynamicResource CyberFont}" />
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#333337" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberCyan}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource CyberCyan}" />
+    </Style>
+
+    <!-- 강조(Accent) 버튼: class="accent" -->
+    <Style Selector="Button.accent">
+        <Setter Property="Background" Value="#333337" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource CyberCyan}" />
+        <Setter Property="BorderThickness" Value="1.5" />
+    </Style>
+
+    <!-- 액티비티바 아이콘 버튼: class="activity" (투명, 좌측 강조선) -->
+    <Style Selector="Button.activity">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource CyberTextDim}" />
+        <Setter Property="Width" Value="48" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.activity:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2D2D30" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource CyberCyan}" />
+    </Style>
+
+    <!-- 입력 -->
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{DynamicResource CyberInputBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource CyberText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberBorder}" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="FontFamily" Value="{DynamicResource CyberFont}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource CyberSelection}" />
+    </Style>
+
+    <!-- 탭 -->
+    <Style Selector="TabControl">
+        <Setter Property="Background" Value="{DynamicResource CyberBgDeep}" />
+    </Style>
+    <Style Selector="TabItem">
+        <Setter Property="Foreground" Value="{DynamicResource CyberTextDim}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="TabItem:selected">
+        <Setter Property="Foreground" Value="{DynamicResource CyberCyan}" />
+    </Style>
+
+    <!-- 메뉴 -->
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+    </Style>
+</Styles>

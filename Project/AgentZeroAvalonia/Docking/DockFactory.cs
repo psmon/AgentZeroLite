@@ -19,7 +19,7 @@ public sealed class DockFactory : Factory
     {
         var chat = new ChatDocument();
         var terminal = new TerminalDocument(1);
-        var doc = new MarkdownDocument();
+        var notebook = new NotebookDocument();
 
         var documents = new DocumentDock
         {
@@ -27,7 +27,7 @@ public sealed class DockFactory : Factory
             Title = "Documents",
             IsCollapsable = false,
             CanCreateDocument = false,
-            VisibleDockables = CreateList<IDockable>(chat, terminal, doc),
+            VisibleDockables = CreateList<IDockable>(chat, terminal, notebook),
             ActiveDockable = terminal, // 터미널 중심 앱 — 시작 시 터미널 활성
         };
         Documents = documents;

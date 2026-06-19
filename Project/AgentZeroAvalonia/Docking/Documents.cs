@@ -25,6 +25,18 @@ public sealed class MarkdownDocument : Document
     }
 }
 
+/// <summary>노트북 — 파일트리 + 문서 뷰어(마크다운/텍스트/이미지).</summary>
+public sealed class NotebookDocument : Document
+{
+    public NotebookViewModel Vm { get; } = new();
+
+    public NotebookDocument()
+    {
+        Id = "Notebook";
+        Title = "노트";
+    }
+}
+
 /// <summary>터미널 도큐먼트 — 각 탭이 독립 TerminalControl(자체 PTY)을 호스팅.</summary>
 public sealed class TerminalDocument : Document
 {
