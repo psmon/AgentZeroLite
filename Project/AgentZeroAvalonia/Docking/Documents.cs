@@ -49,6 +49,18 @@ public sealed class SettingsDocument : Document
     }
 }
 
+/// <summary>클립보드 히스토리.</summary>
+public sealed class ClipboardDocument : Document
+{
+    public ClipboardViewModel Vm { get; } = new();
+
+    public ClipboardDocument()
+    {
+        Id = "Clipboard";
+        Title = "클립보드";
+    }
+}
+
 /// <summary>터미널 도큐먼트 — 각 탭이 독립 TerminalControl(자체 PTY)을 호스팅.</summary>
 public sealed class TerminalDocument : Document
 {

@@ -58,6 +58,8 @@
                                 Command="{Binding ToggleSidebarCommand}" />
                         <Button Classes="activity" Content="📄" ToolTip.Tip="노트"
                                 Command="{Binding ShowNotebookCommand}" />
+                        <Button Classes="activity" Content="📋" ToolTip.Tip="클립보드"
+                                Command="{Binding ShowClipboardCommand}" />
                     </StackPanel>
                     <Button DockPanel.Dock="Bottom" Classes="activity" Content="⚙"
                             ToolTip.Tip="설정" VerticalAlignment="Bottom"

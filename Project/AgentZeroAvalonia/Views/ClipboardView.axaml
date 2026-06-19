@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             xmlns:models="using:AgentZeroAvalonia.Models"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             x:Class="AgentZeroAvalonia.Views.ClipboardView"
+             x:DataType="vm:ClipboardViewModel">
+
+    <DockPanel Margin="8">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="6" Margin="0,0,0,6">
+            <TextBox Grid.Column="0" Text="{Binding FilterText, Mode=TwoWay}"
+                     Watermark="필터…" />
+            <Button Grid.Column="1" Content="지우기" Command="{Binding ClearCommand}" />
+        </Grid>
+        <TextBlock DockPanel.Dock="Bottom" FontSize="10"
+                   Foreground="{DynamicResource CyberTextDim}" Margin="2,4,0,0">
+            <Run Text="{Binding Count}" /><Run Text="건 · 항목 더블클릭 시 클립보드로 복사" />
+        </TextBlock>
+
+        <ListBox x:Name="HistoryList" ItemsSource="{Binding Filtered}"
+                 DoubleTapped="OnCopyBack" Background="{DynamicResource CyberBgPanel}">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="models:ClipboardEntry">
+                    <StackPanel Spacing="1">
+                        <TextBlock Text="{Binding TimeLabel}" FontSize="10"
+                                   Foreground="{DynamicResource CyberTeal}" />
+                        <TextBlock Text="{Binding Preview}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource CyberText}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</UserControl>

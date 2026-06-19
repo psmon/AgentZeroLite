@@ -23,6 +23,9 @@
         <DataTemplate DataType="docking:SettingsDocument">
             <views:SettingsView DataContext="{Binding Vm}" />
         </DataTemplate>
+        <DataTemplate DataType="docking:ClipboardDocument">
+            <views:ClipboardView DataContext="{Binding Vm}" />
+        </DataTemplate>
     </Application.DataTemplates>
 
     <Application.Styles>
