@@ -30,7 +30,10 @@ public sealed class DockFactory : Factory
             IsCollapsable = false,
             CanCreateDocument = false,
             VisibleDockables = CreateList<IDockable>(chat, terminal, notebook, clipboard, settings),
-            ActiveDockable = terminal, // 터미널 중심 앱 — 시작 시 터미널 활성
+            // 시작 활성 탭은 채팅(비PTY). 터미널을 기본 활성으로 두면 IDE 디버거의
+            // 통합 콘솔이 ConPTY를 가로채는 환경(Rider/VS 기본)에서 시작 시 멈춘다.
+            // 터미널은 탭 클릭 시 spawn — 상호작용은 외부 콘솔 권장(README/PORTING 참조).
+            ActiveDockable = chat,
         };
         Documents = documents;
 
