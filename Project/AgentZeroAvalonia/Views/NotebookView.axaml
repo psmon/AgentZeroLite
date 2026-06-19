@@ -23,6 +23,12 @@
                 <TreeView ItemsSource="{Binding RootNodes}"
                           SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
                           Background="Transparent">
+                    <TreeView.Styles>
+                        <!-- 노드 펼침 → FileNode.IsExpanded → 지연 로드 트리거 -->
+                        <Style Selector="TreeViewItem" x:DataType="models:FileNode">
+                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                        </Style>
+                    </TreeView.Styles>
                     <TreeView.ItemTemplate>
                         <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="models:FileNode">
                             <StackPanel Orientation="Horizontal" Spacing="5">

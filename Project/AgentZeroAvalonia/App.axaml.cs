@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -19,6 +20,18 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // 진단 로깅(exe 옆 logs/app-log.txt) + 전역 예외 포착.
+            try { AppLogger.EnableFileOutput(AppContext.BaseDirectory); } catch { }
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                if (e.ExceptionObject is Exception ex) AppLogger.LogError("[CRASH] AppDomain", ex);
+            };
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                AppLogger.LogError("[CRASH] UnobservedTask", e.Exception); e.SetObserved();
+            };
+            AppLogger.Log("[App] 시작");
+
             // EF Core SQLite DB 생성/마이그레이션 + 기본 CliDefinition 시드.
             // (%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db — cross-platform 경로)
             try
