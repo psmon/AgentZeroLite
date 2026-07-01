@@ -45,10 +45,10 @@ public static class TtsProviderNames
     public const string OpenAITts = "OpenAITTS";
 
     /// <summary>
-    /// Supertone Inc's local ONNX TTS, invoked via the <c>pip install supertonic</c>
-    /// Python CLI. 10 builtin voices (M1..M5 / F1..F5), 31 languages incl. Korean.
-    /// First AgentZero provider that depends on a user-side pip install — the
-    /// Voice tab probes for it and surfaces the install command when missing.
+    /// Supertone Inc's local ONNX TTS, run natively through Microsoft.ML.OnnxRuntime
+    /// (no Python / no pip). 10 builtin voices (M1..M5 / F1..F5), 31 languages
+    /// incl. Korean, 44.1 kHz WAV. Models (~398 MB) are downloaded once from the
+    /// Voice tab into <c>%LOCALAPPDATA%\AgentZeroLite\models\supertonic</c>.
     /// </summary>
     public const string Supertonic = "Supertonic";
 }
@@ -127,23 +127,29 @@ public sealed class VoiceSettings
     /// <summary>OpenAITTS provider API key. Stored even when another provider is active.</summary>
     public string TtsOpenAIApiKey { get; set; } = "";
 
-    // ── Supertonic (pip-installed local CLI) ─────────────────────────────
+    // ── Supertonic (native on-device ONNX — no Python) ───────────────────
 
     /// <summary>
-    /// Python interpreter used to launch <c>python -m supertonic</c>. Empty →
-    /// bare <c>"python"</c> on PATH. Lets advanced users point at a venv or a
-    /// pyenv shim without polluting system PATH.
+    /// Override directory holding the Supertonic ONNX bundle. Empty → the
+    /// convention path <see cref="SuperTonicModelStore.DefaultModelDirectory"/>
+    /// (<c>%LOCALAPPDATA%\AgentZeroLite\models\supertonic</c>).
     /// </summary>
-    public string SupertonicPythonPath { get; set; } = "";
+    public string SupertonicModelDir { get; set; } = "";
 
-    /// <summary>ONNX inference steps, 5..12 (default 8 per Supertone model card).</summary>
+    /// <summary>Builtin voice id (M1..M5 / F1..F5). Default F1.</summary>
+    public string SupertonicVoice { get; set; } = "F1";
+
+    /// <summary>ONNX denoising steps, 5..12 (default 8 per Supertone model card).</summary>
     public int SupertonicSteps { get; set; } = 8;
 
     /// <summary>
-    /// BCP-47 short tag passed as <c>--lang</c>. Empty → <c>"na"</c> upstream
-    /// fallback (auto-detect). Korean = <c>"ko"</c>.
+    /// BCP-47 short tag. Unsupported tags auto-coerce to <c>"na"</c>
+    /// (script auto-detect). Korean = <c>"ko"</c>.
     /// </summary>
     public string SupertonicLanguage { get; set; } = "ko";
+
+    /// <summary>Speech speed factor, 0.7..2.0 (default 1.05 per reference).</summary>
+    public float SupertonicSpeed { get; set; } = 1.05f;
 
     // ── Capture / VAD ────────────────────────────────────────────────────
 

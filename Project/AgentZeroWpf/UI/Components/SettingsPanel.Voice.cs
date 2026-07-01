@@ -72,13 +72,10 @@ public partial class SettingsPanel
 
             SelectComboTag(cbTtsProvider, v.TtsProvider);
             pbTtsOpenAIKey.Password = v.TtsOpenAIApiKey;
-            tbSupertonicPython.Text = v.SupertonicPythonPath;
             tbSupertonicSteps.Text = v.SupertonicSteps.ToString();
+            tbSupertonicSpeed.Text = v.SupertonicSpeed.ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture);
             SelectComboTag(cbSupertonicLang, string.IsNullOrWhiteSpace(v.SupertonicLanguage) ? "ko" : v.SupertonicLanguage);
-            // Seed the Python picker with just the saved value as a single
-            // pinned entry — eager py-launcher enumeration would block the
-            // tab open by ~200ms. User clicks Detect when they want to scan.
-            SeedSupertonicPythonPicker(v.SupertonicPythonPath);
+            SelectComboTag(cbSupertonicVoice, string.IsNullOrWhiteSpace(v.SupertonicVoice) ? "F1" : v.SupertonicVoice);
             PreloadSingleItem(cbTtsVoice, v.TtsVoice);
             ApplyTtsProviderUi(v.TtsProvider);
 
@@ -354,10 +351,13 @@ public partial class SettingsPanel
         v.TtsProvider = ReadComboTag(cbTtsProvider, TtsProviderNames.Off);
         v.TtsOpenAIApiKey = pbTtsOpenAIKey.Password ?? "";
         v.TtsVoice = (cbTtsVoice.SelectedItem as string) ?? cbTtsVoice.Text ?? v.TtsVoice;
-        v.SupertonicPythonPath = tbSupertonicPython.Text?.Trim() ?? "";
         v.SupertonicLanguage = ReadComboTag(cbSupertonicLang, "ko");
+        v.SupertonicVoice = ReadComboTag(cbSupertonicVoice, "F1");
         if (int.TryParse(tbSupertonicSteps.Text, out var st) && st >= 5 && st <= 12)
             v.SupertonicSteps = st;
+        if (float.TryParse(tbSupertonicSpeed.Text, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var sp) && sp >= 0.7f && sp <= 2.0f)
+            v.SupertonicSpeed = sp;
 
         // M0024 — source picker swaps which device-id field gets the dropdown
         // tag. Per-source ids are persisted independently so toggling back
@@ -811,9 +811,9 @@ public partial class SettingsPanel
                         : System.Windows.Media.Brushes.LightGreen;
                     break;
                 case TtsProviderNames.Supertonic:
-                    foreach (var voice in SuperTonicTts.BuiltinVoices)
+                    foreach (var voice in SuperTonicOnnxTts.BuiltinVoices)
                         cbTtsVoice.Items.Add(voice);
-                    tbTtsStatus.Text = $"✓ {SuperTonicTts.BuiltinVoices.Length} Supertonic voice(s) listed (builtin).";
+                    tbTtsStatus.Text = $"✓ {SuperTonicOnnxTts.BuiltinVoices.Length} Supertonic voice(s) listed (builtin).";
                     tbTtsStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
                     break;
                 default:
@@ -838,13 +838,11 @@ public partial class SettingsPanel
         {
             var v = ReadVoiceFromUi();
             VoiceSettingsStore.Save(v);
-            // For Supertonic, surface which python actually got persisted so
-            // the user has visual confirmation matching WebDev's read view.
             tbTtsSaveStatus.Text = v.TtsProvider == TtsProviderNames.Supertonic
-                ? $"✓ Saved. Python='{(string.IsNullOrEmpty(v.SupertonicPythonPath) ? "(PATH default)" : v.SupertonicPythonPath)}'"
+                ? $"✓ Saved. Voice={v.SupertonicVoice}, lang={v.SupertonicLanguage}, steps={v.SupertonicSteps}"
                 : "✓ Saved.";
             tbTtsSaveStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
-            AppLogger.Log($"[Voice-TTS] Saved provider={v.TtsProvider} voice={v.TtsVoice} pythonPath='{v.SupertonicPythonPath}'");
+            AppLogger.Log($"[Voice-TTS] Saved provider={v.TtsProvider} voice={v.TtsVoice} supertonicVoice={v.SupertonicVoice}");
         }
         catch (Exception ex)
         {
@@ -1204,24 +1202,17 @@ public partial class SettingsPanel
         }), DispatcherPriority.Background);
     }
 
-    // ── Supertonic Python picker ─────────────────────────────────────
-
-    // Sentinel tags used by the Python picker so SelectionChanged can tell
-    // "real detected python" apart from the synthetic Default / Custom rows.
-    private const string PythonPickerDefaultTag = "__default__"; // empty → PATH 'python'
-    private const string PythonPickerCustomTag = "__custom__";   // means "edit Path manually"
+    // ── Supertonic (native ONNX) ─────────────────────────────────────
 
     /// <summary>
-    /// Mark the TTS slice unsaved. Centralised because every Supertonic field
-    /// (Python picker, Path textbox, Steps, Language) routes here — the M0020
-    /// follow-up #4 root cause was that field changes silently bypassed the
-    /// Save indicator, so users probed against the live textbox value but the
-    /// saved JSON (which WebDev reads) still had a stale path.
+    /// Mark the TTS slice unsaved. Every Supertonic field (Voice, Language,
+    /// Steps, Speed) routes here so field changes surface the Save indicator —
+    /// WebDev / VoiceStream load from the saved JSON, not the live UI.
     /// </summary>
     private void MarkTtsUnsaved()
     {
         if (_voiceInitializing) return;
-        tbTtsSaveStatus.Text = "● Unsaved — click Save TTS so the WebDev test page sees the same path.";
+        tbTtsSaveStatus.Text = "● Unsaved — click Save TTS so the WebDev test page picks up the change.";
         tbTtsSaveStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
     }
 
@@ -1229,227 +1220,27 @@ public partial class SettingsPanel
     private void OnSupertonicFieldChanged(object sender, RoutedEventArgs e) => MarkTtsUnsaved();
 
     /// <summary>
-    /// Tab-open seed: the picker shows just "(PATH default)", "(Custom)" and the
-    /// saved path (if any) as a pinned entry. Full enumeration is deferred to
-    /// the Detect button so opening the tab stays sub-50ms even on machines
-    /// with 5+ Python installs.
-    /// </summary>
-    private void SeedSupertonicPythonPicker(string savedPath)
-    {
-        cbSupertonicPython.Items.Clear();
-        cbSupertonicPython.Items.Add(new ComboBoxItem
-        {
-            Content = "(PATH default — 'python')",
-            Tag = PythonPickerDefaultTag,
-        });
-        if (!string.IsNullOrWhiteSpace(savedPath))
-        {
-            cbSupertonicPython.Items.Add(new ComboBoxItem
-            {
-                Content = $"(saved) {savedPath}",
-                Tag = savedPath,
-            });
-        }
-        cbSupertonicPython.Items.Add(new ComboBoxItem
-        {
-            Content = "(Custom — edit Path field below)",
-            Tag = PythonPickerCustomTag,
-        });
-        SelectSupertonicPythonByPath(savedPath);
-    }
-
-    private void SelectSupertonicPythonByPath(string path)
-    {
-        foreach (var obj in cbSupertonicPython.Items)
-        {
-            if (obj is ComboBoxItem ci && ci.Tag is string tag)
-            {
-                if (string.IsNullOrWhiteSpace(path) && tag == PythonPickerDefaultTag)
-                {
-                    cbSupertonicPython.SelectedItem = ci;
-                    return;
-                }
-                if (string.Equals(tag, path, StringComparison.OrdinalIgnoreCase))
-                {
-                    cbSupertonicPython.SelectedItem = ci;
-                    return;
-                }
-            }
-        }
-        // Saved path didn't match a row → custom.
-        foreach (var obj in cbSupertonicPython.Items)
-            if (obj is ComboBoxItem ci && (ci.Tag as string) == PythonPickerCustomTag)
-            {
-                cbSupertonicPython.SelectedItem = ci;
-                return;
-            }
-    }
-
-    /// <summary>
-    /// "Detect" — re-enumerate installed Pythons via py-launcher + filesystem
-    /// fallback and repopulate the picker. M0020 follow-up #3: gives the user
-    /// an explicit list to pick from so multi-Python systems don't silently
-    /// inherit whatever PATH resolved 'python' to.
-    /// </summary>
-    private async void OnSupertonicDetectPythons(object sender, RoutedEventArgs e)
-    {
-        btnSupertonicDetectPythons.IsEnabled = false;
-        var currentPath = tbSupertonicPython.Text?.Trim() ?? "";
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var pythons = await Task.Run(() => PythonDiscovery.EnumerateAsync(ct: cts.Token));
-
-            cbSupertonicPython.Items.Clear();
-            cbSupertonicPython.Items.Add(new ComboBoxItem
-            {
-                Content = "(PATH default — 'python')",
-                Tag = PythonPickerDefaultTag,
-            });
-            foreach (var p in pythons)
-                cbSupertonicPython.Items.Add(new ComboBoxItem
-                {
-                    Content = p.DisplayLabel,
-                    Tag = p.ExecutablePath,
-                });
-            cbSupertonicPython.Items.Add(new ComboBoxItem
-            {
-                Content = "(Custom — edit Path field below)",
-                Tag = PythonPickerCustomTag,
-            });
-
-            SelectSupertonicPythonByPath(currentPath);
-            tbTtsStatus.Text = pythons.Count == 0
-                ? "No Python interpreters detected. py.exe launcher missing? Set Path manually."
-                : $"✓ {pythons.Count} Python interpreter(s) detected.";
-            tbTtsStatus.Foreground = pythons.Count == 0
-                ? System.Windows.Media.Brushes.Goldenrod
-                : System.Windows.Media.Brushes.LightGreen;
-            AppLogger.Log($"[Voice-TTS] Python detection | found={pythons.Count}" +
-                          (pythons.Count > 0
-                              ? " — " + string.Join(", ", pythons.Select(p => $"{p.Version}@{p.ExecutablePath}"))
-                              : ""));
-        }
-        catch (Exception ex)
-        {
-            tbTtsStatus.Text = $"✗ Detect failed: {ex.Message}";
-            tbTtsStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-            AppLogger.LogError("[Voice-TTS] Python detect failed", ex);
-        }
-        finally
-        {
-            btnSupertonicDetectPythons.IsEnabled = true;
-        }
-    }
-
-    private void OnSupertonicPythonPickerChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_voiceInitializing) return;
-        if (cbSupertonicPython.SelectedItem is not ComboBoxItem ci || ci.Tag is not string tag) return;
-
-        if (tag == PythonPickerCustomTag)
-        {
-            tbSupertonicPython.Focus();
-            tbSupertonicPython.SelectAll();
-            return;
-        }
-        if (tag == PythonPickerDefaultTag)
-        {
-            tbSupertonicPython.Text = ""; // TextChanged → MarkTtsUnsaved
-            return;
-        }
-        // A real detected python — autofill the Path box. The user can still
-        // edit afterwards; the TextBox is the source of truth at save time.
-        // Setting Text fires TextChanged → MarkTtsUnsaved, so no extra call here.
-        tbSupertonicPython.Text = tag;
-    }
-
-    /// <summary>
     /// "Download Model" — opens the reusable <see cref="ModelDownloadDialog"/>
-    /// with Supertonic's <see cref="SuperTonicTts.PrewarmModelAsync"/> as the
-    /// download function and <see cref="SuperTonicTts.ClearCacheDirectory"/>
-    /// as the "Start fresh" handler. The dialog handles the progress bar,
-    /// cancel, retry, and cache-wipe — this method just wires the delegates
-    /// so adding Whisper or LLM downloads later is the same one-call shape.
+    /// with <see cref="SuperTonicModelDownloader.DownloadAsync"/> as the download
+    /// function and <see cref="SuperTonicModelDownloader.ClearCacheDirectory"/> as
+    /// the "Start fresh" handler. Pulls the ~398 MB native ONNX bundle from
+    /// HuggingFace into %LOCALAPPDATA%\AgentZeroLite\models\supertonic — no
+    /// Python, no pip. Same one-call shape AST / diarization downloads use.
     /// </summary>
     private void OnSupertonicDownloadModel(object sender, RoutedEventArgs e)
     {
-        var python = tbSupertonicPython.Text?.Trim() ?? "";
-        var tts = new SuperTonicTts(python);
-
         var dlg = new ModelDownloadDialog(
             title: "Download Supertonic Model",
-            description: "First run downloads ~400 MB from HuggingFace Hub into the local cache. " +
-                         "Resume is automatic on the next attempt — tick 'Start fresh' to wipe and re-download if a previous cancel left files locked.",
-            cachePathHint: SuperTonicTts.CacheDirectory,
-            download: (progress, ct) => tts.PrewarmModelAsync(progress, ct),
-            clearCache: SuperTonicTts.ClearCacheDirectory)
+            description: "Downloads ~398 MB of ONNX models + voice styles from HuggingFace " +
+                         "(Supertone/supertonic-3). Runs fully on-device afterwards — no Python. " +
+                         "Tick 'Start fresh' to wipe and re-download if a previous attempt was interrupted.",
+            cachePathHint: SuperTonicModelStore.DefaultModelDirectory,
+            download: (progress, ct) => SuperTonicModelDownloader.DownloadAsync(progress, ct),
+            clearCache: SuperTonicModelDownloader.ClearCacheDirectory)
         {
             Owner = Window.GetWindow(this),
         };
         dlg.ShowDialog();
-        AppLogger.Log($"[Voice-TTS] Supertonic download dialog closed | userPath='{python}'");
-    }
-
-    /// <summary>
-    /// "Check Install" — runs <c>{python} -m pip show supertonic</c> and surfaces
-    /// the result into <c>tbTtsStatus</c>. First-class probe because Supertonic
-    /// is the only provider that needs a separate pip install — Windows TTS and
-    /// OpenAI TTS are reachable as soon as their settings are filled in.
-    /// </summary>
-    private async void OnSupertonicProbe(object sender, RoutedEventArgs e)
-    {
-        btnSupertonicProbe.IsEnabled = false;
-        tbTtsStatus.Text = "Probing Supertonic install…";
-        tbTtsStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
-        try
-        {
-            var python = tbSupertonicPython.Text?.Trim() ?? "";
-            var tts = new SuperTonicTts(python);
-            var progress = new Progress<string>(msg => Dispatcher.BeginInvoke(new Action(() =>
-            {
-                tbTtsStatus.Text = msg;
-                tbTtsStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
-            })));
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var ok = await Task.Run(async () => await tts.EnsureReadyAsync(progress, cts.Token));
-            // Don't overwrite tbTtsStatus on failure — the probe's progress
-            // callback already wrote a diagnostic message that names the
-            // resolved interpreter. Only stamp a generic ✓ on success.
-            if (ok)
-            {
-                tbTtsStatus.Text = $"✓ Supertonic ready ({tts.LastResolvedVersion}).";
-                tbTtsStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
-            }
-            AppLogger.Log(
-                $"[Voice-TTS] Supertonic probe | userPath='{python}' " +
-                $"resolved='{tts.LastResolvedExecutable ?? "(none)"}' " +
-                $"pyVer='{tts.LastResolvedVersion ?? "?"}' ready={ok}");
-
-            // The probe ran against the *live* textbox, not the saved JSON.
-            // WebDev / VoiceStream load from disk so a successful probe with
-            // an unsaved path is a foot-gun — surface a loud nag instead of
-            // letting the user assume "OK in Settings → OK everywhere".
-            // M0020 follow-up #4: this was the operator's exact failure mode.
-            var saved = VoiceSettingsStore.Load();
-            if (!string.Equals(saved.SupertonicPythonPath?.Trim() ?? "", python, StringComparison.Ordinal))
-            {
-                tbTtsSaveStatus.Text =
-                    $"● Probe ran against the UNSAVED path. Saved value still: " +
-                    $"'{(string.IsNullOrEmpty(saved.SupertonicPythonPath) ? "(empty — PATH 'python')" : saved.SupertonicPythonPath)}'. " +
-                    "Click Save TTS so WebDev + Voice Test see the new path.";
-                tbTtsSaveStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
-            }
-        }
-        catch (Exception ex)
-        {
-            tbTtsStatus.Text = $"✗ Probe error: {ex.Message}";
-            tbTtsStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-            AppLogger.LogError("[Voice-TTS] Supertonic probe failed", ex);
-        }
-        finally
-        {
-            btnSupertonicProbe.IsEnabled = true;
-        }
+        AppLogger.Log("[Voice-TTS] Supertonic model download dialog closed");
     }
 }
