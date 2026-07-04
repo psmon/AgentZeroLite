@@ -14,6 +14,11 @@
     <ApplicationIcon>agentzero.ico</ApplicationIcon>
     <Configurations>Debug;Release;AgentCLI</Configurations>
     <Platforms>AnyCPU</Platforms>
+    <!-- CI.Microsoft.Windows.Console.ConPTY ships legacy version-specific RIDs
+         (win10-x64/x86/arm64) that .NET 8+ no longer resolves by default.
+         Assets still copy via the explicit <Content> steps below, so the
+         warning is cosmetic — suppress just NETSDK1206, nothing broader. -->
+    <NoWarn>$(NoWarn);NETSDK1206</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +40,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
+    <!-- Pin SQLitePCLRaw above EF Core Sqlite's transitive 2.1.10 bundle.
+         NU1903 / GHSA-2m69-gcr7-jv3q (High) covers the ENTIRE 2.1.x line
+         (<= 2.1.11), so the fix is the 3.x line: bundle 3.0.3 ships the
+         SQLite-versioned native (3.50.x), which is outside the vuln range. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
 
     <!-- Voice — mic capture + playback (NAudio), offline STT (Whisper.net),
          Windows SAPI TTS. Two Whisper runtimes are bundled so the loader can

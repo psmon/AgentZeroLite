@@ -36,7 +36,7 @@ public partial class SettingsPanel
     // verified Unload → Load → Session works cleanly in the same process on
     // top of the bfloat16 + iGPU fixes. Remove if no references remain after
     // any follow-up refactor.
-    private static bool _hasLoadedOnceInProcess;
+    private static bool _hasLoadedOnceInProcess = false;
 
     private IReadOnlyList<VulkanDeviceInfo> _vulkanDevices = Array.Empty<VulkanDeviceInfo>();
 

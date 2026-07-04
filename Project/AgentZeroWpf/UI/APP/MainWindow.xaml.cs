@@ -1046,7 +1046,6 @@ public partial class MainWindow : Window
     //  Sidebar navigation
     // =========================================================================
 
-    private Window? _scrapWindow;
     private AgentZeroWpf.UI.Components.FloatingScrapWindow? _floatingScrapWindow;
     private Grid? _scrapOriginalParent;
     private int _scrapOriginalIndex = -1;

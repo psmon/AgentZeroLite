@@ -33,6 +33,12 @@
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- Pin SQLitePCLRaw above EF Core Sqlite's transitive 2.1.10 bundle.
+         NU1903 / GHSA-2m69-gcr7-jv3q (High) covers the ENTIRE 2.1.x line
+         (<= 2.1.11), so the fix is the 3.x line: bundle 3.0.3 ships the
+         SQLite-versioned native (3.50.x), which is outside the vuln range.
+         Runtime dependency, so no PrivateAssets — must ship. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <!-- On-device LLM via self-compiled llama.cpp DLLs under runtimes/ loaded
          explicitly with NativeLibraryConfig.WithLibrary() — this bypasses the
          earlier ggml.dll collision with Whisper.net because the load path and

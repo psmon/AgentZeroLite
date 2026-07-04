@@ -102,7 +102,6 @@ public partial class AgentBotWindow : Window
     // MD file attachments
     private readonly List<string> _attachedMdFiles = [];
     private const int MaxMdAttachments = 3;
-    private int _mdPickerSelectedIndex = -1;
 
     // Input resize drag
     private bool _isResizingInput;
