@@ -10,15 +10,32 @@
     "cancelled"
   ],
   "counts": {
-    "all": 27,
+    "all": 28,
     "inbox": 1,
     "in_progress": 2,
-    "done": 24,
+    "done": 25,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
   },
   "items": [
+    {
+      "id": "M0027",
+      "file": "harness/missions/M0027-SuperTonic-pip제거.md",
+      "title": "SuperTonic pip 의존 제거 (네이티브 ONNX 전환)",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-07-01",
+      "recordFile": null,
+      "recordStatus": null,
+      "recordStarted": null,
+      "recordFinished": null,
+      "designFile": null,
+      "modified": "2026-07-01",
+      "size": 2661
+    },
     {
       "id": "M0026",
       "file": "harness/missions/M0026-에이전트악단-개선.md",

@@ -187,38 +187,38 @@
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 87.9
+      "percent": 86
     },
     {
       "name": "smpark-luna",
-      "commits": 17,
-      "percent": 12.1
+      "commits": 20,
+      "percent": 14
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 87.9
+      "percent": 86
     },
     {
       "name": "smpark-luna",
-      "commits": 17,
-      "percent": 12.1
+      "commits": 20,
+      "percent": 14
     }
   ],
   "contributorsRecent": [
     {
       "name": "smpark-luna",
-      "commits": 17,
+      "commits": 1,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 140,
-    "last7d": 8,
-    "last30d": 30
+    "totalAllTime": 143,
+    "last7d": 1,
+    "last30d": 19
   },
   "topChangedFiles": [
     {
@@ -226,19 +226,19 @@
       "commits": 5
     },
     {
-      "path": "harness/harness.config.json",
-      "commits": 4
-    },
-    {
-      "path": "Home/harness-view/data/pdsa-insight.json",
-      "commits": 4
-    },
-    {
-      "path": "harness/logs/mission-records/M0025-\\354\\210\\230\\355\\226\\211\\352\\262\\260\\352\\263\\274.md",
+      "path": "harness/logs/mission-records/M0026-\\354\\210\\230\\355\\226\\211\\352\\262\\260\\352\\263\\274.md",
       "commits": 2
     },
     {
-      "path": "Home/harness-view/data/models.json",
+      "path": "Home/harness-view/data/news.json",
+      "commits": 2
+    },
+    {
+      "path": "Home/harness-view/data/pdsa-insight.json",
+      "commits": 2
+    },
+    {
+      "path": "harness/logs/mission-records/M0025-\\354\\210\\230\\355\\226\\211\\352\\262\\260\\352\\263\\274.md",
       "commits": 2
     }
   ]

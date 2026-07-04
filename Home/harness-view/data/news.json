@@ -1,79 +1,79 @@
 {
   "_description": "Recent Updates surface — bilingual EN/KO. Default audience: English. `headline`, `narrative`, `highlights[].label/text`, `prompts[].tag/text` use `{ en, ko }` shape. Scalars (updatedAt, tone) stay language-neutral.",
-  "updatedAt": "2026-06-14",
+  "updatedAt": "2026-07-05",
   "headline": {
-    "en": "M0026 cycle — Agent Band gets a YouTube stage: paste a link, it plays in the upper stage while the band reacts below; metadata + genre come from host-side oEmbed and a stateless LLM classify, and the played list now persists",
-    "ko": "M0026 사이클 — 에이전트 악단에 유튜브 무대 추가: 링크를 붙이면 상단 무대에서 재생되고 하단 악단이 반응, 메타·장르는 호스트 oEmbed + stateless LLM 분류로, 재생 목록은 이제 영속"
+    "en": "M0028 cycle — the app gets its FIRST on-device vision model (Florence-2, pip-free ONNX), a Settings → Vision test tab, and an Agent Band girl-group mode that watches the MV: person-count sets the idol count, frame-diff motion drives the dance, and visible instruments summon vision-first",
+    "ko": "M0028 사이클 — 앱에 최초의 온디바이스 비전 모델(Florence-2, pip 없는 ONNX) 도입, Settings → Vision 테스트 탭 신설, 그리고 뮤비를 보는 에이전트 악단 걸그룹 모드: person 수로 아이돌 인원을 맞추고, 프레임 차분 움직임으로 댄스를 구동하며, 보이는 악기를 비전 우선으로 소환"
   },
   "narrative": {
-    "en": "The Agent Band plugin (M0025) learned to listen to system audio and summon performers; this cycle gives it a screen. Paste a YouTube link into the stage-top bar and the video embeds in the UPPER region — the window size never changes, the 1fr stage cell is split, and the band keeps the lower region, reacting exactly as before because the video's audio rides the existing SystemLoopback + AST path (no new audio wiring). Metadata is fetched HOST-side: a new `youtube.oembed` bridge op pulls title / channel / thumbnail without tripping browser CORS, and it's SSRF-safe (the host rebuilds the canonical watch URL from a validated 11-character id). Genre classification routes through a new `llm.classify` op — a STATELESS one-shot LLM session that never pollutes the chat history, with the reply clamped to a fixed category whitelist and a keyword fallback when no model is loaded; the caption badge shows whether the label came from the LLM or a keyword guess. Played videos accumulate in a categorized playlist that now persists to localStorage (survives restarts) with an open/close toggle and one-click replay. Singer staging also changed: GIRL-GROUP mode now excludes the main vocal — the group is the seven idols (vox7) only — while SOLO mode keeps the dedicated main female vocal (vocal-ex). Along the way a one-line External-LLM bug was caught and fixed: `LlmGateway.HasUsableExternal` had omitted the Webnori a2 provider, so `IsActiveAvailable()` returned false for a2 and silently broke the LLM Settings Chat Test and the plugin's classify — even though AIMODE worked, because it gates on a different function. Shipped as agent-band v0.14.0 with the LLM-core fix committed separately.",
-    "ko": "에이전트 악단 플러그인(M0025)이 시스템 오디오를 듣고 연주자를 소환하는 법을 배웠다면, 이번 사이클은 화면을 준다. 무대 상단 바에 유튜브 링크를 붙이면 영상이 상단 영역에 임베드된다 — 창 크기는 그대로, 1fr 스테이지 셀만 분할되고, 하단은 악단이 차지해 예전처럼 반응한다(영상 소리가 기존 SystemLoopback + AST 경로를 타므로 신규 오디오 배선 0). 메타는 호스트 측에서 가져온다: 신규 `youtube.oembed` op가 브라우저 CORS 없이 제목 / 채널 / 썸네일을 받고 SSRF에 안전하다(호스트가 검증된 11자 id로 canonical watch URL 재조립). 장르 분류는 신규 `llm.classify` op로 — 채팅 히스토리를 오염시키지 않는 stateless 1회 LLM 세션, 응답은 고정 카테고리 화이트리스트로 클램프, 모델 미로드 시 키워드 폴백; 캡션 배지가 LLM 분류인지 키워드 추정인지 표시한다. 재생한 영상은 카테고리 재생 목록에 쌓이고 이제 localStorage에 영속(재시작 후에도 유지)되며 열고/닫기 토글과 원클릭 재생을 제공한다. 싱어 연출도 바뀌었다: 걸그룹 모드는 이제 메인보컬을 제외 — 그룹은 7인 아이돌(vox7)만 — 솔로 모드는 전용 메인 여성보컬(vocal-ex)을 유지한다. 도중에 한 줄짜리 External-LLM 버그를 잡아 고쳤다: `LlmGateway.HasUsableExternal`가 Webnori a2 provider를 빠뜨려 a2에서 `IsActiveAvailable()`가 false를 반환, LLM 설정 ChatTest와 플러그인 classify를 조용히 망가뜨렸다 — AIMODE는 다른 함수로 게이트해 정상이었다. 에이전트 악단 v0.14.0으로 출시, LLM 코어 픽스는 별도 커밋."
+    "en": "AgentZero already ran several on-device models (Whisper STT, SuperTonic TTS, AST music, Sherpa diarization); this cycle adds the first VISION one. Florence-2-base runs on-device via ONNX Runtime, downloaded pip-free straight from HuggingFace (~1 GB across four ONNX graphs) into the same %LOCALAPPDATA%\\...\\models cache convention as every other model — no Python, no pip. A new Settings → Vision tab is the test harness: paste a YouTube link, the app plays it and captures frames on a timer via WebView2 CapturePreviewAsync, then overlays Florence-2 object-detection boxes on the last frame. Getting the video to play surfaced YouTube error 153 (\"동영상 플레이어 구성 오류\") — a bare /embed/ navigation gives WebView2 a null origin that YouTube rejects; fixed by serving a tiny IFrame Player API page from a real https origin (WebView2 virtual-host mapping), verified in headless Edge. The ONNX Runtime bump this required (1.20 → 1.23.2) was regression-checked against the existing AST/SuperTonic paths (275 tests green). Then Agent Band's girl-group mode was extended to USE the model (group mode only): the host captures the playing MV region and runs Florence-2 so (1) the person count sets the idol member count — smoothed to the recent 8-second maximum so camera cuts don't flap it, capped at 7, (2) a cheap pixel frame-diff on the crop drives the idle(singing) ↔ action(dance) sync with hysteresis, and (3) visible instruments are summoned vision-first with the audio AST list as fallback. Environment recognition feeds instruments only; the whole thing degrades to the prior audio-only behavior when the model isn't downloaded, the mode is solo, or no video plays. Along the way all 5 build warnings were cleared — dead fields removed, a legacy ConPTY RID warning scoped-suppressed, and a High-severity SQLitePCLRaw advisory (GHSA-2m69-gcr7-jv3q, whole 2.1.x line) fixed by moving the bundled SQLite native to 3.50.x. Shipped as agent-band v0.15.0.",
+    "ko": "AgentZero는 이미 여러 온디바이스 모델(Whisper STT, SuperTonic TTS, AST 음악, Sherpa 화자분리)을 돌렸지만, 이번 사이클은 첫 비전 모델을 추가한다. Florence-2-base가 ONNX Runtime으로 온디바이스 구동되며, HuggingFace에서 pip 없이 바로 다운로드(4개 ONNX 그래프 ~1 GB)되어 다른 모든 모델과 동일한 %LOCALAPPDATA%\\...\\models 캐시 규약에 저장된다 — Python도 pip도 없다. 신규 Settings → Vision 탭이 테스트 하네스다: 유튜브 링크를 붙이면 재생하면서 WebView2 CapturePreviewAsync로 주기적으로 프레임을 캡처하고, 마지막 프레임 위에 Florence-2 객체탐지 박스를 오버레이한다. 영상 재생 과정에서 유튜브 오류 153(\"동영상 플레이어 구성 오류\")이 드러났다 — 바 /embed/ 이동은 WebView2에 null origin을 줘 유튜브가 거부한다; 실제 https origin(WebView2 가상호스트 매핑)에서 IFrame Player API 페이지를 서빙해 해결했고 헤드리스 Edge로 검증했다. 이때 필요했던 ONNX Runtime 상향(1.20 → 1.23.2)은 기존 AST/SuperTonic 경로 회귀를 확인(275 테스트 통과)했다. 이어서 에이전트 악단 걸그룹 모드가 이 모델을 사용하도록 확장됐다(걸그룹 모드 한정): 호스트가 재생 중인 뮤비 영역을 캡처해 Florence-2를 돌려 (1) person 수로 아이돌 인원을 정하되 카메라 컷 출렁임 방지를 위해 최근 8초 최대치로 스무딩(최대 7), (2) 크롭에 대한 값싼 픽셀 프레임 차분으로 유휴(노래) ↔ 동작(댄스) 상태를 히스테리시스로 싱크, (3) 보이는 악기는 비전 우선으로 소환하고 오디오 AST 리스트는 폴백. 환경인식은 악기 감지에만 쓰이고, 모델 미설치·솔로·영상 없음일 땐 기존 오디오 전용 동작으로 자연스럽게 폴백한다. 도중에 빌드 워닝 5종을 전부 제거했다 — 죽은 필드 삭제, 레거시 ConPTY RID 경고 범위 한정 억제, 그리고 High 심각도 SQLitePCLRaw 취약점(GHSA-2m69-gcr7-jv3q, 2.1.x 전체)을 번들 SQLite 네이티브 3.50.x 상향으로 해결. 에이전트 악단 v0.15.0으로 출시."
   },
   "highlights": [
     {
-      "label": { "en": "YouTube embed stage", "ko": "유튜브 임베드 무대" },
+      "label": { "en": "First on-device vision model", "ko": "최초 온디바이스 비전 모델" },
       "text": {
-        "en": "Paste a link → embeds in the upper stage region; window size unchanged (1fr cell split), the band stays below and reacts via the existing SystemLoopback + AST path with no new audio wiring",
-        "ko": "링크 붙이기 → 상단 무대에 임베드; 창 크기 불변(1fr 셀 분할), 하단 악단은 기존 SystemLoopback + AST 경로로 반응(신규 오디오 배선 0)"
+        "en": "Florence-2-base object detection runs on-device via ONNX Runtime, downloaded pip-free from HuggingFace into the shared models cache — same no-Python pattern as Whisper / SuperTonic / AST",
+        "ko": "Florence-2-base 객체탐지가 ONNX Runtime으로 온디바이스 구동, HuggingFace에서 pip 없이 공유 models 캐시로 다운로드 — Whisper / SuperTonic / AST와 동일한 no-Python 패턴"
       },
       "tone": "purple"
     },
     {
-      "label": { "en": "Host-side oEmbed (CORS-safe)", "ko": "호스트 oEmbed (CORS 우회)" },
+      "label": { "en": "Settings → Vision test tab", "ko": "Settings → Vision 테스트 탭" },
       "text": {
-        "en": "New youtube.oembed bridge op fetches title/channel/thumbnail server-side, dodging browser CORS; SSRF-safe — the canonical watch URL is rebuilt from a validated 11-char video id",
-        "ko": "신규 youtube.oembed op가 제목/채널/썸네일을 서버 측에서 가져와 브라우저 CORS 우회; SSRF 안전 — 검증된 11자 id로 canonical URL 재조립"
+        "en": "Paste a YouTube link → the app plays it and captures frames via WebView2 CapturePreviewAsync → object-detection boxes overlay the last frame. YouTube error 153 fixed with an IFrame-Player-API page served from a real origin",
+        "ko": "유튜브 링크 붙이기 → 재생하며 WebView2 CapturePreviewAsync로 프레임 캡처 → 마지막 프레임에 객체탐지 박스 오버레이. 유튜브 오류 153은 실제 origin에서 IFrame Player API 페이지 서빙으로 해결"
       },
       "tone": "blue"
     },
     {
-      "label": { "en": "Stateless LLM classify", "ko": "stateless LLM 분류" },
+      "label": { "en": "Person-count → idol count", "ko": "person 수 → 아이돌 인원" },
       "text": {
-        "en": "New llm.classify op runs a throwaway one-shot session (chat history untouched); reply clamped to a category whitelist, keyword fallback when no model is loaded, provenance badge on the caption",
-        "ko": "신규 llm.classify op가 1회용 세션 구동(채팅 히스토리 불변); 응답을 카테고리 화이트리스트로 클램프, 모델 미로드 시 키워드 폴백, 캡션에 출처 배지"
+        "en": "Girl-group mode only: the host counts `person` boxes in the playing MV → sets the on-stage idol member count, smoothed to the recent 8-second maximum so camera cuts don't flap it (capped at 7)",
+        "ko": "걸그룹 모드 한정: 호스트가 재생 중 뮤비의 `person` 박스를 세어 → 무대 아이돌 인원 결정, 카메라 컷 출렁임 방지 위해 최근 8초 최대치로 스무딩(최대 7)"
       },
       "tone": "green"
     },
     {
-      "label": { "en": "Persisted playlist + toggle", "ko": "영속 재생목록 + 토글" },
+      "label": { "en": "Frame-diff motion → dance sync", "ko": "프레임 차분 → 댄스 싱크" },
       "text": {
-        "en": "Played videos persist to localStorage (survive restarts), categorized with a 📂 open/close toggle and one-click replay; girl-group mode now excludes the main vocal (7 idols), solo keeps vocal-ex",
-        "ko": "재생 영상이 localStorage에 영속(재시작 후 유지), 카테고리화 + 📂 열고/닫기 토글 + 원클릭 재생; 걸그룹은 메인보컬 제외(7인), 솔로는 vocal-ex 유지"
+        "en": "A cheap pixel frame-diff on the MV crop (~300ms) drives the idle(singing) ↔ action(dance) sprite flip with hysteresis — the whole group dances in time with the video's motion",
+        "ko": "뮤비 크롭에 대한 값싼 픽셀 프레임 차분(~300ms)이 유휴(노래) ↔ 동작(댄스) 스프라이트 전환을 히스테리시스로 구동 — 그룹 전체가 영상 움직임에 맞춰 댄스"
       },
       "tone": "amber"
     },
     {
-      "label": { "en": "External LLM gate fix (a2)", "ko": "External LLM 게이트 픽스 (a2)" },
+      "label": { "en": "Vision-first instruments + fallback", "ko": "비전 우선 악기 + 폴백" },
       "text": {
-        "en": "LlmGateway.HasUsableExternal omitted WebnoriA2, so IsActiveAvailable() was false for a2 — breaking Chat Test + plugin classify while AIMODE worked (it gates on CreateExternalProvider). One-line fix, plus save-activates + load-then-patch for the settings flow",
-        "ko": "LlmGateway.HasUsableExternal가 WebnoriA2를 빠뜨려 a2에서 IsActiveAvailable()=false — AIMODE는 되는데(다른 함수로 게이트) ChatTest·플러그인 classify가 붕괴. 한 줄 픽스 + 설정 흐름 save-activates·load-then-patch"
+        "en": "Instruments visible in the MV are summoned vision-first (Florence-2), with the audio AST list as fallback when vision sees none. Degrades to audio-only when the model is missing, mode is solo, or no video plays",
+        "ko": "뮤비에 보이는 악기를 비전 우선(Florence-2)으로 소환, 비전이 못 잡으면 오디오 AST 폴백. 모델 미설치·솔로·영상 없음일 땐 오디오 전용으로 폴백"
       },
       "tone": "purple"
     }
   ],
   "prompts": [
     {
-      "tag": { "en": "Drive the YouTube stage", "ko": "유튜브 무대 시연" },
-      "tone": "purple",
-      "text": {
-        "en": "Open Agent Band → paste a music link in the stage-top bar → 붙이기 — the video plays up top, the caption shows the LLM-classified genre; press ▶ Start (Source = System Loopback) and the band reacts to the audio",
-        "ko": "에이전트 악단 → 무대 상단 바에 음악 링크 붙이기 → 붙이기 — 상단에 영상 재생, 캡션에 LLM 분류 장르 표시; ▶ Start(Source = System Loopback) 누르면 악단이 소리에 반응"
-      }
-    },
-    {
-      "tag": { "en": "Playlist persistence", "ko": "재생목록 영속" },
-      "tone": "amber",
-      "text": {
-        "en": "Play a few links, restart the app, click 📂 목록 — the categorized history is still there; toggle Singer = Group (7 idols, no main vocal) vs Solo (main female vocal)",
-        "ko": "링크 몇 개 재생 → 앱 재시작 → 📂 목록 클릭 — 카테고리 이력 그대로; Singer = Group(7인, 메인보컬 없음) vs Solo(메인 여성보컬) 토글"
-      }
-    },
-    {
-      "tag": { "en": "External Webnori a2", "ko": "External Webnori a2" },
+      "tag": { "en": "Try the Vision tab", "ko": "Vision 탭 시연" },
       "tone": "blue",
       "text": {
-        "en": "Settings → LLM → External → provider Webnori a2 → Save Options (now activates External) → Chat Test now responds, and the plugin classifies genres without a local model loaded",
-        "ko": "Settings → LLM → External → provider Webnori a2 → Save Options(이제 External 활성화) → Chat Test 응답, 로컬 모델 없이도 플러그인이 장르 분류"
+        "en": "Settings → Vision → Download (one-time, ~1 GB, no pip) → paste a YouTube link → START TEST — the video plays and detection boxes overlay the captured frame with a live object list",
+        "ko": "Settings → Vision → Download(1회, ~1 GB, pip 없음) → 유튜브 링크 붙이기 → START TEST — 영상이 재생되고 캡처 프레임에 탐지 박스 + 실시간 객체 목록 오버레이"
+      }
+    },
+    {
+      "tag": { "en": "Girl-group vision", "ko": "걸그룹 비전" },
+      "tone": "purple",
+      "text": {
+        "en": "Open Agent Band → Singer = Group → paste a K-pop MV → ▶ Start. The top hint bar shows 👁 member-count · idle/action · instrument-count live as Florence-2 watches the MV and the idols match it",
+        "ko": "에이전트 악단 → Singer = Group → K-pop 뮤비 붙이기 → ▶ Start. 상단 힌트바에 👁 인원 · 유휴/동작 · 악기 수가 실시간 표시되며 Florence-2가 뮤비를 보고 아이돌이 맞춰 움직임"
+      }
+    },
+    {
+      "tag": { "en": "Graceful fallback", "ko": "우아한 폴백" },
+      "tone": "amber",
+      "text": {
+        "en": "Skip the model download, or switch Singer = Solo — the band behaves exactly as before (audio-only). Vision is strictly additive to girl-group mode and never blocks the existing flow",
+        "ko": "모델 다운로드를 건너뛰거나 Singer = Solo로 바꾸면 — 악단은 예전 그대로(오디오 전용) 동작. 비전은 걸그룹 모드에만 더해지고 기존 흐름을 절대 막지 않음"
       }
     }
   ]
