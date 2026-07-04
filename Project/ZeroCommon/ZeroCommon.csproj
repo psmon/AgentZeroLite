@@ -46,11 +46,22 @@
          DLLs built from llama.cpp commit 3f7c29d (= LLamaSharp 0.26.0 ABI + Gemma 4). -->
     <PackageReference Include="LLamaSharp" Version="0.26.0" />
     <!-- Music classifier (AST AudioSet) inference — CPU-only ONNX Runtime.
-         Used by Agent.Common.Music.OnnxAstClassifier. DirectML/GPU variants
-         are intentionally not added yet to keep the installer footprint flat;
-         add Microsoft.ML.OnnxRuntime.DirectML alongside if a GPU toggle
-         lands later. -->
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.0" />
+         Used by Agent.Common.Music.OnnxAstClassifier + Agent.Common.Vision
+         (Florence-2). DirectML/GPU variants are intentionally not added yet to
+         keep the installer footprint flat; add Microsoft.ML.OnnxRuntime.DirectML
+         alongside if a GPU toggle lands later.
+         Pinned to 1.23.2: the Florence2 package requires ORT >= 1.23.2, and an
+         explicit pin keeps AST/SuperTonic on the same runtime instead of letting
+         the transitive graph split. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
+    <!-- On-device VISION (M0028) — Florence-2-base VLM via curiosity-ai's
+         Florence2 wrapper (MIT). Encapsulates the encoder/decoder/tokenizer +
+         autoregressive loop and pulls the ONNX graphs from HuggingFace with no
+         pip/Python. Model cache is redirected to
+         %LOCALAPPDATA%\AgentZeroLite\models\florence2 via FlorenceModelDownloader
+         to match every other on-device model's location. Brings ImageSharp +
+         Microsoft.ML.OnnxRuntime (>=1.23.2, pinned above). -->
+    <PackageReference Include="Florence2" Version="25.12.63049" />
     <!-- Speaker diarization (M0024) — k2-fsa Sherpa-ONNX with C# bindings.
          Pure ONNX, no Python dependency. Models (pyannote-segmentation-3-0
          + 3D-Speaker embedding, ~50 MB total) downloaded via

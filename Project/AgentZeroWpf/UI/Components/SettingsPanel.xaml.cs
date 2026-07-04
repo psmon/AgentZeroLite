@@ -23,6 +23,7 @@ public partial class SettingsPanel : UserControl
             InitializeVoiceTab();
             InitializeDiarizationTab();
             InitializeMusicTab();
+            InitializeVisionTab();
         };
     }
 
