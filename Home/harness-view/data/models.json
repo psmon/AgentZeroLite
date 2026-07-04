@@ -2,12 +2,12 @@
   "_description": "Static — LLM / STT / TTS models actually integrated in AgentZeroLite. Refresh when csproj packages change or when LlmProviderFactory adds/removes a backend. Bilingual EN/KO content rendered by js/views/models.js.",
   "title":    { "en": "Models", "ko": "모델" },
   "subtitle": {
-    "en": "Models adopted in AgentZero Lite — on-device, hosted, voice",
-    "ko": "AgentZero Lite 에 채택된 모델 — 온디바이스, 호스티드, 보이스"
+    "en": "Models adopted in AgentZero Lite — on-device, hosted, voice, vision",
+    "ko": "AgentZero Lite 에 채택된 모델 — 온디바이스, 호스티드, 보이스, 비전"
   },
   "intro": {
-    "en": "AgentZero Lite is a multi-CLI shell that talks to several LLM, STT, TTS, and (new in v0.10) audio-understanding backends. The architecture leans on-device-first (LLamaSharp + Whisper.net + ONNX Runtime) so the assistant runs without an internet connection, with hosted vendors as opt-in upgrades. The cards below describe each model that ships with the app — variant, size, on-device vs hosted, and what role it plays. Beyond a static catalogue, this surface doubles as a scouting board: as AgentZero develops, when a stronger on-device candidate appears we introduce it here and use the app as a compatibility harness for it. Even if you never touch the CLI, the bundled models are worth exploring as an STT / TTS / Music playground for learning. Continuously discovering good open models → adopting them into AgentZero → exposing them as an open-model playground is itself a learning loop the project commits to.",
-    "ko": "AgentZero Lite 는 여러 LLM / STT / TTS, 그리고 (v0.10 신규) 오디오 이해 백엔드와 대화하는 멀티-CLI 셸이다. 아키텍처는 온디바이스 우선(LLamaSharp + Whisper.net + ONNX Runtime)이라 인터넷 없이도 어시스턴트가 동작하며, 호스티드 벤더는 opt-in 업그레이드로 제공된다. 아래 카드들은 앱에 함께 들어있는 모델들을 변형(variant), 용량, 온디바이스 vs 호스티드, 그리고 역할 관점에서 설명한다. 단순한 카탈로그가 아니라 발굴판(scouting board) 역할도 한다 — AgentZero 디벨롭 과정에서 더 좋은 온디바이스 모델이 발견되면 여기서 소개하고, 앱 자체를 호환성 테스트 하네스로 활용한다. CLI 툴을 직접 쓰지 않더라도 함께 동봉된 모델들을 STT / TTS / Music PlayGround 로 둘러보며 학습용으로 살펴봐도 가치가 있다. 괜찮은 오픈 모델의 지속 발굴 → AgentZero 적용 → 오픈모델 PlayGround 로 노출, 이 자체가 프로젝트가 약속하는 학습 루프다."
+    "en": "AgentZero Lite is a multi-CLI shell that talks to several LLM, STT, TTS, audio-understanding, and (new in M0028) on-device vision backends. The architecture leans on-device-first (LLamaSharp + Whisper.net + ONNX Runtime) so the assistant runs without an internet connection, with hosted vendors as opt-in upgrades. The cards below describe each model that ships with the app — variant, size, on-device vs hosted, and what role it plays. Beyond a static catalogue, this surface doubles as a scouting board: as AgentZero develops, when a stronger on-device candidate appears we introduce it here and use the app as a compatibility harness for it. Even if you never touch the CLI, the bundled models are worth exploring as an STT / TTS / Music playground for learning. Continuously discovering good open models → adopting them into AgentZero → exposing them as an open-model playground is itself a learning loop the project commits to.",
+    "ko": "AgentZero Lite 는 여러 LLM / STT / TTS / 오디오 이해, 그리고 (M0028 신규) 온디바이스 비전 백엔드와 대화하는 멀티-CLI 셸이다. 아키텍처는 온디바이스 우선(LLamaSharp + Whisper.net + ONNX Runtime)이라 인터넷 없이도 어시스턴트가 동작하며, 호스티드 벤더는 opt-in 업그레이드로 제공된다. 아래 카드들은 앱에 함께 들어있는 모델들을 변형(variant), 용량, 온디바이스 vs 호스티드, 그리고 역할 관점에서 설명한다. 단순한 카탈로그가 아니라 발굴판(scouting board) 역할도 한다 — AgentZero 디벨롭 과정에서 더 좋은 온디바이스 모델이 발견되면 여기서 소개하고, 앱 자체를 호환성 테스트 하네스로 활용한다. CLI 툴을 직접 쓰지 않더라도 함께 동봉된 모델들을 STT / TTS / Music PlayGround 로 둘러보며 학습용으로 살펴봐도 가치가 있다. 괜찮은 오픈 모델의 지속 발굴 → AgentZero 적용 → 오픈모델 PlayGround 로 노출, 이 자체가 프로젝트가 약속하는 학습 루프다."
   },
 
   "categories": [
@@ -320,6 +320,61 @@
           "summary": {
             "en": "Text-conditioned audio embedding — given a text prompt like 'solo violin' or 'distorted electric guitar', returns a similarity score against an audio clip. Zero-shot, no fine-tuning needed for new instrument vocabularies. Listed for future integration when 'tell me if this clip contains X' becomes a use case alongside AST's fixed AudioSet taxonomy.",
             "ko": "텍스트 조건부 오디오 임베딩 — 'solo violin' / 'distorted electric guitar' 같은 텍스트 프롬프트와 오디오 클립의 유사도 점수 반환. Zero-shot, 새 악기 어휘에 fine-tuning 불필요. AST 의 고정된 AudioSet 분류 체계와 별개로 '이 클립에 X 가 있는지 물어보기' 가 use case 가 될 때 통합 후보로 등록."
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "vision",
+      "tone": "green",
+      "label": { "en": "Vision & Scene Understanding", "ko": "비전 & 장면 이해" },
+      "lead": {
+        "en": "M0028 — AgentZero's first VISION lane. Where the music lane turns audio into semantic judgement, this turns a video frame into structured detections: what objects / people / instruments are on screen. On-device via ONNX Runtime, pip-free (no Python). Surfaced as Settings → 👁 Vision (paste a YouTube link → the app captures frames and overlays object-detection boxes) and wired into Agent Band's girl-group mode (person-count → idol count, frame-diff motion → dance sync, visible instruments → vision-first summon).",
+        "ko": "M0028 — AgentZero 의 첫 비전 라인. 음악 라인이 오디오를 의미 판단으로 바꾸듯, 이 라인은 영상 프레임을 구조화된 탐지로 바꾼다: 화면에 어떤 객체 / 사람 / 악기가 있는지. ONNX Runtime 으로 온디바이스, pip 없음(Python 불필요). Settings → 👁 Vision 에 노출(유튜브 링크를 붙이면 프레임을 캡처해 객체탐지 박스 오버레이)되고, 에이전트 악단 걸그룹 모드에 연동(person 수 → 아이돌 인원, 프레임 차분 움직임 → 댄스 싱크, 보이는 악기 → 비전 우선 소환)."
+      },
+      "models": [
+        {
+          "name": "Florence-2 (base)",
+          "variant": "ONNX · object detection (OD) · caption/OCR available",
+          "vendor": "Microsoft",
+          "size": "~1 GB cached locally",
+          "params": "0.23B",
+          "badges": ["on-device", "default", "new"],
+          "tone": "purple",
+          "summary": {
+            "en": "Microsoft's unified vision-language model — one encoder/decoder handles object detection, captioning, OCR, phrase grounding and more via a task-prompt. AgentZero drives the OD task through the `Florence2` .NET wrapper (curiosity-ai/florence2-sharp, MIT) over ONNX Runtime, so the whole vision encoder + BART-style decoder + tokenizer + autoregressive loop runs on-device with no Python. The four ONNX graphs (~1 GB total) download pip-free straight from HuggingFace into the same %LOCALAPPDATA%\\...\\models cache convention every other model uses.",
+            "ko": "Microsoft 의 통합 비전-언어 모델 — 하나의 encoder/decoder 가 task-prompt 로 객체탐지 / 캡셔닝 / OCR / phrase grounding 등을 처리. AgentZero 는 OD 태스크를 `Florence2` .NET 래퍼(curiosity-ai/florence2-sharp, MIT)로 ONNX Runtime 위에서 구동 — 비전 encoder + BART 스타일 decoder + 토크나이저 + 자기회귀 루프 전체가 Python 없이 온디바이스로 돈다. 4개 ONNX 그래프(~1 GB)는 HuggingFace 에서 pip 없이 다른 모든 모델과 동일한 %LOCALAPPDATA%\\...\\models 캐시로 다운로드."
+          },
+          "details": {
+            "en": "CPU inference via Microsoft.ML.OnnxRuntime 1.23.2 (~1.4 s per frame on a modern x64) — the ORT bump was regression-checked against the AST / SuperTonic ONNX paths (275 tests green). Settings → Vision is the test harness: a muted-autoplay YouTube IFrame-Player-API page served from a real origin (fixes YouTube error 153 that a bare /embed/ navigation hits), WebView2 CapturePreviewAsync frame capture, and a bbox+label overlay. In Agent Band girl-group mode the host crops the MV region and runs OD every ~2.5 s for person-count + instruments, plus a cheap 32×32 gray frame-diff every ~300 ms for the dance idle↔action signal. The scouting targets below (Moondream2, SmolVLM2) would slot in behind the same IVisionInterpreter seam.",
+            "ko": "Microsoft.ML.OnnxRuntime 1.23.2 로 CPU 추론 (모던 x64 기준 프레임당 ~1.4초) — ORT 상향은 AST / SuperTonic ONNX 경로 회귀를 확인(275 테스트 통과). Settings → Vision 이 테스트 하네스: mute-autoplay 유튜브 IFrame Player API 페이지를 실제 origin 에서 서빙(바 /embed/ 이동이 겪는 유튜브 오류 153 해결), WebView2 CapturePreviewAsync 프레임 캡처, bbox+라벨 오버레이. 에이전트 악단 걸그룹 모드에선 호스트가 뮤비 영역을 크롭해 ~2.5초마다 OD(인원+악기) + ~300ms마다 값싼 32×32 그레이 프레임 차분(유휴↔동작 신호)을 돌린다. 아래 스카우팅 후보(Moondream2, SmolVLM2)는 동일한 IVisionInterpreter 시암 뒤로 들어온다."
+          }
+        },
+        {
+          "name": "Moondream2",
+          "variant": "1.9B VLM · community ONNX",
+          "vendor": "vikhyat",
+          "size": "(scouting — not bundled)",
+          "params": "1.9B",
+          "badges": ["scouting", "next-up"],
+          "tone": "amber",
+          "summary": {
+            "en": "Tiny open vision-language model that runs on edge hardware (even a Raspberry Pi). Does captioning, visual Q&A, object detection and point/region queries. Listed as the next on-device VLM to evaluate against Florence-2 when natural-language scene description ('describe what's happening') becomes a user-visible need — community ONNX exports exist (Xenova / onnx-community), so the IVisionInterpreter adapter is the integration seam.",
+            "ko": "엣지 하드웨어(라즈베리 파이에서도)에서 도는 초소형 오픈 비전-언어 모델. 캡셔닝, 비주얼 Q&A, 객체탐지, point/region 질의 지원. 자연어 장면 서술('무슨 일이 벌어지는지 설명')이 사용자 니즈가 될 때 Florence-2 대비 다음으로 평가할 온디바이스 VLM 으로 등록 — 커뮤니티 ONNX(Xenova / onnx-community)가 있어 IVisionInterpreter 어댑터가 통합 시암."
+          }
+        },
+        {
+          "name": "SmolVLM2",
+          "variant": "256M / 500M / 2.2B",
+          "vendor": "Hugging Face",
+          "size": "(scouting — not bundled)",
+          "params": "0.25B–2.2B",
+          "badges": ["scouting", "next-up"],
+          "tone": "amber",
+          "summary": {
+            "en": "Hugging Face's small vision-language family with a 256M variant light enough for real-time on modest CPUs. Strong on image + short-video understanding. A candidate for a lighter, faster describe/caption lane than Florence-2's ~1.4 s/frame OD — the same IVisionInterpreter contract would host it.",
+            "ko": "Hugging Face 의 소형 비전-언어 패밀리로 256M 변형은 저사양 CPU 에서 실시간이 가능할 만큼 가볍다. 이미지 + 짧은 비디오 이해에 강함. Florence-2 의 ~1.4초/프레임 OD 보다 가볍고 빠른 서술/캡션 라인 후보 — 동일한 IVisionInterpreter 계약으로 호스팅."
           }
         }
       ]
