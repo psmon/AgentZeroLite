@@ -997,6 +997,7 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
     {
         try { TearDownNoteCaptureLocked(); } catch { }
         try { TearDownMusicLocked(); } catch { }
+        try { DisposeVision(); } catch { }
         _noteLock.Dispose();
         _musicLock.Dispose();
         _playback.Dispose();

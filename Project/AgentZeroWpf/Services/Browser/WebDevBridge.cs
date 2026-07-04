@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows.Threading;
@@ -350,6 +351,35 @@ public sealed class WebDevBridge
                 return await _noteHost!.ClassifyAsync(title, channel, cats);
             }
 
+            // ─── Agent Band (M0028) — on-device vision (Florence-2 OD) ───
+            // The frame is captured HERE (the bridge owns the plugin's
+            // CoreWebView2) because the plugin's cross-origin YouTube iframe
+            // can't be read from JS. `_core.CapturePreviewAsync` is safe on
+            // this path — DispatchAsync runs on the WebView2's UI thread.
+            case "vision.status":
+                EnsureNoteHost();
+                return _noteHost!.GetVisionStatus();
+            case "vision.analyze":
+            {
+                EnsureNoteHost();
+                var (ax, ay, aw, ah) = ReadRect(args);
+                using var ms = new MemoryStream();
+                await _core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, ms);
+                return await _noteHost!.VisionAnalyzeAsync(ms.ToArray(), ax, ay, aw, ah);
+            }
+            case "vision.motion":
+            {
+                EnsureNoteHost();
+                var (mx, my, mw, mh) = ReadRect(args);
+                using var ms = new MemoryStream();
+                await _core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, ms);
+                return _noteHost!.VisionMotion(ms.ToArray(), mx, my, mw, mh);
+            }
+            case "vision.reset":
+                EnsureNoteHost();
+                _noteHost!.ResetVision();
+                return new { ok = true };
+
             // ─── Token-monitor plugin surface (read-only) ───────────────
             case "tokens.summary":
             {
@@ -552,6 +582,11 @@ public sealed class WebDevBridge
             return v;
         return null;
     }
+
+    // Vision crop rect in device pixels: { x, y, w, h }. Missing → 0 (host clamps).
+    private static (int x, int y, int w, int h) ReadRect(JsonElement? args)
+        => (TryGetInt(args, "x") ?? 0, TryGetInt(args, "y") ?? 0,
+            TryGetInt(args, "w") ?? 0, TryGetInt(args, "h") ?? 0);
 
     private void EnsureNoteHost()
     {

@@ -619,6 +619,30 @@
   let   climaxNextAt = 0;            // scheduled next climax start (0 = unscheduled)
   let   climaxUntil  = 0;            // all-dance active while performance.now() < this
 
+  // ── Vision (M0028) — GIRL-GROUP MODE ONLY ───────────────────────────
+  // Florence-2 object detection over the playing MV frame drives, in group
+  // mode only:
+  //   • person count       → girl-group member count (recent-max smoothed),
+  //   • frame-diff motion   → dance idle(sing) ↔ action(dance) sync,
+  //   • visible instruments → vision-first instrument summon (audio = fallback).
+  // Degrades cleanly to the prior audio-only behavior when the Florence-2 model
+  // isn't downloaded, the mode is solo, or no video is playing.
+  const VISION_ANALYZE_MS   = 2500;   // Florence-2 OD cadence (slow; ~1.4s CPU)
+  const VISION_MOTION_MS    = 300;    // frame-diff cadence (cheap, host-side)
+  const VISION_COUNT_WIN_MS = 8000;   // rolling window for "recent max" person count
+  const VISION_MOTION_ON    = 0.055;  // motion energy → action (hysteresis high)
+  const VISION_MOTION_OFF   = 0.028;  // → idle (hysteresis low)
+  let visionActive       = false;     // loops running (group + model + live)
+  let visionAnalyzeTimer = 0;
+  let visionMotionTimer  = 0;
+  let visionAnalyzeBusy  = false;
+  let visionMotionBusy   = false;
+  let visionCountSamples = [];        // [{ t, n }] recent person counts
+  let visionMemberTarget = 0;         // recent-max person count (0 = no override)
+  let visionAction       = false;     // motion → dance(action) vs idle(sing)
+  let visionInstruments  = new Map(); // sprite id → score, refreshed each analyze
+  let bandLive           = false;     // music session running
+
   // Spawn-or-refresh one performer at the given score. Marks it "seen this
   // tick" (so it won't fade) and resolves its idle/active state. Returns
   // false if the stage is full of active performers and this one couldn't
@@ -664,6 +688,14 @@
       if (singerMode === 'group' && VOCAL_MALE.includes(id)) continue;
       const prev = collapsed.get(id);
       if (prev === undefined || l.score > prev) collapsed.set(id, l.score);
+    }
+
+    // M0028 — vision-first instruments (girl-group). When the MV visibly shows
+    // instruments, prefer them; the audio AST list is the fallback only when
+    // vision saw none this cycle.
+    if (visionActive && singerMode === 'group' && visionInstruments.size > 0) {
+      collapsed.clear();
+      for (const [id, sc] of visionInstruments) collapsed.set(id, sc);
     }
 
     // Hysteresis: PRESENT to spawn, KEEP to retain. Once a performer is on
@@ -742,6 +774,15 @@
       target = 0;   // ramp the whole group down
     }
 
+    // M0028 — vision override (girl-group only): the recent-max person count in
+    // the MV sets the member target directly. 0 persons over the whole window =
+    // no override (keep the audio-derived target so an instrumental/object cut
+    // doesn't collapse the group).
+    const visionMembers = (visionActive && singerMode === 'group' && visionMemberTarget > 0)
+      ? Math.max(1, Math.min(poolMax, visionMemberTarget)) : 0;
+    if (visionMembers > 0) target = visionMembers;
+    const presentEff = present || visionMembers > 0;
+
     // Chase the target one member per tick.
     if (target > idolRenderedSize) idolRenderedSize++;
     else if (target < idolRenderedSize) idolRenderedSize--;
@@ -757,7 +798,7 @@
     // Periodic climax — every 60s of live group time, a 5s all-dance burst.
     // performState() reads climaxUntil per-frame so the 5s window is crisp
     // regardless of the 1.5s tick. Reset when the group is absent / in solo.
-    if (singerMode === 'group' && present && idolRenderedSize > 0) {
+    if (singerMode === 'group' && presentEff && idolRenderedSize > 0) {
       if (climaxNextAt === 0) climaxNextAt = now + CLIMAX_PERIOD_MS;   // first climax at +60s
       if (now >= climaxNextAt) { climaxUntil = now + CLIMAX_HOLD_MS; climaxNextAt = now + CLIMAX_PERIOD_MS; }
     } else {
@@ -774,7 +815,7 @@
     // Presence score keeps members on stage (animation is decided by the
     // `playing` flag below, not this score). Floor so they don't fade
     // while the group is up.
-    const memberScore = present ? Math.max(fem.score, SCORE_PRESENT) : SCORE_PRESENT;
+    const memberScore = presentEff ? Math.max(fem.score, SCORE_PRESENT) : SCORE_PRESENT;
     for (const id of members) {
       upsertPerformer(id, memberScore, now);
       const p = performers.get(id);
@@ -1239,6 +1280,10 @@
   function performState(p) {
     if (p.fading) return 'idle';
     if (FEMALE_POOL.has(p.id)) {
+      // M0028 — in girl-group with vision active, the MV's frame-diff motion
+      // drives the whole group: action → dance, still → idle(singing). This
+      // takes over from the audio assignee/climax model for tight dance sync.
+      if (visionActive && singerMode === 'group') return visionAction ? 'play' : 'idle';
       // Climax window → every member dances at once (checked per-frame so the
       // 5s hold is exact, not quantized to the 1.5s tick).
       if (climaxUntil && performance.now() < climaxUntil) return 'play';
@@ -1486,6 +1531,9 @@
       setStatus(`LIVE · ${r.source}`, 'live');
       els.diagSource.textContent = r.source;
       els.stop.disabled = false;
+      // M0028 — kick the girl-group vision loops (no-op in solo / no model).
+      bandLive = true;
+      startVisionLoops();
     } catch (ex) {
       setStatus('start failed — ' + ex.message, 'err');
       els.start.disabled = false;
@@ -1514,6 +1562,10 @@
     renderLabelStrip([]);
     lastSpectrum = null;
     if (smoothed) smoothed.fill(0);
+    // M0028 — tear down vision loops + baseline.
+    bandLive = false;
+    stopVisionLoops();
+    try { window.zero && window.zero.vision && window.zero.vision.reset(); } catch (_) {}
   }
 
   function bindEvents() {
@@ -1525,7 +1577,14 @@
     // group back to the lead on the next tick (handled by upsertIdolGroup).
     singerMode = els.singerMode ? els.singerMode.value : 'group';
     if (els.singerMode) {
-      els.singerMode.addEventListener('change', () => { singerMode = els.singerMode.value; });
+      els.singerMode.addEventListener('change', () => {
+        singerMode = els.singerMode.value;
+        // M0028 — vision is group-only: start/stop the loops on mode toggle.
+        if (bandLive) {
+          if (singerMode === 'group') startVisionLoops();
+          else stopVisionLoops();
+        }
+      });
     }
 
     if (window.zero && window.zero.music) {
@@ -1638,6 +1697,98 @@
     return Promise.reject(new Error('bridge unavailable'));
   }
 
+  // ── Vision poll loops (M0028) ───────────────────────────────────────
+  // The MV region in DEVICE pixels (CSS px × dpr) matching the host's frame
+  // capture coords, or null when no video is showing.
+  function videoRectDevicePx() {
+    if (!currentVideoId || !ytEls.frame) return null;
+    if (ytEls.top && ytEls.top.classList.contains('hidden')) return null;
+    const r = ytEls.frame.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return null;
+    const dpr = window.devicePixelRatio || 1;
+    return {
+      x: Math.round(r.left * dpr), y: Math.round(r.top * dpr),
+      w: Math.round(r.width * dpr), h: Math.round(r.height * dpr),
+    };
+  }
+
+  async function startVisionLoops() {
+    stopVisionLoops();
+    if (singerMode !== 'group') return;
+    if (!window.zero || !window.zero.vision) return;
+    let present = false;
+    try { const st = await window.zero.vision.status(); present = !!(st && st.present); }
+    catch (_) { present = false; }
+    if (!present) {
+      els.hint.textContent = '👁 비전 모델 미설치 — Settings → Vision → Download (걸그룹 비전 연동은 비활성, 오디오는 정상)';
+      return;
+    }
+    visionActive = true;
+    visionCountSamples = [];
+    visionMemberTarget = 0;
+    visionAction = false;
+    visionInstruments = new Map();
+    try { await window.zero.vision.reset(); } catch (_) {}
+    visionAnalyzeTimer = setInterval(visionAnalyzeTick, VISION_ANALYZE_MS);
+    visionMotionTimer  = setInterval(visionMotionTick, VISION_MOTION_MS);
+  }
+
+  function stopVisionLoops() {
+    if (visionAnalyzeTimer) { clearInterval(visionAnalyzeTimer); visionAnalyzeTimer = 0; }
+    if (visionMotionTimer)  { clearInterval(visionMotionTimer);  visionMotionTimer = 0; }
+    visionActive = false;
+    visionAction = false;
+    visionMemberTarget = 0;
+    visionCountSamples = [];
+    visionInstruments = new Map();
+    visionAnalyzeBusy = false;
+    visionMotionBusy = false;
+  }
+
+  async function visionAnalyzeTick() {
+    if (visionAnalyzeBusy || !visionActive || singerMode !== 'group') return;
+    const rect = videoRectDevicePx();
+    if (!rect) return;
+    visionAnalyzeBusy = true;
+    try {
+      const r = await window.zero.vision.analyze(rect);
+      if (!r || !r.ok) return;
+      const now = performance.now();
+      visionCountSamples.push({ t: now, n: (r.personCount | 0) });
+      visionCountSamples = visionCountSamples.filter(s => now - s.t <= VISION_COUNT_WIN_MS);
+      const recentMax = visionCountSamples.reduce((m, s) => Math.max(m, s.n), 0);
+      // 0 persons across the whole window → no override (audio fallback).
+      visionMemberTarget = recentMax > 0 ? Math.min(7, recentMax) : 0;
+      // Vision-first instruments: the audio label→sprite mapper's regexes
+      // (guitar/piano/violin/drum/…) also match Florence-2's visual labels.
+      const vi = new Map();
+      for (const d of (r.detections || [])) {
+        const id = labelToPerformer(d.label || '');
+        if (id && !id.startsWith('vocal-')) vi.set(id, Math.max(vi.get(id) || 0, 0.9));
+      }
+      visionInstruments = vi;
+      els.hint.textContent =
+        `👁 인원 ${visionMemberTarget || '-'} · ${visionAction ? '동작(댄스)' : '유휴(노래)'} · 악기 ${vi.size} · ${r.inferMs}ms`;
+    } catch (_) { /* transient — ignore */ }
+    finally { visionAnalyzeBusy = false; }
+  }
+
+  async function visionMotionTick() {
+    if (visionMotionBusy || !visionActive || singerMode !== 'group') return;
+    const rect = videoRectDevicePx();
+    if (!rect) return;
+    visionMotionBusy = true;
+    try {
+      const r = await window.zero.vision.motion(rect);
+      if (r && r.ok) {
+        const m = r.motion || 0;
+        if (!visionAction && m >= VISION_MOTION_ON) visionAction = true;
+        else if (visionAction && m <= VISION_MOTION_OFF) visionAction = false;
+      }
+    } catch (_) {}
+    finally { visionMotionBusy = false; }
+  }
+
   // Accept a full watch/share/embed/shorts/live URL or a bare 11-char id.
   function parseVideoId(raw) {
     if (!raw) return null;
@@ -1664,6 +1815,11 @@
     ytEls.frame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
     currentVideoId = videoId;
     updateTopVisibility();
+    // M0028 — new video: drop the motion baseline + recent-count window so the
+    // first frames of the new MV don't read as a huge motion spike / stale count.
+    visionCountSamples = [];
+    visionMemberTarget = 0;
+    try { window.zero && window.zero.vision && window.zero.vision.reset(); } catch (_) {}
   }
 
   function setCaption(item) {

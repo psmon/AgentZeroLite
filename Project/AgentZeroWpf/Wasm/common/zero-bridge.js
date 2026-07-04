@@ -169,6 +169,25 @@
       onSpectrum:  (handler) => on('music.spectrum', handler),
     },
 
+    // On-device vision surface (M0028) — Florence-2 object detection over the
+    // plugin's currently-rendered frame. The HOST captures the WebView2 frame
+    // (the plugin's cross-origin YouTube iframe can't be read from JS), crops to
+    // the passed device-pixel rect, and runs the model. Used by Agent Band's
+    // girl-group mode (person-count → member count, instruments → summon,
+    // frame-diff motion → dance sync).
+    vision: {
+      // → { present: bool, modelDir } — is Florence-2 downloaded?
+      status: () => invoke('vision.status'),
+      // rect = { x, y, w, h } in DEVICE pixels (CSS px × devicePixelRatio).
+      // → { ok, personCount, detections:[{label,xmin,ymin,xmax,ymax}], inferMs }
+      //   or { ok:false, error:"model-missing"|"busy"|... }
+      analyze: (rect) => invoke('vision.analyze', rect || {}),
+      // Cheap frame-diff motion energy for the same rect. → { ok, motion: 0..1 }
+      motion:  (rect) => invoke('vision.motion', rect || {}),
+      // Drop the motion baseline (call on video change / stop).
+      reset:   () => invoke('vision.reset'),
+    },
+
     // LLM-backed text summarization. maxChars defaults to 6000 host-side;
     // longer inputs are halved on a sentence boundary, summarized
     // recursively, then merged. Returns { ok, summary, inputChars, chunks, error }.
