@@ -208,10 +208,46 @@ body {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
   white-space: nowrap;
+  /* 후속#4 — 가변 길이 상태 텍스트가 좌측 버튼을 밀지 않도록 폭 상한 */
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #yt-bar .yt-meta.ok   { color: var(--ok);   background: rgba(108, 240, 157, 0.12); border-color: rgba(108, 240, 157, 0.3); }
 #yt-bar .yt-meta.warn { color: var(--warn); background: rgba(255, 200, 87, 0.12);  border-color: rgba(255, 200, 87, 0.3); }
 #yt-bar .yt-meta.err  { color: var(--err);  background: rgba(255, 107, 107, 0.12); border-color: rgba(255, 107, 107, 0.3); }
+
+/* 스캔 진행 스트립 (후속#4) — 버튼 줄과 분리된 고정 높이 진행 표시 */
+#mp3-progress {
+  position: relative;
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: rgba(10, 13, 18, 0.9);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  z-index: 2;
+}
+#mp3-progress.hidden { display: none; }
+#mp3ProgressFill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.18), rgba(255, 45, 149, 0.18));
+  transition: width 0.3s ease;
+  pointer-events: none;
+}
+#mp3ProgressText {
+  position: relative;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Top video region (영상 + 재생목록) ──────────────────── */
 #yt-top {
@@ -427,3 +463,130 @@ body {
 }
 
 #diag span { white-space: nowrap; }
+
+/* ── Local MP3 playlist (M0029) ──────────────────────────── */
+/* 소스 탭 — YouTube / MP3 */
+#srcTabs { display: flex; gap: 4px; flex: 0 0 auto; }
+.src-tab {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.src-tab:hover { background: rgba(255, 255, 255, 0.09); }
+.src-tab.active {
+  color: #0b0d12;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+}
+
+/* 소스별 컨트롤 묶음 — 활성 소스만 표시 */
+.src-controls { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.src-controls.hidden { display: none; }
+
+.mp3-folder {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text);
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;          /* 긴 경로는 끝부분(폴더명)이 보이게 */
+  text-align: left;
+}
+.mp3-folder.unset { color: #6b7686; direction: ltr; }
+#mp3CancelScan.hidden, #mp3-src-controls.hidden { display: none; }
+
+/* MP3 미니 플레이어 (후속#2) — 커버+메타+컨트롤만 담는 고정폭 카드.
+   mp3 모드에서는 목록이 정보의 중심 → 플레이리스트가 나머지 폭 전부. */
+#yt-top.mp3-mode #mp3-player  { flex: 0 0 280px; }
+#yt-top.mp3-mode #yt-playlist { flex: 1 1 auto; }
+#mp3-player {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0d1017, #131826);
+}
+#mp3-player.hidden, #yt-player.hidden { display: none; }
+#mp3-cover-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+#mp3Cover { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+#mp3Cover.hidden { display: none; }
+#mp3CoverFb { font-size: 44px; opacity: 0.7; }
+#mp3CoverFb.hidden { display: none; }
+#mp3-meta { flex: 0 0 auto; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.mp3-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mp3-inst { display: flex; flex-wrap: wrap; gap: 4px; }
+.inst-chip {
+  font-size: 10px; font-weight: 700; color: #ffd28a;
+  padding: 3px 8px; border-radius: 999px;
+  background: rgba(255, 200, 87, 0.12); border: 1px solid rgba(255, 200, 87, 0.3);
+}
+.inst-none { font-size: 10px; color: var(--muted); }
+#mp3Audio {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 40px;
+  background: #0b0d12;
+}
+
+/* 악기 검색 필터 (목록 패널 상단) */
+.mp3-filter { display: flex; gap: 6px; }
+.mp3-filter.hidden { display: none; }
+.mp3-filter input {
+  flex: 1 1 auto; min-width: 0; height: 26px;
+  background: rgba(0, 0, 0, 0.35); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 0 8px; font-size: 11px; font-family: inherit;
+}
+.mp3-filter select {
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.35); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 11px; padding: 0 4px;
+}
+
+/* MP3 목록 아이템 — 삭제 버튼 / 재생중 / 파일없음 상태 */
+#yt-playlist .pl-item.mp3 { position: relative; padding-right: 30px; }
+#yt-playlist .pl-item.mp3 .mp3-thumb {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; font-size: 16px;
+}
+#yt-playlist .pl-item.playing {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.45);
+}
+#yt-playlist .pl-item.unavailable { opacity: 0.45; }
+#yt-playlist .pl-s { font-size: 10px; color: var(--muted); }
+#yt-playlist .pl-del {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  border: none; background: transparent; color: var(--muted);
+  font-size: 12px; cursor: pointer; padding: 4px; border-radius: 5px;
+  opacity: 0;
+}
+#yt-playlist .pl-item:hover .pl-del { opacity: 1; }
+#yt-playlist .pl-del:hover { background: rgba(255, 107, 107, 0.15); color: var(--err); }

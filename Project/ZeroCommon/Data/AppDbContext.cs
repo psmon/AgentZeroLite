@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<TokenAccountAlias> TokenAccountAliases => Set<TokenAccountAlias>();
     public DbSet<TokenRemainingObservation> TokenRemainingObservations => Set<TokenRemainingObservation>();
     public DbSet<SessionHeartbeat> SessionHeartbeats => Set<SessionHeartbeat>();
+    public DbSet<Mp3Track> Mp3Tracks => Set<Mp3Track>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -80,6 +81,11 @@ public class AppDbContext : DbContext
         mb.Entity<SessionHeartbeat>()
             .HasIndex(h => h.LastSeenUtc)
             .IsDescending(true);
+
+        // Mp3Track (M0029) — FilePath is the rescan upsert key.
+        mb.Entity<Mp3Track>()
+            .HasIndex(t => t.FilePath)
+            .IsUnique();
     }
 
     public static void InitializeDatabase()

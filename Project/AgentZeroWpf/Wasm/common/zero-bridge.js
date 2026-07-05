@@ -209,6 +209,42 @@
       classify: (opts) => invoke('llm.classify', opts || {}),
     },
 
+    // Agent Band (M0029) — local MP3 playlist, persisted in the host's
+    // SQLite DB (survives reinstall — unlike localStorage). The scan is a
+    // BACKGROUND JOB: scan() returns immediately and the host streams
+    //   mp3.scan.progress → { phase, done, total, current, added, updated, classified }
+    //   mp3.track         → one upserted track DTO (playable immediately;
+    //                       new tracks fire again once the LLM category lands)
+    //   mp3.scan.done     → { ok, total, added, updated, classified, error? }
+    // Playback: the host maps the scan root to https://mp3.local/, so play a
+    // track with  audio.src = 'https://mp3.local/' + encodeURI(relativePath).
+    mp3: {
+      // → { folder, folderExists, scanning, progress?, count }
+      status:      () => invoke('mp3.status'),
+      // Native folder dialog → { ok, folder } | { ok:false, error:'cancelled' }
+      pickFolder:  () => invoke('mp3.pickFolder'),
+      // Persist + virtual-host-map the scan root → { ok, folder }
+      setFolder:   (folder) => invoke('mp3.setFolder', { folder }),
+      // Kick the background scan job → { ok, started } | { ok:false, error:'busy'|'folder-missing' }
+      scan:        (categories) => invoke('mp3.scan', { categories: categories || [] }),
+      cancelScan:  () => invoke('mp3.scan.cancel'),
+      // → { ok, folder, tracks: [{ id, relativePath, title, artist, album,
+      //     category, categoryBy, instruments, durationSeconds, available, … }] }
+      list:        () => invoke('mp3.list'),
+      remove:      (id) => invoke('mp3.remove', { id }),
+      markPlayed:  (id) => invoke('mp3.markPlayed', { id }),
+      // M0029 확장 — merge instrument keys heard live into the track's
+      // persisted set → { ok, id, instruments: string[] }
+      setInstruments: (id, instruments) => invoke('mp3.setInstruments', { id, instruments: instruments || [] }),
+      // 후속#5 — Florence-2 on the APIC cover → vocal gender hint.
+      // { ok, id, gender: 'male'|'female'|'group'|'', by: 'vision'|'cached'|'no-cover', persons? }
+      // Persists only while VocalGender is empty; a later LLM verdict wins.
+      coverGender: (id) => invoke('mp3.coverGender', { id }),
+      onScanProgress: (handler) => on('mp3.scan.progress', handler),
+      onTrack:        (handler) => on('mp3.track', handler),
+      onScanDone:     (handler) => on('mp3.scan.done', handler),
+    },
+
     // Token-monitor plugin surface (M0009). Read-only — the host runs an
     // internal collector that polls Claude Code / Codex CLI JSONL files
     // every minute and persists rows. Plugins query via these methods

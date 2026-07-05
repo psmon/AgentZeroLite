@@ -69,6 +69,10 @@
          using the shared ModelDownloadDialog contract — same UX as AST
          AudioSet (Music tab). -->
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.10.46" />
+    <!-- Local MP3 playlist (M0029) — ID3 tag reading for the Agent Band
+         scan job (title/artist/album/genre/duration). Managed-only, MIT,
+         netstandard2.0 — safe for the headless ZeroCommon target. -->
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
   </ItemGroup>
 
   <!-- Self-built llama.cpp natives: CPU baseline + Vulkan GPU variant.

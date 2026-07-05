@@ -2,14 +2,14 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>Agent Band — M0026</title>
+  <title>Agent Band — M0029</title>
   <link rel="stylesheet" href="agent-band.css" />
 </head>
 <body>
   <header id="band-header">
     <div class="left">
-      <h1>Agent Band <span class="tag">M0026</span></h1>
-      <span class="hint" id="band-hint">유튜브 링크를 붙이면 상단 무대에서 재생되고, ▶ Start(System Loopback)로 악단이 반응합니다.</span>
+      <h1>Agent Band <span class="tag">M0029</span></h1>
+      <span class="hint" id="band-hint">유튜브 링크 또는 로컬 MP3를 재생하고, ▶ Start(System Loopback)로 악단이 반응합니다.</span>
     </div>
     <div class="right">
       <label class="ctrl">
@@ -46,14 +46,34 @@
   </header>
 
   <main id="stage-wrap">
-    <!-- 무대 상단 — 유튜브 링크 붙이기 -->
+    <!-- 무대 상단 — 재생 소스 탭 (YouTube / MP3) + 소스별 컨트롤 (M0029) -->
     <div id="yt-bar">
-      <span class="yt-ic">🔗</span>
-      <input id="ytUrl" type="text" spellcheck="false"
-             placeholder="https://www.youtube.com/watch?v=…  유튜브 링크를 붙여넣기" />
-      <button id="ytPaste" class="yt-paste">붙이기</button>
+      <div id="srcTabs">
+        <button id="srcYt" class="src-tab active" data-src="yt">▶ YouTube</button>
+        <button id="srcMp3" class="src-tab" data-src="mp3">🎵 MP3</button>
+      </div>
+      <div id="yt-src-controls" class="src-controls">
+        <span class="yt-ic">🔗</span>
+        <input id="ytUrl" type="text" spellcheck="false"
+               placeholder="https://www.youtube.com/watch?v=…  유튜브 링크를 붙여넣기" />
+        <button id="ytPaste" class="yt-paste">붙이기</button>
+      </div>
+      <div id="mp3-src-controls" class="src-controls hidden">
+        <span class="yt-ic">🎵</span>
+        <span id="mp3Folder" class="mp3-folder" title="">폴더 미설정</span>
+        <button id="mp3Pick" class="yt-list-btn" title="MP3 폴더 선택 (하위 폴더 포함)">📁 폴더</button>
+        <button id="mp3Scan" class="yt-paste" title="스캔은 백그라운드로 진행 — 스캔된 곡부터 바로 재생 가능">🔍 스캔</button>
+        <button id="mp3CancelScan" class="yt-list-btn hidden">✖ 중지</button>
+      </div>
       <button id="ytListToggle" class="yt-list-btn" title="재생 목록 열기/닫기">📂 목록</button>
       <span class="yt-meta" id="ytMeta">대기</span>
+    </div>
+
+    <!-- 스캔 진행 스트립 (M0029 후속#4) — 가변 길이 진행 텍스트를 버튼 줄에서
+         분리해 별도 고정 높이 레이아웃으로. 버튼 위치가 출렁이지 않는다. -->
+    <div id="mp3-progress" class="hidden">
+      <div id="mp3ProgressFill"></div>
+      <span id="mp3ProgressText">—</span>
     </div>
 
     <!-- 상단 영상 영역 (영상 없으면 접힘) -->
@@ -77,10 +97,36 @@
           </div>
         </div>
       </div>
+      <!-- 로컬 MP3 미니 플레이어 (M0029 후속#2) — 커버+메타+재생 컨트롤만.
+           목록이 정보의 중심이므로 우측 플레이리스트가 나머지 폭을 가진다. -->
+      <div id="mp3-player" class="hidden">
+        <div id="mp3-cover-wrap">
+          <img id="mp3Cover" class="hidden" alt="" />
+          <span id="mp3CoverFb">💿</span>
+        </div>
+        <div id="mp3-meta">
+          <div class="cap-title" id="mp3Title">재생할 곡을 목록에서 선택하세요</div>
+          <div class="cap-channel" id="mp3Artist">—</div>
+          <div class="mp3-badges">
+            <span class="cap-llm" id="mp3By">· 분류</span>
+            <span class="cap-cat" id="mp3Cat">—</span>
+          </div>
+          <div class="mp3-inst" id="mp3NowInst"></div>
+        </div>
+        <audio id="mp3Audio" controls preload="none"></audio>
+      </div>
       <aside id="yt-playlist">
         <div class="pl-head">
-          <span class="pl-title">재생 목록 · 카테고리</span>
+          <span class="pl-title" id="plTitle">재생 목록 · 카테고리</span>
           <span class="pl-count" id="plCount">0</span>
+        </div>
+        <div class="mp3-filter hidden" id="mp3Filter">
+          <input id="mp3InstQuery" type="text" spellcheck="false"
+                 placeholder="악기 검색 — 예: 피아노, drum" />
+          <select id="mp3InstMode" title="포함: 해당 악기가 들어간 곡 / 단독: 그 악기만 있는 곡">
+            <option value="has">포함</option>
+            <option value="only">단독</option>
+          </select>
         </div>
         <div class="pl-tabs" id="plTabs"></div>
         <div class="pl-list" id="plList">

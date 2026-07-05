@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Windows.Threading;
 using Agent.Common;
 using Agent.Common.Browser;
+using Agent.Common.Mp3;
 using Agent.Common.Telemetry;
 using Microsoft.Web.WebView2.Core;
 
@@ -53,6 +54,20 @@ public sealed class WebDevBridge
         _uiDispatcher = Dispatcher.CurrentDispatcher;
         _core.WebMessageReceived += OnMessage;
 
+        // M0029 후속 #1 — mp3.local is served by THIS handler, not the folder
+        // mapping: the Chromium media stack streams <audio> with HTTP Range
+        // requests, which SetVirtualHostNameToFolderMapping cannot answer —
+        // scan worked but playback failed. The interceptor answers 206
+        // Partial Content from a FileStream slice (real streaming + seek).
+        // The folder mapping stays as a fallback for older runtimes where
+        // adding the filter throws.
+        try
+        {
+            _core.AddWebResourceRequestedFilter($"https://{Mp3VirtualHost}/*", CoreWebView2WebResourceContext.All);
+            _core.WebResourceRequested += OnMp3ResourceRequested;
+        }
+        catch (Exception ex) { AppLogger.Log($"[WebDev:Mp3] resource filter unavailable: {ex.Message}"); }
+
         if (_noteHost is not null)
         {
             _noteHost.NoteTranscript        += OnNoteTranscript;
@@ -65,6 +80,10 @@ public sealed class WebDevBridge
             _noteHost.MusicTick             += OnMusicTick;
             _noteHost.MusicAmplitude        += OnMusicAmplitude;
             _noteHost.MusicSpectrum         += OnMusicSpectrum;
+            // M0029 — Agent Band MP3 scan job stream.
+            _noteHost.Mp3ScanProgress       += OnMp3ScanProgress;
+            _noteHost.Mp3TrackUpserted      += OnMp3TrackUpserted;
+            _noteHost.Mp3ScanDone           += OnMp3ScanDone;
         }
 
         TokenUsageCollector.Instance.TickCompleted += OnTokenTick;
@@ -75,6 +94,7 @@ public sealed class WebDevBridge
     public void Detach()
     {
         try { _core.WebMessageReceived -= OnMessage; } catch { }
+        try { _core.WebResourceRequested -= OnMp3ResourceRequested; } catch { }
         if (_noteHost is not null)
         {
             try { _noteHost.NoteTranscript       -= OnNoteTranscript;      } catch { }
@@ -86,6 +106,9 @@ public sealed class WebDevBridge
             try { _noteHost.MusicTick            -= OnMusicTick;           } catch { }
             try { _noteHost.MusicAmplitude       -= OnMusicAmplitude;      } catch { }
             try { _noteHost.MusicSpectrum        -= OnMusicSpectrum;       } catch { }
+            try { _noteHost.Mp3ScanProgress      -= OnMp3ScanProgress;     } catch { }
+            try { _noteHost.Mp3TrackUpserted     -= OnMp3TrackUpserted;    } catch { }
+            try { _noteHost.Mp3ScanDone          -= OnMp3ScanDone;         } catch { }
         }
         try { TokenUsageCollector.Instance.TickCompleted -= OnTokenTick; } catch { }
         try { TokenRemainingCollector.Instance.TickCompleted -= OnTokenRemainingTick; } catch { }
@@ -165,6 +188,14 @@ public sealed class WebDevBridge
     // a new classification is ready.
     private void OnMusicSpectrum(float[] bars) =>
         PostEvent("music.spectrum", new { spectrum = bars });
+
+    // ─── Agent Band (M0029) — MP3 scan job stream ────────────────────
+    // The scan runs as a background job on the host; these events are what
+    // makes the playlist update INCREMENTALLY while the scan is still
+    // running (each upserted track is playable the moment it arrives).
+    private void OnMp3ScanProgress(Mp3ScanProgressInfo p) => PostEvent("mp3.scan.progress", p);
+    private void OnMp3TrackUpserted(Mp3TrackDto t)        => PostEvent("mp3.track", t);
+    private void OnMp3ScanDone(Mp3ScanDoneInfo d)         => PostEvent("mp3.scan.done", d);
 
     private async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
@@ -380,6 +411,80 @@ public sealed class WebDevBridge
                 _noteHost!.ResetVision();
                 return new { ok = true };
 
+            // ─── Agent Band (M0029) — local MP3 playlist (SQLite-backed) ──
+            // The scan root is mapped to https://mp3.local/ HERE (the bridge
+            // owns the CoreWebView2) so the plugin's <audio> element streams
+            // files natively (seek/range included) — audio bytes never cross
+            // the postMessage bridge.
+            case "mp3.status":
+            {
+                EnsureNoteHost();
+                EnsureMp3HostMapping(Mp3SettingsStore.Load().ScanFolder);
+                return _noteHost!.GetMp3Status();
+            }
+            case "mp3.pickFolder":
+            {
+                var current = Mp3SettingsStore.Load().ScanFolder;
+                var dlg = new Microsoft.Win32.OpenFolderDialog
+                {
+                    Title = "MP3 폴더 선택 — 하위 폴더까지 스캔합니다",
+                };
+                if (!string.IsNullOrWhiteSpace(current) && Directory.Exists(current))
+                    dlg.InitialDirectory = current;
+                // DispatchAsync runs on the WebView2's UI thread — safe to block on the dialog.
+                var picked = dlg.ShowDialog() == true ? dlg.FolderName : null;
+                if (string.IsNullOrWhiteSpace(picked))
+                    return new { ok = false, error = "cancelled" };
+                return new { ok = true, folder = picked };
+            }
+            case "mp3.setFolder":
+            {
+                EnsureNoteHost();
+                var folder = args?.TryGetProperty("folder", out var fEl) == true && fEl.ValueKind == JsonValueKind.String
+                    ? fEl.GetString() ?? "" : "";
+                var r = _noteHost!.Mp3SetFolder(folder);
+                EnsureMp3HostMapping(Mp3SettingsStore.Load().ScanFolder);
+                return r;
+            }
+            case "mp3.scan":
+            {
+                EnsureNoteHost();
+                var cats = ReadStringArray(args, "categories");
+                EnsureMp3HostMapping(Mp3SettingsStore.Load().ScanFolder);
+                return _noteHost!.Mp3StartScan(cats);
+            }
+            case "mp3.scan.cancel":
+                EnsureNoteHost();
+                return _noteHost!.Mp3CancelScan();
+            case "mp3.list":
+            {
+                EnsureNoteHost();
+                EnsureMp3HostMapping(Mp3SettingsStore.Load().ScanFolder);
+                return await _noteHost!.Mp3ListAsync();
+            }
+            case "mp3.remove":
+            {
+                EnsureNoteHost();
+                return await _noteHost!.Mp3RemoveAsync(TryGetInt(args, "id") ?? 0);
+            }
+            case "mp3.markPlayed":
+            {
+                EnsureNoteHost();
+                return await _noteHost!.Mp3MarkPlayedAsync(TryGetInt(args, "id") ?? 0);
+            }
+            case "mp3.setInstruments":
+            {
+                EnsureNoteHost();
+                var id = TryGetInt(args, "id") ?? 0;
+                var keys = ReadStringArray(args, "instruments");
+                return await _noteHost!.Mp3SetInstrumentsAsync(id, keys);
+            }
+            case "mp3.coverGender":
+            {
+                EnsureNoteHost();
+                return await _noteHost!.Mp3CoverGenderAsync(TryGetInt(args, "id") ?? 0);
+            }
+
             // ─── Token-monitor plugin surface (read-only) ───────────────
             case "tokens.summary":
             {
@@ -587,6 +692,165 @@ public sealed class WebDevBridge
     private static (int x, int y, int w, int h) ReadRect(JsonElement? args)
         => (TryGetInt(args, "x") ?? 0, TryGetInt(args, "y") ?? 0,
             TryGetInt(args, "w") ?? 0, TryGetInt(args, "h") ?? 0);
+
+    private static List<string> ReadStringArray(JsonElement? args, string name)
+    {
+        var list = new List<string>();
+        if (args?.TryGetProperty(name, out var el) == true && el.ValueKind == JsonValueKind.Array)
+            foreach (var item in el.EnumerateArray())
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    var s = item.GetString();
+                    if (!string.IsNullOrWhiteSpace(s)) list.Add(s!);
+                }
+        return list;
+    }
+
+    // ─── mp3.local virtual host (M0029) ─────────────────────────────
+    // Maps the CURRENT scan root so <audio src="https://mp3.local/<rel>">
+    // streams from disk with native range/seek. Re-mapping the same host
+    // name to a new folder is supported by WebView2 — done whenever the
+    // operator changes the scan folder.
+    private const string Mp3VirtualHost = "mp3.local";
+    private string? _mp3MappedFolder;
+
+    private void EnsureMp3HostMapping(string? folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return;
+        if (string.Equals(_mp3MappedFolder, folder, StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            _core.SetVirtualHostNameToFolderMapping(
+                Mp3VirtualHost, folder, CoreWebView2HostResourceAccessKind.Allow);
+            _mp3MappedFolder = folder;
+            AppLogger.Log($"[WebDev:Mp3] mp3.local → {folder}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[WebDev:Mp3] vhost mapping failed: {ex.Message}");
+        }
+    }
+
+    // Streams one MP3 under the scan root with HTTP Range support (206) —
+    // what the <audio> element actually needs for playback + seeking. Path
+    // is unescaped and clamped under the root; only *.mp3 is served.
+    private void OnMp3ResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
+    {
+        void Respond(int status, string reason, string headers, Stream? body = null)
+        {
+            try { e.Response = _core.Environment.CreateWebResourceResponse(body, status, reason, headers); }
+            catch (Exception ex) { AppLogger.Log($"[WebDev:Mp3] response build failed: {ex.Message}"); }
+        }
+
+        try
+        {
+            var uri = new Uri(e.Request.Uri);
+            if (!string.Equals(uri.Host, Mp3VirtualHost, StringComparison.OrdinalIgnoreCase)) return;
+
+            var rel = Uri.UnescapeDataString(uri.AbsolutePath).TrimStart('/');
+            if (rel.Length == 0) { Respond(404, "Not Found", ""); return; }
+
+            // Cover-art route (후속 #2): /__cover/<trackId> → ID3 APIC bytes.
+            // Id-based (DB lookup), so no path handling at all on this branch.
+            if (rel.StartsWith("__cover/", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_noteHost is not null
+                    && int.TryParse(rel.Substring("__cover/".Length), out var coverId)
+                    && _noteHost.TryGetMp3Cover(coverId) is { } cover)
+                    Respond(200, "OK",
+                        $"Content-Type: {cover.Mime}\nContent-Length: {cover.Data.Length}\nCache-Control: max-age=3600",
+                        new MemoryStream(cover.Data));
+                else
+                    Respond(404, "Not Found", "");
+                return;
+            }
+
+            var root = Mp3SettingsStore.Load().ScanFolder;
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            { Respond(404, "Not Found", ""); return; }
+            var rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+            var full = Path.GetFullPath(Path.Combine(rootFull, rel.Replace('/', Path.DirectorySeparatorChar)));
+            if (!full.StartsWith(rootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            { Respond(403, "Forbidden", ""); return; }
+            if (!full.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) || !File.Exists(full))
+            { Respond(404, "Not Found", ""); return; }
+
+            long total = new FileInfo(full).Length;
+            long start = 0, end = total - 1;
+            bool ranged = false;
+
+            var rangeRaw = e.Request.Headers.Contains("Range") ? e.Request.Headers.GetHeader("Range") : null;
+            if (!string.IsNullOrEmpty(rangeRaw) && rangeRaw.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+            {
+                // "bytes=start-end" / "bytes=start-" / "bytes=-suffix" (first range only)
+                var spec = rangeRaw.Substring(6).Split(',')[0].Trim();
+                var dash = spec.IndexOf('-');
+                if (dash >= 0)
+                {
+                    var sPart = spec.Substring(0, dash).Trim();
+                    var ePart = spec.Substring(dash + 1).Trim();
+                    if (sPart.Length == 0 && ePart.Length > 0 && long.TryParse(ePart, out var suffix))
+                    { start = Math.Max(0, total - suffix); end = total - 1; ranged = true; }
+                    else if (sPart.Length > 0 && long.TryParse(sPart, out var s))
+                    {
+                        start = s;
+                        end = ePart.Length > 0 && long.TryParse(ePart, out var en) ? Math.Min(en, total - 1) : total - 1;
+                        ranged = true;
+                    }
+                }
+                if (ranged && (start > end || start >= total))
+                { Respond(416, "Range Not Satisfiable", $"Content-Range: bytes */{total}"); return; }
+            }
+
+            long count = end - start + 1;
+            var fs = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read);
+            fs.Seek(start, SeekOrigin.Begin);
+            const string common = "Content-Type: audio/mpeg\nAccept-Ranges: bytes";
+            if (ranged)
+                Respond(206, "Partial Content",
+                    $"{common}\nContent-Length: {count}\nContent-Range: bytes {start}-{end}/{total}",
+                    new StreamSlice(fs, count));
+            else
+                Respond(200, "OK", $"{common}\nContent-Length: {total}", fs);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[WebDev:Mp3] serve failed: {ex.GetType().Name}: {ex.Message}");
+            Respond(500, "Internal Error", "");
+        }
+    }
+
+    // Read-only forward view of the next N bytes of an inner stream — lets a
+    // 206 response hand WebView2 exactly the requested slice without copying
+    // the file into memory.
+    private sealed class StreamSlice : Stream
+    {
+        private readonly Stream _inner;
+        private long _remaining;
+        public StreamSlice(Stream inner, long count) { _inner = inner; _remaining = count; }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_remaining <= 0) return 0;
+            int n = _inner.Read(buffer, offset, (int)Math.Min(count, _remaining));
+            _remaining -= n;
+            return n;
+        }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
 
     private void EnsureNoteHost()
     {
