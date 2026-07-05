@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<TokenRemainingObservation> TokenRemainingObservations => Set<TokenRemainingObservation>();
     public DbSet<SessionHeartbeat> SessionHeartbeats => Set<SessionHeartbeat>();
     public DbSet<Mp3Track> Mp3Tracks => Set<Mp3Track>();
+    public DbSet<Mp3MoodCard> Mp3MoodCards => Set<Mp3MoodCard>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

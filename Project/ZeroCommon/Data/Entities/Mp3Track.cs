@@ -49,6 +49,13 @@ public class Mp3Track
     /// <summary>CSV of canonical instrument/vocal keys heard during playback ("piano,drum,vocal").</summary>
     public string Instruments { get; set; } = "";
 
+    /// <summary>
+    /// CSV of canonical mood keys heard during playback (M0030 — AST의
+    /// "Happy/Sad/Exciting music" 계열 무드 라벨): "happy,exciting,tender".
+    /// 악기와 같은 실시간 누적·클램프 경로를 탄다.
+    /// </summary>
+    public string Moods { get; set; } = "";
+
     public double DurationSeconds { get; set; }
     public long FileSizeBytes { get; set; }
 

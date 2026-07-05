@@ -1,5 +1,33 @@
 // agent-band.js — M0025 Agent Band plugin.
 //
+// v0.21.0 changelog (M0030 후속 #1 — 3단 레이아웃 + 스캔 성능):
+//   • MP3 레이아웃 3단 분리 — [미니 재생기 280px | 목록(남는 폭 전부) |
+//     검색·필터 패널 232px]. 검색/장르 탭/가수 칩이 3단 패널로 이동해
+//     목록 가시성 확보. 패널은 🔍 버튼으로 접힘/펼침.
+//   • 목록 헤더에 ▶ 전체(순차재생) / 🔀 랜덤재생 토글 — 현재 필터 목록
+//     기준, 곡 종료 시 순차 or 랜덤으로 자동 이어재생.
+//   • 스캔 성능 — 호스트가 트랙 upsert를 파일당 1건 → ~2s/100건 배치
+//     (mp3.tracks)로 전환해 WPF 디스패처·postMessage 폭주 제거. 플러그인은
+//     스캔 중 목록 렌더를 15s 스로틀(진행 스트립은 그대로), O(1) 인덱스맵
+//     업서트, per-item 리스너 → plList 위임 리스너 1개. 스캔 완료 시
+//     mp3.list 재로드로 정렬 복원 + 즉시 렌더.
+//
+// v0.20.0 changelog (M0030 — 태깅 체계·무대 규칙 재정의·느낌 카드):
+//   • 태깅 4계열 확립 — 장르(Category) / 가수(Artist) / 음악적느낌(Moods,
+//     AST 무드 라벨 7종 실시간 누적·영속) / 악기(Instruments).
+//   • 리얼타임 재조정 — 명시적 성별 라벨 2틱 지속 시 사전분류(LLM/비전)보다
+//     우선해 무대 성별을 재조정 ('그룹' 판정만은 유지 — 오디오로 솔로/그룹
+//     구분 불가). 곡 전환 시 리셋.
+//   • 무대 규칙 — 솔로 판정: 1인 보컬만 등장하고 재생 중 절대 사라지지
+//     않음(노래 신호 시 노래 애니, 아니면 기본 애니). 걸그룹 모드는
+//     '그룹 판정 && 신나는 음악(업비트 장르 or exciting/댄스 라벨 10s
+//     히스테리시스)'일 때만 — 신나도 솔로 판정이면 1인 모드.
+//   • 검색 강화 — 통합 검색(가수/제목/느낌/악기, 한/영), 장르 선택 시
+//     하위 가수 칩(곡수 표시) 원클릭 필터.
+//   • 느낌 카드 자동추천 — 🃏 카드 뷰: LLM이 라이브러리 태그 인벤토리로
+//     카드(제목+설명+장르/가수/느낌/악기 필터)를 생성·영속. 카드 클릭 시
+//     풀에서 랜덤 재생, 곡이 끝나면 같은 풀에서 자동 이어재생.
+//
 // v0.19.0 changelog (M0029 후속 #5 — 커버 아트 비전 성별):
 //   • 성별 미확정 곡이 재생을 시작하면 호스트가 ID3 APIC 커버를 Florence-2
 //     OD로 분석해 남/녀/그룹(person 3+)을 판정 — 판정 즉시 무대 캐릭터가
@@ -763,15 +791,14 @@
       for (const [id, sc] of visionInstruments) collapsed.set(id, sc);
     }
 
-    // M0029 후속#3 — MP3 남성 솔로 연출: 성별이 남성(태그/LLM 우선, 미확정
-    // 기본값 남성)이면 여성 아이돌 대신 남성 보컬이 노래 신호로 무대에 선다.
-    // 악기 등장은 위의 기존 경로 그대로.
+    // M0029/M0030 — MP3 남성 솔로 연출: 성별이 남성이면 여성 아이돌 대신
+    // 남성 보컬이 무대에 선다. M0030 고정 규칙 — 재생 중에는 항상 최소
+    // PRESENT 점수로 upsert되어 절대 사라지지 않고, 노래 신호(v ≥ ACTIVE)일
+    // 때만 노래 애니(play), 아니면 기본 애니(idle). 악기 등장은 기존 경로.
     if (mp3MaleSoloActive()) {
       const v = mp3AnyVocalSignal(labels);
-      if (v > 0) {
-        const maleId = VOCAL_MALE[0];
-        collapsed.set(maleId, Math.max(collapsed.get(maleId) || 0, v));
-      }
+      const maleId = VOCAL_MALE[0];
+      collapsed.set(maleId, Math.max(collapsed.get(maleId) || 0, Math.max(v, SCORE_PRESENT)));
     }
 
     // Hysteresis: PRESENT to spawn, KEEP to retain. Once a performer is on
@@ -841,7 +868,9 @@
 
     const onStage = idolRenderedSize > 0;
     const vocalPresent = fem.score >= (onStage ? SCORE_KEEP : SCORE_PRESENT);
-    const present = vocalPresent || activeStyles.length > 0;
+    // M0030 — MP3 솔로(여성) 고정: 재생 중에는 리드가 절대 무대에서 내려가지
+    // 않는다. 노래 애니는 playing 플래그(vocalPresent/leadActive)가 결정.
+    const present = vocalPresent || activeStyles.length > 0 || mp3SoloPinActive();
 
     let target;
     if (present) {
@@ -1681,7 +1710,8 @@
         const labels = tick.labels || [];
         upsertPerformersFromLabels(labels);
         if (DANCE_TROUPE_ENABLED) upsertDancersFromLabels(labels);
-        mp3AccumulateInstruments(labels);   // M0029 — 재생 중 보유악기 실시간 누적
+        mp3StageTick(labels);        // M0030 — 무대 디렉션(모드/성별 리얼타임 재조정)
+        mp3AccumulateTags(labels);   // M0029/M0030 — 재생 중 악기+느낌 태그 누적
         renderLabelStrip(labels);
         els.diagTick.textContent = `tick ${tickCounter}`;
         els.diagInfer.textContent = `${tick.inferMs} ms`;
@@ -2100,11 +2130,30 @@
   let mp3Scanning = false;
   let prevSingerMode = null;       // 유튜브로 복귀할 때 복원할 Singer 모드
   let mp3HeardInst = new Set();    // 이번 재생에서 이미 알고/들은 악기 키
-  let mp3InstDirty = false;        // 아직 영속 안 된 신규 악기 존재 (후속#3 버그픽스)
+  let mp3HeardMoods = new Set();   // 이번 재생에서 들은 음악적 느낌 키 (M0030)
+  let mp3InstDirty = false;        // 아직 영속 안 된 신규 태그 존재 (악기/느낌 공용)
   let mp3LastInstPush = 0;
   let mp3RenderTimer = 0;
   let mp3LastProgress = null;      // { pct, text } — 탭 전환 시 진행 스트립 복원용
-  let mp3EnvGender = 'male';       // 환경음 성별 추정 — 기본 남성, female 감지 시 전환
+
+  // ── 리얼타임 재조정 계층 (M0030) ─────────────────────────────────────
+  // 사전분류(LLM/비전)보다 우선순위가 높았어도, 재생 중 명시적 성별 라벨이
+  // 지속되면(≥2틱) 무대 성별을 재조정한다. '그룹' 판정만은 유지 — 오디오로
+  // 솔로/그룹을 구분할 수 없기 때문. 곡이 바뀌면 리셋.
+  let mp3RtFem = 0, mp3RtMale = 0;   // 연속 명시 라벨 틱 카운터
+  let mp3RealtimeGender = '';        // '' | 'male' | 'female' — 재조정 결과
+  let mp3LastExcitingAt = -1e9;      // 마지막 '신나는 음악' 신호 시각
+  const MP3_EXCITING_HOLD_MS = 10000; // 신남 히스테리시스 — 잔잔 구간 10s 유지
+
+  // ── 검색/뷰 상태 (M0030) ────────────────────────────────────────────
+  let mp3ArtistFilter = '';        // 장르 하위 가수 칩 필터 ('' = 전체)
+  let mp3ViewMode = 'list';        // 'list' | 'cards' (느낌 카드 자동추천)
+  const mp3Cards = [];             // 저장된 느낌 카드 (host DTO)
+  let mp3ActiveCard = null;        // 카드 재생 중이면 해당 카드 (자동 다음곡 풀)
+  let mp3CardBusy = false;         // 카드 생성 LLM 진행 중
+  let mp3FilterOpen = true;        // 3단 검색·필터 패널 접힘/펼침 (후속#1)
+  let mp3ShuffleOn = false;        // 🔀 랜덤재생 토글 (후속#1)
+  const mp3TrackIdx = new Map();   // id → mp3Tracks index (O(1) 배치 upsert용)
 
   // 악기 키 ↔ 한국어 표기 — 검색은 한/영 모두 허용 ("피아노" = "piano")
   const INSTRUMENT_KO = {
@@ -2113,6 +2162,19 @@
     clarinet: '클라리넷', oboe: '오보에', horn: '호른', trumpet: '트럼펫',
     trombone: '트롬본', tuba: '튜바', drum: '드럼', vocal: '보컬',
   };
+
+  // 음악적 느낌 키 ↔ 한국어 (M0030) — AST AudioSet의 무드 라벨 7종.
+  const MOOD_KO = {
+    happy: '행복', funny: '유쾌', sad: '슬픔', tender: '서정',
+    exciting: '신남', angry: '격정', scary: '긴장',
+  };
+  function moodKeyOf(name) {
+    const m = /(happy|funny|sad|tender|exciting|angry|scary) music/i.exec(name || '');
+    return m ? m[1].toLowerCase() : null;
+  }
+  function mp3MoodList(t) {
+    return String((t && t.moods) || '').split(',').filter(Boolean);
+  }
 
   const mp3Els = {
     tabYt:    document.getElementById('srcYt'),
@@ -2136,6 +2198,14 @@
     instQ:    document.getElementById('mp3InstQuery'),
     instMode: document.getElementById('mp3InstMode'),
     plTitle:  document.getElementById('plTitle'),
+    artistChips: document.getElementById('mp3ArtistChips'),
+    artistSec:   document.getElementById('mp3ArtistSec'),
+    viewToggle:  document.getElementById('mp3ViewToggle'),
+    catTabs:     document.getElementById('mp3CatTabs'),
+    filterPane:  document.getElementById('mp3-filter-pane'),
+    filterCollapse: document.getElementById('mp3FilterCollapse'),
+    playAll:     document.getElementById('mp3PlayAll'),
+    shuffle:     document.getElementById('mp3Shuffle'),
     progress:     document.getElementById('mp3-progress'),
     progressFill: document.getElementById('mp3ProgressFill'),
     progressText: document.getElementById('mp3ProgressText'),
@@ -2182,34 +2252,76 @@
   //   • K-Pop/EDM/힙합/록 또는 LLM이 '그룹' 판정 → 🎤 걸그룹 댄스 무대
   //     (기존 group 스테이징 재사용 — 노래/댄스 전환은 환경음이 그대로 결정).
   //   • 악기 등장은 기존 연출 그대로 (labelToPerformer 경로 무변경).
-  const MP3_GROUP_CATS = ['K-Pop', 'EDM', '힙합', '록'];
+  const MP3_UPBEAT_CATS = ['K-Pop', 'EDM', '힙합', '록'];   // 장르 자체가 '신나는' 힌트
 
   function mp3CurrentTrack() { return mp3Tracks.find(x => x.id === mp3CurrentId) || null; }
 
-  function mp3ConceptFor(t) {
-    if (((t && t.vocalGender) || '') === 'group') return 'group';
-    return MP3_GROUP_CATS.includes((t && t.category) || '') ? 'group' : 'solo';
+  // 성별 결정 (M0030 규칙):
+  //   1) '그룹' 판정(LLM/비전)은 항상 유지 — 오디오로 솔로/그룹 구분 불가.
+  //   2) 리얼타임 재조정 — 명시적 성별 라벨 지속 시 사전분류보다 우선.
+  //   3) 사전분류(LLM > 커버비전) → 4) 기본 남성.
+  function mp3EffectiveGender(t) {
+    const tagG = (t && t.vocalGender) || '';
+    if (tagG === 'group') return 'group';
+    if (mp3RealtimeGender) return mp3RealtimeGender;
+    return tagG || 'male';
   }
 
-  // 태그(LLM) 판정 우선 — 환경음은 미확정일 때만.
-  function mp3EffectiveGender(t) {
-    const g = (t && t.vocalGender) || '';
-    if (g === 'male' || g === 'female') return g;
-    return mp3EnvGender;
+  // 걸그룹 모드 조건 (M0030): 그룹 판정 && 신나는 음악(장르 업비트 or 리얼타임
+  // exciting 신호 10s 히스테리시스). 신나는 음악이어도 솔로 판정이면 1인 모드.
+  function mp3DesiredMode(t) {
+    if (mp3EffectiveGender(t) !== 'group') return 'solo';
+    const upbeat = MP3_UPBEAT_CATS.includes((t && t.category) || '')
+      || performance.now() - mp3LastExcitingAt < MP3_EXCITING_HOLD_MS;
+    return upbeat ? 'group' : 'solo';
+  }
+
+  // 솔로 무대 고정 — 곡이 재생 중이면 솔로 가수는 절대 무대에서 사라지지
+  // 않는다 (노래 신호 없을 땐 기본(idle) 애니로 서 있음).
+  function mp3SoloPinActive() {
+    return sourceMode === 'mp3' && mp3CurrentId != null && singerMode === 'solo'
+      && !!mp3Els.audio && !mp3Els.audio.paused;
   }
 
   function mp3MaleSoloActive() {
-    if (sourceMode !== 'mp3' || mp3CurrentId == null || singerMode !== 'solo') return false;
-    return mp3EffectiveGender(mp3CurrentTrack()) === 'male';
+    return mp3SoloPinActive() && mp3EffectiveGender(mp3CurrentTrack()) === 'male';
   }
 
-  // AST의 모든 노래 신호(남/여/중립) 최대 점수 — 남성 솔로 등장 트리거.
+  // AST의 모든 노래 신호(남/여/중립) 최대 점수 — 솔로 노래 애니 트리거.
   function mp3AnyVocalSignal(labels) {
     let v = 0;
     for (const l of (labels || []))
       if (/sing(ing)?|choir|vocal|chant|yodel|rapping|hum/i.test(l.name || ''))
         v = Math.max(v, l.score || 0);
     return v;
+  }
+
+  // 매 틱 무대 디렉션 (M0030) — 신남 신호 갱신 + 성별 리얼타임 재조정 +
+  // 모드(솔로↔걸그룹) 자연 전환.
+  function mp3StageTick(labels) {
+    if (sourceMode !== 'mp3' || mp3CurrentId == null) return;
+    if (!mp3Els.audio || mp3Els.audio.paused) return;
+    const now = performance.now();
+
+    let femTick = false, maleTick = false, excitingTick = false;
+    for (const l of (labels || [])) {
+      if (!l || (l.score || 0) < SCORE_ACTIVE) continue;
+      const s = (l.name || '').toLowerCase();
+      if (/female sing|\bwoman sing/.test(s)) femTick = true;
+      else if (/male sing|\bman sing\b/.test(s)) maleTick = true;
+      if (moodKeyOf(s) === 'exciting' || labelToDance(l.name)) excitingTick = true;
+    }
+    if (excitingTick) mp3LastExcitingAt = now;
+
+    // 명시 라벨 2틱 연속 → 리얼타임 성별 재조정 (사전분류 재조정 가능).
+    if (femTick && !maleTick)      { mp3RtFem = Math.min(3, mp3RtFem + 1); mp3RtMale = 0; }
+    else if (maleTick && !femTick) { mp3RtMale = Math.min(3, mp3RtMale + 1); mp3RtFem = 0; }
+    if (mp3RtFem >= 2 && mp3RealtimeGender !== 'female')      { mp3RealtimeGender = 'female'; mp3ApplyStageConcept(mp3CurrentTrack()); }
+    else if (mp3RtMale >= 2 && mp3RealtimeGender !== 'male')  { mp3RealtimeGender = 'male';   mp3ApplyStageConcept(mp3CurrentTrack()); }
+
+    // 모드 자연 전환 (그룹 판정 곡의 잔잔↔신남 구간).
+    const t = mp3CurrentTrack();
+    if (t && mp3DesiredMode(t) !== singerMode) mp3ApplyStageConcept(t);
   }
 
   // 후속#5 — 커버 아트 비전 성별. 성별 미확정 곡이 재생을 시작하면 호스트가
@@ -2233,16 +2345,16 @@
 
   function mp3ApplyStageConcept(t) {
     if (sourceMode !== 'mp3') return;
-    const concept = mp3ConceptFor(t);
-    const mode = concept === 'group' ? 'group' : 'solo';
+    const mode = mp3DesiredMode(t);
     if (mode !== singerMode) {
       singerMode = mode;
       if (els.singerMode) els.singerMode.value = mode;   // 표시만 — mp3에선 셀렉트 잠금 유지
     }
     const cat = (t && t.category) || '미분류';
-    els.hint.textContent = concept === 'group'
+    const g = mp3EffectiveGender(t);
+    els.hint.textContent = mode === 'group'
       ? `MP3 공연 — 🎤 걸그룹 댄스 무대 (${cat})`
-      : `MP3 공연 — 🎙 ${mp3EffectiveGender(t) === 'female' ? '여성' : '남성'} 솔로 무대 (${cat})`;
+      : `MP3 공연 — 🎙 ${g === 'female' ? '여성' : '남성'} 솔로 무대 (${cat})${g === 'group' ? ' · 그룹(잔잔 구간)' : ''}`;
   }
 
   // ── 소스 전환 (상단 탭) ────────────────────────────────────────────
@@ -2288,21 +2400,30 @@
       els.hint.textContent = '유튜브 링크를 붙이면 상단 무대에서 재생되고, ▶ Start(System Loopback)로 악단이 반응합니다.';
       setYtMeta('대기');
       mp3UpdateProgressStrip();   // yt 모드에서는 스트립 숨김
+      if (mp3Els.viewToggle)  mp3Els.viewToggle.classList.add('hidden');
+      if (mp3Els.playAll)     mp3Els.playAll.classList.add('hidden');
+      if (mp3Els.shuffle)     mp3Els.shuffle.classList.add('hidden');
+      if (mp3Els.filterPane)  mp3Els.filterPane.classList.add('hidden');
+      if (mp3Els.artistChips) mp3Els.artistChips.classList.add('hidden');
+      if (ytEls.plTabs)       ytEls.plTabs.classList.remove('hidden');
     }
     renderPlaylist();
     updateTopVisibility();
   }
 
   // ── 재생 ──────────────────────────────────────────────────────────
-  function playMp3Track(t) {
+  function playMp3Track(t, opts) {
     if (!t) return;
     if (!t.available) { setYtMeta('파일 없음 — 현재 폴더 밖이거나 삭제됨 (재스캔 필요)', 'warn'); return; }
+    if (!(opts && opts.keepCard)) mp3ActiveCard = null;   // 목록 직접 선택 → 카드 모드 해제
     mp3CurrentId = t.id;
     mp3HeardInst = new Set(mp3InstList(t));   // 이미 아는 악기는 재푸시하지 않음
+    mp3HeardMoods = new Set(mp3MoodList(t));  // 이미 아는 느낌도 재푸시하지 않음
     mp3InstDirty = false;
     mp3LastInstPush = 0;
-    mp3EnvGender = 'male';                    // 곡마다 환경음 성별 추정 리셋 (기본 남성)
-    mp3ApplyStageConcept(t);                  // 장르 기반 공연 컨셉 적용 (후속#3)
+    mp3RtFem = 0; mp3RtMale = 0; mp3RealtimeGender = '';   // 곡마다 리얼타임 재조정 리셋
+    mp3LastExcitingAt = -1e9;
+    mp3ApplyStageConcept(t);                  // 공연 컨셉 적용 (그룹판정+신남 게이트)
     if (!t.vocalGender) mp3RequestCoverGender(t.id);   // 커버 비전 성별 (후속#5)
     if (mp3Els.audio) {
       mp3Els.audio.src = mp3TrackUrl(t);
@@ -2325,16 +2446,37 @@
     renderMp3Playlist();
   }
 
-  // 자동 다음 곡 — 현재 필터(카테고리+악기)와 일치하는 재생 가능 곡 순환.
+  // 자동 다음 곡 — 카드 재생 중이면 카드 풀에서 랜덤(자동추천), 아니면
+  // 현재 필터 목록에서 순차(기본) 또는 🔀 랜덤(후속#1).
   function playNextMp3() {
-    const items = mp3Tracks
-      .filter(t => mp3Filter === 'all' || t.category === mp3Filter)
-      .filter(mp3MatchesInstFilter)
-      .filter(t => t.available);
+    if (mp3ActiveCard) {
+      const pool = mp3CardPool(mp3ActiveCard).filter(t => t.id !== mp3CurrentId);
+      if (pool.length > 0) {
+        playMp3Track(pool[Math.floor(Math.random() * pool.length)], { keepCard: true });
+        return;
+      }
+      mp3ActiveCard = null;   // 풀 소진 — 일반 순환으로 폴백
+    }
+    const items = mp3FilteredTracks().filter(t => t.available);
     if (items.length === 0) return;
+    if (mp3ShuffleOn) {
+      const pool = items.filter(t => t.id !== mp3CurrentId);
+      const pick = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : items[0];
+      playMp3Track(pick);
+      return;
+    }
     const i = items.findIndex(t => t.id === mp3CurrentId);
     const next = items[(i + 1) % items.length];
     if (next && next.id !== mp3CurrentId) playMp3Track(next);
+  }
+
+  // ▶ 전체 — 현재 필터 목록을 처음부터(🔀 켜져 있으면 랜덤 시작) 재생.
+  function onMp3PlayAll() {
+    const items = mp3FilteredTracks().filter(t => t.available);
+    if (items.length === 0) { setYtMeta('재생 가능한 곡이 없습니다', 'warn'); return; }
+    mp3ActiveCard = null;
+    const first = mp3ShuffleOn ? items[Math.floor(Math.random() * items.length)] : items[0];
+    playMp3Track(first);
   }
 
   function renderMp3Caption(t) {
@@ -2356,9 +2498,12 @@
     }
     if (mp3Els.nowInst) {
       const inst = mp3InstList(t);
-      mp3Els.nowInst.innerHTML = inst.length
-        ? inst.map(k => `<span class="inst-chip">${escapeHtml(INSTRUMENT_KO[k] || k)}</span>`).join('')
-        : '<span class="inst-none">🎧 재생하면 들리는 악기가 여기 쌓입니다</span>';
+      const mood = mp3MoodList(t);
+      const chips =
+        inst.map(k => `<span class="inst-chip">${escapeHtml(INSTRUMENT_KO[k] || k)}</span>`).join('') +
+        mood.map(k => `<span class="inst-chip mood">${escapeHtml(MOOD_KO[k] || k)}</span>`).join('');
+      mp3Els.nowInst.innerHTML = chips ||
+        '<span class="inst-none">🎧 재생하면 들리는 악기·느낌이 여기 쌓입니다</span>';
     }
   }
 
@@ -2366,113 +2511,176 @@
   // music.tick의 AST 라벨을 기존 악기 매퍼(labelToPerformer)로 정규화해
   // 재생 중인 트랙의 악기 세트에 합류 → 호스트가 SQLite에 머지 영속.
   // 노래(보컬) 라벨은 'vocal' 키 하나로 접는다.
-  function mp3AccumulateInstruments(labels) {
+  // 재생 중 태그 실시간 누적 (M0030 확장): 악기 + 음악적 느낌(무드 라벨)을
+  // 함께 수집해 영속. dirty 플래그 방식 — 스로틀에 걸린 신규 태그도 다음
+  // 틱(1.5s)에 반드시 재시도된다.
+  function mp3AccumulateTags(labels) {
     if (sourceMode !== 'mp3' || mp3CurrentId == null) return;
     if (!mp3Els.audio || mp3Els.audio.paused) return;
     for (const l of (labels || [])) {
       if (!l || (l.score || 0) < SCORE_ACTIVE) continue;
-      // 환경음 성별 추정 (후속#3) — 명시적 female 라벨만 여성 전환 트리거.
-      // 태그(LLM) 판정이 있으면 mp3EffectiveGender가 그쪽을 우선한다.
-      if (mp3EnvGender !== 'female' && /female sing|\bwoman sing/i.test(l.name || '')) {
-        mp3EnvGender = 'female';
-        mp3ApplyStageConcept(mp3CurrentTrack());
-      }
+      // 악기 (+보컬 폴드)
       let key = null;
       const id = labelToPerformer(l.name || '');
       if (id && !id.startsWith('vocal-') && !id.startsWith('vox7-')) key = id;
       else if (/sing|choir|vocal/i.test(l.name || '')) key = 'vocal';
       if (key && !mp3HeardInst.has(key)) { mp3HeardInst.add(key); mp3InstDirty = true; }
+      // 음악적 느낌 (M0030)
+      const mood = moodKeyOf(l.name);
+      if (mood && !mp3HeardMoods.has(mood)) { mp3HeardMoods.add(mood); mp3InstDirty = true; }
     }
-    // 후속#3 버그픽스 — dirty 플래그 방식: 스로틀에 걸려 이번 틱에 못 보낸
-    // 신규 악기도 다음 틱(1.5s)에 반드시 재시도된다. (기존에는 첫 푸시 후
-    // 2.5초 안에 감지된 두 번째 악기가 영구 유실 — "1개만 업데이트" 증상)
     const now = performance.now();
     if (!mp3InstDirty || now - mp3LastInstPush < 2500) return;
     mp3LastInstPush = now;
     mp3InstDirty = false;
-    const id = mp3CurrentId;
-    hostInvoke('mp3.setInstruments', { id, instruments: Array.from(mp3HeardInst) })
-      .then(r => {
-        if (!r || !r.ok) return;
-        const t = mp3Tracks.find(x => x.id === id);
-        if (t) t.instruments = (r.instruments || []).join(',');
-        if (t && id === mp3CurrentId) renderMp3Caption(t);
+    const id2 = mp3CurrentId;
+    Promise.all([
+      hostInvoke('mp3.setInstruments', { id: id2, instruments: Array.from(mp3HeardInst) }),
+      hostInvoke('mp3.setMoods',       { id: id2, moods: Array.from(mp3HeardMoods) }),
+    ]).then(([ri, rm]) => {
+        const t = mp3Tracks.find(x => x.id === id2);
+        if (!t) return;
+        if (ri && ri.ok) t.instruments = (ri.instruments || []).join(',');
+        if (rm && rm.ok) t.moods = (rm.moods || []).join(',');
+        if (id2 === mp3CurrentId) renderMp3Caption(t);
         scheduleMp3Render();
       })
       .catch(() => { mp3InstDirty = true; });   // 실패 시 다음 틱 재시도
   }
 
-  // ── 악기 검색 필터 (포함 / 단독) ───────────────────────────────────
-  // 검색어(쉼표/공백 구분, 한/영)는 각각 악기 키로 해석 — '포함'은 모든
-  // 검색 악기가 곡에 있어야 매치, '단독'은 검색한 악기 외 다른 악기가
-  // 없어야 매치 (보컬은 악기로 치지 않음 — '보컬'을 직접 검색한 경우만).
-  function mp3MatchesInstFilter(t) {
+  // ── 통합 검색 (M0030) — 가수/제목/느낌/악기 ─────────────────────────
+  // 검색어(쉼표/공백 구분, 한/영)는 각각: 악기 키, 느낌 키, 가수 부분일치,
+  // 제목 부분일치 중 하나라도 만족해야 매치(AND across terms). '단독'은
+  // 악기로 해석된 검색어에만 적용 — 그 악기 외 다른 악기가 없어야 매치
+  // (보컬은 악기로 치지 않음, '보컬'을 직접 검색한 경우만 카운트).
+  function mp3MatchesSearch(t) {
     const q = (mp3InstQuery || '').trim().toLowerCase();
     if (!q) return true;
-    const have = mp3InstList(t);
-    const haveSet = new Set(have);
+    const haveInst = new Set(mp3InstList(t));
+    const haveMood = new Set(mp3MoodList(t));
+    const artist = (t.artist || '').toLowerCase();
+    const title  = (t.title || '').toLowerCase();
     const terms = q.split(/[,\s]+/).filter(Boolean);
     if (terms.length === 0) return true;
-    const matched = new Set();
+    const matchedInst = new Set();
+    let anyInstTerm = false;
     for (const term of terms) {
-      const keys = Object.keys(INSTRUMENT_KO).filter(k =>
+      const instKeys = Object.keys(INSTRUMENT_KO).filter(k =>
         k.includes(term) || INSTRUMENT_KO[k].includes(term));
-      const hit = keys.filter(k => haveSet.has(k));
-      if (hit.length === 0) return false;
-      hit.forEach(k => matched.add(k));
+      const moodKeys = Object.keys(MOOD_KO).filter(k =>
+        k.includes(term) || MOOD_KO[k].includes(term));
+      if (instKeys.length) anyInstTerm = true;
+      const instHit = instKeys.filter(k => haveInst.has(k));
+      const ok = instHit.length > 0
+        || moodKeys.some(k => haveMood.has(k))
+        || artist.includes(term)
+        || title.includes(term);
+      if (!ok) return false;
+      instHit.forEach(k => matchedInst.add(k));
     }
-    if (mp3InstMode === 'only') {
-      for (const k of have) {
-        if (k === 'vocal' && !matched.has('vocal')) continue;
-        if (!matched.has(k)) return false;
+    if (mp3InstMode === 'only' && anyInstTerm) {
+      for (const k of haveInst) {
+        if (k === 'vocal' && !matchedInst.has('vocal')) continue;
+        if (!matchedInst.has(k)) return false;
       }
     }
     return true;
   }
 
+  // 현재 목록 필터 체인: 카테고리 탭 → 가수 칩 → 통합 검색.
+  function mp3FilteredTracks() {
+    return mp3Tracks
+      .filter(t => mp3Filter === 'all'
+        || (mp3Filter === '__none' ? !t.category : t.category === mp3Filter))
+      .filter(t => !mp3ArtistFilter || (t.artist || '') === mp3ArtistFilter)
+      .filter(mp3MatchesSearch);
+  }
+
   // ── 목록 렌더 (증분 upsert + 400ms 스로틀) ─────────────────────────
+  function mp3ReindexTracks() {
+    mp3TrackIdx.clear();
+    mp3Tracks.forEach((t, i) => mp3TrackIdx.set(t.id, i));
+  }
+
+  // O(1) upsert (후속#1) — 배치 이벤트가 수백 건씩 도착해도 인덱스 맵으로
+  // 즉시 반영. 신규는 뒤에 붙이고(스캔 순서), 스캔 완료 시 mp3.list 재로드로
+  // 정식 정렬(최신순)을 복원한다.
   function upsertMp3Track(dto) {
     if (!dto || typeof dto.id !== 'number') return;
-    const i = mp3Tracks.findIndex(t => t.id === dto.id);
-    if (i >= 0) mp3Tracks[i] = dto; else mp3Tracks.unshift(dto);
+    const i = mp3TrackIdx.get(dto.id);
+    if (i !== undefined) mp3Tracks[i] = dto;
+    else { mp3TrackIdx.set(dto.id, mp3Tracks.length); mp3Tracks.push(dto); }
     if (dto.id === mp3CurrentId) {
       renderMp3Caption(dto);
       mp3ApplyStageConcept(dto);   // 재생 중 분류(장르/성별)가 도착하면 연출 즉시 반영
     }
-    scheduleMp3Render();
   }
 
+  // 렌더 스로틀 (후속#1) — 스캔 중에는 15s(목록 갱신이 실시간일 필요 없음,
+  // UI 반응속도 우선), 평시에는 400ms. 진행 스트립/카운트는 별도로 가볍게 돈다.
   function scheduleMp3Render() {
     if (mp3RenderTimer) return;
+    const delay = mp3Scanning ? 15000 : 400;
     mp3RenderTimer = setTimeout(() => {
       mp3RenderTimer = 0;
       if (sourceMode === 'mp3') { renderMp3Playlist(); updateTopVisibility(); }
-    }, 400);
+    }, delay);
+  }
+
+  function mp3RenderNow() {
+    if (mp3RenderTimer) { clearTimeout(mp3RenderTimer); mp3RenderTimer = 0; }
+    if (sourceMode === 'mp3') { renderMp3Playlist(); updateTopVisibility(); }
   }
 
   function renderMp3Playlist() {
+    const mp3 = sourceMode === 'mp3';
+    const cardsMode = mp3ViewMode === 'cards';
+    if (mp3Els.viewToggle) {
+      mp3Els.viewToggle.classList.toggle('hidden', !mp3);
+      mp3Els.viewToggle.textContent = cardsMode ? '📃 목록' : '🃏 카드';
+      mp3Els.viewToggle.classList.toggle('on', cardsMode);
+    }
+    // 후속#1 — 전체/랜덤 재생 버튼 (mp3 목록 뷰 전용)
+    if (mp3Els.playAll) mp3Els.playAll.classList.toggle('hidden', !mp3 || cardsMode);
+    if (mp3Els.shuffle) {
+      mp3Els.shuffle.classList.toggle('hidden', !mp3 || cardsMode);
+      mp3Els.shuffle.classList.toggle('on', mp3ShuffleOn);
+    }
+    if (mp3Els.plTitle)
+      mp3Els.plTitle.textContent = cardsMode ? '느낌 카드 · 자동추천' : 'MP3 목록';
+    // 후속#1 — 3단 검색·필터 패널 (카드 뷰에선 숨김, 접힘 상태 반영)
+    if (mp3Els.filterPane) {
+      mp3Els.filterPane.classList.toggle('hidden', !mp3 || cardsMode);
+      mp3Els.filterPane.classList.toggle('collapsed', !mp3FilterOpen);
+    }
+    if (ytEls.plTabs) ytEls.plTabs.classList.toggle('hidden', mp3);   // 유튜브 탭은 mp3에서 숨김
+    if (cardsMode) { renderMp3Cards(); return; }
+
     if (ytEls.plCount) ytEls.plCount.textContent = String(mp3Tracks.length);
 
-    if (ytEls.plTabs) {
+    // 장르 탭 — 3단 필터 패널에 렌더 (후속#1).
+    if (mp3Els.catTabs) {
       const used = YT_CATEGORIES.filter(c => mp3Tracks.some(t => t.category === c));
-      // 후속#2 — LLM 분류 전(2차 패스 대기) 곡을 모아 보는 '미분류' 탭.
       const hasNone = mp3Tracks.some(t => !t.category);
       const cats = ['all', ...used, ...(hasNone ? ['__none'] : [])];
       if (!cats.includes(mp3Filter)) mp3Filter = 'all';
-      ytEls.plTabs.innerHTML = cats.map(c => {
+      mp3Els.catTabs.innerHTML = cats.map(c => {
         const label = c === 'all' ? '전체' : c === '__none' ? '미분류' : c;
         const active = c === mp3Filter ? ' active' : '';
         return `<button class="pl-tab${active}" data-cat="${escapeHtml(c)}">${escapeHtml(label)}</button>`;
       }).join('');
-      ytEls.plTabs.querySelectorAll('.pl-tab').forEach(btn =>
-        btn.addEventListener('click', () => { mp3Filter = btn.getAttribute('data-cat'); renderMp3Playlist(); }));
+      mp3Els.catTabs.querySelectorAll('.pl-tab').forEach(btn =>
+        btn.addEventListener('click', () => {
+          mp3Filter = btn.getAttribute('data-cat');
+          mp3ArtistFilter = '';   // 장르가 바뀌면 가수 칩 필터 리셋
+          renderMp3Playlist();
+        }));
     }
 
+    renderMp3ArtistChips();
+
     if (!ytEls.plList) return;
-    const items = mp3Tracks
-      .filter(t => mp3Filter === 'all'
-        || (mp3Filter === '__none' ? !t.category : t.category === mp3Filter))
-      .filter(mp3MatchesInstFilter);
+    const items = mp3FilteredTracks();
     if (items.length === 0) {
       ytEls.plList.innerHTML = `<span class="pl-empty">${
         mp3Tracks.length === 0
@@ -2480,8 +2688,11 @@
           : '검색/필터와 일치하는 곡이 없습니다'}</span>`;
       return;
     }
+    // 후속#1 — 클릭은 plList의 위임 리스너 하나가 처리 (per-item 리스너 제거:
+    // 대용량 목록 렌더 비용 대폭 절감).
     ytEls.plList.innerHTML = items.map(t => {
       const inst = mp3InstList(t).map(k => INSTRUMENT_KO[k] || k).join('·');
+      const mood = mp3MoodList(t).map(k => MOOD_KO[k] || k).join('·');
       const cls = 'pl-item mp3'
         + (t.id === mp3CurrentId ? ' playing' : '')
         + (t.available ? '' : ' unavailable');
@@ -2492,34 +2703,207 @@
           `<div class="pl-t">${escapeHtml(t.title || t.fileName)}</div>` +
           (sub ? `<div class="pl-s">${escapeHtml(sub)}</div>` : '') +
           `<div class="pl-c">${mp3ByBadge(t.categoryBy)} ${escapeHtml(t.category || '미분류')}` +
-            `${inst ? ' · 🎹 ' + escapeHtml(inst) : ''}</div>` +
+            `${inst ? ' · 🎹 ' + escapeHtml(inst) : ''}` +
+            `${mood ? ' · 💫 ' + escapeHtml(mood) : ''}</div>` +
         `</div>` +
         `<button class="pl-del" data-del="${t.id}" title="목록에서 제거 (파일은 유지)">🗑</button>` +
       `</div>`;
     }).join('');
-    ytEls.plList.querySelectorAll('.pl-item.mp3').forEach(el =>
-      el.addEventListener('click', () => {
-        const t = mp3Tracks.find(x => x.id === Number(el.getAttribute('data-id')));
-        if (t) playMp3Track(t);
-      }));
-    ytEls.plList.querySelectorAll('.pl-del').forEach(btn =>
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const id = Number(btn.getAttribute('data-del'));
-        try {
-          const r = await hostInvoke('mp3.remove', { id });
-          if (r && r.ok) {
-            const i = mp3Tracks.findIndex(t => t.id === id);
-            if (i >= 0) mp3Tracks.splice(i, 1);
-            if (mp3CurrentId === id) {
-              mp3CurrentId = null;
-              if (mp3Els.audio) { try { mp3Els.audio.pause(); } catch (_) {} }
-            }
-            renderMp3Playlist();
-            updateTopVisibility();
+  }
+
+  // plList 클릭 위임 (후속#1) — mp3 소스에서만 동작. 목록 아이템/삭제/카드/
+  // 카드생성 버튼을 한 리스너로 처리해 렌더마다 리스너를 다시 달지 않는다.
+  async function onMp3ListClick(e) {
+    if (sourceMode !== 'mp3') return;
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      e.stopPropagation();
+      const id = Number(del.getAttribute('data-del'));
+      try {
+        const r = await hostInvoke('mp3.remove', { id });
+        if (r && r.ok) {
+          const i = mp3Tracks.findIndex(t => t.id === id);
+          if (i >= 0) { mp3Tracks.splice(i, 1); mp3ReindexTracks(); }
+          if (mp3CurrentId === id) {
+            mp3CurrentId = null;
+            if (mp3Els.audio) { try { mp3Els.audio.pause(); } catch (_) {} }
           }
-        } catch (_) { /* host without mp3.* — ignore */ }
+          renderMp3Playlist();
+          updateTopVisibility();
+        }
+      } catch (_) {}
+      return;
+    }
+    const cdel = e.target.closest('[data-cdel]');
+    if (cdel) {
+      e.stopPropagation();
+      const id = Number(cdel.getAttribute('data-cdel'));
+      try {
+        const r = await hostInvoke('mp3.cardRemove', { id });
+        if (r && r.ok) {
+          const i = mp3Cards.findIndex(c => c.id === id);
+          if (i >= 0) mp3Cards.splice(i, 1);
+          if (mp3ActiveCard && mp3ActiveCard.id === id) mp3ActiveCard = null;
+          renderMp3Playlist();
+        }
+      } catch (_) {}
+      return;
+    }
+    if (e.target.closest('#mp3CardCreate')) { onMp3CardCreate(); return; }
+    const cardEl = e.target.closest('.mood-card');
+    if (cardEl) {
+      const c = mp3Cards.find(x => x.id === Number(cardEl.getAttribute('data-card')));
+      if (c) playMp3Card(c);
+      return;
+    }
+    const item = e.target.closest('.pl-item.mp3');
+    if (item) {
+      const t = mp3Tracks.find(x => x.id === Number(item.getAttribute('data-id')));
+      if (t) playMp3Track(t);
+    }
+  }
+
+  // 장르(1차 필터) 선택 시 하위 가수 칩 — 원클릭 가수 필터 (M0030).
+  function renderMp3ArtistChips() {
+    if (!mp3Els.artistChips) return;
+    const hide = () => {
+      mp3Els.artistChips.classList.add('hidden');
+      if (mp3Els.artistSec) mp3Els.artistSec.classList.add('hidden');
+    };
+    if (mp3Els.artistSec) mp3Els.artistSec.classList.remove('hidden');
+    const genreActive = mp3Filter !== 'all';
+    if (!genreActive) { hide(); mp3ArtistFilter = ''; return; }
+    const inCat = mp3Tracks.filter(t =>
+      mp3Filter === '__none' ? !t.category : t.category === mp3Filter);
+    const counts = new Map();
+    for (const t of inCat) {
+      const a = (t.artist || '').trim();
+      if (a) counts.set(a, (counts.get(a) || 0) + 1);
+    }
+    const artists = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+    if (artists.length === 0) { hide(); return; }
+    if (mp3ArtistFilter && !counts.has(mp3ArtistFilter)) mp3ArtistFilter = '';
+    mp3Els.artistChips.classList.remove('hidden');
+    mp3Els.artistChips.innerHTML =
+      `<button class="pl-tab artist${mp3ArtistFilter === '' ? ' active' : ''}" data-artist="">가수 전체</button>` +
+      artists.map(([a, n]) =>
+        `<button class="pl-tab artist${a === mp3ArtistFilter ? ' active' : ''}" data-artist="${escapeHtml(a)}">🎤 ${escapeHtml(a)} <span class="cnt">${n}</span></button>`
+      ).join('');
+    mp3Els.artistChips.querySelectorAll('.pl-tab').forEach(btn =>
+      btn.addEventListener('click', () => {
+        mp3ArtistFilter = btn.getAttribute('data-artist') || '';
+        renderMp3Playlist();
       }));
+  }
+
+  // ── 느낌 카드 (M0030 — 자동추천 모드) ───────────────────────────────
+  function mp3CardFiltersOf(card) {
+    try {
+      const f = JSON.parse(card.filtersJson || '{}');
+      return {
+        categories: Array.isArray(f.categories) ? f.categories : [],
+        artists: Array.isArray(f.artists) ? f.artists : [],
+        moods: Array.isArray(f.moods) ? f.moods : [],
+        instruments: Array.isArray(f.instruments) ? f.instruments : [],
+      };
+    } catch (_) { return { categories: [], artists: [], moods: [], instruments: [] }; }
+  }
+
+  // 카드 필터와 일치하는 재생 가능 트랙 풀 — 비어있지 않은 차원만 AND,
+  // 차원 내부는 OR(any-of).
+  function mp3CardPool(card) {
+    const f = mp3CardFiltersOf(card);
+    return mp3Tracks.filter(t => {
+      if (!t.available) return false;
+      if (f.categories.length && !f.categories.includes(t.category || '')) return false;
+      if (f.artists.length) {
+        const a = (t.artist || '').toLowerCase();
+        if (!f.artists.some(x => a.includes(String(x).toLowerCase()))) return false;
+      }
+      if (f.moods.length) {
+        const m = new Set(mp3MoodList(t));
+        if (!f.moods.some(x => m.has(x))) return false;
+      }
+      if (f.instruments.length) {
+        const i = new Set(mp3InstList(t));
+        if (!f.instruments.some(x => i.has(x))) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderMp3Cards() {
+    if (ytEls.plCount) ytEls.plCount.textContent = String(mp3Cards.length);
+    if (!ytEls.plList) return;
+    const chips = (f) => {
+      const parts = [];
+      f.categories.forEach(c => parts.push(`<span class="mc-chip cat">${escapeHtml(c)}</span>`));
+      f.artists.forEach(a => parts.push(`<span class="mc-chip art">🎤 ${escapeHtml(a)}</span>`));
+      f.moods.forEach(m => parts.push(`<span class="mc-chip mood">💫 ${escapeHtml(MOOD_KO[m] || m)}</span>`));
+      f.instruments.forEach(i => parts.push(`<span class="mc-chip inst">🎹 ${escapeHtml(INSTRUMENT_KO[i] || i)}</span>`));
+      return parts.join('');
+    };
+    ytEls.plList.innerHTML =
+      `<button class="mc-create" id="mp3CardCreate"${mp3CardBusy ? ' disabled' : ''}>` +
+        `${mp3CardBusy ? '⏳ LLM이 카드를 만드는 중…' : '➕ 카드 생성하기 (LLM이 태그를 파악해 자동생성)'}</button>` +
+      (mp3Cards.length === 0
+        ? '<span class="pl-empty">아직 카드가 없습니다 — 곡을 몇 개 재생해 태그를 모은 뒤 생성해 보세요</span>'
+        : mp3Cards.map(c => {
+            const f = mp3CardFiltersOf(c);
+            const n = mp3CardPool(c).length;
+            const active = mp3ActiveCard && mp3ActiveCard.id === c.id;
+            return `<div class="mood-card${active ? ' playing' : ''}" data-card="${c.id}">` +
+              `<div class="mc-head"><span class="mc-title">${escapeHtml(c.title)}</span>` +
+                `<button class="pl-del" data-cdel="${c.id}" title="카드 삭제">🗑</button></div>` +
+              `<div class="mc-desc">${escapeHtml(c.description || '')}</div>` +
+              `<div class="mc-tags">${chips(f)}</div>` +
+              `<div class="mc-count">${active ? '▶ 재생 중 · ' : ''}${n}곡</div>` +
+            `</div>`;
+          }).join(''));
+
+    // 클릭 처리는 plList 위임 리스너(onMp3ListClick)가 담당.
+  }
+
+  // 카드 클릭 → 풀에서 랜덤 재생 (자동추천). 곡이 끝나면 같은 풀에서 계속.
+  function playMp3Card(card) {
+    const pool = mp3CardPool(card);
+    if (pool.length === 0) { setYtMeta('카드와 일치하는 곡이 없습니다', 'warn'); return; }
+    mp3ActiveCard = card;
+    playMp3Track(pool[Math.floor(Math.random() * pool.length)], { keepCard: true });
+    renderMp3Playlist();   // 카드 재생중 표시 갱신
+  }
+
+  async function onMp3CardCreate() {
+    if (mp3CardBusy) return;
+    mp3CardBusy = true;
+    renderMp3Playlist();
+    try {
+      const r = await hostInvoke('mp3.cardCreate', {});
+      if (r && r.ok && r.card) {
+        mp3Cards.unshift(r.card);
+        setYtMeta('✓ 카드 생성됨', 'ok');
+      } else {
+        const err = r && r.error;
+        setYtMeta(err === 'llm-not-ready' ? '카드 생성엔 LLM 필요 — Settings → LLM'
+                : err === 'empty-library' ? '먼저 폴더를 스캔하세요'
+                : err === 'parse-failed' ? 'LLM 응답 해석 실패 — 다시 시도'
+                : '카드 생성 실패', 'warn');
+      }
+    } catch (ex) { setYtMeta('카드 생성 실패 — ' + ex.message, 'err'); }
+    finally {
+      mp3CardBusy = false;
+      renderMp3Playlist();
+    }
+  }
+
+  async function loadMp3Cards() {
+    try {
+      const r = await hostInvoke('mp3.cards', {});
+      if (r && r.ok && Array.isArray(r.cards)) {
+        mp3Cards.length = 0;
+        for (const c of r.cards) mp3Cards.push(c);
+      }
+    } catch (_) { /* 구버전 호스트 — 카드 모드 비활성 */ }
   }
 
   // ── 폴더 / 스캔 잡 UI ──────────────────────────────────────────────
@@ -2592,6 +2976,7 @@
       if (r && r.ok && Array.isArray(r.tracks)) {
         mp3Tracks.length = 0;
         for (const t of r.tracks) mp3Tracks.push(t);
+        mp3ReindexTracks();
         if (sourceMode === 'mp3') { renderMp3Playlist(); updateTopVisibility(); }
       }
     } catch (_) { /* 구버전 호스트 (mp3.* 없음) — MP3 탭은 빈 상태 유지 */ }
@@ -2607,6 +2992,26 @@
       mp3Els.instQ.addEventListener('input', () => { mp3InstQuery = mp3Els.instQ.value; scheduleMp3Render(); });
     if (mp3Els.instMode)
       mp3Els.instMode.addEventListener('change', () => { mp3InstMode = mp3Els.instMode.value; scheduleMp3Render(); });
+    if (mp3Els.viewToggle)
+      mp3Els.viewToggle.addEventListener('click', () => {
+        mp3ViewMode = mp3ViewMode === 'cards' ? 'list' : 'cards';
+        renderMp3Playlist();
+      });
+    // 후속#1 — 3단 필터 패널 접힘/펼침 + 전체/랜덤 재생.
+    if (mp3Els.filterCollapse)
+      mp3Els.filterCollapse.addEventListener('click', () => {
+        mp3FilterOpen = !mp3FilterOpen;
+        if (mp3Els.filterPane) mp3Els.filterPane.classList.toggle('collapsed', !mp3FilterOpen);
+      });
+    if (mp3Els.playAll) mp3Els.playAll.addEventListener('click', onMp3PlayAll);
+    if (mp3Els.shuffle)
+      mp3Els.shuffle.addEventListener('click', () => {
+        mp3ShuffleOn = !mp3ShuffleOn;
+        mp3Els.shuffle.classList.toggle('on', mp3ShuffleOn);
+        setYtMeta(mp3ShuffleOn ? '🔀 랜덤재생 켜짐' : '🔀 랜덤재생 꺼짐');
+      });
+    // 후속#1 — 목록 클릭 위임 리스너 (렌더마다 재부착 없음).
+    if (ytEls.plList) ytEls.plList.addEventListener('click', onMp3ListClick);
     if (mp3Els.audio) {
       mp3Els.audio.addEventListener('ended', playNextMp3);
       // 진단 가시화 — 미디어 스택 실패를 코드명으로 표시 (2=네트워크,
@@ -2619,7 +3024,12 @@
     }
 
     if (window.zero && typeof window.zero.on === 'function') {
-      window.zero.on('mp3.track', upsertMp3Track);
+      // 후속#1 — 배치 업서트: 스캔 중에는 호스트가 ~2s/100건으로 묶어 보낸다.
+      window.zero.on('mp3.tracks', d => {
+        const arr = (d && d.tracks) || [];
+        for (const t of arr) upsertMp3Track(t);
+        scheduleMp3Render();
+      });
       window.zero.on('mp3.scan.progress', p => {
         mp3Scanning = true;
         renderMp3ScanUi();
@@ -2642,12 +3052,14 @@
           if (d && d.ok) setYtMeta(`✓ 완료 ${d.total}곡`, 'ok');
           else setYtMeta(d && d.error === 'cancelled' ? '스캔 중지됨' : '스캔 실패', 'warn');
         }
-        scheduleMp3Render();
+        // 후속#1 — 정식 정렬 복원(재로드) + 즉시 렌더 (스캔 중 15s 스로틀 해제).
+        loadMp3List().then(mp3RenderNow);
       });
     }
     renderMp3Folder();
     renderMp3ScanUi();
     loadMp3List();
+    loadMp3Cards();
   }
 
   // ── Boot ─────────────────────────────────────────────────────────────

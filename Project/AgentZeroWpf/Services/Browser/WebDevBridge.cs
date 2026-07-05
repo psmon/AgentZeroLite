@@ -82,7 +82,7 @@ public sealed class WebDevBridge
             _noteHost.MusicSpectrum         += OnMusicSpectrum;
             // M0029 — Agent Band MP3 scan job stream.
             _noteHost.Mp3ScanProgress       += OnMp3ScanProgress;
-            _noteHost.Mp3TrackUpserted      += OnMp3TrackUpserted;
+            _noteHost.Mp3TrackBatch         += OnMp3TrackBatch;
             _noteHost.Mp3ScanDone           += OnMp3ScanDone;
         }
 
@@ -107,7 +107,7 @@ public sealed class WebDevBridge
             try { _noteHost.MusicAmplitude       -= OnMusicAmplitude;      } catch { }
             try { _noteHost.MusicSpectrum        -= OnMusicSpectrum;       } catch { }
             try { _noteHost.Mp3ScanProgress      -= OnMp3ScanProgress;     } catch { }
-            try { _noteHost.Mp3TrackUpserted     -= OnMp3TrackUpserted;    } catch { }
+            try { _noteHost.Mp3TrackBatch        -= OnMp3TrackBatch;       } catch { }
             try { _noteHost.Mp3ScanDone          -= OnMp3ScanDone;         } catch { }
         }
         try { TokenUsageCollector.Instance.TickCompleted -= OnTokenTick; } catch { }
@@ -194,7 +194,8 @@ public sealed class WebDevBridge
     // makes the playlist update INCREMENTALLY while the scan is still
     // running (each upserted track is playable the moment it arrives).
     private void OnMp3ScanProgress(Mp3ScanProgressInfo p) => PostEvent("mp3.scan.progress", p);
-    private void OnMp3TrackUpserted(Mp3TrackDto t)        => PostEvent("mp3.track", t);
+    // M0030 후속#1 — 트랙 upsert는 배치(~2s/100건)로만 UI에 도달한다.
+    private void OnMp3TrackBatch(IReadOnlyList<Mp3TrackDto> tracks) => PostEvent("mp3.tracks", new { tracks });
     private void OnMp3ScanDone(Mp3ScanDoneInfo d)         => PostEvent("mp3.scan.done", d);
 
     private async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -483,6 +484,24 @@ public sealed class WebDevBridge
             {
                 EnsureNoteHost();
                 return await _noteHost!.Mp3CoverGenderAsync(TryGetInt(args, "id") ?? 0);
+            }
+            case "mp3.setMoods":
+            {
+                EnsureNoteHost();
+                var id = TryGetInt(args, "id") ?? 0;
+                var keys = ReadStringArray(args, "moods");
+                return await _noteHost!.Mp3SetMoodsAsync(id, keys);
+            }
+            case "mp3.cards":
+                EnsureNoteHost();
+                return await _noteHost!.Mp3CardsAsync();
+            case "mp3.cardCreate":
+                EnsureNoteHost();
+                return await _noteHost!.Mp3CardCreateAsync();
+            case "mp3.cardRemove":
+            {
+                EnsureNoteHost();
+                return await _noteHost!.Mp3CardRemoveAsync(TryGetInt(args, "id") ?? 0);
             }
 
             // ─── Token-monitor plugin surface (read-only) ───────────────

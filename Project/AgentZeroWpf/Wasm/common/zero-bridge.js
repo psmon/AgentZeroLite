@@ -240,8 +240,19 @@
       // { ok, id, gender: 'male'|'female'|'group'|'', by: 'vision'|'cached'|'no-cover', persons? }
       // Persists only while VocalGender is empty; a later LLM verdict wins.
       coverGender: (id) => invoke('mp3.coverGender', { id }),
+      // M0030 — mood keys heard live (happy/sad/exciting/…) → persisted set.
+      setMoods: (id, moods) => invoke('mp3.setMoods', { id, moods: moods || [] }),
+      // M0030 — 느낌 카드 (LLM-curated saved filters; auto-recommend mode).
+      // cards() → { ok, cards: [{ id, title, description, filtersJson, createdAtUtc }] }
+      // cardCreate() → { ok, card } | { ok:false, error:'llm-not-ready'|'parse-failed'|... }
+      cards:      () => invoke('mp3.cards'),
+      cardCreate: () => invoke('mp3.cardCreate'),
+      cardRemove: (id) => invoke('mp3.cardRemove', { id }),
       onScanProgress: (handler) => on('mp3.scan.progress', handler),
-      onTrack:        (handler) => on('mp3.track', handler),
+      // M0030 후속#1 — batched upserts: { tracks: [dto, …] } (~2s cadence
+      // during a scan). Replaces the per-file mp3.track event, which flooded
+      // the bridge and lagged the UI on fast tag scans.
+      onTracks:       (handler) => on('mp3.tracks', handler),
       onScanDone:     (handler) => on('mp3.scan.done', handler),
     },
 

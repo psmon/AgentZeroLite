@@ -118,19 +118,35 @@
       <aside id="yt-playlist">
         <div class="pl-head">
           <span class="pl-title" id="plTitle">재생 목록 · 카테고리</span>
-          <span class="pl-count" id="plCount">0</span>
-        </div>
-        <div class="mp3-filter hidden" id="mp3Filter">
-          <input id="mp3InstQuery" type="text" spellcheck="false"
-                 placeholder="악기 검색 — 예: 피아노, drum" />
-          <select id="mp3InstMode" title="포함: 해당 악기가 들어간 곡 / 단독: 그 악기만 있는 곡">
-            <option value="has">포함</option>
-            <option value="only">단독</option>
-          </select>
+          <span class="pl-head-right">
+            <button id="mp3PlayAll" class="pl-view-btn hidden" title="현재 목록 전체 순차재생">▶ 전체</button>
+            <button id="mp3Shuffle" class="pl-view-btn hidden" title="랜덤재생 토글 — 켜면 다음 곡이 랜덤">🔀</button>
+            <button id="mp3ViewToggle" class="pl-view-btn hidden" title="목록 ↔ 느낌 카드(자동추천)">🃏 카드</button>
+            <span class="pl-count" id="plCount">0</span>
+          </span>
         </div>
         <div class="pl-tabs" id="plTabs"></div>
         <div class="pl-list" id="plList">
           <span class="pl-empty">아직 추가된 영상이 없습니다</span>
+        </div>
+      </aside>
+      <!-- 3단째 — MP3 검색·필터 패널 (M0030 후속#1, 접힘/펼침) -->
+      <aside id="mp3-filter-pane" class="hidden">
+        <button id="mp3FilterCollapse" class="fp-collapse" title="검색·필터 접기/펼치기">🔍</button>
+        <div class="fp-body">
+          <div class="fp-title">검색 · 필터</div>
+          <div class="mp3-filter" id="mp3Filter">
+            <input id="mp3InstQuery" type="text" spellcheck="false"
+                   placeholder="검색 — 가수, 제목, 느낌, 악기" />
+            <select id="mp3InstMode" title="포함: 해당 악기가 들어간 곡 / 단독: 그 악기만 있는 곡 (악기 검색어에만 적용)">
+              <option value="has">포함</option>
+              <option value="only">단독</option>
+            </select>
+          </div>
+          <div class="fp-sec">장르</div>
+          <div class="pl-tabs" id="mp3CatTabs"></div>
+          <div class="fp-sec" id="mp3ArtistSec">가수</div>
+          <div class="pl-tabs mp3-artist-chips hidden" id="mp3ArtistChips"></div>
         </div>
       </aside>
     </div>

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using Agent.Common;
 using Agent.Common.Data;
 using Agent.Common.Data.Entities;
@@ -18,7 +19,11 @@ public sealed record Mp3ScanDoneInfo(bool Ok, int Total, int Added, int Updated,
 public sealed record Mp3TrackDto(
     int Id, string RelativePath, string FileName, string FolderName, string Title, string Artist,
     string Album, string TagGenre, string Category, string CategoryBy, string VocalGender,
-    string Instruments, double DurationSeconds, int PlayCount, DateTime? LastPlayedAtUtc, bool Available);
+    string Instruments, string Moods, double DurationSeconds, int PlayCount,
+    DateTime? LastPlayedAtUtc, bool Available);
+
+/// <summary>One saved 느낌 카드 (M0030). <c>FiltersJson</c> = { categories, artists, moods, instruments }.</summary>
+public sealed record Mp3CardDto(int Id, string Title, string Description, string FiltersJson, DateTime CreatedAtUtc);
 
 /// <summary>
 /// Local-MP3 playlist surface for the Agent Band plugin (M0029). The playlist
@@ -46,7 +51,12 @@ public sealed partial class WebDevHost
     private Mp3ScanProgressInfo? _mp3LastProgress;  // last emitted, for mp3.status polling
 
     public event Action<Mp3ScanProgressInfo>? Mp3ScanProgress;
-    public event Action<Mp3TrackDto>? Mp3TrackUpserted;
+    /// <summary>
+    /// M0030 후속#1 — upserted tracks are BATCHED (~2s / 100건) instead of
+    /// one event per file: per-file events flooded the WPF dispatcher +
+    /// WebView2 postMessage during fast tag scans and made the whole UI lag.
+    /// </summary>
+    public event Action<IReadOnlyList<Mp3TrackDto>>? Mp3TrackBatch;
     public event Action<Mp3ScanDoneInfo>? Mp3ScanDone;
 
     /// <summary>{ folder, folderExists, scanning, progress?, count }.</summary>
@@ -181,6 +191,164 @@ public sealed partial class WebDevHost
     }
 
     /// <summary>
+    /// M0030 — merge mood keys (AST "Happy/Sad/Exciting music" 계열) heard by
+    /// the live tick into the track's persisted mood set. Same clamp path as
+    /// instruments — JS can never store junk.
+    /// </summary>
+    public async Task<object> Mp3SetMoodsAsync(int id, IReadOnlyList<string> moods)
+        => await Task.Run(() =>
+        {
+            using var db = new AppDbContext();
+            var row = db.Mp3Tracks.Find(id);
+            if (row is null) return (object)new { ok = false, error = "not-found" };
+            var merged = Mp3InstrumentSet.Merge(row.Moods, moods);
+            if (merged != row.Moods)
+            {
+                row.Moods = merged;
+                db.SaveChanges();
+            }
+            return (object)new { ok = true, id, moods = Mp3InstrumentSet.Parse(merged) };
+        });
+
+    // ─── 느낌 카드 (M0030 — 자동추천) ────────────────────────────────────
+
+    public async Task<object> Mp3CardsAsync()
+        => await Task.Run(() =>
+        {
+            using var db = new AppDbContext();
+            var cards = db.Mp3MoodCards.OrderByDescending(c => c.CreatedAtUtc).ThenBy(c => c.Id)
+                .Select(c => new Mp3CardDto(c.Id, c.Title, c.Description, c.FiltersJson, c.CreatedAtUtc))
+                .ToList();
+            return (object)new { ok = true, cards };
+        });
+
+    public async Task<object> Mp3CardRemoveAsync(int id)
+        => await Task.Run(() =>
+        {
+            using var db = new AppDbContext();
+            var row = db.Mp3MoodCards.Find(id);
+            if (row is null) return (object)new { ok = false, error = "not-found" };
+            db.Mp3MoodCards.Remove(row);
+            db.SaveChanges();
+            return (object)new { ok = true, id };
+        });
+
+    /// <summary>
+    /// "카드생성하기" — the LLM curates ONE mood card from the library's tag
+    /// inventory (장르/가수/느낌/악기, all mined from the DB) and a
+    /// don't-repeat list of existing card titles. Every filter value in the
+    /// reply is clamped against the inventory, so the card can only ever
+    /// select tracks that actually exist. Persisted; returns the card DTO.
+    /// </summary>
+    public async Task<object> Mp3CardCreateAsync(CancellationToken ct = default)
+    {
+        if (!LlmGateway.IsActiveAvailable())
+            return new { ok = false, error = "llm-not-ready" };
+
+        List<string> cats, artists, moods, insts, existingTitles;
+        using (var db = new AppDbContext())
+        {
+            var rows = db.Mp3Tracks
+                .Select(t => new { t.Category, t.Artist, t.Moods, t.Instruments })
+                .ToList();
+            if (rows.Count == 0) return new { ok = false, error = "empty-library" };
+
+            cats = rows.Where(r => r.Category.Length > 0)
+                .GroupBy(r => r.Category).OrderByDescending(g => g.Count())
+                .Select(g => g.Key).ToList();
+            artists = rows.Where(r => !string.IsNullOrWhiteSpace(r.Artist))
+                .GroupBy(r => r.Artist.Trim()).OrderByDescending(g => g.Count())
+                .Select(g => g.Key).Take(30).ToList();
+            moods = rows.SelectMany(r => Mp3InstrumentSet.Parse(r.Moods)).Distinct().ToList();
+            insts = rows.SelectMany(r => Mp3InstrumentSet.Parse(r.Instruments)).Distinct().ToList();
+            existingTitles = db.Mp3MoodCards.Select(c => c.Title).ToList();
+        }
+
+        await _chatLock.WaitAsync(ct);
+        string reply;
+        try
+        {
+            await using var session = LlmGateway.OpenSession();
+            var prompt =
+                "너는 음악 추천 큐레이터야. 아래 로컬 음악 라이브러리의 태그 목록에서 '느낌 카드' 하나를 만들어.\n" +
+                "카드는 분위기 테마 하나를 잡고, 그 테마에 어울리는 장르/가수/느낌/악기 필터를 고르는 것.\n" +
+                "반드시 아래 목록에 실제로 있는 값만 사용해. 각 항목은 없으면 '없음'.\n" +
+                "다음 형식 그대로 6줄만 답해. 다른 말은 절대 쓰지 마:\n" +
+                "제목: <짧은 카드 이름>\n설명: <포함된 가수와 느낌을 1~2문장으로 요약>\n" +
+                "장르: <쉼표 목록 또는 없음>\n가수: <쉼표 목록 또는 없음>\n" +
+                "느낌: <쉼표 목록 또는 없음>\n악기: <쉼표 목록 또는 없음>\n\n" +
+                "[라이브러리]\n" +
+                $"장르: {string.Join(", ", cats)}\n" +
+                $"가수: {string.Join(", ", artists)}\n" +
+                $"느낌: {string.Join(", ", moods)}\n" +
+                $"악기: {string.Join(", ", insts)}\n" +
+                (existingTitles.Count > 0
+                    ? $"이미 있는 카드(테마가 겹치지 않게): {string.Join(", ", existingTitles)}\n"
+                    : "");
+            reply = ((await session.SendAsync(prompt, ct)) ?? "").Trim();
+        }
+        catch (OperationCanceledException) { return new { ok = false, error = "cancelled" }; }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[WebDev:Mp3] card create failed: {ex.GetType().Name}: {ex.Message}");
+            return new { ok = false, error = ex.Message };
+        }
+        finally { _chatLock.Release(); }
+
+        var title = CardLine(reply, "제목");
+        var desc  = CardLine(reply, "설명");
+        var fCats  = ClampList(CardLine(reply, "장르"), cats);
+        var fArts  = ClampArtists(CardLine(reply, "가수"), artists);
+        var fMoods = ClampList(CardLine(reply, "느낌"), moods);
+        var fInsts = ClampList(CardLine(reply, "악기"), insts);
+        if (title.Length == 0 || (fCats.Count + fArts.Count + fMoods.Count + fInsts.Count) == 0)
+        {
+            AppLogger.Log($"[WebDev:Mp3] card parse failed | raw='{Trunc(reply, 120)}'");
+            return new { ok = false, error = "parse-failed", raw = Trunc(reply, 200) };
+        }
+
+        var filtersJson = JsonSerializer.Serialize(new
+        {
+            categories = fCats, artists = fArts, moods = fMoods, instruments = fInsts,
+        });
+        using (var db = new AppDbContext())
+        {
+            var card = new Mp3MoodCard { Title = title, Description = desc, FiltersJson = filtersJson };
+            db.Mp3MoodCards.Add(card);
+            db.SaveChanges();
+            AppLogger.Log($"[WebDev:Mp3] card created | '{title}' filters={filtersJson}");
+            return new { ok = true, card = new Mp3CardDto(card.Id, card.Title, card.Description, card.FiltersJson, card.CreatedAtUtc) };
+        }
+    }
+
+    private static string CardLine(string reply, string key)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(
+            reply, $@"^\s*{key}\s*[:：]\s*(.+)$", System.Text.RegularExpressions.RegexOptions.Multiline);
+        var v = m.Success ? m.Groups[1].Value.Trim() : "";
+        return v == "없음" ? "" : v;
+    }
+
+    private static List<string> ClampList(string csv, IReadOnlyList<string> inventory)
+        => csv.Split(',', '、')
+            .Select(s => s.Trim()).Where(s => s.Length > 0)
+            .Select(s => inventory.FirstOrDefault(i => string.Equals(i, s, StringComparison.OrdinalIgnoreCase)))
+            .Where(s => s is not null).Select(s => s!)
+            .Distinct().Take(8).ToList();
+
+    // 아티스트는 표기가 흔들리므로 (피처링/괄호) 부분일치까지 허용해 인벤토리
+    // 표기로 정규화한다.
+    private static List<string> ClampArtists(string csv, IReadOnlyList<string> inventory)
+        => csv.Split(',', '、')
+            .Select(s => s.Trim()).Where(s => s.Length > 1)
+            .Select(s => inventory.FirstOrDefault(i =>
+                string.Equals(i, s, StringComparison.OrdinalIgnoreCase)
+                || i.Contains(s, StringComparison.OrdinalIgnoreCase)
+                || s.Contains(i, StringComparison.OrdinalIgnoreCase)))
+            .Where(s => s is not null).Select(s => s!)
+            .Distinct().Take(8).ToList();
+
+    /// <summary>
     /// 후속 #5 — cover-art vision gender. Runs Florence-2 OD on the track's
     /// APIC cover (probe-validated: covers WITH a person yield man/woman
     /// labels; illustration covers yield none). Called lazily by the plugin
@@ -277,6 +445,8 @@ public sealed partial class WebDevHost
         int added = 0, updated = 0, classified = 0, done = 0, total = 0;
         string? error = null;
         long lastEmitMs = 0;
+        long lastBatchMs = 0;
+        var batch = new List<Mp3TrackDto>(128);
 
         void EmitProgress(string phase, string current, bool force = false)
         {
@@ -285,6 +455,25 @@ public sealed partial class WebDevHost
             lastEmitMs = now;
             _mp3LastProgress = new Mp3ScanProgressInfo(phase, done, total, current, added, updated, classified);
             Mp3ScanProgress?.Invoke(_mp3LastProgress);
+        }
+
+        // 트랙 이벤트 배치 (M0030 후속#1) — 2s 또는 100건마다 한 번만 UI로.
+        void QueueTrack(Mp3TrackDto dto, bool force = false)
+        {
+            batch.Add(dto);
+            var now = Environment.TickCount64;
+            if (!force && batch.Count < 100 && now - lastBatchMs < 2000) return;
+            lastBatchMs = now;
+            var snapshot = batch.ToList();
+            batch.Clear();
+            Mp3TrackBatch?.Invoke(snapshot);
+        }
+        void FlushTracks()
+        {
+            if (batch.Count == 0) return;
+            var snapshot = batch.ToList();
+            batch.Clear();
+            Mp3TrackBatch?.Invoke(snapshot);
         }
 
         try
@@ -336,13 +525,14 @@ public sealed partial class WebDevHost
 
                 done++;
                 // Playable NOW — the plugin appends/updates its list from this
-                // event while the scan keeps running (M0029 확장2).
-                Mp3TrackUpserted?.Invoke(ToDto(row, root));
+                // (batched) event while the scan keeps running (M0029 확장2).
+                QueueTrack(ToDto(row, root));
                 EmitProgress("scan", f.Title);
 
                 if (needsClassify && categories.Count > 0)
                     backlog.Add((row.Id, f, row.Category.Length > 0));
             }
+            FlushTracks();
 
             // ── Phase 2 — async classify pass over the 미분류 backlog ─────
             // One LLM call per pending track; each verdict lands as its own
@@ -374,11 +564,12 @@ public sealed partial class WebDevHost
                         if (gender.Length > 0) again.VocalGender = gender;
                         db.SaveChanges();
                         if (by == "llm") classified++;
-                        Mp3TrackUpserted?.Invoke(ToDto(again, root));
+                        QueueTrack(ToDto(again, root));
                     }
                 }
                 EmitProgress("classify", f.Title);
             }
+            FlushTracks();
             EmitProgress("done", "", force: true);
         }
         catch (OperationCanceledException) { error = "cancelled"; }
@@ -473,7 +664,7 @@ public sealed partial class WebDevHost
         bool available = rel.Length > 0 && File.Exists(r.FilePath);
         return new Mp3TrackDto(
             r.Id, rel, r.FileName, r.FolderName, r.Title, r.Artist, r.Album, r.TagGenre,
-            r.Category, r.CategoryBy, r.VocalGender, r.Instruments, r.DurationSeconds,
+            r.Category, r.CategoryBy, r.VocalGender, r.Instruments, r.Moods, r.DurationSeconds,
             r.PlayCount, r.LastPlayedAtUtc, available);
     }
 }

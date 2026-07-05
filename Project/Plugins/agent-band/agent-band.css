@@ -590,3 +590,99 @@ body {
 }
 #yt-playlist .pl-item:hover .pl-del { opacity: 1; }
 #yt-playlist .pl-del:hover { background: rgba(255, 107, 107, 0.15); color: var(--err); }
+
+/* ── M0030 후속#1 — 3단 레이아웃: 재생기 | 목록 | 검색·필터 ── */
+#mp3-filter-pane {
+  flex: 0 0 232px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  transition: flex-basis 0.15s ease;
+}
+#mp3-filter-pane.hidden { display: none; }
+#mp3-filter-pane.collapsed { flex: 0 0 40px; overflow: hidden; padding: 6px 4px; }
+#mp3-filter-pane.collapsed .fp-body { display: none; }
+.fp-collapse {
+  position: absolute; top: 6px; right: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text); font-size: 12px;
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  z-index: 1;
+}
+.fp-collapse:hover { background: rgba(0, 229, 255, 0.12); }
+#mp3-filter-pane .fp-body { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+#mp3-filter-pane .fp-title { font-size: 12px; font-weight: 700; color: var(--text); padding-right: 30px; }
+#mp3-filter-pane .fp-sec { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+#mp3-filter-pane .pl-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 3단에서 목록은 남는 폭 전부 (미니 플레이어 280 + 필터 232 제외) */
+#yt-top.mp3-mode #yt-playlist { flex: 1 1 auto; }
+
+/* ── M0030 — 검색 강화 + 느낌 카드 ───────────────────────── */
+#yt-playlist .pl-head-right { display: flex; align-items: center; gap: 6px; }
+.pl-view-btn {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border);
+}
+.pl-view-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.pl-view-btn.on { color: #ffd28a; background: rgba(255, 200, 87, 0.14); border-color: rgba(255, 200, 87, 0.4); }
+.pl-view-btn.hidden { display: none; }
+#plTabs.hidden, .mp3-artist-chips.hidden { display: none; }
+
+/* 장르 하위 가수 칩 (원클릭 필터) */
+.mp3-artist-chips .pl-tab.artist { color: #d9c9ff; }
+.mp3-artist-chips .pl-tab.artist.active {
+  color: #efe6ff; background: rgba(139, 92, 246, 0.18); border-color: rgba(139, 92, 246, 0.5);
+}
+.mp3-artist-chips .pl-tab .cnt { opacity: 0.6; font-weight: 600; }
+
+/* 느낌 칩 (나우플레잉 — 악기 칩과 색 구분) */
+.inst-chip.mood {
+  color: #b7e3ff;
+  background: rgba(0, 149, 255, 0.12); border-color: rgba(0, 149, 255, 0.32);
+}
+
+/* 느낌 카드 */
+.mc-create {
+  width: 100%;
+  border: 1px dashed rgba(255, 200, 87, 0.45);
+  background: rgba(255, 200, 87, 0.07);
+  color: #ffd28a;
+  font-weight: 700; font-size: 11px;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer;
+}
+.mc-create:hover:not(:disabled) { background: rgba(255, 200, 87, 0.14); }
+.mc-create:disabled { opacity: 0.6; cursor: wait; }
+.mood-card {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(139, 92, 246, 0.06));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mood-card:hover { border-color: rgba(255, 200, 87, 0.45); background: rgba(255, 200, 87, 0.06); }
+.mood-card.playing { border-color: rgba(0, 229, 255, 0.5); background: rgba(0, 229, 255, 0.08); }
+.mood-card .mc-head { display: flex; align-items: center; justify-content: space-between; }
+.mood-card .mc-title { font-size: 13px; font-weight: 700; color: #ffe9c4; }
+.mood-card .mc-desc { font-size: 11px; line-height: 1.5; color: var(--muted); }
+.mood-card .mc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.mood-card .mc-count { font-size: 10px; font-weight: 700; color: #7df0ff; }
+.mood-card .pl-del { position: static; transform: none; opacity: 0.5; }
+.mood-card:hover .pl-del { opacity: 1; }
+.mc-chip {
+  font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+}
+.mc-chip.cat  { color: #7df0ff; border-color: rgba(0, 229, 255, 0.35); }
+.mc-chip.art  { color: #d9c9ff; border-color: rgba(139, 92, 246, 0.4); }
+.mc-chip.mood { color: #b7e3ff; border-color: rgba(0, 149, 255, 0.35); }
+.mc-chip.inst { color: #ffd28a; border-color: rgba(255, 200, 87, 0.35); }
