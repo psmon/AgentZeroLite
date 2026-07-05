@@ -6,6 +6,7 @@
     "code-coach",
     "kakashi-copy",
     "mission-records",
+    "music-curator",
     "pre-commit-review",
     "release-build-pipeline",
     "security-guard",
@@ -16,13 +17,22 @@
     "build-doctor": 6,
     "code-coach": 24,
     "kakashi-copy": 1,
-    "mission-records": 26,
+    "mission-records": 28,
+    "music-curator": 1,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
     "tamer": 20
   },
   "items": [
+    {
+      "category": "music-curator",
+      "file": "harness/logs/music-curator/2026-07-05-20-33-mp3-local-playlist.md",
+      "date": "2026-07-05",
+      "time": "20:33",
+      "title": "mp3 local playlist",
+      "size": 1945
+    },
     {
       "category": "agent-band",
       "file": "harness/logs/agent-band/2026-06-14-2010-m0026-youtube-stage-design.md",
@@ -886,6 +896,22 @@
       "time": null,
       "title": "M0026-수행결과",
       "size": 17015
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0029-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0029-수행결과",
+      "size": 18125
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0030-수행결과.md",
+      "date": null,
+      "time": null,
+      "title": "M0030-수행결과",
+      "size": 13426
     }
   ]
 }
