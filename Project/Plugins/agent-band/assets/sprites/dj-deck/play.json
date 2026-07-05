@@ -1,0 +1,108 @@
+{
+  "frames": {
+    "dj-deck_play_0.png": {
+      "frame": {
+        "x": 8,
+        "y": 8,
+        "w": 192,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 192
+      },
+      "duration": 110
+    },
+    "dj-deck_play_1.png": {
+      "frame": {
+        "x": 208,
+        "y": 8,
+        "w": 192,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 192
+      },
+      "duration": 110
+    },
+    "dj-deck_play_2.png": {
+      "frame": {
+        "x": 408,
+        "y": 8,
+        "w": 192,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 192
+      },
+      "duration": 110
+    },
+    "dj-deck_play_3.png": {
+      "frame": {
+        "x": 608,
+        "y": 8,
+        "w": 192,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 192
+      },
+      "duration": 110
+    }
+  },
+  "meta": {
+    "app": "pencil-creator",
+    "version": "2.7.0",
+    "image": "play.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 808,
+      "h": 208
+    },
+    "scale": "1",
+    "frameTags": [
+      {
+        "name": "play",
+        "from": 0,
+        "to": 3,
+        "direction": "forward"
+      }
+    ],
+    "slug": "dj-deck"
+  }
+}

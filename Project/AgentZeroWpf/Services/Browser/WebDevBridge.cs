@@ -461,7 +461,8 @@ public sealed class WebDevBridge
             {
                 EnsureNoteHost();
                 EnsureMp3HostMapping(Mp3SettingsStore.Load().ScanFolder);
-                return await _noteHost!.Mp3ListAsync();
+                return await _noteHost!.Mp3ListAsync(
+                    TryGetInt(args, "offset") ?? 0, TryGetInt(args, "limit") ?? 0);
             }
             case "mp3.remove":
             {

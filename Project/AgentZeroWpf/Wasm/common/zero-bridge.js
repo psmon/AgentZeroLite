@@ -228,9 +228,13 @@
       // Kick the background scan job → { ok, started } | { ok:false, error:'busy'|'folder-missing' }
       scan:        (categories) => invoke('mp3.scan', { categories: categories || [] }),
       cancelScan:  () => invoke('mp3.scan.cancel'),
-      // → { ok, folder, tracks: [{ id, relativePath, title, artist, album,
-      //     category, categoryBy, instruments, durationSeconds, available, … }] }
-      list:        () => invoke('mp3.list'),
+      // → { ok, folder, total, offset, tracks: [{ id, relativePath, title,
+      //     artist, album, category, categoryBy, instruments, durationSeconds,
+      //     available, … }] } — PAGED (M0030 후속#4): omit offset/limit for all.
+      list:        (offset, limit) => invoke('mp3.list', {
+        ...(offset == null ? {} : { offset }),
+        ...(limit == null ? {} : { limit }),
+      }),
       remove:      (id) => invoke('mp3.remove', { id }),
       markPlayed:  (id) => invoke('mp3.markPlayed', { id }),
       // M0029 확장 — merge instrument keys heard live into the track's

@@ -19,7 +19,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 120
+      "duration": 150
     },
     "harp_idle_1.png": {
       "frame": {
@@ -40,7 +40,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 120
+      "duration": 150
     },
     "harp_idle_2.png": {
       "frame": {
@@ -61,7 +61,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 120
+      "duration": 150
     },
     "harp_idle_3.png": {
       "frame": {
@@ -82,7 +82,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 120
+      "duration": 150
     }
   },
   "meta": {

@@ -547,9 +547,22 @@ body {
   background: rgba(255, 200, 87, 0.12); border: 1px solid rgba(255, 200, 87, 0.3);
 }
 .inst-none { font-size: 10px; color: var(--muted); }
-#mp3Audio {
+#mp3-nav { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+#mp3-nav button {
   flex: 0 0 auto;
-  width: 100%;
+  width: 34px; height: 34px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#mp3-nav button:hover { background: rgba(0, 229, 255, 0.12); }
+#mp3-nav button:active { transform: scale(0.95); }
+#mp3Audio {
+  flex: 1 1 auto;
+  min-width: 0;
   height: 40px;
   background: #0b0d12;
 }
@@ -669,7 +682,17 @@ body {
 }
 .mood-card:hover { border-color: rgba(255, 200, 87, 0.45); background: rgba(255, 200, 87, 0.06); }
 .mood-card.playing { border-color: rgba(0, 229, 255, 0.5); background: rgba(0, 229, 255, 0.08); }
-.mood-card .mc-head { display: flex; align-items: center; justify-content: space-between; }
+.mood-card .mc-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.mood-card .mc-btns { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.mood-card .mc-play {
+  border: none;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #0b0d12;
+  font-weight: 700; font-size: 10px;
+  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  white-space: nowrap;
+}
+.mood-card .mc-play:active { transform: scale(0.96); }
 .mood-card .mc-title { font-size: 13px; font-weight: 700; color: #ffe9c4; }
 .mood-card .mc-desc { font-size: 11px; line-height: 1.5; color: var(--muted); }
 .mood-card .mc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -686,3 +709,14 @@ body {
 .mc-chip.art  { color: #d9c9ff; border-color: rgba(139, 92, 246, 0.4); }
 .mc-chip.mood { color: #b7e3ff; border-color: rgba(0, 149, 255, 0.35); }
 .mc-chip.inst { color: #ffd28a; border-color: rgba(255, 200, 87, 0.35); }
+
+/* 대용량 목록 '더 보기' (M0030 후속#3) */
+.pl-more {
+  width: 100%;
+  border: 1px dashed var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-weight: 600; font-size: 11px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.pl-more:hover { background: rgba(0, 229, 255, 0.08); color: var(--text); }

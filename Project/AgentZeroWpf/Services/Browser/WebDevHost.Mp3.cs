@@ -113,18 +113,30 @@ public sealed partial class WebDevHost
         return new { ok = true, cancelling = _mp3ScanRunning == 1 };
     }
 
-    /// <summary>All playlist rows, newest first. Runs off the UI thread (DispatchAsync is UI-bound).</summary>
-    public async Task<object> Mp3ListAsync()
+    /// <summary>
+    /// Playlist rows, newest first, PAGED (M0030 후속#4) — a 5k+ library made
+    /// the all-at-once list slow (row-per-File.Exists + full serialize over
+    /// postMessage). limit ≤ 0 = everything (back-compat). Returns
+    /// { ok, folder, total, offset, tracks } so the plugin can paint the
+    /// first page instantly and hydrate the rest in the background.
+    /// </summary>
+    public async Task<object> Mp3ListAsync(int offset = 0, int limit = 0)
     {
         var root = Mp3SettingsStore.Load().ScanFolder;
         return await Task.Run(() =>
         {
             using var db = new AppDbContext();
-            var rows = db.Mp3Tracks.OrderByDescending(t => t.AddedAtUtc).ThenBy(t => t.Id).ToList();
+            int total = db.Mp3Tracks.Count();
+            var q = db.Mp3Tracks.OrderByDescending(t => t.AddedAtUtc).ThenBy(t => t.Id).AsQueryable();
+            if (offset > 0) q = q.Skip(offset);
+            if (limit > 0) q = q.Take(limit);
+            var rows = q.ToList();
             return (object)new
             {
                 ok = true,
                 folder = root,
+                total,
+                offset,
                 tracks = rows.Select(r => ToDto(r, root)).ToList(),
             };
         });
@@ -660,8 +672,12 @@ public sealed partial class WebDevHost
     {
         // Relative to the CURRENT root — a track scanned under an old root
         // stays listed but unplayable (Available=false) until re-scanned.
+        // 후속#4 — File.Exists를 여기서 돌리지 않는다: 5k+ 라이브러리에서
+        // 목록 조회의 주 병목이었다. 삭제된 파일은 재생 시점에 미디어
+        // 오류로 드러나고 플러그인이 그 곡을 비활성 마킹 + 다음 곡으로
+        // 넘어간다.
         var rel = Mp3Scanner.ToRelativePath(currentRoot, r.FilePath);
-        bool available = rel.Length > 0 && File.Exists(r.FilePath);
+        bool available = rel.Length > 0;
         return new Mp3TrackDto(
             r.Id, rel, r.FileName, r.FolderName, r.Title, r.Artist, r.Album, r.TagGenre,
             r.Category, r.CategoryBy, r.VocalGender, r.Instruments, r.Moods, r.DurationSeconds,

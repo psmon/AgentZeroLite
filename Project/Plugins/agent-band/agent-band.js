@@ -1,5 +1,89 @@
 // agent-band.js — M0025 Agent Band plugin.
 //
+// v0.24.2 changelog (M0030 후속 #6 — 플레이어 ⏮/⏭ 내비게이션):
+//   • 미니 플레이어에 이전(⏮)/다음(⏭) 버튼 — 모든 재생 모드에 적용.
+//     ⏭ = 현재 모드 규칙 그대로: 카드 재생 중이면 카드 풀 랜덤, 🔀 랜덤이면
+//     필터 목록 랜덤, 기본은 순차. ⏮ = 3초 넘게 재생했으면 곡 처음으로,
+//     아니면 재생 이력(최근 50곡)에서 꺼냄 — 랜덤/카드 모드에서도 실제
+//     들었던 순서로 되돌아간다.
+//
+// v0.24.1 changelog (M0030 후속 #5 — 카드 재생 확실화):
+//   • 카드에 ▶ 재생 버튼 명시 (카드 본문 클릭도 동일 동작 — 재생 수단이
+//     보이지 않던 UX 해소).
+//   • 필터 점진 완화 폴백 — 엄격 일치 0곡이면 악기 → 느낌 → 가수 순으로
+//     완화(장르 최후 유지), 그래도 없으면 전체에서 랜덤 — 카드 클릭은
+//     반드시 재생된다('≈ 유사 재생' 배지로 완화 표시). 재생 초기엔
+//     느낌/악기 태그가 아직 안 쌓여 카드와 어긋나던 문제의 대응.
+//     자동 이어재생(ended)도 완화 풀 사용. 카드의 '0곡' 표기는 '≈ 유사
+//     재생'으로 대체.
+//
+// v0.24.0 changelog (M0030 후속 #4 — 목록 페이징 + 재생 시점 파일 검증):
+//   • mp3.list 페이징(offset/limit) — 첫 50곡으로 즉시 첫 화면을 그리고
+//     나머지는 500곡 단위 백그라운드 하이드레이션(카운트가 "로드/전체"로
+//     진행 표시). SELECT-all + 전량 직렬화의 초기 로드 지연 제거.
+//   • File.Exists 전수 체크 폐지(운영자 지적) — 목록 시점의 주 병목.
+//     available=현재 루트 하위 여부만. 삭제된 파일은 재생 시점 미디어
+//     오류로 드러나고, 해당 곡 비활성 마킹 + 자동 다음 곡(연속 3회 실패
+//     시 중단, 재생 성공 시 카운터 리셋).
+//
+// v0.23.1 changelog (M0031 후속 #3 — 무대 유지 모드):
+//   • 신호가 끊겨도 최신 등장 악기 2 + 보컬 1은 무대에 남는다(idle 애니) —
+//     전원 퇴장으로 무대가 텅 비는 썰렁함 방지. 더 새로운 등장자가 오면
+//     유지권이 넘어가 오래된 쪽부터 자연 퇴장(FADE 기존 경로).
+//   • 여성 리드(아이돌 컨트롤러 관리)는 그룹이 줄어들 때 0이 아닌 1에서
+//     멈춘다 — 한 번 선 리드는 노래가 멈춰도 무대를 지킨다.
+//
+// v0.23.0 changelog (M0031 후속 #2 — 보컬 신규 영입 + 랜덤 채택 + 하이라이트):
+//   • 보컬 리마스터/영입 — vocal-2(남)·vocal-4(남) 교체, 신규 vocal-1(여)·
+//     vocal-3(여) 영입, vocal-ex·vox7 리마스터(역할 불변).
+//   • 성별 매칭 랜덤 채택 — 보컬 발생 시 성별 풀에서 랜덤으로 뽑는다
+//     (기존: 항상 같은 보컬). 여성 솔로 풀 [vocal-ex, vocal-1, vocal-3],
+//     남성 풀 [vocal-2, vocal-4]. 무대에 서 있는 동안은 유지(깜빡임 방지),
+//     무대가 비거나(리롤) MP3 곡이 바뀔 때(리롤) 교체.
+//   • 솔로 하이라이트 연출 — 싱어가 무대에 선 시점부터 스펙트럼 평균
+//     에너지를 20s 수집해 기준선을 만들고, 단기 EMA가 기준선 1.25배를
+//     넘는 순간(보통 곡의 하이라이트) 6s간 열창(play) 애니를 라벨과
+//     무관하게 유지. 곡 전환/정지 시 기준선 리셋.
+//
+// v0.22.1 changelog (M0031 후속 #1 — EDM/락 매칭 강화, 어휘 전수 대조):
+//   • AudioSet 527 어휘(class_labels_indices.csv)를 전수 대조해 실존 라벨
+//     기준으로 재작성 — 죽은 패턴(guitar solo/distortion/e-drum/moog) 제거,
+//     놓친 라벨 보강: Progressive/Psychedelic rock·Rock and roll → elec-guitar,
+//     Funk → elec-bass, Beatboxing → drum-machine, Theremin → synth,
+//     Hammond/Electronic organ → keytar, Organ → piano, Ska → trumpet.
+//   • EDM 분업 소환: House/Techno/EDM/Dance/Disco/HipHop → dj-deck,
+//     Dubstep/Drum and bass → edrum(전용 라벨이 없어 장르 소환, \bdrum\b에
+//     삼켜지지 않게 선점), Electronica/Ambient/Trance/New-age → synth.
+//   • 오탐 방어: "Speech synthesizer"(TTS) lookbehind 제외 — Computer
+//     keyboard/Scratch/Electric toothbrush 등 비음악 라벨 오탐 0 검증.
+//
+// v0.22.0 changelog (M0031 — 악기 연주단 스프라이트 전면 교체 + 신규 영입):
+//   • 기존 15종 연주자 스프라이트 전면 교체 (퀄리티 개선판, 동일 아틀라스
+//     포맷 — idle/play 192×192×4프레임). 보컬(vocal-*/vox7-*)은 유지.
+//   • 락/EDM 신규 연주자 7종 영입: elec-guitar(일렉기타), elec-bass(베이스),
+//     synth(신디사이저), keytar(키타), dj-deck(DJ), drum-machine(드럼머신),
+//     edrum(전자드럼).
+//   • 매핑 개선 — 변형 악기를 베이스 정규식보다 먼저 매치("Bass guitar"가
+//     guitar로, "Drum machine"이 drum으로 삼켜지지 않게), 장르 폴백 추가
+//     (락 계열 → elec-guitar, EDM 계열 → dj-deck). 무대 배치(ORDER_RANK):
+//     일렉기타·베이스는 기타군 옆, 키타·신스는 피아노 옆, DJ·드럼머신·
+//     전자드럼은 퍼커션 우측. 악기 검색 한국어 표기 7종 추가.
+//
+// v0.21.2 changelog (M0030 후속 #3 — 대용량 라이브러리 초기 로드):
+//   • "재설치하면 스캔 데이터가 사라진다"는 보고의 실체 — 데이터는 SQLite에
+//     전부 보존(검증: 5,366곡). 수천 곡을 한 번에 DOM으로 그리는 초기
+//     로드가 느려 '폴더 선택 후 스캔' 빈 문구가 오래 보인 착시였다.
+//   • 수정: 로드 전에는 '⏳ 목록 불러오는 중…' 표시(빈 목록과 구분),
+//     렌더 캡 300곡 + '더 보기'(재생 순환·검색은 전체 기준),
+//     탭 진입 시 미로드면 mp3.list 재시도.
+//
+// v0.21.1 changelog (M0030 후속 #2 — 갱신 주기 스코프 축소):
+//   • 느린 갱신(15s)은 '스캔 중 + 배치 데이터 유입'에만 적용 — 스캔이
+//     아닐 때는 항상 즉시(400ms), 사용자 조작(검색/필터)은 스캔 중에도
+//     150ms. 더 이른 렌더 요청이 대기 중인 긴 타이머를 앞당겨 재예약.
+//   • 빈 목록에 첫 배치 도착 시 즉시 표시 — 최초 로드가 스캔 스로틀에
+//     걸려 늦게 보이던 문제 수정.
+//
 // v0.21.0 changelog (M0030 후속 #1 — 3단 레이아웃 + 스캔 성능):
 //   • MP3 레이아웃 3단 분리 — [미니 재생기 280px | 목록(남는 폭 전부) |
 //     검색·필터 패널 232px]. 검색/장르 탭/가수 칩이 3단 패널로 이동해
@@ -437,18 +521,86 @@
   //       on-vocal performer; the rest dance to their assigned genres.
   //   Male pool — unchanged:
   //     vocal-2 = male (dark hair, red coat)  vocal-4 = male (silver hair, purple coat)
-  const SOLO_VOCAL   = 'vocal-ex';   // SOLO mode only
+  // M0031 후속#2 — 보컬 신규 영입 + 성별 매칭 랜덤 채택.
+  // vocal-ex는 기존 역할 그대로(걸그룹 계열 리드 아트 유지), 신규 영입:
+  // vocal-1(여)·vocal-3(여)이 여성 솔로 풀에 합류, vocal-2(남)·vocal-4(남)는
+  // 리마스터 교체. 보컬 발생 시 같은 보컬만 반복 등장하지 않도록 성별 풀에서
+  // 랜덤 채택 — 무대에 서 있는 동안은 유지(깜빡임 방지), 무대가 비거나 곡이
+  // 바뀌면 리롤.
+  const SOLO_FEMALES = ['vocal-ex', 'vocal-1', 'vocal-3'];   // 여성 솔로 풀
   const GIRL_GROUP   = ['vox7-1', 'vox7-2', 'vox7-3', 'vox7-4', 'vox7-5', 'vox7-6', 'vox7-7']; // GROUP mode (7)
   // Full roster — only for layout / fade / FEMALE_POOL bookkeeping. The
   // ACTIVE roster for a given mode comes from femalePool() below.
-  const VOCAL_FEMALE = [SOLO_VOCAL, ...GIRL_GROUP];
+  const VOCAL_FEMALE = [...SOLO_FEMALES, ...GIRL_GROUP];
   const VOCAL_MALE   = ['vocal-2', 'vocal-4'];
   const FEMALE_POOL   = new Set(VOCAL_FEMALE);
-  let maleCursor = 0;
+  let soloFemaleId = SOLO_FEMALES[0];   // 현재 채택된 여성 솔로
+  let maleVocalId  = null;              // 현재 채택된 남성 보컬
 
-  // The active female roster for the current Singer mode. SOLO = just the
-  // main vocal; GROUP = the 7-member girl-group (vocal-ex excluded).
-  function femalePool() { return singerMode === 'solo' ? [SOLO_VOCAL] : GIRL_GROUP; }
+  function rollSoloFemale() {
+    soloFemaleId = SOLO_FEMALES[Math.floor(Math.random() * SOLO_FEMALES.length)];
+  }
+  function rollMaleVocal() {
+    maleVocalId = VOCAL_MALE[Math.floor(Math.random() * VOCAL_MALE.length)];
+    return maleVocalId;
+  }
+  // 남성 보컬 sticky-random — 무대에 없거나 퇴장(fade) 중이면 리롤.
+  function pickMaleVocal() {
+    const cur = maleVocalId ? performers.get(maleVocalId) : null;
+    if (!cur || cur.fading) rollMaleVocal();
+    return maleVocalId;
+  }
+
+  // The active female roster for the current Singer mode. SOLO = the
+  // currently-adopted solo female; GROUP = the 7-member girl-group.
+  function femalePool() { return singerMode === 'solo' ? [soloFemaleId] : GIRL_GROUP; }
+
+  // ── 솔로 하이라이트 연출 (M0031 후속#2) ─────────────────────────────
+  // 곡 구조 가정: 전주 → 싱어 등장 → ~1분 뒤 하이라이트. 싱어가 무대에 선
+  // 시점부터 스펙트럼 평균 에너지를 SOLO_HL_BASE_MS 동안 수집해 기준선을
+  // 만들고, 이후 단기 EMA가 기준선의 SOLO_HL_FACTOR 배를 넘는 순간
+  // 하이라이트 발동 — 솔로 보컬이 라벨과 무관하게 열창(play) 애니 유지.
+  const SOLO_HL_BASE_MS = 20000;   // 싱어 등장 후 기준선 수집 구간
+  const SOLO_HL_FACTOR  = 1.25;    // 기준선 대비 발동 배율
+  const SOLO_HL_HOLD_MS = 6000;    // 1회 발동 유지 (재발동 가능)
+  let soloHlOnset = 0, soloHlBaseSum = 0, soloHlBaseN = 0, soloHlBase = 0;
+  let soloHlEma = 0, soloHlUntil = 0;
+
+  function soloHlReset() {
+    soloHlOnset = 0; soloHlBaseSum = 0; soloHlBaseN = 0; soloHlBase = 0;
+    soloHlEma = 0; soloHlUntil = 0;
+  }
+
+  function soloVocalOnStageId() {
+    if (singerMode !== 'solo') return null;
+    for (const id of [soloFemaleId, maleVocalId]) {
+      if (!id) continue;
+      const p = performers.get(id);
+      if (p && !p.fading) return id;
+    }
+    return null;
+  }
+
+  // 30Hz 스펙트럼 스트림에서 호출 — 싱어 등장 구간의 평균 대비 상승 감지.
+  function soloHighlightFeed(spec) {
+    if (!spec || spec.length === 0) return;
+    if (!soloVocalOnStageId()) { if (soloHlOnset) soloHlReset(); return; }
+    let sum = 0;
+    for (let i = 0; i < spec.length; i++) sum += spec[i];
+    const mean = sum / spec.length;
+    const now = performance.now();
+    if (!soloHlOnset) soloHlOnset = now;
+    soloHlEma = soloHlEma ? soloHlEma * 0.92 + mean * 0.08 : mean;
+    if (now - soloHlOnset <= SOLO_HL_BASE_MS) { soloHlBaseSum += mean; soloHlBaseN++; return; }
+    if (!soloHlBase && soloHlBaseN > 0) soloHlBase = soloHlBaseSum / soloHlBaseN;
+    if (soloHlBase > 0.015 && soloHlEma > soloHlBase * SOLO_HL_FACTOR)
+      soloHlUntil = now + SOLO_HL_HOLD_MS;
+  }
+
+  function soloHighlightActive(id) {
+    return soloHlUntil > 0 && performance.now() < soloHlUntil
+      && singerMode === 'solo' && (id === soloFemaleId || id === maleVocalId);
+  }
 
   // Idols sing AND dance. They ship `idle` + `dance` sheets (no `play`
   // sheet), so their active logical state ('play') is remapped to the
@@ -487,6 +639,19 @@
     const s = label.toLowerCase();
 
     // ── Tier 1: specific instruments ──
+    // M0031 — 락/EDM 신규 연주자. AudioSet 527 어휘(class_labels_indices.csv)
+    // 전수 대조로 실존 라벨만 매치한다. 변형(electric/bass/machine)은 반드시
+    // 베이스 악기 정규식보다 먼저 — "Bass guitar"가 guitar로, "Drum machine"이
+    // drum으로 삼켜지지 않게 순서가 계약이다.
+    if (/bass guitar/.test(s))                                     return 'elec-bass';
+    if (/electric guitar|tapping \(guitar/.test(s))                return 'elec-guitar';
+    if (/drum machine|beatbox/.test(s))                            return 'drum-machine';
+    // "Drum and bass"(장르)가 아래 \bdrum\b에 삼켜지지 않게 여기서 선점.
+    if (/dubstep|drum and bass/.test(s))                           return 'edrum';
+    // "Speech synthesizer"(TTS)는 악기가 아님 — lookbehind로 제외.
+    if (/(?<!speech )synthesizer|\bsampler\b|theremin/.test(s))    return 'synth';
+    if (/electric piano|electronic organ|hammond organ/.test(s))   return 'keytar';
+    if (/scratch(ing)? \(performance|turntable/.test(s))           return 'dj-deck';
     if (/\bcello\b/.test(s))                                       return 'cello';
     if (/\bviola\b/.test(s))                                       return 'viola';
     if (/\bviolin\b|\bfiddle\b/.test(s))                           return 'violin';
@@ -500,7 +665,7 @@
     if (/\btrumpet\b/.test(s))                                     return 'trumpet';
     if (/\btrombone\b/.test(s))                                    return 'trombone';
     if (/\btuba\b/.test(s))                                        return 'tuba';
-    if (/\bpiano\b/.test(s))                                       return 'piano';
+    if (/\bpiano\b|\borgan\b/.test(s))                             return 'piano';   // Organ — 전자/해먼드는 위 keytar가 선점
     if (/\bdrum\b|cymbal|tom-tom|hi-hat|tabla|\bgong\b/.test(s))   return 'drum';
 
     // ── Vocals ──
@@ -510,9 +675,8 @@
     // upsertIdolGroupFromLabels) which stages a full group rather than a
     // single soloist. Male-specific labels are excluded from that signal.
     if (/male sing|\bman sing\b/.test(s) && !/female/.test(s)) {
-      const id = VOCAL_MALE[maleCursor % VOCAL_MALE.length];
-      maleCursor++;
-      return id;
+      // M0031 후속#2 — 성별 매칭 랜덤 채택 (같은 보컬 고정 등장 폐지).
+      return pickMaleVocal();
     }
 
     // ── Tier 2: parent-category fallbacks ──
@@ -523,6 +687,18 @@
     if (/\bbrass\b/.test(s))                                      return 'trumpet';
     if (/keyboard \(musical\)/.test(s))                           return 'piano';
     if (/percussion/.test(s))                                     return 'drum';
+    // M0031 — 장르 폴백 (AudioSet 실존 라벨 기준). EDM 계열은 분업 소환으로
+    // 무대에 다양성을 준다: 하우스/테크노/댄스/디스코/힙합 → DJ 덱,
+    // 덥스텝/드럼앤베이스 → 전자드럼(전용 라벨이 없어 장르로만 소환),
+    // 일렉트로니카/앰비언트/트랜스 → 신디사이저. 펑크(Funk)는 베이스 주도
+    // 장르라 일렉베이스, 스카는 브라스 주도라 트럼펫.
+    if (/house music|techno|electronic dance|dance music|\bdisco\b|hip hop/.test(s)) return 'dj-deck';
+    if (/electronica|electronic music|ambient music|trance music|new-age music/.test(s)) return 'synth';
+    if (/\bfunk\b/.test(s))                                       return 'elec-bass';
+    if (/\bska\b/.test(s))                                        return 'trumpet';
+    // 락 계열 전체(rock music/punk rock/progressive/psychedelic/rock and roll
+    // — 어휘상 'rock'은 전부 음악 라벨) + 헤비메탈/그런지 → 일렉기타.
+    if (/\brock\b|heavy metal|grunge/.test(s))                    return 'elec-guitar';
 
     return null;
   }
@@ -766,7 +942,6 @@
   function upsertPerformersFromLabels(labels) {
     tickCounter++;
     const now = performance.now();
-    maleCursor = 0;
 
     // Collapse multi-label hits onto a single sprite id with the strongest score
     // ("Guitar" + "Acoustic guitar" → one guitar slot with max score).
@@ -797,7 +972,7 @@
     // 때만 노래 애니(play), 아니면 기본 애니(idle). 악기 등장은 기존 경로.
     if (mp3MaleSoloActive()) {
       const v = mp3AnyVocalSignal(labels);
-      const maleId = VOCAL_MALE[0];
+      const maleId = pickMaleVocal();   // 곡마다/퇴장 시 랜덤 리롤 (M0031 후속#2)
       collapsed.set(maleId, Math.max(collapsed.get(maleId) || 0, Math.max(v, SCORE_PRESENT)));
     }
 
@@ -816,9 +991,28 @@
     // Stage the female idol group (main vocal + fan-out).
     upsertIdolGroup(labels, now);
 
-    // Unseen-for-N-ticks → fade-out → evict.
+    // M0031 후속#3 — 무대 유지 모드: 전원 퇴장하면 무대가 썰렁하므로
+    // 최신 등장 악기 2 + 보컬 1은 신호가 끊겨도 남는다(기본 idle 애니).
+    // 더 새로운 등장자가 오면 유지권이 넘어가 오래된 쪽부터 자연 퇴장.
+    const keepWarm = new Set();
+    {
+      const alive = [...performers.values()].filter(p => !p.fading);
+      alive.filter(p => !isVocal(p.id))
+        .sort((a, b) => b.addedAt - a.addedAt)
+        .slice(0, 2)
+        .forEach(p => keepWarm.add(p.id));
+      const newestVocal = alive.filter(p => isVocal(p.id))
+        .sort((a, b) => b.addedAt - a.addedAt)[0];
+      if (newestVocal) keepWarm.add(newestVocal.id);
+    }
+
+    // Unseen-for-N-ticks → fade-out → evict (유지 대상은 idle로만 전환).
     for (const [id, p] of performers) {
       if (p.lastSeenTick === tickCounter) continue;
+      if (keepWarm.has(id)) {
+        if (tickCounter - p.lastSeenTick >= PERSIST_TICKS && p.state !== 'idle') p.state = 'idle';
+        continue;
+      }
       if (!p.fading && tickCounter - p.lastSeenTick >= PERSIST_TICKS) {
         p.fading = true;
         p.fadeAt = now;
@@ -862,7 +1056,10 @@
     const leadActive     = activeStyles.some(st => LEAD_STYLES.has(st));
     const nonLeadStyles  = activeStyles.filter(st => !LEAD_STYLES.has(st));
 
-    // Active roster for the current mode: SOLO=[vocal-ex], GROUP=the 7 idols.
+    // M0031 후속#2 — 무대가 빈 동안 여성 솔로 후보를 리롤: 새로 설 때마다
+    // 다른 보컬이 나온다 (서 있는 동안은 고정 — 깜빡임 방지).
+    if (singerMode === 'solo' && idolRenderedSize === 0) rollSoloFemale();
+    // Active roster for the current mode: SOLO=[채택된 솔로], GROUP=the 7 idols.
     const pool = femalePool();
     const poolMax = pool.length;   // 1 (solo) or 7 (girl-group)
 
@@ -888,7 +1085,9 @@
       }
     } else {
       idolPresentTicks = 0;
-      target = 0;   // ramp the whole group down
+      // M0031 후속#3 — 보컬 1 유지: 한 번 선 리드는 신호가 끊겨도 무대에
+      // 남는다(idle 애니, playing=false). 그룹은 리드 1인까지만 줄어든다.
+      target = idolRenderedSize > 0 ? 1 : 0;
     }
 
     // M0028 — vision override (girl-group only): the recent-max person count in
@@ -1123,9 +1322,14 @@
   const ORDER_RANK = {
     'violin': 10, 'viola': 11, 'cello': 12, 'contrabass': 13,
     'guitar': 20, 'harp': 21,
+    // M0031 — 락 밴드는 기타군 옆에 나란히.
+    'elec-guitar': 22, 'elec-bass': 23,
     'flute': 30, 'clarinet': 31, 'oboe': 32,
     'horn': 40, 'trumpet': 41, 'trombone': 42, 'tuba': 43,
-    'piano': 50, 'drum': 60,
+    // M0031 — 키보드군(키타·신스)은 피아노 옆, EDM 리그(DJ·드럼머신·
+    // 전자드럼)는 퍼커션 쪽 우측 끝.
+    'piano': 50, 'keytar': 51, 'synth': 52,
+    'drum': 60, 'dj-deck': 61, 'drum-machine': 62, 'edrum': 63,
   };
 
   // Order the vocal cluster so the main vocal sits dead-center and the
@@ -1396,6 +1600,9 @@
   //   • instruments / male vocals → their score-derived p.state, unchanged.
   function performState(p) {
     if (p.fading) return 'idle';
+    // M0031 후속#2 — 솔로 하이라이트: 스펙트럼이 싱어 등장 구간 평균을
+    // 넘어선 동안 솔로 보컬은 라벨과 무관하게 열창 유지.
+    if (soloHighlightActive(p.id)) return 'play';
     if (FEMALE_POOL.has(p.id)) {
       // M0028 — in girl-group with vision active, the MV's frame-diff motion
       // drives the whole group: action → dance, still → idle(singing). This
@@ -1676,6 +1883,8 @@
     climaxUntil = 0;
     notes.length = 0;
     lastEmitMs.clear();
+    soloHlReset();          // M0031 후속#2 — 하이라이트 상태 정리
+    maleVocalId = null;
     renderLabelStrip([]);
     lastSpectrum = null;
     if (smoothed) smoothed.fill(0);
@@ -1724,6 +1933,7 @@
       // Fast spectrum stream (30 Hz) — used for the bar visualizer.
       window.zero.music.onSpectrum(evt => {
         setSpectrum(evt.spectrum || []);
+        soloHighlightFeed(evt.spectrum);   // M0031 후속#2 — 솔로 하이라이트 감지
       });
     }
   }
@@ -2154,6 +2364,12 @@
   let mp3FilterOpen = true;        // 3단 검색·필터 패널 접힘/펼침 (후속#1)
   let mp3ShuffleOn = false;        // 🔀 랜덤재생 토글 (후속#1)
   const mp3TrackIdx = new Map();   // id → mp3Tracks index (O(1) 배치 upsert용)
+  let mp3ListLoaded = false;       // mp3.list 1회 성공 여부 — 로딩중/빈목록 구분 (후속#3)
+  let mp3RenderLimit = 300;        // 대용량 목록 렌더 캡 — '더 보기'로 확장 (후속#3)
+  let mp3ListLoading = false;      // 페이징 하이드레이션 진행 중 (후속#4)
+  let mp3ListTotal = 0;            // 서버가 알려준 전체 곡 수 (하이드레이션 진행 표시)
+  let mp3ErrStreak = 0;            // 연속 재생 실패 수 — 3회 초과 시 자동 스킵 중단
+  const mp3History = [];           // 재생 이력 (⏮ 이전 곡용 — 랜덤/카드 모드에서도 정확)
 
   // 악기 키 ↔ 한국어 표기 — 검색은 한/영 모두 허용 ("피아노" = "piano")
   const INSTRUMENT_KO = {
@@ -2161,6 +2377,9 @@
     contrabass: '콘트라베이스', harp: '하프', guitar: '기타', flute: '플루트',
     clarinet: '클라리넷', oboe: '오보에', horn: '호른', trumpet: '트럼펫',
     trombone: '트롬본', tuba: '튜바', drum: '드럼', vocal: '보컬',
+    // M0031 — 락/EDM 신규 연주자
+    'elec-guitar': '일렉기타', 'elec-bass': '베이스', synth: '신디사이저',
+    keytar: '키타', 'dj-deck': 'DJ', 'drum-machine': '드럼머신', edrum: '전자드럼',
   };
 
   // 음악적 느낌 키 ↔ 한국어 (M0030) — AST AudioSet의 무드 라벨 7종.
@@ -2189,6 +2408,8 @@
     cover:    document.getElementById('mp3Cover'),
     coverFb:  document.getElementById('mp3CoverFb'),
     audio:    document.getElementById('mp3Audio'),
+    prev:     document.getElementById('mp3Prev'),
+    next:     document.getElementById('mp3Next'),
     title:    document.getElementById('mp3Title'),
     artist:   document.getElementById('mp3Artist'),
     by:       document.getElementById('mp3By'),
@@ -2382,6 +2603,7 @@
       if (els.singerMode) { els.singerMode.value = 'solo'; els.singerMode.disabled = true; }
       els.hint.textContent = 'MP3 공연 모드 — 곡을 재생하면 장르에 맞는 무대 연출이 적용됩니다.';
       playlistOpen = true;
+      if (!mp3ListLoaded) loadMp3List();   // 후속#3 — 초기 로드 실패/미완이면 재시도
       setYtMeta(mp3Tracks.length ? `MP3 ${mp3Tracks.length}곡` : '📁 폴더 선택 후 🔍 스캔');
       renderMp3ScanUi();
       mp3UpdateProgressStrip();   // 후속#4 — 진행 중이면 하단 스트립 복원
@@ -2416,6 +2638,11 @@
     if (!t) return;
     if (!t.available) { setYtMeta('파일 없음 — 현재 폴더 밖이거나 삭제됨 (재스캔 필요)', 'warn'); return; }
     if (!(opts && opts.keepCard)) mp3ActiveCard = null;   // 목록 직접 선택 → 카드 모드 해제
+    // ⏮ 이력 (M0030 후속#6) — 뒤로가기 재생은 이력에 다시 쌓지 않는다.
+    if (!(opts && opts.noHistory) && mp3CurrentId != null && mp3CurrentId !== t.id) {
+      mp3History.push(mp3CurrentId);
+      if (mp3History.length > 50) mp3History.shift();
+    }
     mp3CurrentId = t.id;
     mp3HeardInst = new Set(mp3InstList(t));   // 이미 아는 악기는 재푸시하지 않음
     mp3HeardMoods = new Set(mp3MoodList(t));  // 이미 아는 느낌도 재푸시하지 않음
@@ -2423,6 +2650,8 @@
     mp3LastInstPush = 0;
     mp3RtFem = 0; mp3RtMale = 0; mp3RealtimeGender = '';   // 곡마다 리얼타임 재조정 리셋
     mp3LastExcitingAt = -1e9;
+    rollSoloFemale(); rollMaleVocal();   // 곡마다 보컬 랜덤 리롤 (M0031 후속#2)
+    soloHlReset();                       // 곡마다 하이라이트 기준선 리셋
     mp3ApplyStageConcept(t);                  // 공연 컨셉 적용 (그룹판정+신남 게이트)
     if (!t.vocalGender) mp3RequestCoverGender(t.id);   // 커버 비전 성별 (후속#5)
     if (mp3Els.audio) {
@@ -2450,7 +2679,7 @@
   // 현재 필터 목록에서 순차(기본) 또는 🔀 랜덤(후속#1).
   function playNextMp3() {
     if (mp3ActiveCard) {
-      const pool = mp3CardPool(mp3ActiveCard).filter(t => t.id !== mp3CurrentId);
+      const pool = mp3CardPoolRelaxed(mp3ActiveCard).pool.filter(t => t.id !== mp3CurrentId);
       if (pool.length > 0) {
         playMp3Track(pool[Math.floor(Math.random() * pool.length)], { keepCard: true });
         return;
@@ -2468,6 +2697,21 @@
     const i = items.findIndex(t => t.id === mp3CurrentId);
     const next = items[(i + 1) % items.length];
     if (next && next.id !== mp3CurrentId) playMp3Track(next);
+  }
+
+  // ⏮ 이전 곡 (M0030 후속#6) — 3초 넘게 재생했으면 처음으로 되감고, 아니면
+  // 재생 이력에서 꺼낸다 (랜덤/카드 모드에서도 실제 들었던 순서 그대로).
+  function onMp3Prev() {
+    if (mp3Els.audio && mp3Els.audio.currentTime > 3) { mp3Els.audio.currentTime = 0; return; }
+    while (mp3History.length > 0) {
+      const id = mp3History.pop();
+      const t = mp3Tracks.find(x => x.id === id);
+      if (t && t.available) {
+        playMp3Track(t, { keepCard: true, noHistory: true });
+        return;
+      }
+    }
+    if (mp3Els.audio) mp3Els.audio.currentTime = 0;   // 이력 없음 — 처음으로
   }
 
   // ▶ 전체 — 현재 필터 목록을 처음부터(🔀 켜져 있으면 랜덤 시작) 재생.
@@ -2616,11 +2860,20 @@
     }
   }
 
-  // 렌더 스로틀 (후속#1) — 스캔 중에는 15s(목록 갱신이 실시간일 필요 없음,
-  // UI 반응속도 우선), 평시에는 400ms. 진행 스트립/카운트는 별도로 가볍게 돈다.
-  function scheduleMp3Render() {
-    if (mp3RenderTimer) return;
-    const delay = mp3Scanning ? 15000 : 400;
+  // 렌더 스로틀 (후속#1/#2) — 느린 주기(15s)는 "스캔 중 + 데이터 유입
+  // (배치 업서트)"에만 적용된다. 사용자 조작(검색/필터)이나 스캔이 아닐
+  // 때는 항상 짧은 지연으로 즉시 반영 — 더 이른 렌더 요청이 오면 대기 중인
+  // 긴 타이머를 앞당겨 재예약하므로, 스캔 타이머가 최초 로드나 조작을
+  // 가로막지 않는다. 진행 스트립/카운트는 별도로 가볍게 돈다.
+  let mp3RenderTimerAt = 0;   // 예약된 발화 시각
+  function scheduleMp3Render(kind) {
+    const delay = kind === 'ui' ? 150 : (mp3Scanning ? 15000 : 400);
+    const fireAt = performance.now() + delay;
+    if (mp3RenderTimer) {
+      if (fireAt >= mp3RenderTimerAt - 50) return;   // 기존 예약이 더 이르면 유지
+      clearTimeout(mp3RenderTimer);                  // 더 이른 요청 → 앞당겨 재예약
+    }
+    mp3RenderTimerAt = fireAt;
     mp3RenderTimer = setTimeout(() => {
       mp3RenderTimer = 0;
       if (sourceMode === 'mp3') { renderMp3Playlist(); updateTopVisibility(); }
@@ -2656,7 +2909,10 @@
     if (ytEls.plTabs) ytEls.plTabs.classList.toggle('hidden', mp3);   // 유튜브 탭은 mp3에서 숨김
     if (cardsMode) { renderMp3Cards(); return; }
 
-    if (ytEls.plCount) ytEls.plCount.textContent = String(mp3Tracks.length);
+    // 하이드레이션 중에는 "로드/전체"로 진행을 보여준다 (후속#4).
+    if (ytEls.plCount)
+      ytEls.plCount.textContent = mp3ListTotal > mp3Tracks.length
+        ? `${mp3Tracks.length}/${mp3ListTotal}` : String(mp3Tracks.length);
 
     // 장르 탭 — 3단 필터 패널에 렌더 (후속#1).
     if (mp3Els.catTabs) {
@@ -2673,6 +2929,7 @@
         btn.addEventListener('click', () => {
           mp3Filter = btn.getAttribute('data-cat');
           mp3ArtistFilter = '';   // 장르가 바뀌면 가수 칩 필터 리셋
+          mp3RenderLimit = 300;   // 필터가 바뀌면 렌더 캡 리셋 (후속#3)
           renderMp3Playlist();
         }));
     }
@@ -2682,15 +2939,23 @@
     if (!ytEls.plList) return;
     const items = mp3FilteredTracks();
     if (items.length === 0) {
+      // 후속#3 — '아직 로드 전'과 '진짜 빈 목록'을 구분: 대용량 라이브러리의
+      // 초기 로드 동안 "폴더 선택 후 스캔" 문구가 떠서 데이터가 사라진 것처럼
+      // 보이던 착시 제거.
       ytEls.plList.innerHTML = `<span class="pl-empty">${
-        mp3Tracks.length === 0
+        !mp3ListLoaded ? '⏳ 저장된 목록 불러오는 중…'
+        : mp3Tracks.length === 0
           ? '📁 폴더를 선택하고 🔍 스캔을 눌러주세요'
           : '검색/필터와 일치하는 곡이 없습니다'}</span>`;
       return;
     }
+    // 후속#3 — 렌더 캡: 수천 곡을 한 번에 DOM으로 그리지 않는다 (표시만 제한;
+    // 재생 순환·검색은 전체 목록 기준). '더 보기'로 300곡씩 확장.
+    const shown = items.slice(0, mp3RenderLimit);
+    const restCount = items.length - shown.length;
     // 후속#1 — 클릭은 plList의 위임 리스너 하나가 처리 (per-item 리스너 제거:
     // 대용량 목록 렌더 비용 대폭 절감).
-    ytEls.plList.innerHTML = items.map(t => {
+    ytEls.plList.innerHTML = shown.map(t => {
       const inst = mp3InstList(t).map(k => INSTRUMENT_KO[k] || k).join('·');
       const mood = mp3MoodList(t).map(k => MOOD_KO[k] || k).join('·');
       const cls = 'pl-item mp3'
@@ -2708,7 +2973,9 @@
         `</div>` +
         `<button class="pl-del" data-del="${t.id}" title="목록에서 제거 (파일은 유지)">🗑</button>` +
       `</div>`;
-    }).join('');
+    }).join('') + (restCount > 0
+      ? `<button class="pl-more" data-more="1">▼ ${restCount}곡 더 보기 (검색·필터로 좁힐 수도 있어요)</button>`
+      : '');
   }
 
   // plList 클릭 위임 (후속#1) — mp3 소스에서만 동작. 목록 아이템/삭제/카드/
@@ -2750,6 +3017,11 @@
       return;
     }
     if (e.target.closest('#mp3CardCreate')) { onMp3CardCreate(); return; }
+    if (e.target.closest('[data-more]')) {           // 후속#3 — 300곡씩 확장
+      mp3RenderLimit += 300;
+      renderMp3Playlist();
+      return;
+    }
     const cardEl = e.target.closest('.mood-card');
     if (cardEl) {
       const c = mp3Cards.find(x => x.id === Number(cardEl.getAttribute('data-card')));
@@ -2811,8 +3083,7 @@
 
   // 카드 필터와 일치하는 재생 가능 트랙 풀 — 비어있지 않은 차원만 AND,
   // 차원 내부는 OR(any-of).
-  function mp3CardPool(card) {
-    const f = mp3CardFiltersOf(card);
+  function mp3PoolFor(f) {
     return mp3Tracks.filter(t => {
       if (!t.available) return false;
       if (f.categories.length && !f.categories.includes(t.category || '')) return false;
@@ -2830,6 +3101,29 @@
       }
       return true;
     });
+  }
+
+  function mp3CardPool(card) { return mp3PoolFor(mp3CardFiltersOf(card)); }
+
+  // 카드 재생 풀 — 엄격 일치가 0곡이면 점진 완화 (M0030 후속#5): 재생 초기엔
+  // 느낌/악기 태그가 아직 안 쌓여 카드 필터와 어긋날 수 있다. 악기 → 느낌 →
+  // 가수 순으로 풀고(장르는 최후까지 유지), 그래도 없으면 전체에서 재생 —
+  // 카드 클릭은 반드시 무언가를 재생한다.
+  function mp3CardPoolRelaxed(card) {
+    let pool = mp3CardPool(card);
+    if (pool.length) return { pool, relaxed: false };
+    const f = mp3CardFiltersOf(card);
+    const steps = [
+      { ...f, instruments: [] },
+      { ...f, instruments: [], moods: [] },
+      { ...f, instruments: [], moods: [], artists: [] },
+      { categories: [], artists: [], moods: [], instruments: [] },
+    ];
+    for (const s of steps) {
+      pool = mp3PoolFor(s);
+      if (pool.length) return { pool, relaxed: true };
+    }
+    return { pool: [], relaxed: true };
   }
 
   function renderMp3Cards() {
@@ -2854,22 +3148,26 @@
             const active = mp3ActiveCard && mp3ActiveCard.id === c.id;
             return `<div class="mood-card${active ? ' playing' : ''}" data-card="${c.id}">` +
               `<div class="mc-head"><span class="mc-title">${escapeHtml(c.title)}</span>` +
-                `<button class="pl-del" data-cdel="${c.id}" title="카드 삭제">🗑</button></div>` +
+                `<span class="mc-btns">` +
+                  `<button class="mc-play" title="이 카드로 자동추천 재생">▶ 재생</button>` +
+                  `<button class="pl-del" data-cdel="${c.id}" title="카드 삭제">🗑</button>` +
+                `</span></div>` +
               `<div class="mc-desc">${escapeHtml(c.description || '')}</div>` +
               `<div class="mc-tags">${chips(f)}</div>` +
-              `<div class="mc-count">${active ? '▶ 재생 중 · ' : ''}${n}곡</div>` +
+              `<div class="mc-count">${active ? '▶ 재생 중 · ' : ''}${n > 0 ? n + '곡' : '≈ 유사 재생'}</div>` +
             `</div>`;
           }).join(''));
 
     // 클릭 처리는 plList 위임 리스너(onMp3ListClick)가 담당.
   }
 
-  // 카드 클릭 → 풀에서 랜덤 재생 (자동추천). 곡이 끝나면 같은 풀에서 계속.
+  // 카드 클릭/▶ → 풀에서 랜덤 재생 (자동추천). 곡이 끝나면 같은 풀에서 계속.
   function playMp3Card(card) {
-    const pool = mp3CardPool(card);
-    if (pool.length === 0) { setYtMeta('카드와 일치하는 곡이 없습니다', 'warn'); return; }
+    const { pool, relaxed } = mp3CardPoolRelaxed(card);
+    if (pool.length === 0) { setYtMeta('재생 가능한 곡이 없습니다', 'warn'); return; }
     mp3ActiveCard = card;
     playMp3Track(pool[Math.floor(Math.random() * pool.length)], { keepCard: true });
+    if (relaxed) setYtMeta('≈ 유사 재생 (정확 일치 곡 없음)', 'warn');
     renderMp3Playlist();   // 카드 재생중 표시 갱신
   }
 
@@ -2954,7 +3252,13 @@
   function onMp3CancelScan() { hostInvoke('mp3.scan.cancel', {}).catch(() => {}); }
 
   // ── 부트 로드 + 이벤트 구독 ────────────────────────────────────────
+  // 페이징 하이드레이션 (후속#4) — 첫 50곡으로 즉시 첫 화면을 그리고,
+  // 나머지는 500곡 단위 백그라운드 페이지로 채운다. SELECT-all + 전량
+  // 직렬화가 만들던 초기 로드 지연 제거 (File.Exists 전수 체크도 호스트에서
+  // 제거 — 없는 파일은 재생 시점 처리).
   async function loadMp3List() {
+    if (mp3ListLoading) return;
+    mp3ListLoading = true;
     try {
       const st = await hostInvoke('mp3.status', {});
       if (st) {
@@ -2972,14 +3276,25 @@
           mp3UpdateProgressStrip();
         }
       }
-      const r = await hostInvoke('mp3.list', {});
-      if (r && r.ok && Array.isArray(r.tracks)) {
-        mp3Tracks.length = 0;
-        for (const t of r.tracks) mp3Tracks.push(t);
-        mp3ReindexTracks();
-        if (sourceMode === 'mp3') { renderMp3Playlist(); updateTopVisibility(); }
+      const first = await hostInvoke('mp3.list', { offset: 0, limit: 50 });
+      if (!(first && first.ok && Array.isArray(first.tracks))) return;
+      mp3Tracks.length = 0;
+      mp3TrackIdx.clear();
+      for (const t of first.tracks) upsertMp3Track(t);
+      mp3ListTotal = first.total || mp3Tracks.length;
+      mp3ListLoaded = true;   // 후속#3 — '로딩중' ↔ '빈 목록' 구분
+      if (sourceMode === 'mp3') { renderMp3Playlist(); updateTopVisibility(); }
+
+      let offset = first.tracks.length;
+      while (offset < mp3ListTotal) {
+        const page = await hostInvoke('mp3.list', { offset, limit: 500 });
+        if (!(page && page.ok && Array.isArray(page.tracks)) || page.tracks.length === 0) break;
+        for (const t of page.tracks) upsertMp3Track(t);
+        offset += page.tracks.length;
+        scheduleMp3Render('ui');   // 카운트/목록 진행 반영 (150ms 스로틀)
       }
     } catch (_) { /* 구버전 호스트 (mp3.* 없음) — MP3 탭은 빈 상태 유지 */ }
+    finally { mp3ListLoading = false; }
   }
 
   function bindMp3() {
@@ -2989,9 +3304,9 @@
     if (mp3Els.scan)   mp3Els.scan.addEventListener('click', onMp3Scan);
     if (mp3Els.cancel) mp3Els.cancel.addEventListener('click', onMp3CancelScan);
     if (mp3Els.instQ)
-      mp3Els.instQ.addEventListener('input', () => { mp3InstQuery = mp3Els.instQ.value; scheduleMp3Render(); });
+      mp3Els.instQ.addEventListener('input', () => { mp3InstQuery = mp3Els.instQ.value; mp3RenderLimit = 300; scheduleMp3Render('ui'); });
     if (mp3Els.instMode)
-      mp3Els.instMode.addEventListener('change', () => { mp3InstMode = mp3Els.instMode.value; scheduleMp3Render(); });
+      mp3Els.instMode.addEventListener('change', () => { mp3InstMode = mp3Els.instMode.value; scheduleMp3Render('ui'); });
     if (mp3Els.viewToggle)
       mp3Els.viewToggle.addEventListener('click', () => {
         mp3ViewMode = mp3ViewMode === 'cards' ? 'list' : 'cards';
@@ -3012,14 +3327,28 @@
       });
     // 후속#1 — 목록 클릭 위임 리스너 (렌더마다 재부착 없음).
     if (ytEls.plList) ytEls.plList.addEventListener('click', onMp3ListClick);
+    // ⏮/⏭ 내비게이션 (M0030 후속#6) — ⏭는 현재 모드 규칙 그대로
+    // (카드=풀 랜덤, 🔀=필터 랜덤, 기본=순차), ⏮는 재생 이력 기반.
+    if (mp3Els.prev) mp3Els.prev.addEventListener('click', onMp3Prev);
+    if (mp3Els.next) mp3Els.next.addEventListener('click', playNextMp3);
     if (mp3Els.audio) {
       mp3Els.audio.addEventListener('ended', playNextMp3);
-      // 진단 가시화 — 미디어 스택 실패를 코드명으로 표시 (2=네트워크,
-      // 3=디코드, 4=소스 미지원). "조용한 재생 실패"를 없애기 위한 배지.
+      mp3Els.audio.addEventListener('playing', () => { mp3ErrStreak = 0; });
+      // 후속#4 — 파일 존재는 재생 시점에 검증한다 (목록 시점 전수 체크 폐지).
+      // 실패한 곡은 비활성 마킹 후 자동으로 다음 곡 — 연속 3회 실패 시
+      // 중단(라이브러리 전체 소실 시 무한 스킵 방지). 코드명 배지 유지.
       mp3Els.audio.addEventListener('error', () => {
         const code = (mp3Els.audio.error && mp3Els.audio.error.code) || 0;
         const name = { 1: 'aborted', 2: 'network', 3: 'decode', 4: 'src-not-supported' }[code] || code;
-        setYtMeta(`재생 오류 — ${name}`, 'err');
+        const t = mp3CurrentTrack();
+        if (t) { t.available = false; scheduleMp3Render('ui'); }
+        mp3ErrStreak++;
+        if (mp3ErrStreak <= 3) {
+          setYtMeta(`⏭ 재생 실패(${name}) — 다음 곡`, 'warn');
+          setTimeout(playNextMp3, 800);
+        } else {
+          setYtMeta(`재생 오류 — ${name}`, 'err');
+        }
       });
     }
 
@@ -3027,8 +3356,13 @@
       // 후속#1 — 배치 업서트: 스캔 중에는 호스트가 ~2s/100건으로 묶어 보낸다.
       window.zero.on('mp3.tracks', d => {
         const arr = (d && d.tracks) || [];
+        if (arr.length === 0) return;
+        const wasEmpty = mp3Tracks.length === 0;
         for (const t of arr) upsertMp3Track(t);
-        scheduleMp3Render();
+        // 후속#2 — 빈 목록에 첫 배치가 도착하면 즉시 표시 (최초 로드가
+        // 스캔 스로틀에 걸려 늦게 보이던 문제); 이후에는 스캔 중 15s 주기.
+        if (wasEmpty) mp3RenderNow();
+        else scheduleMp3Render();
       });
       window.zero.on('mp3.scan.progress', p => {
         mp3Scanning = true;
