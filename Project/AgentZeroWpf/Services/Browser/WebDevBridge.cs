@@ -736,7 +736,12 @@ public sealed class WebDevBridge
 
     private void EnsureMp3HostMapping(string? folder)
     {
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return;
+        // Timeout-bounded probe — this runs on the UI thread for every mp3.*
+        // bridge call (incl. the plugin's on-load mp3.status/mp3.list). A bare
+        // Directory.Exists on a disconnected network scan root would freeze the
+        // whole app here (see PathAvailability). Unreachable → skip the mapping;
+        // tracks just show Available=false until the drive is back.
+        if (!PathAvailability.DirectoryExistsFast(folder)) return;
         if (string.Equals(_mp3MappedFolder, folder, StringComparison.OrdinalIgnoreCase)) return;
         try
         {

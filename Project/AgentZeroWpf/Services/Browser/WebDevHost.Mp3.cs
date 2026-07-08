@@ -68,7 +68,9 @@ public sealed partial class WebDevHost
         return new
         {
             folder,
-            folderExists = !string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder),
+            // Timeout-bounded — a disconnected network scan root must not freeze
+            // the UI thread this status poll runs on (see PathAvailability).
+            folderExists = PathAvailability.DirectoryExistsFast(folder),
             scanning = _mp3ScanRunning == 1,
             progress = _mp3ScanRunning == 1 ? _mp3LastProgress : null,
             count,
@@ -79,7 +81,9 @@ public sealed partial class WebDevHost
     public object Mp3SetFolder(string folder)
     {
         folder = (folder ?? "").Trim();
-        if (folder.Length == 0 || !Directory.Exists(folder))
+        // Fresh pick — drop any stale (dead-drive) verdict before probing.
+        PathAvailability.Invalidate(folder);
+        if (folder.Length == 0 || !PathAvailability.DirectoryExistsFast(folder))
             return new { ok = false, error = "folder-missing", folder };
         var s = Mp3SettingsStore.Load();
         s.ScanFolder = folder;
@@ -95,7 +99,9 @@ public sealed partial class WebDevHost
     public object Mp3StartScan(IReadOnlyList<string> categories)
     {
         var root = Mp3SettingsStore.Load().ScanFolder;
-        if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+        // Fail fast if the (possibly network) root is unreachable instead of
+        // letting the scan job block on it — keeps this UI-thread call snappy.
+        if (string.IsNullOrWhiteSpace(root) || !PathAvailability.DirectoryExistsFast(root))
             return new { ok = false, error = "folder-missing" };
         if (Interlocked.CompareExchange(ref _mp3ScanRunning, 1, 0) != 0)
             return new { ok = false, error = "busy" };
