@@ -19,7 +19,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 110
+      "duration": 140
     },
     "piano_play_1.png": {
       "frame": {
@@ -40,7 +40,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 110
+      "duration": 140
     },
     "piano_play_2.png": {
       "frame": {
@@ -61,7 +61,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 110
+      "duration": 140
     },
     "piano_play_3.png": {
       "frame": {
@@ -82,7 +82,7 @@
         "w": 192,
         "h": 192
       },
-      "duration": 110
+      "duration": 140
     }
   },
   "meta": {
