@@ -127,10 +127,18 @@ public sealed class SherpaSpeakerDiarizer : ISpeakerDiarizer
 
     public ValueTask DisposeAsync()
     {
-        // Sherpa OfflineSpeakerDiarization owns native handles. Currently no
-        // public Dispose on the C# wrapper (1.10.x); rely on finalizer for
-        // process exit. If a later version exposes IDisposable, plug it here.
-        _sd = null;
+        // Sherpa OfflineSpeakerDiarization owns native handles (segmentation +
+        // embedding ONNX sessions, ~50 MB). The org.k2fsa.sherpa.onnx 1.10.46
+        // wrapper DOES expose IDisposable/Dispose() (verified via reflection:
+        // Dispose() → SherpaOnnxDestroyOfflineSpeakerDiarization), so release
+        // the native handle deterministically instead of leaking it until the
+        // GC finalizer runs. Guard under _initLock so we don't race a Process
+        // in flight on the capture thread.
+        lock (_initLock)
+        {
+            try { _sd?.Dispose(); } catch { /* finalizer is the backstop */ }
+            _sd = null;
+        }
         return ValueTask.CompletedTask;
     }
 }

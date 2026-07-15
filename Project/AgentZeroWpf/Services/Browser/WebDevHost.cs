@@ -118,6 +118,19 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
     private const int NotePartialIntervalMs = 10_000;
     private const int NotePartialMinBytes = 16_000 * 2 * 2; // 2 s of 16 kHz mono PCM16
 
+    // P0 (2026-07-15) — single serialization gate for ALL note-pipeline native
+    // inference (partial STT, chunk STT, diarize). whisper.cpp's Vulkan factory
+    // and the single Sherpa diarizer instance are NOT safe for concurrent
+    // Process/inference: overlapping calls corrupt native heap and FailFast the
+    // host a few minutes into a loopback session. This gate guarantees no two
+    // native inferences ever overlap — chunk STT waits for an in-flight partial,
+    // partials try-acquire and skip if anything else is running.
+    private readonly SemaphoreSlim _noteInferGate = new(1, 1);
+    // Chunk-tick re-entrancy guard — mirrors _notePartialBusy. Without it the
+    // 30 s periodic timer stacked ProcessFinalChunkAsync tasks whenever Whisper
+    // medium ran slower than the realtime chunk window.
+    private int _noteChunkBusy;
+
     public event Action<NoteTranscriptInfo>? NoteTranscript;  // M0024 Phase 3 — rich payload
     public event Action?         NoteUtteranceStarted;
     public event Action?         NoteUtteranceEnded;
@@ -593,6 +606,15 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
 
             _ = Task.Run(async () =>
             {
+                // Try-acquire the shared inference gate without blocking. Partials
+                // are best-effort previews — if a chunk/utterance STT is currently
+                // running, skip this partial rather than queue behind it (queuing
+                // would build a native-inference backlog).
+                if (!await _noteInferGate.WaitAsync(0).ConfigureAwait(false))
+                {
+                    System.Threading.Interlocked.Exchange(ref _notePartialBusy, 0);
+                    return;
+                }
                 try
                 {
                     var text = await stt.TranscribeAsync(pcm, lang, ctsToken).ConfigureAwait(false);
@@ -609,6 +631,7 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
                 }
                 finally
                 {
+                    _noteInferGate.Release();
                     System.Threading.Interlocked.Exchange(ref _notePartialBusy, 0);
                 }
             });
@@ -624,6 +647,7 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
     private void StartNoteChunkTimer()
     {
         StopNoteChunkTimer();
+        System.Threading.Interlocked.Exchange(ref _noteChunkBusy, 0);
         var ms = _noteLoopbackChunkSec * 1000;
         _noteChunkTimer = new System.Threading.Timer(OnNoteChunkTick, null, ms, ms);
         AppLogger.Log($"[WebDev:Note-Chunk] timer started, interval={_noteLoopbackChunkSec}s");
@@ -649,10 +673,25 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
         if (lb is null || stt is null) return;
         if ((_noteCts?.Token ?? CancellationToken.None).IsCancellationRequested) return;
 
+        // Re-entrancy guard: if the previous chunk is still transcribing (Whisper
+        // medium can run slower than the 30 s realtime window), we must NOT start
+        // a second concurrent inference. Drain the buffer anyway to keep
+        // _pcmBuffer bounded, then drop this chunk with a log — losing one
+        // chunk's transcript is the correct trade vs. a native-concurrency crash
+        // or unbounded buffer growth.
+        if (System.Threading.Interlocked.CompareExchange(ref _noteChunkBusy, 1, 0) != 0)
+        {
+            var dropped = lb.ConsumePcmBuffer();
+            _notePartialLastBytes = 0;
+            AppLogger.Log($"[WebDev:Note-Chunk] busy — previous chunk still processing; dropped {dropped.Length} bytes ({dropped.Length / 32_000.0:F1}s)");
+            return;
+        }
+
         var pcm = lb.ConsumePcmBuffer();
         if (pcm.Length < 8000)
         {
             AppLogger.Log($"[WebDev:Note-Chunk] empty chunk skipped (bytes={pcm.Length})");
+            System.Threading.Interlocked.Exchange(ref _noteChunkBusy, 0);
             return;
         }
         // Reset partial baseline because the buffer was just drained; next
@@ -661,7 +700,11 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
 
         AppLogger.Log($"[WebDev:Note-Chunk] tick → STT | bytes={pcm.Length} ({pcm.Length / 32_000.0:F1}s)");
         try { NoteUtteranceEnded?.Invoke(); } catch { }
-        _ = Task.Run(() => ProcessFinalChunkAsync(pcm, "loopback-chunk"));
+        _ = Task.Run(async () =>
+        {
+            try { await ProcessFinalChunkAsync(pcm, "loopback-chunk"); }
+            finally { System.Threading.Interlocked.Exchange(ref _noteChunkBusy, 0); }
+        });
     }
 
     /// <summary>
@@ -675,6 +718,12 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
         var ctsToken = _noteCts?.Token ?? CancellationToken.None;
         var lang = _noteLanguage;
         if (stt is null) return;
+
+        // Serialize native inference — see _noteInferGate. Blocks until any
+        // in-flight partial STT finishes so whisper.cpp + Sherpa are never
+        // entered concurrently. Cancelled WaitAsync (STOP) exits cleanly.
+        try { await _noteInferGate.WaitAsync(ctsToken).ConfigureAwait(false); }
+        catch (OperationCanceledException) { return; }
         try
         {
             var text = await stt.TranscribeAsync(pcm, lang, ctsToken);
@@ -721,6 +770,10 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
         {
             AppLogger.Log($"[WebDev:Note-{label}] STT transcribe failed: {ex.GetType().Name}: {ex.Message}");
             NoteError?.Invoke("Transcribe failed: " + ex.Message);
+        }
+        finally
+        {
+            _noteInferGate.Release();
         }
     }
 
@@ -999,6 +1052,14 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
         try { TearDownMusicLocked(); } catch { }
         try { DisposeVision(); } catch { }
         try { DisposeMp3(); } catch { }
+        // P1 (2026-07-15) — release the cached note-side diarizer's native ONNX
+        // sessions. It's kept alive across capture sessions (see
+        // TearDownNoteCaptureLocked) to avoid a ~50 MB model reload, so host
+        // Dispose is the only place its native handle gets freed deterministically.
+        // TearDownNoteCaptureLocked already cancelled _noteCts above, so no
+        // Process is in flight against _sd here.
+        var diar = _noteDiarizer; _noteDiarizer = null;
+        try { diar?.DisposeAsync().AsTask().GetAwaiter().GetResult(); } catch { }
         _noteLock.Dispose();
         _musicLock.Dispose();
         _playback.Dispose();
