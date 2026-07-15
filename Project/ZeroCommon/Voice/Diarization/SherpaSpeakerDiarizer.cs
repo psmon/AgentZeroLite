@@ -14,15 +14,40 @@ namespace Agent.Common.Voice.Diarization;
 /// Input contract: 16 kHz mono float samples in <c>[-1, 1]</c>. PCM16 byte
 /// input is converted in <see cref="DiarizeAsync"/>.
 ///
-/// Threading: <see cref="OfflineSpeakerDiarization"/> is built on the
-/// capture thread but inference (<c>Process</c>) runs synchronously and
-/// is wrapped in <c>Task.Run</c> so callers stay UI-thread friendly.
+/// <para>
+/// <b>Memory model (2026-07-15) — chunk-scoped instance.</b> Each
+/// <see cref="DiarizeAsync"/> call builds its OWN
+/// <see cref="OfflineSpeakerDiarization"/>, runs <c>Process</c>, and disposes
+/// it in a <c>using</c> block, so ALL native memory (ONNX session arenas,
+/// segmentation + embedding + clustering scratch) is returned to the OS after
+/// every utterance. This mirrors how <c>WhisperLocalStt</c> disposes its
+/// per-call processor while keeping the heavy model resident.
+/// </para>
+/// <para>
+/// The previous design held ONE reused instance for the whole capture session.
+/// ONNX Runtime's arena allocator grows to its peak working set and never
+/// returns memory to the OS, so a reused instance's footprint only ratcheted
+/// up. On an integrated GPU (shared system RAM) that pressure compounded with
+/// Whisper's Vulkan allocations and faulted the driver a few minutes into a
+/// note-capture session (STT-only sessions, which recycle per call, stayed
+/// stable). Sherpa exposes no factory/processor split, so "return memory per
+/// chunk" necessarily means recreating the session each call (~46 MB model
+/// re-init). The build cost is logged; if it proves too heavy, switch to a
+/// recycle-every-N cache — a localized change to <see cref="DiarizeAsync"/>.
+/// </para>
+///
+/// Threading: inference (<c>Process</c>) runs synchronously and is wrapped in
+/// <c>Task.Run</c> so callers stay UI-thread friendly.
 /// </summary>
 public sealed class SherpaSpeakerDiarizer : ISpeakerDiarizer
 {
     private readonly DiarizationSettings _settings;
-    private OfflineSpeakerDiarization? _sd;
     private readonly object _initLock = new();
+    // Validated model paths — resolved + existence-checked once in
+    // EnsureReadyAsync. No persistent native instance is held (see class remarks).
+    private bool _validated;
+    private string? _segPath;
+    private string? _embPath;
 
     public SherpaSpeakerDiarizer(DiarizationSettings settings)
     {
@@ -38,7 +63,7 @@ public sealed class SherpaSpeakerDiarizer : ISpeakerDiarizer
         {
             lock (_initLock)
             {
-                if (_sd is not null) return true;
+                if (_validated) return true;
 
                 var segPath = DiarizationSettingsStore.ResolveSegmentationPath(_settings);
                 var embPath = DiarizationSettingsStore.ResolveEmbeddingPath(_settings);
@@ -58,41 +83,70 @@ public sealed class SherpaSpeakerDiarizer : ISpeakerDiarizer
                 var embMb = new FileInfo(embPath).Length / (1024.0 * 1024.0);
                 progress?.Report($"Loading Sherpa diarization (segmentation {segMb:F1} MB + embedding {embMb:F1} MB)…");
 
-                var config = new OfflineSpeakerDiarizationConfig();
-                config.Segmentation.Pyannote.Model = segPath;
-                config.Embedding.Model = embPath;
-                config.Clustering.NumClusters = _settings.ExpectedSpeakerCount > 0
-                    ? _settings.ExpectedSpeakerCount
-                    : -1; // -1 → auto-cluster using the threshold path
-                if (_settings.NumThreads > 0)
+                // Warm once: build + immediately dispose so config/model errors
+                // surface at Start time (not on the first utterance) and the OS
+                // file cache is primed. Per-chunk instances are created fresh in
+                // DiarizeAsync — this warm instance is NOT retained.
+                var warmSw = Stopwatch.StartNew();
+                using (var warm = new OfflineSpeakerDiarization(BuildConfig(segPath, embPath)))
                 {
-                    config.Segmentation.NumThreads = _settings.NumThreads;
-                    config.Embedding.NumThreads = _settings.NumThreads;
+                    warmSw.Stop();
+                    progress?.Report($"✓ Diarizer ready · sample rate {warm.SampleRate} Hz (warm build {warmSw.ElapsedMilliseconds} ms)");
+                    AppLogger.Log($"[Diar] warm build ok | buildMs={warmSw.ElapsedMilliseconds} seg={segMb:F1}MB emb={embMb:F1}MB");
                 }
 
-                _sd = new OfflineSpeakerDiarization(config);
-                progress?.Report($"✓ Diarizer ready · sample rate {_sd.SampleRate} Hz");
+                _segPath = segPath;
+                _embPath = embPath;
+                _validated = true;
                 return true;
             }
         }, ct);
     }
 
+    private OfflineSpeakerDiarizationConfig BuildConfig(string segPath, string embPath)
+    {
+        var config = new OfflineSpeakerDiarizationConfig();
+        config.Segmentation.Pyannote.Model = segPath;
+        config.Embedding.Model = embPath;
+        config.Clustering.NumClusters = _settings.ExpectedSpeakerCount > 0
+            ? _settings.ExpectedSpeakerCount
+            : -1; // -1 → auto-cluster using the threshold path
+        if (_settings.NumThreads > 0)
+        {
+            config.Segmentation.NumThreads = _settings.NumThreads;
+            config.Embedding.NumThreads = _settings.NumThreads;
+        }
+        return config;
+    }
+
     public async Task<DiarizationResult> DiarizeAsync(byte[] pcm16, int hintSpeakerCount = 0, CancellationToken ct = default)
     {
-        if (_sd is null)
+        if (!_validated)
         {
             var ok = await EnsureReadyAsync(null, ct).ConfigureAwait(false);
             if (!ok) throw new InvalidOperationException("Sherpa diarizer not ready — call EnsureReadyAsync first.");
         }
+
+        string segPath, embPath;
+        lock (_initLock) { segPath = _segPath!; embPath = _embPath!; }
 
         return await Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
 
             var samples = Pcm16ToFloat(pcm16);
-            var sw = Stopwatch.StartNew();
-            var raw = _sd!.Process(samples);
-            sw.Stop();
+
+            // Chunk-scoped instance: build → process → dispose. The using block
+            // returns every byte of native scratch to the OS after this chunk,
+            // exactly like WhisperLocalStt's per-call processor. See class remarks
+            // for why a persistent instance was the crash trigger on integrated GPUs.
+            var buildSw = Stopwatch.StartNew();
+            using var sd = new OfflineSpeakerDiarization(BuildConfig(segPath, embPath));
+            buildSw.Stop();
+
+            var inferSw = Stopwatch.StartNew();
+            var raw = sd.Process(samples);
+            inferSw.Stop();
 
             var list = new List<SpeakerSegment>();
             // Sherpa returns per-segment Start/End/Speaker triples.
@@ -109,7 +163,8 @@ public sealed class SherpaSpeakerDiarizer : ISpeakerDiarizer
                 speakerCount = max + 1;
             }
 
-            return new DiarizationResult(list, speakerCount, sw.Elapsed);
+            AppLogger.Log($"[Diar] chunk-scoped | buildMs={buildSw.ElapsedMilliseconds} inferMs={inferSw.ElapsedMilliseconds} samples={samples.Length} segs={list.Count} speakers={speakerCount}");
+            return new DiarizationResult(list, speakerCount, inferSw.Elapsed);
         }, ct).ConfigureAwait(false);
     }
 
@@ -127,18 +182,10 @@ public sealed class SherpaSpeakerDiarizer : ISpeakerDiarizer
 
     public ValueTask DisposeAsync()
     {
-        // Sherpa OfflineSpeakerDiarization owns native handles (segmentation +
-        // embedding ONNX sessions, ~50 MB). The org.k2fsa.sherpa.onnx 1.10.46
-        // wrapper DOES expose IDisposable/Dispose() (verified via reflection:
-        // Dispose() → SherpaOnnxDestroyOfflineSpeakerDiarization), so release
-        // the native handle deterministically instead of leaking it until the
-        // GC finalizer runs. Guard under _initLock so we don't race a Process
-        // in flight on the capture thread.
-        lock (_initLock)
-        {
-            try { _sd?.Dispose(); } catch { /* finalizer is the backstop */ }
-            _sd = null;
-        }
+        // No persistent native instance to release — DiarizeAsync scopes each
+        // OfflineSpeakerDiarization to its own using block, so there is nothing
+        // to leak here. Reset validation state for the IAsyncDisposable contract.
+        lock (_initLock) { _validated = false; }
         return ValueTask.CompletedTask;
     }
 }
