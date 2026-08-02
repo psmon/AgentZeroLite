@@ -220,6 +220,12 @@
                            Margin="14,0" TextTrimming="CharacterEllipsis"/>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="btnScrollDir" Content="↓ DOWN"
+                            Style="{DynamicResource FlatButton}" FontSize="10" FontWeight="Bold"
+                            Foreground="{DynamicResource CyberCyanBrush}"
+                            ToolTip="수집 방향 — ↓ DOWN: 최신이 상단(문서/피드형), ↑ UP: 최신이 하단·위로 올라가며 수집(채팅형)"
+                            Click="OnToggleScrollDirClick" Margin="0,0,10,0"/>
+
                     <TextBlock Text="RANGE" Foreground="{DynamicResource TextDim}"
                                FontSize="10" FontFamily="Consolas"
                                VerticalAlignment="Center" Margin="0,0,4,0"/>

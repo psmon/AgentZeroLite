@@ -43,6 +43,9 @@ public partial class ScrapPagePanel : UserControl
     private ScrapWriter? _currentScrap;
     private string? _fullTreeText;
 
+    // 수집 방향 — 기본은 아래로(문서/피드형). UP이면 하단에서 위로(채팅형).
+    private ScrollDirection _scrollDirection = ScrollDirection.Down;
+
     // Output panel cap (matches Origin's MaxDisplayChars).
     private const int MaxDisplayChars = 256 * 1024;
 
@@ -257,7 +260,8 @@ public partial class ScrapPagePanel : UserControl
                 MaxAttempts: int.TryParse(txtMaxAttempts.Text, out int max) ? Math.Clamp(max, 10, 9999) : 500,
                 DeltaMultiplier: int.TryParse(txtScrollDelta.Text, out int delta) ? Math.Clamp(delta, 1, 20) : 3,
                 FilterStartDate: dpFilterStart.SelectedDate,
-                FilterEndDate: dpFilterEnd.SelectedDate);
+                FilterEndDate: dpFilterEnd.SelectedDate,
+                Direction: _scrollDirection);
 
             lblCaptureStatus.Text = "캡처 중...";
             string result = await _captureService.CaptureAsync(
@@ -314,6 +318,27 @@ public partial class ScrapPagePanel : UserControl
     // =========================================================================
     //  Toolbar buttons
     // =========================================================================
+
+    /// <summary>수집 방향 토글 — ↓ DOWN(기본) ↔ ↑ UP(역방향).</summary>
+    private void OnToggleScrollDirClick(object sender, RoutedEventArgs e)
+    {
+        _scrollDirection = _scrollDirection == ScrollDirection.Down
+            ? ScrollDirection.Up
+            : ScrollDirection.Down;
+
+        if (_scrollDirection == ScrollDirection.Up)
+        {
+            btnScrollDir.Content = "↑ UP";
+            btnScrollDir.Foreground = (System.Windows.Media.Brush)FindResource("CyberMagentaBrush");
+        }
+        else
+        {
+            btnScrollDir.Content = "↓ DOWN";
+            btnScrollDir.Foreground = (System.Windows.Media.Brush)FindResource("CyberCyanBrush");
+        }
+
+        AppLogger.Log($"[Scrap.UI] 수집 방향 전환 → {_scrollDirection}");
+    }
 
     private void OnClearClick(object sender, RoutedEventArgs e) => txtCapturedText.Clear();
 

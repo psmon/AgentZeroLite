@@ -117,6 +117,7 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
+    public const int SB_PAGEUP = 2;
     public const int SB_PAGEDOWN = 3;
     public const int SB_TOP = 6;
     public const int SB_BOTTOM = 7;

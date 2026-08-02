@@ -261,7 +261,8 @@ internal sealed class ChromiumTextCapture
                 var scrollPattern = (ScrollPattern)sp;
                 if (scrollPattern.Current.VerticallyScrollable)
                 {
-                    scrollPattern.SetScrollPercent(ScrollPattern.NoScroll, 0);
+                    // 역방향이면 최하단(100%)에서 시작해 위로 올라가며 수집.
+                    scrollPattern.SetScrollPercent(ScrollPattern.NoScroll, scroll.IsReverse ? 100 : 0);
                     Thread.Sleep(200);
                 }
             }
@@ -315,9 +316,11 @@ internal sealed class ChromiumTextCapture
                 break;
             }
 
+            // 역방향은 휠을 위로(+), 정방향은 아래로(-).
+            int wheelDelta = NativeMethods.WHEEL_DELTA * scroll.DeltaMultiplier;
             NativeMethods.mouse_event(
                 NativeMethods.MOUSEEVENTF_WHEEL, 0, 0,
-                -NativeMethods.WHEEL_DELTA * scroll.DeltaMultiplier, IntPtr.Zero);
+                scroll.IsReverse ? wheelDelta : -wheelDelta, IntPtr.Zero);
             Thread.Sleep(scroll.DelayMs);
 
             int linesBefore = lines.Count;

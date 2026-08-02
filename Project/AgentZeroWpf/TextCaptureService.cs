@@ -363,7 +363,7 @@ internal sealed partial class TextCaptureService
 
             progress?.Report("WM_VSCROLL 폴백 시도 중...");
             AppLogger.Log("[Capture] Strategy 4: WM_VSCROLL");
-            text = await Task.Run(() => TryWmVScrollFallback(hwnd, ct, progress), ct);
+            text = await Task.Run(() => TryWmVScrollFallback(hwnd, ct, progress, scroll), ct);
             if (!string.IsNullOrWhiteSpace(text))
             {
                 AppLogger.Log($"[Capture] WM_VSCROLL 성공 | {text.Length}자");
@@ -496,7 +496,8 @@ internal sealed partial class TextCaptureService
                         {
                             try
                             {
-                                scrollPattern.SetScrollPercent(ScrollPattern.NoScroll, 0);
+                                // 역방향이면 최하단(100%)에서 시작해 위로 올라가며 수집.
+                                scrollPattern.SetScrollPercent(ScrollPattern.NoScroll, scroll.IsReverse ? 100 : 0);
                                 Thread.Sleep(100);
                             }
                             catch { }
@@ -551,9 +552,11 @@ internal sealed partial class TextCaptureService
                         try { if (scrollPattern != null) scrollBefore = scrollPattern.Current.VerticalScrollPercent; }
                         catch { }
 
+                        // 역방향이면 휠을 위로(+), 정방향이면 아래로(-) 굴린다.
+                        int wheelDelta = NativeMethods.WHEEL_DELTA * scroll.DeltaMultiplier;
                         NativeMethods.mouse_event(
                             NativeMethods.MOUSEEVENTF_WHEEL, 0, 0,
-                            -NativeMethods.WHEEL_DELTA * scroll.DeltaMultiplier, IntPtr.Zero);
+                            scroll.IsReverse ? wheelDelta : -wheelDelta, IntPtr.Zero);
                         Thread.Sleep(scroll.DelayMs);
 
                         double scrollAfter = -1;
@@ -562,7 +565,8 @@ internal sealed partial class TextCaptureService
 
                         bool scrollTrackable = scrollBefore >= 0 && scrollAfter >= 0;
                         bool scrollMoved = scrollTrackable && Math.Abs(scrollAfter - scrollBefore) >= 0.1;
-                        bool atBottom = scrollTrackable && scrollAfter >= 99.5;
+                        // 정방향은 최하단(≥99.5%), 역방향은 최상단(≤0.5%)이 스크롤 끝.
+                        bool atBottom = scrollTrackable && (scroll.IsReverse ? scrollAfter <= 0.5 : scrollAfter >= 99.5);
 
                         int linesBefore = lines.Count;
                         CollectVisibleText(element, collected, lines);
@@ -732,7 +736,8 @@ internal sealed partial class TextCaptureService
 
             if (scrollPattern?.Current.VerticallyScrollable == true)
             {
-                scrollPattern.SetScrollPercent(ScrollPattern.NoScroll, 0);
+                // 역방향이면 최하단(100%)에서 시작.
+                scrollPattern.SetScrollPercent(ScrollPattern.NoScroll, scroll.IsReverse ? 100 : 0);
                 Thread.Sleep(100);
             }
 
@@ -763,11 +768,14 @@ internal sealed partial class TextCaptureService
                     break;
 
                 double before = scrollPattern.Current.VerticalScrollPercent;
-                scrollPattern.Scroll(ScrollAmount.NoAmount, ScrollAmount.LargeIncrement);
+                scrollPattern.Scroll(ScrollAmount.NoAmount,
+                    scroll.IsReverse ? ScrollAmount.LargeDecrement : ScrollAmount.LargeIncrement);
                 Thread.Sleep(100);
 
                 double after = scrollPattern.Current.VerticalScrollPercent;
-                if (Math.Abs(after - before) < 0.01 || after >= 99.9)
+                // 정방향은 최하단(≥99.9%), 역방향은 최상단(≤0.1%)에서 종료.
+                bool reachedEnd = scroll.IsReverse ? after <= 0.1 : after >= 99.9;
+                if (Math.Abs(after - before) < 0.01 || reachedEnd)
                 {
                     CollectVisibleText(element, collected, lines);
                     break;
@@ -828,11 +836,14 @@ internal sealed partial class TextCaptureService
         catch { }
     }
 
-    private static string? TryWmVScrollFallback(IntPtr hwnd, CancellationToken ct, IProgress<string>? progress)
+    private static string? TryWmVScrollFallback(IntPtr hwnd, CancellationToken ct, IProgress<string>? progress, ScrollOptions scroll)
     {
         try
         {
-            NativeMethods.SendMessage(hwnd, NativeMethods.WM_VSCROLL, (IntPtr)NativeMethods.SB_TOP, IntPtr.Zero);
+            // 정방향은 최상단(SB_TOP)부터 아래로, 역방향은 최하단(SB_BOTTOM)부터 위로.
+            int homeCmd = scroll.IsReverse ? NativeMethods.SB_BOTTOM : NativeMethods.SB_TOP;
+            int stepCmd = scroll.IsReverse ? NativeMethods.SB_PAGEUP : NativeMethods.SB_PAGEDOWN;
+            NativeMethods.SendMessage(hwnd, NativeMethods.WM_VSCROLL, (IntPtr)homeCmd, IntPtr.Zero);
             Thread.Sleep(100);
 
             var collected = new HashSet<string>();
@@ -853,7 +864,7 @@ internal sealed partial class TextCaptureService
                     }
                 }
 
-                NativeMethods.SendMessage(hwnd, NativeMethods.WM_VSCROLL, (IntPtr)NativeMethods.SB_PAGEDOWN, IntPtr.Zero);
+                NativeMethods.SendMessage(hwnd, NativeMethods.WM_VSCROLL, (IntPtr)stepCmd, IntPtr.Zero);
                 Thread.Sleep(50);
 
                 string textAfter = GetWindowTextWm(hwnd);
@@ -1074,8 +1085,8 @@ internal sealed partial class TextCaptureService
 
             ct.ThrowIfCancellationRequested();
 
-            // Ctrl+Home — jump to top so we capture from the beginning.
-            SendCtrlKey(NativeMethods.VK_HOME);
+            // 정방향: Ctrl+Home으로 최상단부터. 역방향: Ctrl+End으로 최하단부터.
+            SendCtrlKey(scroll.IsReverse ? NativeMethods.VK_END : NativeMethods.VK_HOME);
             Thread.Sleep(scroll.DelayMs);
 
             // Initial capture
@@ -1109,8 +1120,8 @@ internal sealed partial class TextCaptureService
                     Thread.Sleep(200);
                 }
 
-                // PageDown to advance one viewport.
-                SendKey(NativeMethods.VK_NEXT);
+                // 정방향은 PageDown, 역방향은 PageUp으로 한 화면 이동.
+                SendKey(scroll.IsReverse ? NativeMethods.VK_PRIOR : NativeMethods.VK_NEXT);
                 Thread.Sleep(scroll.DelayMs);
 
                 // Re-select-all + copy. For editors, Ctrl+A re-selects the *whole*
@@ -1133,11 +1144,16 @@ internal sealed partial class TextCaptureService
                     continue;
                 }
 
-                // Real growth — emit the tail so the preview pane fills live.
+                // Real growth — emit the fresh part so the preview pane fills live.
+                // 정방향은 새 내용이 뒤에 붙고, 역방향(위로 로드)은 앞에 붙는다.
                 stagnantCount = 0;
-                string newSlice = next.Length > accumulated.Length && next.StartsWith(accumulated, StringComparison.Ordinal)
-                    ? next.Substring(accumulated.Length)
-                    : "\n--- new content ---\n" + next;
+                string newSlice;
+                if (scroll.IsReverse && next.EndsWith(accumulated, StringComparison.Ordinal))
+                    newSlice = next.Substring(0, next.Length - accumulated.Length);
+                else if (!scroll.IsReverse && next.StartsWith(accumulated, StringComparison.Ordinal))
+                    newSlice = next.Substring(accumulated.Length);
+                else
+                    newSlice = "\n--- new content ---\n" + next;
                 accumulated = next;
                 scrap?.WriteAll(newSlice);
                 progress?.Report($"스크롤 {round + 1} — 누적 {accumulated.Length}자");
