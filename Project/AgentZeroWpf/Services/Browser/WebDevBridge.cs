@@ -756,9 +756,10 @@ public sealed class WebDevBridge
         }
     }
 
-    // Streams one MP3 under the scan root with HTTP Range support (206) —
-    // what the <audio> element actually needs for playback + seeking. Path
-    // is unescaped and clamped under the root; only *.mp3 is served.
+    // Streams one audio file under the scan root with HTTP Range support (206)
+    // — what the <audio> element actually needs for playback + seeking. Path
+    // is unescaped and clamped under the root; only Mp3Scanner.SupportedExtensions
+    // (mp3 / flac / wav) are served, with the extension's Content-Type.
     private void OnMp3ResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
     {
         void Respond(int status, string reason, string headers, Stream? body = null)
@@ -797,7 +798,7 @@ public sealed class WebDevBridge
             var full = Path.GetFullPath(Path.Combine(rootFull, rel.Replace('/', Path.DirectorySeparatorChar)));
             if (!full.StartsWith(rootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             { Respond(403, "Forbidden", ""); return; }
-            if (!full.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) || !File.Exists(full))
+            if (!Agent.Common.Mp3.Mp3Scanner.SupportedExtensions.Contains(Path.GetExtension(full)) || !File.Exists(full))
             { Respond(404, "Not Found", ""); return; }
 
             long total = new FileInfo(full).Length;
@@ -830,7 +831,7 @@ public sealed class WebDevBridge
             long count = end - start + 1;
             var fs = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read);
             fs.Seek(start, SeekOrigin.Begin);
-            const string common = "Content-Type: audio/mpeg\nAccept-Ranges: bytes";
+            var common = $"Content-Type: {Agent.Common.Mp3.Mp3Scanner.ContentTypeFor(full)}\nAccept-Ranges: bytes";
             if (ranged)
                 Respond(206, "Partial Content",
                     $"{common}\nContent-Length: {count}\nContent-Range: bytes {start}-{end}/{total}",

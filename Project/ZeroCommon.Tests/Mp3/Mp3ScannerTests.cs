@@ -83,4 +83,32 @@ public sealed class Mp3ScannerTests
         }
         finally { Directory.Delete(dir, recursive: true); }
     }
+
+    [Fact]
+    public void EnumerateMp3Files_IncludesFlacAndWav_CaseInsensitive()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "az-mp3-enum-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "song.mp3"), "");
+        File.WriteAllText(Path.Combine(dir, "lossless.flac"), "");
+        File.WriteAllText(Path.Combine(dir, "master.WAV"), "");   // upper-case ext still matches
+        File.WriteAllText(Path.Combine(dir, "cover.jpg"), "");    // not audio → skipped
+        try
+        {
+            var files = Mp3Scanner.EnumerateMp3Files(dir);
+            Assert.Equal(3, files.Count);
+            Assert.Contains(files, f => f.EndsWith(".flac", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(files, f => f.EndsWith(".WAV", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(files, f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(@"C:\music\a.mp3", "audio/mpeg")]
+    [InlineData(@"C:\music\a.flac", "audio/flac")]
+    [InlineData(@"C:\music\a.WAV", "audio/wav")]     // extension match is case-insensitive
+    [InlineData(@"C:\music\a.unknown", "audio/mpeg")] // default falls back to mpeg
+    public void ContentTypeFor_MapsExtension(string path, string expected)
+        => Assert.Equal(expected, Mp3Scanner.ContentTypeFor(path));
 }

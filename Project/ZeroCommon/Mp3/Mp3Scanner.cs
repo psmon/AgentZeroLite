@@ -23,7 +23,20 @@ public sealed record Mp3ScannedFile(
 /// </summary>
 public static class Mp3Scanner
 {
-    /// <summary>Recursive *.mp3 enumeration, sorted for stable scan order. Unreadable subdirs are skipped.</summary>
+    /// <summary>
+    /// Audio file extensions the scanner picks up. MP3 is the original set;
+    /// FLAC + WAV added so lossless libraries scan too. TagLibSharp reads tags
+    /// for all three, and Chromium's &lt;audio&gt; plays all three natively, so
+    /// support is just a matter of enumerating + serving the right MIME.
+    /// </summary>
+    public static readonly IReadOnlySet<string> SupportedExtensions =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mp3", ".flac", ".wav" };
+
+    /// <summary>
+    /// Recursive audio-file enumeration (<see cref="SupportedExtensions"/>),
+    /// sorted for stable scan order. Unreadable subdirs are skipped. The
+    /// name is historical — the scan module is "mp3" but the set is broader.
+    /// </summary>
     public static IReadOnlyList<string> EnumerateMp3Files(string root)
     {
         var opts = new EnumerationOptions
@@ -32,10 +45,25 @@ public static class Mp3Scanner
             IgnoreInaccessible = true,
             MatchCasing = MatchCasing.CaseInsensitive,
         };
-        return Directory.EnumerateFiles(root, "*.mp3", opts)
+        // One directory pass, then filter by extension — cheaper than a glob
+        // per extension on a (possibly network) tree.
+        return Directory.EnumerateFiles(root, "*", opts)
+            .Where(p => SupportedExtensions.Contains(Path.GetExtension(p)))
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    /// <summary>
+    /// HTTP <c>Content-Type</c> for a scanned audio file, keyed off its
+    /// extension. Used by the mp3.local virtual-host stream so the
+    /// &lt;audio&gt; element gets the right MIME for FLAC / WAV (not just MP3).
+    /// </summary>
+    public static string ContentTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".flac" => "audio/flac",
+        ".wav"  => "audio/wav",
+        _       => "audio/mpeg",
+    };
 
     /// <summary>
     /// Read one file's tags, falling back to filename-derived title when the
