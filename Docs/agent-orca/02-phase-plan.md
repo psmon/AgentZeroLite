@@ -35,7 +35,10 @@
       `ApprovalParser` 스크래핑은 폴백 유지.
 - [ ] (후속) Settings UI 토글, 훅 스크립트 session/detail 정교화.
 
-### 1b. Trust preset (orca 기능 F) — 미착수 (W2, 이번 선택 밖)
+### 1b. Trust preset (orca 기능 F) — ✅ W2 완료
+- [x] `TrustPresetWriter`(ZeroCommon 순수) — Cursor/Copilot/Codex 신뢰 파일 upsert. 10 테스트.
+- [x] `-cli trust-workspace [path]`(명시적·동의). realpath 정규화.
+- [ ] (follow-up) worktree 백링크 검증(신뢰 과확장 방지), Settings UI 토글.
 
 ### 1b. Trust preset (orca 기능 F)
 - [ ] `TrustPresetWriter.cs` (`ZeroCommon/Agents/`) — 각 CLI 신뢰 파일 기록. orca
@@ -59,11 +62,12 @@
 - [x] ActivityBar 버튼 + 오버레이 + 토글(형제 핸들러 연동).
 - [ ] (후속) operator 데스크톱 스모크(WebView2/git 런타임), Staged 토글, 파일 접기.
 
-### 2b. App-CLI 확장 + 안티드리프트 스킬 스텁 (orca 기능 D, C)
-- [ ] `-cli` 확장: `terminal-wait`(TUI-idle 대기), `worktree`(2b 후 Phase 3와 연계), `orchestrate`(Phase 3).
-- [ ] `SkillStubInjector.cs` — 호스트 에이전트 스킬 폴더(`~/.claude/skills/agentzero/`)에 **스텁만** 주입.
-      전체 가이드는 앱이 `-cli help <topic>`로 런타임 서빙 (드리프트 방지).
-- [ ] `OrcaCliLauncher.cs` 참조 — Windows 런처 개행/PATH 함정 대응 확인 (AgentZero는 단일 exe라 유리).
+### 2b. App-CLI 확장 + 안티드리프트 스킬 스텁 (orca 기능 D, C) — ✅ W4·W5 완료
+- [x] `-cli` 확장: `terminal-wait`(TUI-idle 폴링), `worktree`(add/list/remove, `--trust`),
+      `orchestrate`(list/create/status), `help <topic>`(가이드 서빙).
+- [x] `SkillStubInjector` + `AgentSkillGuides.BuildStub` — 스텁만 주입, 가이드는 `-cli help` 서빙.
+      marker 기반 안전 제거. 11 테스트(worktree 6 + guides 5).
+- [x] `-cli skill-stub-install/-uninstall`(명시적·동의).
 
 **산출물**: `DiffReviewPanel`, `DiffComment` 엔티티+마이그레이션, `SkillStubInjector.cs`, `-cli` 신규 커맨드.
 **테스트**: diff 파싱 + 주석→프롬프트 조립 유닛 테스트. 스텁 주입 멱등성 테스트.
@@ -81,9 +85,14 @@
       AskCoordinator+Reply/Escalation/QueryRunStatus+Reply/RunCompleted`.
 - [x] `CoordinatorActor`(transport-agnostic, workerRouter 주입) — dispatch/전진/사이클 abort/
       실패 처리/ask 게이트. Akka.TestKit 6 테스트.
-- [ ] (follow-up) 워커 라우터→실제 에이전트 배선, `-cli orchestrate`, 인메모리↔영속 연동.
+- [x] **W6 실전화**: `WorkerRouterActor`(round-robin, Sender 보존) + `OrchestrationMapper`(순수) +
+      `OrchestrationStore`(EF 영속) + `-cli orchestrate list/create/status`. end-to-end TestKit 6.
+- [ ] (follow-up, GUI 바운드) 워커 sink→터미널 에이전트 배선, `-cli orchestrate run`, heartbeat 타임아웃.
 
-### 3b. git worktree = 1급 워크스페이스 — 미착수 (follow-up)
+### 3b. git worktree = 1급 워크스페이스 — ✅ 코어(W7) 완료
+- [x] `GitWorktreeBuilder`(add/remove/list 셸아웃 + porcelain 파서 6 테스트) + `-cli worktree`.
+- [x] `--trust`로 W2 trust preset 연동.
+- [ ] (follow-up) WorkspaceActor 확장(status badge/hosted tabs 자동 배치, UI 통합).
 
 ### 3b. git worktree = 1급 워크스페이스 (orca 기능 A 보조)
 - [ ] `WorkspaceActor` 모델 확장: `(repo, worktreePath, branch, hostedTabs, statusBadge)`.
