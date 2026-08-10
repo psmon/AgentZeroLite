@@ -61,7 +61,7 @@ public static class GitWorktreeBuilder
     /// <summary>Lists worktrees for the repo containing <paramref name="repoDir"/>.</summary>
     public static async Task<IReadOnlyList<Worktree>> ListAsync(string repoDir)
     {
-        var res = await RunGitAsync(repoDir, "worktree list --porcelain");
+        var res = await RunGitAsync(repoDir, "worktree list --porcelain").ConfigureAwait(false);
         return res.Ok ? ParseWorktreeList(res.StdOut) : Array.Empty<Worktree>();
     }
 
@@ -102,8 +102,12 @@ public static class GitWorktreeBuilder
             if (proc is null) return new GitResult(false, "", "failed to start git");
             var outTask = proc.StandardOutput.ReadToEndAsync();
             var errTask = proc.StandardError.ReadToEndAsync();
-            await proc.WaitForExitAsync();
-            return new GitResult(proc.ExitCode == 0, await outTask, await errTask);
+            // ConfigureAwait(false): the CLI path calls these via GetAwaiter().
+            // GetResult() on WPF's UI thread (App.OnStartup carries a
+            // DispatcherSynchronizationContext), so continuations must NOT
+            // capture it or the .GetResult() deadlocks.
+            await proc.WaitForExitAsync().ConfigureAwait(false);
+            return new GitResult(proc.ExitCode == 0, await outTask.ConfigureAwait(false), await errTask.ConfigureAwait(false));
         }
         catch (Exception ex)
         {

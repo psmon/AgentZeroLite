@@ -66,9 +66,9 @@ public static class GitDiffService
 
             var outTask = proc.StandardOutput.ReadToEndAsync();
             var errTask = proc.StandardError.ReadToEndAsync();
-            await proc.WaitForExitAsync();
-            var stdout = await outTask;
-            var stderr = await errTask;
+            await proc.WaitForExitAsync().ConfigureAwait(false);
+            var stdout = await outTask.ConfigureAwait(false);
+            var stderr = await errTask.ConfigureAwait(false);
             return (proc.ExitCode == 0, stdout, stderr);
         }
         catch (System.Exception ex)

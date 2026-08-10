@@ -782,6 +782,7 @@ internal static class CliHandler
         }
         try
         {
+            EnsureDbReady();
             using var db = new Agent.Common.Data.AppDbContext();
             var sub = args[0].ToLowerInvariant();
             switch (sub)
@@ -887,7 +888,7 @@ internal static class CliHandler
         {
             case "list":
             {
-                var list = Agent.Common.Module.GitWorktreeBuilder.ListAsync(cwd).GetAwaiter().GetResult();
+                var list = System.Threading.Tasks.Task.Run(() => Agent.Common.Module.GitWorktreeBuilder.ListAsync(cwd)).GetAwaiter().GetResult();
                 if (list.Count == 0) { Console.WriteLine("No worktrees (or not a git repo)."); return 0; }
                 foreach (var w in list)
                 {
@@ -901,7 +902,7 @@ internal static class CliHandler
             {
                 if (args.Length < 2) { Console.Error.WriteLine("Usage: worktree add <path> [branch] [--trust]"); return 1; }
                 var branch = args.Length > 2 && !args[2].StartsWith("--") ? args[2] : null;
-                var res = Agent.Common.Module.GitWorktreeBuilder.AddAsync(cwd, args[1], branch).GetAwaiter().GetResult();
+                var res = System.Threading.Tasks.Task.Run(() => Agent.Common.Module.GitWorktreeBuilder.AddAsync(cwd, args[1], branch)).GetAwaiter().GetResult();
                 if (!res.Ok) { Console.Error.WriteLine(res.StdErr.Trim()); return 1; }
                 Console.WriteLine($"Added worktree: {args[1]}" + (branch is null ? " (detached)" : $" (branch {branch})"));
 
@@ -919,7 +920,7 @@ internal static class CliHandler
             {
                 if (args.Length < 2) { Console.Error.WriteLine("Usage: worktree remove <path> [--force]"); return 1; }
                 bool force = args.Contains("--force");
-                var res = Agent.Common.Module.GitWorktreeBuilder.RemoveAsync(cwd, args[1], force).GetAwaiter().GetResult();
+                var res = System.Threading.Tasks.Task.Run(() => Agent.Common.Module.GitWorktreeBuilder.RemoveAsync(cwd, args[1], force)).GetAwaiter().GetResult();
                 if (res.Ok) { Console.WriteLine($"Removed worktree: {args[1]}"); return 0; }
                 Console.Error.WriteLine(res.StdErr.Trim()); return 1;
             }
@@ -1124,10 +1125,20 @@ internal static class CliHandler
     //      Reads the local telemetry DB in-process (no GUI) and prints a
     //      per-model breakdown via TokenCostCalculator.
     // =========================================================================
+    // The in-process DB CLI commands may run before the GUI ever launched with
+    // this build, so the SQLite file might be missing the latest migrations.
+    // Ensure it's created + migrated (idempotent; no-op if the GUI already did).
+    private static void EnsureDbReady()
+    {
+        try { Agent.Common.Data.AppDbContext.InitializeDatabase(); }
+        catch (Exception ex) { AppLogger.Log($"[CLI] EnsureDbReady failed: {ex.Message}"); }
+    }
+
     private static int ShowCost()
     {
         try
         {
+            EnsureDbReady();
             using var db = new Agent.Common.Data.AppDbContext();
             var records = db.TokenUsageRecords.ToList();
             if (records.Count == 0)
