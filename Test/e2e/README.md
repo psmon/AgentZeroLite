@@ -13,7 +13,7 @@ for future work.
 |------|--------|-----------|----------------|
 | **T1 — CLI in-process** | `cli/test-cli-inproc.ps1` | no | `help <topic>`, `worktree`, `cost`, `orchestrate create/status/list` return correct output + exit codes |
 | **T2 — GUI smoke + visual** | `gui/test-gui-smoke.ps1` | yes | app launches with the build, window enumerable, screenshot captured, UIA tree reachable (warn-only) |
-| **T3 — GUI↔CLI interaction** | (future) | yes | terminal-send/read/wait, agent-hook round-trips through a live GUI |
+| **T3 — GUI↔CLI interaction** | `gui/test-gui-cli-interaction.ps1` | yes | status/terminal-list/terminal-read IPC, `terminal-wait` idle-detection against a live terminal, `agent-hook` fire-and-forget. `terminal-send` runs only against a shell-titled tab (never injects into an agent/SSH session). |
 
 ### Design notes
 - **WinExe capture**: `AgentZeroLite.exe` is a GUI-subsystem binary — `& $exe`
@@ -57,8 +57,9 @@ Each run drops a timestamped folder under `_artifacts/` (git-ignored):
 ```
 Test/e2e/
   lib/_common.ps1        shared: exe resolve, Invoke-Cli, assert/test framework, GUI+screenshot helpers
-  cli/test-cli-inproc.ps1  Tier 1
-  gui/test-gui-smoke.ps1   Tier 2
+  cli/test-cli-inproc.ps1        Tier 1
+  gui/test-gui-smoke.ps1         Tier 2
+  gui/test-gui-cli-interaction.ps1  Tier 3
   run-all.ps1            orchestrator
   _artifacts/            per-run outputs (git-ignored)
 ```

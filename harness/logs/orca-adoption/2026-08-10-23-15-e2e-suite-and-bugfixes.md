@@ -59,8 +59,21 @@ phase: E2E
 | 아키텍처 정합성 | Pass | ConfigureAwait/Task.Run로 UI-스레드 규율. CLI DB 자기-초기화. |
 | 테스트 가능성 | A | 재사용 3-tier 스위트. CLI tier 헤드리스, GUI tier 스크린샷 아티팩트. |
 
+## 후속 — Tier 3 (GUI↔CLI 연동) 추가 완료
+
+`gui/test-gui-cli-interaction.ps1` 신설 + `run-all.ps1` 편입:
+- status / terminal-list / terminal-read IPC 라운드트립 (실기기).
+- **W4 `terminal-wait`가 실제 RTX-NOTE 터미널의 idle을 ~1.2s에 감지** — 신규 명령 실환경 실증.
+- `terminal-send`는 셸-타이틀 탭에만(에이전트/SSH 세션 비간섭) — 실환경엔 셸 탭 없어 안전 스킵.
+- W1 `agent-hook` fire-and-forget 수락.
+- 파싱 이슈 1건 발견·대응: `terminal-list`는 사람용 표 + `--- JSON ---` 마커 + JSON 혼합 출력이라
+  마커 이후만 추출(제품 정상, 테스트 파서 보정).
+
+**전체 3-tier 실행 결과**: E2E PASSED — 18 체크(T1 7 / T2 4 / T3 7), 0 실패.
+(element-tree는 WebView2 포함 방대 트리로 60s warn-only.)
+
 ## 다음 단계 제안
 
-- Tier 3(GUI↔CLI 연동: terminal-send/read/wait, agent-hook 라운드트립) 추가.
-- CI에 `run-all.ps1 -SkipGui` 게이트 편입.
+- CI에 `run-all.ps1 -SkipGui` 게이트 편입(헤드리스 T1).
 - 버그 1은 **모든 async CLI 서브커맨드**에 영향했으므로, 향후 async CLI 추가 시 Task.Run 래핑 규약화.
+- 셸 터미널 자동 생성 CLI가 생기면 T3의 send 라운드트립을 무조건 실행 가능.

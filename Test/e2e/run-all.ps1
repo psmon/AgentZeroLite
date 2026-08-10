@@ -26,9 +26,14 @@ if (-not $SkipGui) {
     Write-Host ">>> Tier 2: GUI smoke + visual" -ForegroundColor Magenta
     & pwsh -NoProfile -File (Join-Path $here "gui\test-gui-smoke.ps1") -Configuration $Configuration
     if ($LASTEXITCODE -ne 0) { $fails += $LASTEXITCODE }
+
+    Write-Host ""
+    Write-Host ">>> Tier 3: GUI <-> CLI interaction" -ForegroundColor Magenta
+    & pwsh -NoProfile -File (Join-Path $here "gui\test-gui-cli-interaction.ps1") -Configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { $fails += $LASTEXITCODE }
 } else {
     Write-Host ""
-    Write-Host ">>> Tier 2 skipped (-SkipGui)" -ForegroundColor Yellow
+    Write-Host ">>> Tier 2 + 3 skipped (-SkipGui)" -ForegroundColor Yellow
 }
 
 Write-Host ""
