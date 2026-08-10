@@ -3246,11 +3246,14 @@ public partial class MainWindow : Window
             });
     }
 
-    /// <summary>Returns the first CLI group's folder path (active workspace root), or null.</summary>
+    /// <summary>Returns the ACTIVE workspace folder (falling back to the first real folder).</summary>
     private string? GetActiveWorkspaceRoot()
     {
         try
         {
+            var active = GetActiveDirectoryPath();
+            if (!string.IsNullOrWhiteSpace(active) && System.IO.Directory.Exists(active))
+                return active;
             foreach (var g in _cliGroups)
                 if (!string.IsNullOrWhiteSpace(g.DirectoryPath) && System.IO.Directory.Exists(g.DirectoryPath))
                     return g.DirectoryPath;

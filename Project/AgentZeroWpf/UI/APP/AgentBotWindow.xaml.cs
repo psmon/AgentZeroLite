@@ -1229,11 +1229,17 @@ public partial class AgentBotWindow : Window
             OnResult: r => Dispatcher.BeginInvoke(new Action(() => HandleAgentLoopResult(r)))));
 
         var getGroups = _getGroups;
-        // Workspace root for the file tools (W8): the first group carrying a
-        // real folder path. File ops are sandboxed to this root; null ⇒ the
-        // model is denied disk access (FileToolCore default-deny).
+        var getActiveDir = _getActiveDirectory;
+        // Workspace root for the file tools (W8): the ACTIVE workspace folder
+        // (the group the user is currently in) — NOT the first group. File ops
+        // are sandboxed to this root; null ⇒ the model is denied disk access
+        // (FileToolCore default-deny). Falls back to the first real folder only
+        // when no active directory is resolvable.
         System.Func<string?> getWorkspaceRoot = () =>
         {
+            var active = getActiveDir?.Invoke();
+            if (!string.IsNullOrWhiteSpace(active) && System.IO.Directory.Exists(active))
+                return active;
             var groups = getGroups?.Invoke();
             if (groups is null) return null;
             foreach (var g in groups)

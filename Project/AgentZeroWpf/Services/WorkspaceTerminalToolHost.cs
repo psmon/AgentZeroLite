@@ -347,29 +347,33 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
 
     public Task<string> ReadFileAsync(string path, int maxBytes, CancellationToken ct)
     {
-        var result = FileToolCore.ReadFile(Root(), path, maxBytes);
-        AppLogger.Log($"[AIMODE] read_file path=\"{path}\"");
+        var root = Root();
+        var result = FileToolCore.ReadFile(root, path, maxBytes);
+        AppLogger.Log($"[AIMODE] read_file root=\"{root ?? "<none>"}\" path=\"{path}\"");
         return Task.FromResult(result);
     }
 
     public Task<string> WriteFileAsync(string path, string content, CancellationToken ct)
     {
-        var result = FileToolCore.WriteFile(Root(), path, content);
-        AppLogger.Log($"[AIMODE] write_file path=\"{path}\" len={content.Length}");
+        var root = Root();
+        var result = FileToolCore.WriteFile(root, path, content);
+        AppLogger.Log($"[AIMODE] write_file root=\"{root ?? "<none>"}\" path=\"{path}\" len={content.Length}");
         return Task.FromResult(result);
     }
 
     public Task<string> EditFileAsync(string path, string oldString, string newString, bool replaceAll, CancellationToken ct)
     {
-        var result = FileToolCore.Edit(Root(), path, oldString, newString, replaceAll);
-        AppLogger.Log($"[AIMODE] edit_file path=\"{path}\" replace_all={replaceAll}");
+        var root = Root();
+        var result = FileToolCore.Edit(root, path, oldString, newString, replaceAll);
+        AppLogger.Log($"[AIMODE] edit_file root=\"{root ?? "<none>"}\" path=\"{path}\" replace_all={replaceAll}");
         return Task.FromResult(result);
     }
 
     public Task<string> GrepAsync(string pattern, string? pathFilter, int maxResults, CancellationToken ct)
     {
-        var result = FileToolCore.Grep(Root(), pattern, pathFilter, maxResults);
-        AppLogger.Log($"[AIMODE] grep pattern=\"{pattern}\" path=\"{pathFilter}\"");
+        var root = Root();
+        var result = FileToolCore.Grep(root, pattern, pathFilter, maxResults);
+        AppLogger.Log($"[AIMODE] grep root=\"{root ?? "<none>"}\" pattern=\"{pattern}\" path=\"{pathFilter}\"");
         return Task.FromResult(result);
     }
 }
