@@ -500,6 +500,16 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (command == "agent-hook")
+            {
+                string evt = root.TryGetProperty("event", out var ep) ? ep.GetString() ?? "" : "";
+                string state = root.TryGetProperty("state", out var sp) ? sp.GetString() ?? "" : "";
+                string session = root.TryGetProperty("session", out var ssp) ? ssp.GetString() ?? "" : "";
+                string detail = root.TryGetProperty("detail", out var dp) ? dp.GetString() ?? "" : "";
+                HandleAgentHook(evt, state, session, detail);
+                return;
+            }
+
             AppLogger.Log($"[IPC] 알 수 없는 명령: {command}");
         }
         catch (Exception ex)
@@ -904,6 +914,31 @@ public partial class MainWindow : Window
         }
 
         IpcMemoryMappedResponseWriter.WriteJson(BotChatMmfName, BotChatMmfSize, resultJson, "[IPC] bot-chat 응답 쓰기 오류");
+    }
+
+    /// <summary>
+    /// Routes a hosted-agent hook report (mission W1) into the actor system.
+    /// Fire-and-forget: no MMF response is written because the CLI side never
+    /// waits. The AgentBotActor resolves the phase and drives the AI-mode
+    /// progress UI, replacing terminal-output scraping as the state source.
+    /// </summary>
+    private void HandleAgentHook(string evt, string state, string session, string detail)
+    {
+        try
+        {
+            Actors.ActorSystemManager.System
+                .ActorSelection("/user/stage/bot")
+                .Tell(new Agent.Common.Actors.AgentHookEvent(
+                    HookEvent: evt,
+                    StateOverride: string.IsNullOrWhiteSpace(state) ? null : state,
+                    Session: session,
+                    Detail: detail));
+            AppLogger.Log($"[IPC] agent-hook event={evt} state={state} session={session}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[IPC] agent-hook 라우팅 오류: {ex.Message}");
+        }
     }
 
     // =========================================================================
@@ -1491,6 +1526,9 @@ public partial class MainWindow : Window
         DumpDockLayout("settings-open-before");
         CloseWebDev();
         CloseScrap();
+        CloseHarnessView();
+        CloseNote();
+        CloseDiffReview();
         EnterOverlayMode();
         SettingsPanel.Visibility = Visibility.Visible;
         DumpDockLayout("settings-open-after");
@@ -1849,6 +1887,7 @@ public partial class MainWindow : Window
         CloseSettings();
         CloseScrap();
         CloseHarnessView();
+        CloseDiffReview();
         EnterOverlayMode();
         NotePage.Visibility = Visibility.Visible;
     }
@@ -3076,6 +3115,7 @@ public partial class MainWindow : Window
         CloseSettings();
         CloseHarnessView();
         CloseNote();
+        CloseDiffReview();
         OnSidebarBotClick(sender, e);
     }
 
@@ -3105,6 +3145,8 @@ public partial class MainWindow : Window
         CloseWebDev();
         CloseSettings();
         CloseHarnessView();
+        CloseNote();
+        CloseDiffReview();
         EnterOverlayMode();
         ScrapPage.Visibility = Visibility.Visible;
     }
@@ -3134,8 +3176,87 @@ public partial class MainWindow : Window
         if (WebDevPage.Visibility != Visibility.Visible &&
             SettingsPanel.Visibility != Visibility.Visible &&
             ScrapPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible)
+            NotePage.Visibility != Visibility.Visible &&
+            DiffReviewPage.Visibility != Visibility.Visible)
             ExitOverlayMode();
+    }
+
+    // ====================================================================
+    //  W3 (orca-adoption) — Diff Review overlay toggle. Renders the active
+    //  workspace's git diff; comments ship back to the agent via StartAgentLoop.
+    // ====================================================================
+
+    private void OnActivityDiffClick(object sender, RoutedEventArgs e)
+    {
+        if (DiffReviewPage.Visibility == Visibility.Visible)
+        {
+            CloseDiffReview();
+            return;
+        }
+        CloseWebDev();
+        CloseSettings();
+        CloseScrap();
+        CloseHarnessView();
+        ConfigureDiffReviewPanel();
+        EnterOverlayMode();
+        DiffReviewPage.Visibility = Visibility.Visible;
+    }
+
+    private void CloseDiffReview()
+    {
+        if (DiffReviewPage.Visibility != Visibility.Visible) return;
+        DiffReviewPage.Visibility = Visibility.Collapsed;
+        if (WebDevPage.Visibility != Visibility.Visible &&
+            SettingsPanel.Visibility != Visibility.Visible &&
+            ScrapPage.Visibility != Visibility.Visible &&
+            NotePage.Visibility != Visibility.Visible &&
+            HarnessViewPage.Visibility != Visibility.Visible)
+            ExitOverlayMode();
+    }
+
+    private bool _diffReviewConfigured;
+
+    /// <summary>
+    /// Wires the Diff Review panel to the active workspace root and the agent
+    /// ship path (StartAgentLoop). Idempotent — only wires once.
+    /// </summary>
+    private void ConfigureDiffReviewPanel()
+    {
+        if (_diffReviewConfigured) return;
+        _diffReviewConfigured = true;
+
+        DiffReviewPage.Configure(
+            workspaceRootProvider: GetActiveWorkspaceRoot,
+            shipPrompt: prompt =>
+            {
+                try
+                {
+                    // Ensure the bot exists (it wires the AI loop bindings), then
+                    // run the review as an AI request through the same path as
+                    // typed input.
+                    if (_botWindow is null)
+                        OnSidebarBotClick(this, new RoutedEventArgs());
+                    _botWindow?.PostAiRequest(prompt);
+                    AppLogger.Log($"[DiffReview] shipped review to agent (len={prompt.Length})");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Log($"[DiffReview] ship failed: {ex.Message}");
+                }
+            });
+    }
+
+    /// <summary>Returns the first CLI group's folder path (active workspace root), or null.</summary>
+    private string? GetActiveWorkspaceRoot()
+    {
+        try
+        {
+            foreach (var g in _cliGroups)
+                if (!string.IsNullOrWhiteSpace(g.DirectoryPath) && System.IO.Directory.Exists(g.DirectoryPath))
+                    return g.DirectoryPath;
+        }
+        catch { /* fall through */ }
+        return null;
     }
 
     // ====================================================================
@@ -3261,6 +3382,7 @@ public partial class MainWindow : Window
         CloseSettings();
         CloseScrap();
         CloseHarnessView();
+        CloseDiffReview();
         EnterOverlayMode();
         WebDevPage.Visibility = Visibility.Visible;
     }

@@ -68,6 +68,28 @@ public interface IAgentToolbelt
     /// <summary>Synthesize a key press by spec ("ctrl+c", "alt+f4", "f5"). Gated by approval.</summary>
     Task<string> OsKeyPressAsync(string keySpec, CancellationToken ct)
         => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
+    // ====================== File surface (mission W8, orca-adoption) =========
+    // Default implementations return a "no workspace" envelope so test doubles
+    // and any host without a bound workspace root keep compiling AND stay
+    // default-deny. The production WPF host binds the active workspace folder
+    // and delegates to the pure <see cref="FileToolCore"/> (sandboxed to root).
+
+    /// <summary>Read a UTF-8 text file inside the workspace root. Returns JSON envelope.</summary>
+    Task<string> ReadFileAsync(string path, int maxBytes, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
+
+    /// <summary>Create/overwrite a text file inside the workspace root. Returns JSON envelope.</summary>
+    Task<string> WriteFileAsync(string path, string content, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
+
+    /// <summary>Replace old→new text in a file inside the workspace root. Returns JSON envelope.</summary>
+    Task<string> EditFileAsync(string path, string oldString, string newString, bool replaceAll, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
+
+    /// <summary>Regex search across text files under the workspace root. Returns JSON envelope.</summary>
+    Task<string> GrepAsync(string pattern, string? pathFilter, int maxResults, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
 }
 
 /// <summary>

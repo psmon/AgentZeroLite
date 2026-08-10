@@ -173,6 +173,19 @@ Available tools:
   - os_key_press               synthesize a keystroke. Spec uses '+' for modifiers.
                                args: { "key": <"ctrl+c" | "alt+f4" | "f5" | "a" | ...> }
 
+  --- Workspace files (mission W8) — only use when the user EXPLICITLY asks to
+      read, search, or modify files in the current project/workspace folder.
+      All paths are relative to the workspace root; access outside it is denied. ---
+  - read_file                  return a text file's contents.
+                               args: { "path": <string>, "max_bytes": <int?> }
+  - write_file                 create or overwrite a text file with new contents.
+                               args: { "path": <string>, "content": <string> }
+  - edit_file                  replace an exact substring in a file. By default the
+                               target must be unique; set replace_all for every match.
+                               args: { "path": <string>, "old": <string>, "new": <string>, "replace_all": <bool?> }
+  - grep                       regex-search text files under the workspace root.
+                               args: { "pattern": <string>, "path": <string?>, "max_results": <int?> }
+
   - done                       end the conversation with a final message to the user.
                                args: { "message": <string> }
 
@@ -210,7 +223,7 @@ Hard rules (apply to BOTH modes):
     public const string Gbnf = """
 root         ::= ws "{" ws "\"tool\"" ws ":" ws toolname ws "," ws "\"args\"" ws ":" ws args ws "}" ws
 
-toolname     ::= "\"list_terminals\"" | "\"read_terminal\"" | "\"send_to_terminal\"" | "\"send_key\"" | "\"wait\"" | "\"os_list_windows\"" | "\"os_screenshot\"" | "\"os_activate\"" | "\"os_element_tree\"" | "\"os_mouse_click\"" | "\"os_key_press\"" | "\"done\""
+toolname     ::= "\"list_terminals\"" | "\"read_terminal\"" | "\"send_to_terminal\"" | "\"send_key\"" | "\"wait\"" | "\"os_list_windows\"" | "\"os_screenshot\"" | "\"os_activate\"" | "\"os_element_tree\"" | "\"os_mouse_click\"" | "\"os_key_press\"" | "\"read_file\"" | "\"write_file\"" | "\"edit_file\"" | "\"grep\"" | "\"done\""
 
 args         ::= "{" ws "}" | "{" ws kv (ws "," ws kv)* ws "}"
 kv           ::= string ws ":" ws value
@@ -251,6 +264,10 @@ ws           ::= ([ \t\n\r])*
         "os_element_tree",
         "os_mouse_click",
         "os_key_press",
+        "read_file",
+        "write_file",
+        "edit_file",
+        "grep",
         "done",
     };
 }

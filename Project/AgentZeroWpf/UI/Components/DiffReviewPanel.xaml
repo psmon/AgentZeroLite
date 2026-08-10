@@ -1,0 +1,49 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.DiffReviewPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             Background="{DynamicResource EditorBg}">
+    <!--
+        W3 (orca-adoption) — Diff Review overlay. WebView2 renders the working-tree
+        git diff; the reviewer drops inline comments on lines and ships them back
+        to the agent as a follow-up prompt. Same overlay z-order as HarnessViewPanel.
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- Toolbar -->
+            <RowDefinition Height="*"/>      <!-- WebView2 -->
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{DynamicResource ToolbarBg}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1"
+                Padding="10,5">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="btnRefresh" Content="↻  Refresh"
+                            Style="{DynamicResource SmallButton}" FontSize="11"
+                            Foreground="{DynamicResource TextDim}" Padding="10,3"
+                            ToolTip="Re-run git diff for the active workspace"
+                            Click="OnRefreshClick"/>
+                    <Button x:Name="btnShip" Content="➤  Ship 0 to agent"
+                            Style="{DynamicResource SmallButton}" FontSize="11"
+                            Foreground="{DynamicResource CyberMintBrush}" Padding="10,3" Margin="6,0,0,0"
+                            ToolTip="Send collected comments to the agent as a follow-up prompt"
+                            Click="OnShipClick"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Rectangle Width="3" Height="10" Fill="{DynamicResource CyberMintBrush}"
+                               Margin="0,0,6,0" RadiusX="1" RadiusY="1"/>
+                    <TextBlock Text="DIFF REVIEW" FontSize="10" FontWeight="Bold"
+                               Foreground="{DynamicResource CyberMintBrush}" FontFamily="Consolas"
+                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="txtWorkspace" Text="(no workspace)"
+                               FontSize="10" Foreground="{DynamicResource TextDim}"
+                               FontFamily="Consolas" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <wv2:WebView2 x:Name="webview" Grid.Row="1" DefaultBackgroundColor="#1E1E1E"/>
+    </Grid>
+</UserControl>

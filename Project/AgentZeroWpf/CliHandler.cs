@@ -78,6 +78,9 @@ internal static class CliHandler
             "terminal-key" => TerminalKey(cliArgs.Skip(1).ToArray()),
             "terminal-read" => TerminalRead(cliArgs.Skip(1).ToArray()),
             "bot-chat" => BotChat(cliArgs.Skip(1).ToArray()),
+            "agent-hook" => AgentHook(cliArgs.Skip(1).ToArray()),
+            "agent-hook-install" => AgentHookInstall(),
+            "agent-hook-uninstall" => AgentHookUninstall(),
             "os" => OsCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             _ => PrintUnknownCommand(command),
         };
@@ -767,6 +770,92 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  agent-hook --event <name> [--state <phase>] [--session <id>] [--detail <t>]
+    //      : fire-and-forget agent-CLI hook report (mission W1, orca-adoption).
+    //      Installed into a hosted agent CLI (Claude Code) via AgentHookInstaller;
+    //      the hook invokes this so the GUI knows the agent's real state without
+    //      scraping terminal output. Always fire-and-forget (no MMF round-trip).
+    // =========================================================================
+    private static int AgentHook(string[] args)
+    {
+        string evt = "", state = "", session = "", detail = "";
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i].ToLowerInvariant())
+            {
+                case "--event"   when i + 1 < args.Length: evt = args[++i]; break;
+                case "--state"   when i + 1 < args.Length: state = args[++i]; break;
+                case "--session" when i + 1 < args.Length: session = args[++i]; break;
+                case "--detail"  when i + 1 < args.Length: detail = args[++i]; break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(evt))
+        {
+            Console.Error.WriteLine("Usage: agent-hook --event <name> [--state <phase>] [--session <id>] [--detail <text>]");
+            return 1;
+        }
+
+        IntPtr agentWnd = FindAgentZero();
+        if (agentWnd == IntPtr.Zero) return 1;
+
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"agent-hook\"");
+        sb.Append($",\"event\":\"{EscapeJson(evt)}\"");
+        sb.Append($",\"state\":\"{EscapeJson(state)}\"");
+        sb.Append($",\"session\":\"{EscapeJson(session)}\"");
+        sb.Append($",\"detail\":\"{EscapeJson(detail)}\"");
+        sb.Append('}');
+
+        // Fire-and-forget by design — hooks fire on the agent's hot path, so we
+        // never block them on an MMF response (mirrors --no-wait semantics).
+        SendWpfCommand(agentWnd, sb.ToString());
+        return 0;
+    }
+
+    // =========================================================================
+    //  agent-hook-install / agent-hook-uninstall
+    //      : install/remove AgentZero state-reporting hooks into every
+    //      ~/.claude*/settings.json. Runs IN-PROCESS (no GUI/IPC needed) — this
+    //      is the explicit, consented entry point for modifying Claude settings.
+    // =========================================================================
+    private static int AgentHookInstall()
+    {
+        var results = AgentZeroWpf.Services.AgentHookInstaller.InstallAll();
+        if (results.Count == 0)
+        {
+            Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
+            return 0;
+        }
+        int failed = 0;
+        foreach (var r in results)
+        {
+            if (r.Ok) Console.WriteLine($"  [{r.AccountKey}] {r.Action}" + (r.BackupPath is null ? "" : $"  (backup: {r.BackupPath})"));
+            else { Console.Error.WriteLine($"  [{r.AccountKey}] FAILED: {r.Error}"); failed++; }
+        }
+        Console.WriteLine(failed == 0 ? "Agent hooks installed." : $"Completed with {failed} failure(s).");
+        return failed == 0 ? 0 : 1;
+    }
+
+    private static int AgentHookUninstall()
+    {
+        var results = AgentZeroWpf.Services.AgentHookInstaller.UninstallAll();
+        if (results.Count == 0)
+        {
+            Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
+            return 0;
+        }
+        int failed = 0;
+        foreach (var r in results)
+        {
+            if (r.Ok) Console.WriteLine($"  [{r.AccountKey}] {r.Action}");
+            else { Console.Error.WriteLine($"  [{r.AccountKey}] FAILED: {r.Error}"); failed++; }
+        }
+        Console.WriteLine(failed == 0 ? "Agent hooks removed." : $"Completed with {failed} failure(s).");
+        return failed == 0 ? 0 : 1;
+    }
+
+    // =========================================================================
     //  bot-signal <kind> [--from name] [--to name] [--message text...]
     //      : send structured peer signal to AgentBot broker
     // =========================================================================
@@ -834,6 +923,9 @@ internal static class CliHandler
         Console.WriteLine("  terminal-key  <grp> <tab> <key>         Send a control key to a terminal");
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
         Console.WriteLine("  bot-chat <message> [--from name]        Display external chat in AgentBot");
+        Console.WriteLine("  agent-hook --event <name> [--state p]   Report hosted-agent state (fire-and-forget)");
+        Console.WriteLine("  agent-hook-install                      Install state hooks into ~/.claude*/settings.json");
+        Console.WriteLine("  agent-hook-uninstall                    Remove AgentZero hooks from ~/.claude*/settings.json");
         Console.WriteLine("  os <verb> [args]                        OS-control: window/screenshot/input (see 'os help')");
         Console.WriteLine("  help                                    Show detailed help");
         Console.WriteLine("  version, --version, -v                  Print CLI build identity (no GUI needed)");

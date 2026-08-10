@@ -3,6 +3,7 @@ using System;
 using Agent.Common.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Agent.Common.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260810111027_AddDiffComments")]
+    partial class AddDiffComments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0-preview.3.25171.6");
@@ -367,110 +370,6 @@ namespace Agent.Common.Data.Migrations
                     b.ToTable("Mp3Tracks");
                 });
 
-            modelBuilder.Entity("Agent.Common.Data.Entities.OrchestrationDispatch", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("DispatchedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("LastHeartbeatUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("RunId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("TaskId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("WorkerName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RunId", "TaskId");
-
-                    b.ToTable("OrchestrationDispatches");
-                });
-
-            modelBuilder.Entity("Agent.Common.Data.Entities.OrchestrationRun", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("FinishedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("OrchestrationRuns");
-                });
-
-            modelBuilder.Entity("Agent.Common.Data.Entities.OrchestrationTask", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DependsOnJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("FinishedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Prompt")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ResultMessage")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("RunId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TaskKey")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RunId", "TaskKey")
-                        .IsUnique();
-
-                    b.ToTable("OrchestrationTasks");
-                });
-
             modelBuilder.Entity("Agent.Common.Data.Entities.SessionHeartbeat", b =>
                 {
                     b.Property<long>("Id")
@@ -711,25 +610,9 @@ namespace Agent.Common.Data.Migrations
                     b.Navigation("Group");
                 });
 
-            modelBuilder.Entity("Agent.Common.Data.Entities.OrchestrationTask", b =>
-                {
-                    b.HasOne("Agent.Common.Data.Entities.OrchestrationRun", "Run")
-                        .WithMany("Tasks")
-                        .HasForeignKey("RunId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Run");
-                });
-
             modelBuilder.Entity("Agent.Common.Data.Entities.CliGroup", b =>
                 {
                     b.Navigation("Tabs");
-                });
-
-            modelBuilder.Entity("Agent.Common.Data.Entities.OrchestrationRun", b =>
-                {
-                    b.Navigation("Tasks");
                 });
 #pragma warning restore 612, 618
         }

@@ -293,6 +293,40 @@ public sealed class LocalAgentLoop : IAgentLoop
                 return await _host.OsKeyPressAsync(key, ct);
             }
 
+            // ---- Workspace files (mission W8) ---------------------------
+            // Toolbelt returns a JSON envelope directly; forward verbatim.
+
+            case "read_file":
+            {
+                var path = ReadString(call.Args, "path", "");
+                var maxBytes = ReadInt(call.Args, "max_bytes", FileToolCore.DefaultMaxReadBytes);
+                return await _host.ReadFileAsync(path, maxBytes, ct);
+            }
+
+            case "write_file":
+            {
+                var path = ReadString(call.Args, "path", "");
+                var content = ReadString(call.Args, "content", "");
+                return await _host.WriteFileAsync(path, content, ct);
+            }
+
+            case "edit_file":
+            {
+                var path = ReadString(call.Args, "path", "");
+                var oldStr = ReadString(call.Args, "old", "");
+                var newStr = ReadString(call.Args, "new", "");
+                var replaceAll = ReadBool(call.Args, "replace_all", false);
+                return await _host.EditFileAsync(path, oldStr, newStr, replaceAll, ct);
+            }
+
+            case "grep":
+            {
+                var pattern = ReadString(call.Args, "pattern", "");
+                var pathFilter = ReadString(call.Args, "path", "");
+                var maxResults = ReadInt(call.Args, "max_results", 200);
+                return await _host.GrepAsync(pattern, string.IsNullOrEmpty(pathFilter) ? null : pathFilter, maxResults, ct);
+            }
+
             default:
                 return $"{{\"error\":\"unknown tool {EscapeJsonString(call.Tool)}\"}}";
         }
