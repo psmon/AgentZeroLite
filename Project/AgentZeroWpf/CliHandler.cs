@@ -81,6 +81,8 @@ internal static class CliHandler
             "agent-hook" => AgentHook(cliArgs.Skip(1).ToArray()),
             "agent-hook-install" => AgentHookInstall(),
             "agent-hook-uninstall" => AgentHookUninstall(),
+            "trust-workspace" => TrustWorkspace(cliArgs.Skip(1).ToArray()),
+            "cost" => ShowCost(),
             "os" => OsCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             _ => PrintUnknownCommand(command),
         };
@@ -856,6 +858,68 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  trust-workspace [path]
+    //      : pre-mark a folder as trusted in each agent CLI's trust store
+    //      (Cursor / Copilot / Codex) so their "trust this folder?" prompt
+    //      won't intercept injected keystrokes (mission W2, orca-adoption).
+    //      Runs IN-PROCESS (no GUI). Explicit, consented — modifies ~/.cursor,
+    //      ~/.copilot, ~/.codex. Defaults to the current directory.
+    // =========================================================================
+    private static int TrustWorkspace(string[] args)
+    {
+        var path = args.Length > 0 && !args[0].StartsWith("--")
+            ? args[0]
+            : Directory.GetCurrentDirectory();
+
+        if (!Directory.Exists(path))
+        {
+            Console.Error.WriteLine($"Error: folder not found: {path}");
+            return 1;
+        }
+
+        var results = Agent.Common.Agents.TrustPresetWriter.MarkAllTrusted(path);
+        Console.WriteLine($"Trusting workspace: {System.IO.Path.GetFullPath(path)}");
+        int failed = 0;
+        foreach (var r in results)
+        {
+            if (r.Ok) Console.WriteLine($"  [{r.Agent}] {r.Detail}");
+            else { Console.Error.WriteLine($"  [{r.Agent}] FAILED: {r.Detail}"); failed++; }
+        }
+        return failed == 0 ? 0 : 1;
+    }
+
+    // =========================================================================
+    //  cost : estimated USD cost from recorded token usage (mission W9).
+    //      Reads the local telemetry DB in-process (no GUI) and prints a
+    //      per-model breakdown via TokenCostCalculator.
+    // =========================================================================
+    private static int ShowCost()
+    {
+        try
+        {
+            using var db = new Agent.Common.Data.AppDbContext();
+            var records = db.TokenUsageRecords.ToList();
+            if (records.Count == 0)
+            {
+                Console.WriteLine("No token usage recorded yet.");
+                return 0;
+            }
+            var total = Agent.Common.Telemetry.TokenCostCalculator.TotalUsd(records);
+            Console.WriteLine($"Estimated cost (all recorded turns): ${total:F2}  ({records.Count} turns)");
+            Console.WriteLine("By model:");
+            foreach (var (model, usd, count) in Agent.Common.Telemetry.TokenCostCalculator.ByModel(records))
+                Console.WriteLine($"  {model,-32} ${usd,10:F2}   ({count} turns)");
+            Console.WriteLine("(estimate — prices are editable defaults, not a live feed)");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    // =========================================================================
     //  bot-signal <kind> [--from name] [--to name] [--message text...]
     //      : send structured peer signal to AgentBot broker
     // =========================================================================
@@ -926,6 +990,8 @@ internal static class CliHandler
         Console.WriteLine("  agent-hook --event <name> [--state p]   Report hosted-agent state (fire-and-forget)");
         Console.WriteLine("  agent-hook-install                      Install state hooks into ~/.claude*/settings.json");
         Console.WriteLine("  agent-hook-uninstall                    Remove AgentZero hooks from ~/.claude*/settings.json");
+        Console.WriteLine("  trust-workspace [path]                  Pre-trust a folder for Cursor/Copilot/Codex CLIs");
+        Console.WriteLine("  cost                                    Estimated USD cost from recorded token usage");
         Console.WriteLine("  os <verb> [args]                        OS-control: window/screenshot/input (see 'os help')");
         Console.WriteLine("  help                                    Show detailed help");
         Console.WriteLine("  version, --version, -v                  Print CLI build identity (no GUI needed)");
