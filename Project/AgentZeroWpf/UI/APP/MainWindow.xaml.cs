@@ -344,6 +344,17 @@ public partial class MainWindow : Window
         });
         _automationScheduler.Start();
 
+        // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
+        PreviewKeyDown += (_, ke) =>
+        {
+            if (ke.Key == System.Windows.Input.Key.J
+                && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            {
+                ShowCommandPalette();
+                ke.Handled = true;
+            }
+        };
+
         // Wire up settings/CLI events BEFORE DB init so that a DB failure
         // never leaves the Settings close (X) button orphaned.
         SettingsPanel.CliDefinitionsChanged += RebuildCliContextMenu;
@@ -1019,6 +1030,30 @@ public partial class MainWindow : Window
         {
             AppLogger.Log($"[Orchestrate] run #{runId} error: {ex.Message}");
         }
+    }
+
+    /// <summary>Builds palette items (workspaces + commands) and shows the Ctrl+J palette.</summary>
+    private void ShowCommandPalette()
+    {
+        var items = new List<UI.Components.PaletteItem>();
+
+        for (int i = 0; i < _cliGroups.Count; i++)
+        {
+            int idx = i;
+            var name = _cliGroups[i].DisplayName;
+            items.Add(new UI.Components.PaletteItem(name, "Workspace", () => ActivateGroup(idx)));
+        }
+
+        void Cmd(string label, Action a) => items.Add(new UI.Components.PaletteItem(label, "Command", a));
+        Cmd("Diff Review", () => OnActivityDiffClick(this, new RoutedEventArgs()));
+        Cmd("Bot (AgentCLI)", () => OnSidebarBotClick(this, new RoutedEventArgs()));
+        Cmd("Harness View", () => OnActivityHarnessClick(this, new RoutedEventArgs()));
+        Cmd("WebDev", () => OnActivityWebDevClick(this, new RoutedEventArgs()));
+        Cmd("Scrap", () => OnActivityScrapClick(this, new RoutedEventArgs()));
+        Cmd("Note", () => OnActivityNoteClick(this, new RoutedEventArgs()));
+
+        var palette = new UI.Components.CommandPaletteWindow(this, items);
+        palette.Show();
     }
 
     // =========================================================================
