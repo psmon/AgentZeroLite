@@ -4,8 +4,8 @@
 
 > 🇰🇷 한국어 문서: [README-KR.md](README-KR.md)
 >
-> 🧩 **Extension features** (file tools · Diff Review · multi-agent CLI · worktrees ·
-> orchestration · cost): **[Extension Manual → README-EX.en.md](README-EX.en.md)** · [한국어](README-EX.md)
+> 🧩 **Extension features** (file tools · Diff Review · command palette · multi-agent CLI ·
+> worktrees · orchestration · automations · cost): **[Extension Manual → README-EX.en.md](README-EX.en.md)** · [한국어](README-EX.md)
 
 ---
 

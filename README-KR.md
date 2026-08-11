@@ -4,8 +4,8 @@
 
 > 영문 원본: [README.md](README.md)
 >
-> 🧩 **확장 기능 매뉴얼** (파일 도구 · Diff 리뷰 · 멀티 에이전트 CLI · worktree ·
-> 오케스트레이션 · 비용): **[확장 매뉴얼 → README-EX.md](README-EX.md)** · [English](README-EX.en.md)
+> 🧩 **확장 기능 매뉴얼** (파일 도구 · Diff 리뷰 · 커맨드 팔레트 · 멀티 에이전트 CLI ·
+> worktree · 오케스트레이션 · 예약 자동화 · 비용): **[확장 매뉴얼 → README-EX.md](README-EX.md)** · [English](README-EX.en.md)
 
 ---
 

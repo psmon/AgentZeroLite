@@ -7,7 +7,7 @@
 
 확장 기능은 두 갈래입니다.
 - **CLI 확장** — `AgentZeroLite.exe -cli <명령>` 으로 앱을 스크립팅
-- **GUI/봇 확장** — 화면 안에서 쓰는 신규 기능(파일 도구, Diff 리뷰)
+- **GUI/봇 확장** — 화면 안에서 쓰는 신규 기능(파일 도구, Diff 리뷰, 커맨드 팔레트 Ctrl+J)
 
 ---
 
@@ -36,6 +36,7 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 
 | 하고 싶은 것 | 봇에게 이렇게 | 내부 도구 |
 |---|---|---|
+| 파일 목록 보기 | "이 폴더에 어떤 파일 있어?" | list_files |
 | 파일 읽기 | "README.md 읽어줘" | read_file |
 | 파일 요약 | "Program.cs 요약해줘" | read_file |
 | 내용 검색 | "이 프로젝트에서 'TODO' 찾아줘" | grep |
@@ -49,7 +50,8 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 - 워크스페이스가 없으면 파일 접근이 막힙니다(기본 차단).
 
 **정확도 팁**: 파일명은 확장자까지 정확히("README.md", "README" ❌).
-잘 모르면 먼저 "이 폴더에서 'class' 찾아줘"(grep)로 위치를 파악하세요.
+봇은 이제 **`list_files`로 폴더를 훑어 정확한 파일명을 스스로 찾을 수 있습니다** —
+"어떤 파일 있는지 보고 README 요약해줘"처럼 지시하면 목록→읽기를 이어서 합니다.
 
 **동작 확인(로그)**: `logs\app-log.txt` 에
 `[AIMODE] read_file root="C:\...\현재워크스페이스" path="README.md"` 형태로 어떤
@@ -114,8 +116,8 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 
 ## 5. 에이전트 감독 실행(오케스트레이션) 🧭
 
-여러 작업을 **의존성(DAG)** 으로 묶어 관리하는 실행 단위입니다. 현재는 실행 계획을
-**저장·조회**하는 단계까지 제공합니다.
+여러 작업을 **의존성(DAG)** 으로 묶어, **코디네이터가 실행 중인 터미널 에이전트들에
+자동으로 배분·감독**하는 실행 단위입니다.
 
 ```powershell
 # 작업 정의 파일 (deps 로 의존성 지정)
@@ -124,13 +126,18 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 #     "tasks":[ {"key":"a","prompt":"코드 생성","deps":[]},
 #               {"key":"b","prompt":"테스트","deps":["a"]} ] }
 
-& $AZ -cli orchestrate create run.json    # 실행 생성 → "Created run #N"
+& $AZ -cli orchestrate create run.json    # 실행 계획 생성 → "Created run #N"
 & $AZ -cli orchestrate status N            # Task/의존성/상태 확인 (b ← [a])
+& $AZ -cli orchestrate run N               # 실행! 준비된 Task를 터미널 에이전트에 배분
 & $AZ -cli orchestrate list                # 최근 실행 목록
 ```
 
-> 각 Task를 실제 터미널 에이전트에 **자동 배분/감독**하는 실행 배선은 후속 작업입니다.
-> 지금은 위 3번(멀티 에이전트 협업)처럼 사람/에이전트가 직접 배분합니다.
+**동작 방식**: `run` 하면 실행 중인 각 터미널이 워커가 됩니다. 코디네이터는 의존성이
+충족된 Task를 워커에 보내고(터미널에 프롬프트 전송), 그 터미널이 **유휴(작업 완료)**
+가 되면 다음 Task로 전진합니다. 모든 Task가 끝나면 run 상태가 done으로 저장됩니다.
+
+> `run` 은 실행 중 GUI + 터미널 에이전트가 필요합니다. 진행은 `orchestrate status N`
+> 으로 추적하세요. (단일 위임은 3번의 멀티 에이전트 협업으로도 가능합니다.)
 
 ---
 
@@ -184,6 +191,39 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 
 ---
 
+## 9. 예약 자동화 (Automations) ⏰
+
+프롬프트를 **스케줄에 맞춰 봇에 자동 실행**시킵니다. 매일 리뷰, 주기적 요약 등에 유용합니다.
+
+```powershell
+# 30분마다 / 매시 정각 / 매일 특정 시각(UTC)
+& $AZ -cli automation create --name "daily-review" --schedule "daily 09:00" --prompt "오늘 변경사항 요약해줘"
+& $AZ -cli automation create --name "ping" --schedule "every 30m" --prompt "빌드 상태 확인해줘"
+& $AZ -cli automation list       # 등록 목록 + 다음 실행 시각
+& $AZ -cli automation due         # 지금 실행 대상 확인
+& $AZ -cli automation remove 3    # 삭제
+```
+
+- 스케줄 형식: **`every <N>m`** / **`every <N>h`** / **`hourly`** / **`daily HH:mm`**(UTC).
+- GUI가 떠 있으면 스케줄러(60초 틱)가 실행 시각이 된 자동화를 **봇 AI에 발화**하고
+  다음 실행 시각을 갱신합니다.
+
+---
+
+## 10. 커맨드 팔레트 (Ctrl+J) 🎯
+
+**Ctrl+J** 로 어디서든 워크스페이스·기능으로 **퍼지 검색 점프**합니다.
+
+1. `Ctrl+J` → 검색창이 뜹니다
+2. 일부만 입력해도 매칭됩니다 — 예: `dr` → **Diff Review**, `web` → **WebDev**,
+   워크스페이스 이름 일부 → 해당 워크스페이스로 전환
+3. `↑`/`↓` 로 이동, `Enter` 로 실행, `Esc` 로 닫기
+
+대상: 열려 있는 **워크스페이스**(전환) + 주요 **커맨드**(Diff Review / Bot / Harness /
+WebDev / Scrap / Note). 마우스로 ActivityBar를 오가지 않고 키보드로 즉시 이동합니다.
+
+---
+
 ## CLI 명령 요약
 
 | 명령 | 설명 | GUI 필요 |
@@ -191,6 +231,8 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 | `cost` | 토큰 사용 → 비용 추정 | ✕ |
 | `worktree <list\|add\|remove>` | git worktree 관리 (`add ... --trust`) | ✕ |
 | `orchestrate <list\|create\|status>` | 감독 실행 생성/조회 | ✕ |
+| `orchestrate run <id>` | 실행 — 터미널 에이전트에 배분·감독 | ○ |
+| `automation <create\|list\|remove\|due>` | 예약 자동화 (every/hourly/daily) | ✕ |
 | `help [topic]` | 가이드 서빙(agentzero/orchestrate) | ✕ |
 | `trust-workspace [경로]` | 폴더를 에이전트 CLI에 신뢰 등록 | ✕ |
 | `agent-hook-install` / `-uninstall` | 상태 훅 설치/제거 | ✕ |

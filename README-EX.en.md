@@ -7,7 +7,7 @@ features**. For the core product, see [`README.md`](README.md).
 
 Extension features come in two forms:
 - **CLI extensions** — script the app via `AgentZeroLite.exe -cli <command>`
-- **GUI / bot extensions** — new in-app features (file tools, Diff Review)
+- **GUI / bot extensions** — new in-app features (file tools, Diff Review, Ctrl+J command palette)
 
 ---
 
@@ -37,6 +37,7 @@ Put the bot in **AI mode** and it can directly read / write / edit / search file
 
 | What you want | Ask the bot | Underlying tool |
 |---|---|---|
+| List files | "what files are in this folder?" | list_files |
 | Read a file | "read README.md" | read_file |
 | Summarize a file | "summarize Program.cs" | read_file |
 | Search content | "find 'TODO' in this project" | grep |
@@ -50,7 +51,8 @@ Put the bot in **AI mode** and it can directly read / write / edit / search file
 - With no workspace bound, file access is denied (default-deny).
 
 **Accuracy tip**: give the exact filename incl. extension ("README.md", not
-"README"). If unsure, first "find 'class' in this folder" (grep) to locate it.
+"README"). The bot can now **discover exact names itself via `list_files`** —
+ask "see what files exist, then summarize the README" and it chains list → read.
 
 **Verify (log)**: `logs\app-log.txt` records which folder was targeted, e.g.
 `[AIMODE] read_file root="C:\...\your-workspace" path="README.md"`.
@@ -116,8 +118,9 @@ Agent A works on main, Agent B works in the `featB` worktree → merge later.
 
 ## 5. Supervised Runs (Orchestration) 🧭
 
-Bundle multiple tasks with **dependencies (a DAG)** into a managed run. Currently
-this provides **saving and inspecting** the plan.
+Bundle multiple tasks with **dependencies (a DAG)** into a managed run where a
+**coordinator automatically dispatches and supervises the tasks across your
+running terminal agents**.
 
 ```powershell
 # task definition file (deps declare dependencies)
@@ -126,13 +129,19 @@ this provides **saving and inspecting** the plan.
 #     "tasks":[ {"key":"a","prompt":"generate code","deps":[]},
 #               {"key":"b","prompt":"run tests","deps":["a"]} ] }
 
-& $AZ -cli orchestrate create run.json    # create a run → "Created run #N"
+& $AZ -cli orchestrate create run.json    # create a plan → "Created run #N"
 & $AZ -cli orchestrate status N            # tasks / deps / status (b ← [a])
+& $AZ -cli orchestrate run N               # run it! ready tasks go to terminal agents
 & $AZ -cli orchestrate list                # recent runs
 ```
 
-> Automatically dispatching / supervising each task on live terminal agents is a
-> follow-up. For now, dispatch manually as in section 3 (multi-agent collaboration).
+**How it works**: on `run`, each running terminal becomes a worker. The
+coordinator sends dependency-satisfied tasks to workers (types the prompt into
+the terminal), and advances to the next task once that terminal goes **idle
+(done)**. When all tasks finish, the run is saved as done.
+
+> `run` needs the GUI + live terminal agents. Track progress with
+> `orchestrate status N`. (Single delegation also works via §3 multi-agent collaboration.)
 
 ---
 
@@ -186,6 +195,41 @@ Agents/users can look up the current usage anytime (always matches the running b
 
 ---
 
+## 9. Scheduled Automations ⏰
+
+Run a prompt into the bot **on a recurring schedule** — daily reviews, periodic
+summaries, and the like.
+
+```powershell
+# every 30 minutes / top of every hour / daily at a UTC time
+& $AZ -cli automation create --name "daily-review" --schedule "daily 09:00" --prompt "summarize today's changes"
+& $AZ -cli automation create --name "ping" --schedule "every 30m" --prompt "check the build status"
+& $AZ -cli automation list       # registered automations + next run time
+& $AZ -cli automation due         # what's due right now
+& $AZ -cli automation remove 3    # delete
+```
+
+- Schedule forms: **`every <N>m`** / **`every <N>h`** / **`hourly`** / **`daily HH:mm`** (UTC).
+- While the GUI is running, the scheduler (60 s tick) fires due automations into
+  the bot AI and advances their next-run time.
+
+---
+
+## 10. Command Palette (Ctrl+J) 🎯
+
+Press **Ctrl+J** to **fuzzy-jump** to any workspace or command from anywhere.
+
+1. `Ctrl+J` → a search box appears
+2. Type a fragment — e.g. `dr` → **Diff Review**, `web` → **WebDev**, or part of
+   a workspace name to switch to it
+3. `↑`/`↓` to move, `Enter` to run, `Esc` to close
+
+Targets: open **workspaces** (switch to) + key **commands** (Diff Review / Bot /
+Harness / WebDev / Scrap / Note). Keyboard-first navigation instead of hunting the
+ActivityBar with the mouse.
+
+---
+
 ## CLI Command Summary
 
 | Command | Description | Needs GUI |
@@ -193,6 +237,8 @@ Agents/users can look up the current usage anytime (always matches the running b
 | `cost` | token usage → cost estimate | ✕ |
 | `worktree <list\|add\|remove>` | manage git worktrees (`add ... --trust`) | ✕ |
 | `orchestrate <list\|create\|status>` | create/inspect supervised runs | ✕ |
+| `orchestrate run <id>` | run — dispatch/supervise across terminal agents | ○ |
+| `automation <create\|list\|remove\|due>` | scheduled runs (every/hourly/daily) | ✕ |
 | `help [topic]` | serve guides (agentzero/orchestrate) | ✕ |
 | `trust-workspace [path]` | trust a folder for agent CLIs | ✕ |
 | `agent-hook-install` / `-uninstall` | install/remove status hooks | ✕ |
