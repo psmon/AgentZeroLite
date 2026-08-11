@@ -85,6 +85,9 @@ internal static class CliHandler
             "cost" => ShowCost(),
             "worktree" => Worktree(cliArgs.Skip(1).ToArray()),
             "terminal-wait" => TerminalWait(cliArgs.Skip(1).ToArray()),
+            "agent-state" => AgentState(),
+            "agent-resume-cmd" => AgentResumeCmd(cliArgs.Skip(1).ToArray()),
+            "agent-resume" => AgentResume(cliArgs.Skip(1).ToArray()),
             "skill-stub-install" => SkillStubInstall(),
             "skill-stub-uninstall" => SkillStubUninstall(),
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
@@ -732,18 +735,59 @@ internal static class CliHandler
     {
         if (args.Length < 2 || !int.TryParse(args[0], out int grp) || !int.TryParse(args[1], out int tab))
         {
-            Console.Error.WriteLine("Usage: terminal-wait <group> <tab> [--timeout-ms N] [--idle-ms N]");
+            Console.Error.WriteLine("Usage: terminal-wait <group> <tab> [--until <working|blocked|idle|done>] [--agent <name>] [--timeout-ms N] [--idle-ms N] [--stall-ms N]");
             return 1;
         }
-        int timeoutMs = 60000, idleMs = 1500, pollMs = 400;
-        for (int i = 2; i < args.Length - 1; i++)
+        int timeoutMs = 60000, idleMs = 1500, pollMs = 400, stallMs = 8000;
+        string? until = null, agentHint = "";
+        for (int i = 2; i < args.Length; i++)
         {
-            if (args[i].Equals("--timeout-ms", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var t)) timeoutMs = t;
-            else if (args[i].Equals("--idle-ms", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var d)) idleMs = d;
+            if (args[i].Equals("--timeout-ms", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && int.TryParse(args[i + 1], out var t)) timeoutMs = t;
+            else if (args[i].Equals("--idle-ms", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && int.TryParse(args[i + 1], out var d)) idleMs = d;
+            else if (args[i].Equals("--stall-ms", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && int.TryParse(args[i + 1], out var sm)) stallMs = sm;
+            else if (args[i].Equals("--until", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) until = args[i + 1];
+            else if (args[i].Equals("--agent", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) agentHint = args[i + 1];
         }
 
         IntPtr agentWnd = FindAgentZero();
         if (agentWnd == IntPtr.Zero) return 1;
+
+        // --until: wait for the agent to reach a lifecycle STATE (herdr H5),
+        // detected from the terminal screen via the manifest engine. Stall guard
+        // returns if the state stops changing before the target is reached.
+        if (until is not null)
+        {
+            if (!Enum.TryParse<Agent.Common.Agents.AgentActivity>(until, ignoreCase: true, out var target))
+            {
+                Console.Error.WriteLine($"Invalid --until state '{until}' (working|blocked|idle|done)");
+                return 1;
+            }
+            var manifest = Agent.Common.Agents.AgentManifestCatalog.ForAgent(agentHint);
+            var totalU = Stopwatch.StartNew();
+            var sinceChange = Stopwatch.StartNew();
+            var prev = Agent.Common.Agents.AgentActivity.Unknown;
+            while (totalU.ElapsedMilliseconds < timeoutMs)
+            {
+                var text = ReadTerminalTextRaw(agentWnd, grp, tab, 4000) ?? "";
+                var snap = new Agent.Common.Agents.ScreenSnapshot(text.Replace("\r\n", "\n").Split('\n'));
+                var res = Agent.Common.Agents.AgentStateDetector.Detect(manifest, snap);
+                var state = res.StateChanged ? res.State : prev;
+                if (state == target)
+                {
+                    Console.WriteLine($"reached {target} after {totalU.ElapsedMilliseconds}ms" + (res.MatchedRuleId is null ? "" : $" (rule {res.MatchedRuleId})"));
+                    return 0;
+                }
+                if (state != prev) { prev = state; sinceChange.Restart(); }
+                else if (sinceChange.ElapsedMilliseconds >= stallMs)
+                {
+                    Console.Error.WriteLine($"stalled: state '{state}' unchanged {stallMs}ms, target '{target}' not reached");
+                    return 3;
+                }
+                Thread.Sleep(pollMs);
+            }
+            Console.Error.WriteLine($"terminal-wait: timed out after {timeoutMs}ms waiting for {target}");
+            return 2;
+        }
 
         var total = Stopwatch.StartNew();
         var idle = Stopwatch.StartNew();
@@ -978,6 +1022,96 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  agent-resume-cmd [cwd]  (herdr H3)
+    //      : discover the latest Claude conversation for a folder and print the
+    //      command to resume it (`claude --resume <id>`). In-process. Defaults
+    //      to the current directory.
+    // =========================================================================
+    private static int AgentResumeCmd(string[] args)
+    {
+        var cwd = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : Directory.GetCurrentDirectory();
+        var cmd = Agent.Common.Agents.ClaudeSessionLocator.BuildResumeCommand(cwd);
+        if (cmd is null)
+        {
+            Console.WriteLine($"No prior Claude session found for {System.IO.Path.GetFullPath(cwd)}.");
+            return 0;
+        }
+        Console.WriteLine(cmd);
+        return 0;
+    }
+
+    // =========================================================================
+    //  agent-resume <grp> <tab>  (herdr H3)
+    //      : discover the latest Claude conversation for a tab's workspace and
+    //      print the resume command. Does NOT auto-restart the live terminal —
+    //      resuming restores the SAME conversation, so run it yourself when ready
+    //      (e.g. after the agent exits). Needs the GUI (resolves the tab's cwd).
+    // =========================================================================
+    private const string AgentResumeMmfName = "AgentZeroLite_AgentResume_Response";
+    private const int AgentResumeMmfSize = 4096;
+
+    private static int AgentResume(string[] args)
+    {
+        if (args.Length < 2 || !int.TryParse(args[0], out int g) || !int.TryParse(args[1], out int t))
+        {
+            Console.Error.WriteLine("Usage: agent-resume <group> <tab>");
+            return 1;
+        }
+        IntPtr wnd = FindAgentZero();
+        if (wnd == IntPtr.Zero) return 1;
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"agent-resume\"");
+        sb.Append($",\"group_index\":{g},\"tab_index\":{t}");
+        sb.Append('}');
+        if (!SendWpfCommand(wnd, sb.ToString())) return 1;
+        var json = TryReadMmf(AgentResumeMmfName, AgentResumeMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+        using var doc = JsonDocument.Parse(json);
+        var cmd = doc.RootElement.TryGetProperty("cmd", out var cp) ? cp.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(cmd))
+        {
+            Console.WriteLine("No prior Claude session found for this tab's workspace.");
+            return 0;
+        }
+        Console.WriteLine(cmd);
+        return 0;
+    }
+
+    // =========================================================================
+    //  agent-state  (herdr H1/H2) — detected lifecycle state per terminal + rollup
+    // =========================================================================
+    private const string AgentStateMmfName = "AgentZeroLite_AgentState_Response";
+    private const int AgentStateMmfSize = 32768;
+
+    private static int AgentState()
+    {
+        IntPtr wnd = FindAgentZero();
+        if (wnd == IntPtr.Zero) return 1;
+        if (!SendWpfCommand(wnd, "{\"command\":\"agent-state\"}")) return 1;
+        var json = TryReadMmf(AgentStateMmfName, AgentStateMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        int attention = root.TryGetProperty("attention", out var ap) ? ap.GetInt32() : 0;
+        Console.WriteLine($"Agents needing attention: {attention}");
+        if (root.TryGetProperty("tabs", out var tabs) && tabs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var t in tabs.EnumerateArray())
+            {
+                var g = t.GetProperty("group").GetInt32();
+                var tb = t.GetProperty("tab").GetInt32();
+                var title = t.GetProperty("title").GetString() ?? "";
+                var state = t.GetProperty("state").GetString() ?? "";
+                var seen = t.TryGetProperty("seen", out var sp) && sp.GetBoolean();
+                var flag = state == "blocked" || (state == "done" && !seen) ? " ←" : "";
+                Console.WriteLine($"  [{g}:{tb}] {state,-8} {(seen ? " " : "*")} {title}{flag}");
+            }
+        }
+        return 0;
+    }
+
+    // =========================================================================
     //  worktree <list|add|remove> ...  (missions W4/W7)
     //      : git worktree management in the current directory's repo. In-process.
     // =========================================================================
@@ -1161,7 +1295,9 @@ internal static class CliHandler
     // =========================================================================
     private static int AgentHookInstall()
     {
-        var results = AgentZeroWpf.Services.AgentHookInstaller.InstallAll();
+        var results = AgentZeroWpf.Services.AgentHookInstaller.InstallAll().ToList();
+        // herdr H4: also install Codex / Cursor hooks (skipped if not installed).
+        results.AddRange(AgentZeroWpf.Services.AgentHookInstaller.InstallExtraClis());
         if (results.Count == 0)
         {
             Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
@@ -1179,7 +1315,8 @@ internal static class CliHandler
 
     private static int AgentHookUninstall()
     {
-        var results = AgentZeroWpf.Services.AgentHookInstaller.UninstallAll();
+        var results = AgentZeroWpf.Services.AgentHookInstaller.UninstallAll().ToList();
+        results.AddRange(AgentZeroWpf.Services.AgentHookInstaller.UninstallExtraClis());
         if (results.Count == 0)
         {
             Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
@@ -1355,7 +1492,10 @@ internal static class CliHandler
         Console.WriteLine("  terminal-send <grp> <tab> <text>        Send text to a terminal");
         Console.WriteLine("  terminal-key  <grp> <tab> <key>         Send a control key to a terminal");
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
-        Console.WriteLine("  terminal-wait <grp> <tab> [--idle-ms N] Block until a terminal goes idle");
+        Console.WriteLine("  terminal-wait <grp> <tab> [--until S]   Block until idle, or until state S (working|blocked|idle|done)");
+        Console.WriteLine("  agent-state                             Detected agent state per terminal + attention rollup");
+        Console.WriteLine("  agent-resume-cmd [cwd]                  Print 'claude --resume <id>' for a folder's latest session");
+        Console.WriteLine("  agent-resume <grp> <tab>                Resume command for a tab's workspace (auto-resolves cwd)");
         Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
         Console.WriteLine("  orchestrate <list|create|status|run> .. Supervised multi-agent runs ('run' dispatches live)");
         Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");

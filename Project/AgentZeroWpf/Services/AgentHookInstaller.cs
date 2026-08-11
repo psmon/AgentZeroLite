@@ -172,15 +172,76 @@ public static class AgentHookInstaller
     }
 
     private static void WriteAtomic(string settingsPath, JsonObject root)
+        => WriteAtomicText(settingsPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+
+    private static void WriteAtomicText(string path, string text)
     {
-        var tmp = settingsPath + ".tmp";
-        var json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(tmp, json);
-        try { File.Move(tmp, settingsPath, overwrite: true); }
+        var tmp = path + ".tmp";
+        File.WriteAllText(tmp, text);
+        try { File.Move(tmp, path, overwrite: true); }
         catch { File.Delete(tmp); throw; }
     }
 
     private static string SelfExePath()
         => Process.GetCurrentProcess().MainModule?.FileName
            ?? Path.Combine(AppContext.BaseDirectory, "AgentZeroLite.exe");
+
+    // ── Multi-CLI hooks (herdr H4) — Codex / Cursor hooks.json ────────────────
+    private static string HomeDir => System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+
+    /// <summary>
+    /// Installs AgentZero state-reporting hooks into Codex and Cursor hook files
+    /// (only when that CLI's config dir exists). Extends the Claude-only installer
+    /// to more CLIs (herdr H4).
+    /// </summary>
+    public static IReadOnlyList<HookResult> InstallExtraClis()
+    {
+        var results = new List<HookResult>();
+        results.Add(InstallHooksJson("codex", Path.Combine(HomeDir, ".codex"), Agent.Common.Agents.AgentHookFileBuilder.CodexEvents));
+        results.Add(InstallHooksJson("cursor", Path.Combine(HomeDir, ".cursor"), Agent.Common.Agents.AgentHookFileBuilder.CursorEvents));
+        return results;
+    }
+
+    public static IReadOnlyList<HookResult> UninstallExtraClis()
+    {
+        var results = new List<HookResult>();
+        results.Add(UninstallHooksJson("codex", Path.Combine(HomeDir, ".codex")));
+        results.Add(UninstallHooksJson("cursor", Path.Combine(HomeDir, ".cursor")));
+        return results;
+    }
+
+    private static HookResult InstallHooksJson(string name, string dir, (string, string)[] events)
+    {
+        try
+        {
+            if (!Directory.Exists(dir)) return new HookResult(name, true, "skipped (CLI not installed)", null, null);
+            var path = Path.Combine(dir, "hooks.json");
+            var existing = File.Exists(path) ? File.ReadAllText(path) : "";
+            var backup = File.Exists(path) ? Backup(name, path, existing) : null;
+            var json = Agent.Common.Agents.AgentHookFileBuilder.AddHooks(existing, SelfExePath(), events);
+            WriteAtomicText(path, json);
+            AppLogger.Log($"[AgentHookInstaller] installed {name} hooks at {path}");
+            return new HookResult(name, true, "installed", backup, null);
+        }
+        catch (Exception ex)
+        {
+            return new HookResult(name, false, null, null, $"{ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private static HookResult UninstallHooksJson(string name, string dir)
+    {
+        try
+        {
+            var path = Path.Combine(dir, "hooks.json");
+            if (!File.Exists(path)) return new HookResult(name, true, "noop", null, null);
+            var (json, changed) = Agent.Common.Agents.AgentHookFileBuilder.RemoveHooks(File.ReadAllText(path));
+            if (changed) WriteAtomicText(path, json);
+            return new HookResult(name, true, changed ? "uninstalled" : "noop", null, null);
+        }
+        catch (Exception ex)
+        {
+            return new HookResult(name, false, null, null, $"{ex.GetType().Name}: {ex.Message}");
+        }
+    }
 }

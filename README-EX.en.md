@@ -7,7 +7,7 @@ features**. For the core product, see [`README.md`](README.md).
 
 Extension features come in two forms:
 - **CLI extensions** — script the app via `AgentZeroLite.exe -cli <command>`
-- **GUI / bot extensions** — new in-app features (file tools, Diff Review, Ctrl+J command palette)
+- **GUI / bot extensions** — new in-app features (file tools, Diff Review, Ctrl+J command palette, agent state detection)
 
 ---
 
@@ -153,12 +153,12 @@ them only when you want, explicitly. Uninstallers are provided.
 
 | Feature | What it does | Install | Uninstall |
 |---|---|---|---|
-| **Status hooks** | Report the agent's real state to the bot (replaces terminal scraping) | `-cli agent-hook-install` | `-cli agent-hook-uninstall` |
+| **Status hooks** | Report the agent's real state to the bot — **Claude + Codex/Cursor** (only installed CLIs) | `-cli agent-hook-install` | `-cli agent-hook-uninstall` |
 | **Folder trust** | Pre-trust a folder so the "trust this folder?" prompt won't swallow injected input | `-cli trust-workspace [path]` | delete the trust files manually |
 | **Guide stub** | Let agents learn the CLI above by themselves (`-cli help`) | `-cli skill-stub-install` | `-cli skill-stub-uninstall` |
 
 ```powershell
-& $AZ -cli agent-hook-install     # register status hooks in ~/.claude*/settings.json (backed up)
+& $AZ -cli agent-hook-install     # register status hooks in ~/.claude*/settings.json + ~/.codex, ~/.cursor (backed up)
 & $AZ -cli trust-workspace .      # trust the current folder for each agent CLI
 & $AZ -cli skill-stub-install     # inject a usage stub into the agent's skills folder
 ```
@@ -230,6 +230,46 @@ ActivityBar with the mouse.
 
 ---
 
+## 11. Agent State Detection 🚦
+
+Detects the **live state** of your hosted coding agents (Claude/Codex/…) so you can
+see at a glance **which of many agents is waiting on you**.
+
+- **SESSIONS state chip** — each session row shows a colored chip:
+  🔴 `blocked` (waiting on approval/input) · 🟡 `working` (generating) · 🔵 `done`
+  (finished but not yet seen) · ⚪ `idle`. Blocked / unseen-done are bolded.
+- **Title bar** — `AgentZero Lite ● N need attention`.
+- **Taskbar flash** — when an agent newly becomes blocked/done, the taskbar flashes
+  (only while the window is in the background).
+
+```powershell
+& $AZ -cli agent-state
+#  Agents needing attention: 1
+#    [5:0] blocked  * Claude ←     ← waiting on approval (* = unseen)
+```
+
+**How it works**: covers CLIs without hooks too. It reads the terminal screen against
+rules (manifests) to classify state. Rules are **data you can tune** — drop
+`%LOCALAPPDATA%\AgentZeroLite\agent-detection\<agent>.json` to override the built-ins
+(claude/codex/generic) without a rebuild.
+
+**Wait for a state** (for scripts/agents):
+```powershell
+& $AZ -cli terminal-wait 0 1 --until blocked --agent claude   # until it waits on approval
+& $AZ -cli terminal-wait 0 1 --until idle                     # until it finishes
+```
+
+**Restore a conversation** — find a folder's latest Claude session and print the resume command:
+```powershell
+& $AZ -cli agent-resume-cmd "C:\code\myproj"   # by folder
+& $AZ -cli agent-resume 5 0                     # auto-resolve from a tab's (group 5, tab 0) workspace
+#  claude --resume 8151ecda-83b1-450d-...
+```
+> It does **not** auto-restart a live terminal (safety). `--resume` restores the same
+> conversation, so run the command yourself when ready (e.g. after the agent exits).
+
+---
+
 ## CLI Command Summary
 
 | Command | Description | Needs GUI |
@@ -239,6 +279,10 @@ ActivityBar with the mouse.
 | `orchestrate <list\|create\|status>` | create/inspect supervised runs | ✕ |
 | `orchestrate run <id>` | run — dispatch/supervise across terminal agents | ○ |
 | `automation <create\|list\|remove\|due>` | scheduled runs (every/hourly/daily) | ✕ |
+| `agent-state` | detected state per terminal + attention rollup | ○ |
+| `terminal-wait <g> <t> --until <state>` | wait until a state (working/blocked/idle/done) | ○ |
+| `agent-resume-cmd [cwd]` | print resume command for a folder's latest Claude session | ✕ |
+| `agent-resume <g> <t>` | auto-discover a tab's workspace session → resume command | ○ |
 | `help [topic]` | serve guides (agentzero/orchestrate) | ✕ |
 | `trust-workspace [path]` | trust a folder for agent CLIs | ✕ |
 | `agent-hook-install` / `-uninstall` | install/remove status hooks | ✕ |

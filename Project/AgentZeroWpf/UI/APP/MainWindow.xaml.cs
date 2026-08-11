@@ -344,6 +344,29 @@ public partial class MainWindow : Window
         });
         _automationScheduler.Start();
 
+        // Agent-state monitor (herdr H1/H2) — detect per-terminal agent state and
+        // surface an attention count in the title bar.
+        _agentStateMonitor = new Services.AgentStateMonitor(
+            groupsProvider: () => _cliGroups,
+            activeProvider: () => _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count
+                ? (_activeGroupIndex, _cliGroups[_activeGroupIndex].ActiveTabIndex)
+                : ((int, int)?)null);
+        _agentStateMonitor.Changed += () =>
+        {
+            int attention = _agentStateMonitor?.AttentionCount() ?? 0;
+            // Flash the taskbar only when a NEW agent starts needing the user.
+            if (attention > _prevAttention)
+            {
+                try { Services.TaskbarFlasher.Flash(new WindowInteropHelper(this).Handle); }
+                catch { }
+                AppLogger.Log($"[AgentState] attention rose to {attention} — flashing taskbar");
+            }
+            _prevAttention = attention;
+            UpdateAgentAttentionTitle();
+            RefreshSessionList(); // repaint state chips when a detected state changes
+        };
+        _agentStateMonitor.Start();
+
         // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
         PreviewKeyDown += (_, ke) =>
         {
@@ -519,6 +542,20 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (command == "agent-state")
+            {
+                HandleAgentState();
+                return;
+            }
+
+            if (command == "agent-resume")
+            {
+                int g = root.TryGetProperty("group_index", out var grp) ? grp.GetInt32() : -1;
+                int t = root.TryGetProperty("tab_index", out var tp) ? tp.GetInt32() : -1;
+                HandleAgentResume(g, t);
+                return;
+            }
+
             if (command == "orchestrate-run")
             {
                 int runId = root.TryGetProperty("run_id", out var rp) ? rp.GetInt32() : 0;
@@ -616,6 +653,57 @@ public partial class MainWindow : Window
         AppLogger.Log($"[IPC] terminal-list | groups={_cliGroups.Count} tabs={totalTabs} bytes={json.Length}");
         if (inv.Length > 0)
             AppLogger.Log($"[IPC] terminal-list inventory | {inv}");
+    }
+
+    // =========================================================================
+    //  Agent resume (herdr H3) — discover a tab's latest conversation + command
+    // =========================================================================
+    private const string AgentResumeMmfName = "AgentZeroLite_AgentResume_Response";
+    private const int AgentResumeMmfSize = 4096;
+
+    private void HandleAgentResume(int g, int t)
+    {
+        string cwd = (g >= 0 && g < _cliGroups.Count) ? _cliGroups[g].DirectoryPath : "";
+        string title = (g >= 0 && g < _cliGroups.Count && t >= 0 && t < _cliGroups[g].Tabs.Count)
+            ? _cliGroups[g].Tabs[t].Title : "";
+        var cmd = Agent.Common.Agents.ClaudeSessionLocator.BuildResumeCommand(cwd) ?? "";
+        var json = $"{{\"ok\":true,\"cwd\":\"{EscapeJson(cwd)}\",\"title\":\"{EscapeJson(title)}\",\"cmd\":\"{EscapeJson(cmd)}\"}}";
+        IpcMemoryMappedResponseWriter.WriteJson(AgentResumeMmfName, AgentResumeMmfSize, json, "[IPC] agent-resume 응답 쓰기 오류");
+    }
+
+    // =========================================================================
+    //  Agent state (herdr H1/H2) — detected per-terminal lifecycle state + rollup
+    // =========================================================================
+    private const string AgentStateMmfName = "AgentZeroLite_AgentState_Response";
+    private const int AgentStateMmfSize = 32768;
+
+    /// <summary>Reflects the attention count (blocked / unseen-done agents) into the title bar.</summary>
+    private void UpdateAgentAttentionTitle()
+    {
+        int n = _agentStateMonitor?.AttentionCount() ?? 0;
+        Title = n > 0 ? $"AgentZero Lite  ● {n} need attention" : "AgentZero Lite";
+    }
+
+    private void HandleAgentState()
+    {
+        var snap = _agentStateMonitor?.Snapshot() ?? System.Array.Empty<Services.AgentStateMonitor.TabState>();
+        int attention = _agentStateMonitor?.AttentionCount() ?? 0;
+        var sb = new StringBuilder();
+        sb.Append("{\"ok\":true,\"attention\":").Append(attention).Append(",\"tabs\":[");
+        for (int i = 0; i < snap.Count; i++)
+        {
+            var s = snap[i];
+            if (i > 0) sb.Append(',');
+            sb.Append('{');
+            sb.Append($"\"group\":{s.Group},\"tab\":{s.Tab}");
+            sb.Append($",\"title\":\"{EscapeJson(s.Title)}\"");
+            sb.Append($",\"state\":\"{s.Activity.ToString().ToLowerInvariant()}\"");
+            sb.Append($",\"seen\":{(s.Seen ? "true" : "false")}");
+            sb.Append($",\"rule\":\"{EscapeJson(s.Rule ?? "")}\"");
+            sb.Append('}');
+        }
+        sb.Append("]}");
+        IpcMemoryMappedResponseWriter.WriteJson(AgentStateMmfName, AgentStateMmfSize, sb.ToString(), "[IPC] agent-state 응답 쓰기 오류");
     }
 
     // =========================================================================
@@ -1696,6 +1784,8 @@ public partial class MainWindow : Window
 
     private readonly List<CliGroupInfo> _cliGroups = [];
     private Services.AutomationScheduler? _automationScheduler;
+    private Services.AgentStateMonitor? _agentStateMonitor;
+    private int _prevAttention;
     private int _activeGroupIndex = -1;
 
     // Convenience accessors for active group
@@ -3563,6 +3653,35 @@ public partial class MainWindow : Window
     /// Clicking a row switches to the owning workspace + tab in one action, saving the
     /// user from having to navigate via DIRECTORIES first.
     /// </summary>
+    /// <summary>
+    /// Maps a detected agent state to a session-row dot brush, chip label and
+    /// tooltip (herdr H2 UI). Blocked/unseen-done are the attention colors.
+    /// </summary>
+    private (System.Windows.Media.Brush Brush, string Label, string Tip) AgentStateVisual(
+        Services.AgentStateMonitor.TabState? s, bool isActive)
+    {
+        System.Windows.Media.Brush B(byte r, byte g, byte b)
+            => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(r, g, b));
+
+        if (s is null)
+        {
+            var fallback = isActive
+                ? (System.Windows.Media.Brush)FindResource("CyberCyanBrush")
+                : (System.Windows.Media.Brush)FindResource("CyberPurpleBrush");
+            return (fallback, "", isActive ? "활성 · 실행 중" : "실행 중");
+        }
+
+        return s.Activity switch
+        {
+            Agent.Common.Agents.AgentActivity.Blocked => (B(0xE0, 0x6C, 0x75), "blocked", "차단됨 — 입력/승인 대기"),
+            Agent.Common.Agents.AgentActivity.Working => (B(0xE5, 0xC0, 0x7B), "working", "작업 중"),
+            Agent.Common.Agents.AgentActivity.Done when !s.Seen => (B(0x61, 0xAF, 0xEF), "done", "완료 — 아직 확인 안 함"),
+            Agent.Common.Agents.AgentActivity.Done => (B(0x98, 0xC3, 0x79), "done", "완료 (확인함)"),
+            Agent.Common.Agents.AgentActivity.Idle => (B(0x7F, 0x84, 0x8E), "idle", "대기 중"),
+            _ => ((System.Windows.Media.Brush)FindResource("CyberPurpleBrush"), "", "실행 중"),
+        };
+    }
+
     private void RefreshSessionList()
     {
         if (pnlSessions is null) return;
@@ -3610,17 +3729,17 @@ public partial class MainWindow : Window
                 // Line 1: live dot + icon + session title
                 var line1 = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
-                // Status badge: green dot for running, cyan for active-running
+                // Status badge: colored by DETECTED agent state (herdr H1/H2).
+                var detected = _agentStateMonitor?.Lookup(gi, ti);
+                var (dotBrush, stateLabel, stateTip) = AgentStateVisual(detected, isActive);
                 var liveDot = new System.Windows.Shapes.Ellipse
                 {
                     Width = 6,
                     Height = 6,
                     Margin = new Thickness(0, 0, 6, 0),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Fill = isActive
-                        ? (System.Windows.Media.Brush)FindResource("CyberCyanBrush")
-                        : (System.Windows.Media.Brush)FindResource("CyberPurpleBrush"),
-                    ToolTip = isActive ? "활성 · 실행 중" : "실행 중",
+                    Fill = dotBrush,
+                    ToolTip = stateTip,
                 };
                 line1.Children.Add(liveDot);
 
@@ -3648,6 +3767,24 @@ public partial class MainWindow : Window
                 };
                 line1.Children.Add(icon);
                 line1.Children.Add(title);
+
+                // Detected-state chip (herdr H2) — e.g. "blocked"/"working"/"done".
+                if (!string.IsNullOrEmpty(stateLabel))
+                {
+                    bool attention = detected is not null
+                        && (detected.Activity == Agent.Common.Agents.AgentActivity.Blocked
+                            || (detected.Activity == Agent.Common.Agents.AgentActivity.Done && !detected.Seen));
+                    line1.Children.Add(new TextBlock
+                    {
+                        Text = stateLabel,
+                        FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                        FontSize = 9,
+                        Margin = new Thickness(8, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Foreground = dotBrush,
+                        FontWeight = attention ? FontWeights.Bold : FontWeights.Normal,
+                    });
+                }
                 stack.Children.Add(line1);
 
                 // Line 2: workspace origin + last activity hint

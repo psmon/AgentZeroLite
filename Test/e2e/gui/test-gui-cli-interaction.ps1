@@ -84,6 +84,14 @@ Test-Case "terminal-send round-trip (shell tab only)" {
     Write-Host "      echoed token observed: $token"
 }
 
+Test-Case "herdr agent-state reports detected states + attention" {
+    $r = Invoke-Cli -Exe $exe -CliArgs @("agent-state") -TimeoutSec 20
+    Assert-Exit0 $r
+    Assert-Contains $r.Output "attention"
+    # Each running tab should be classified into a known lifecycle state.
+    if ($script:RunTab) { Assert-True ($r.Output -match "idle|working|blocked|done|unknown") "no state classified: $($r.Output)" }
+}
+
 Test-Case "W1 agent-hook fire-and-forget accepted" {
     $r = Invoke-Cli -Exe $exe -CliArgs @("agent-hook","--event","PreToolUse","--detail","e2e-probe","--no-wait") -TimeoutSec 15
     Assert-Exit0 $r
