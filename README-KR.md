@@ -3,6 +3,9 @@
 **AI 시대를 위한 미니멀 IDE — 여러 개의 CLI를 한 화면에서 나란히 다루세요.**
 
 > 영문 원본: [README.md](README.md)
+>
+> 🧩 **확장 기능 매뉴얼** (파일 도구 · Diff 리뷰 · 멀티 에이전트 CLI · worktree ·
+> 오케스트레이션 · 비용): **[확장 매뉴얼 → README-EX.md](README-EX.md)** · [English](README-EX.en.md)
 
 ---
 

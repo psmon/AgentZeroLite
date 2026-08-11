@@ -1,5 +1,7 @@
 # AgentZero Lite — 확장 기능 매뉴얼 (README-EX)
 
+> 🇺🇸 English: [README-EX.en.md](README-EX.en.md) · ⬅ 본 문서로 [README.md](README.md)
+
 이 문서는 최근 추가된 **확장 기능**의 사용법만 모은 실전 매뉴얼입니다.
 기존 기능은 `README`를 참고하세요.
 
