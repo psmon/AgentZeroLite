@@ -1135,7 +1135,6 @@ public partial class MainWindow : Window
         void Cmd(string label, Action a) => items.Add(new UI.Components.PaletteItem(label, "Command", a));
         Cmd("Diff Review", () => OnActivityDiffClick(this, new RoutedEventArgs()));
         Cmd("Bot (AgentCLI)", () => OnSidebarBotClick(this, new RoutedEventArgs()));
-        Cmd("Harness View", () => OnActivityHarnessClick(this, new RoutedEventArgs()));
         Cmd("WebDev", () => OnActivityWebDevClick(this, new RoutedEventArgs()));
         Cmd("Scrap", () => OnActivityScrapClick(this, new RoutedEventArgs()));
         Cmd("Note", () => OnActivityNoteClick(this, new RoutedEventArgs()));

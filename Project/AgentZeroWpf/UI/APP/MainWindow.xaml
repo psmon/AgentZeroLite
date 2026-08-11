@@ -613,13 +613,9 @@
                                         Content="&#xE70F;" ToolTip="Scrap — window spy + text capture"
                                         Click="OnActivityScrapClick"/>
 
-                                <!-- Harness View Icon (M0022-6) — WebView2 over the
-                                     published harness-view dashboard. Mint accent so it
-                                     reads as the "operator's dashboard" entry next to
-                                     the other tooling icons. -->
-                                <Button x:Name="btnActivityHarness" Style="{StaticResource ActivityBarIcon}"
-                                        Content="&#xE9D9;" ToolTip="Harness View — dashboard"
-                                        Click="OnActivityHarnessClick"/>
+                                <!-- Harness View entry removed (menu hidden). The overlay
+                                     panel + toggle handlers remain for internal use, but no
+                                     ActivityBar icon or palette command opens it. -->
 
                                 <!-- Note Icon (M0022-7) — promote NOTE from a cramped
                                      bottom-panel tab to a full-overlay so the document
