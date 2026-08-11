@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace Agent.Common.Agents;
 
@@ -29,9 +30,19 @@ public static class AgentManifestCatalog
             }) { BottomLines = 6 },
         new("blocked_proceed", AgentActivity.Blocked, 975, ScreenRegion.BottomLines,
             C("do you want to proceed?")) { BottomLines = 6 },
-        // Actively generating.
+        // Actively generating — interrupt hint, or the "✻ Gerund…" spinner with
+        // its live token counter (as opposed to the "✻ Cooked for 7s" done line).
         new("working_interrupt", AgentActivity.Working, 900, ScreenRegion.BottomLines,
-            new MatchGroup { Any = new[] { C("esc to interrupt"), C("esc to stop") } }) { BottomLines = 6 },
+            new MatchGroup
+            {
+                Any = new[]
+                {
+                    C("esc to interrupt"),
+                    C("esc to stop"),
+                    Rx(@"✻\s+\w+…"),          // spinner: "✻ Gallivanting…"
+                    Rx(@"\(\d+s\b.*tokens\)"), // live token counter while streaming
+                },
+            }) { BottomLines = 8 },
         // Empty prompt caret with no blocker markers → idle.
         new("idle_prompt", AgentActivity.Idle, 800, ScreenRegion.BottomLines,
             new MatchGroup
@@ -77,12 +88,47 @@ public static class AgentManifestCatalog
             }) { BottomLines = 6 },
     });
 
-    /// <summary>Picks a manifest by agent/tab name (substring, case-insensitive).</summary>
-    public static AgentManifest ForAgent(string? name)
+    /// <summary>
+    /// Directory scanned for JSON manifest overrides (herdr's "rules are data").
+    /// Drop <c>&lt;agentId&gt;.json</c> here to override the built-in rules without a
+    /// rebuild. Defaults to <c>%LOCALAPPDATA%\AgentZeroLite\agent-detection</c>.
+    /// </summary>
+    public static string OverrideDir { get; set; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "AgentZeroLite", "agent-detection");
+
+    private static readonly Dictionary<string, AgentManifest> _cache = new();
+
+    /// <summary>Maps an agent/tab name to its manifest id (claude/codex/generic).</summary>
+    public static string ResolveId(string? name)
     {
         var n = (name ?? "").ToLowerInvariant();
-        if (n.Contains("claude")) return Claude;
-        if (n.Contains("codex")) return Codex;
-        return Generic;
+        if (n.Contains("claude")) return "claude";
+        if (n.Contains("codex")) return "codex";
+        return "generic";
     }
+
+    private static AgentManifest BuiltIn(string id) => id switch
+    {
+        "claude" => Claude,
+        "codex" => Codex,
+        _ => Generic,
+    };
+
+    /// <summary>
+    /// Picks a manifest by agent/tab name: a JSON override in
+    /// <see cref="OverrideDir"/> wins over the built-in. Results are cached;
+    /// call <see cref="Reload"/> after editing an override.
+    /// </summary>
+    public static AgentManifest ForAgent(string? name)
+    {
+        var id = ResolveId(name);
+        if (_cache.TryGetValue(id, out var cached)) return cached;
+        var resolved = AgentManifestJson.LoadOverride(id, OverrideDir) ?? BuiltIn(id);
+        _cache[id] = resolved;
+        return resolved;
+    }
+
+    /// <summary>Clears the manifest cache so overrides are re-read.</summary>
+    public static void Reload() => _cache.Clear();
 }
