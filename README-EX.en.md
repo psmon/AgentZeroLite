@@ -153,12 +153,12 @@ them only when you want, explicitly. Uninstallers are provided.
 
 | Feature | What it does | Install | Uninstall |
 |---|---|---|---|
-| **Status hooks** | Report the agent's real state to the bot (replaces terminal scraping) | `-cli agent-hook-install` | `-cli agent-hook-uninstall` |
+| **Status hooks** | Report the agent's real state to the bot — **Claude + Codex/Cursor** (only installed CLIs) | `-cli agent-hook-install` | `-cli agent-hook-uninstall` |
 | **Folder trust** | Pre-trust a folder so the "trust this folder?" prompt won't swallow injected input | `-cli trust-workspace [path]` | delete the trust files manually |
 | **Guide stub** | Let agents learn the CLI above by themselves (`-cli help`) | `-cli skill-stub-install` | `-cli skill-stub-uninstall` |
 
 ```powershell
-& $AZ -cli agent-hook-install     # register status hooks in ~/.claude*/settings.json (backed up)
+& $AZ -cli agent-hook-install     # register status hooks in ~/.claude*/settings.json + ~/.codex, ~/.cursor (backed up)
 & $AZ -cli trust-workspace .      # trust the current folder for each agent CLI
 & $AZ -cli skill-stub-install     # inject a usage stub into the agent's skills folder
 ```
@@ -261,9 +261,12 @@ rules (manifests) to classify state. Rules are **data you can tune** — drop
 
 **Restore a conversation** — find a folder's latest Claude session and print the resume command:
 ```powershell
-& $AZ -cli agent-resume-cmd "C:\code\myproj"
+& $AZ -cli agent-resume-cmd "C:\code\myproj"   # by folder
+& $AZ -cli agent-resume 5 0                     # auto-resolve from a tab's (group 5, tab 0) workspace
 #  claude --resume 8151ecda-83b1-450d-...
 ```
+> It does **not** auto-restart a live terminal (safety). `--resume` restores the same
+> conversation, so run the command yourself when ready (e.g. after the agent exits).
 
 ---
 
@@ -279,6 +282,7 @@ rules (manifests) to classify state. Rules are **data you can tune** — drop
 | `agent-state` | detected state per terminal + attention rollup | ○ |
 | `terminal-wait <g> <t> --until <state>` | wait until a state (working/blocked/idle/done) | ○ |
 | `agent-resume-cmd [cwd]` | print resume command for a folder's latest Claude session | ✕ |
+| `agent-resume <g> <t>` | auto-discover a tab's workspace session → resume command | ○ |
 | `help [topic]` | serve guides (agentzero/orchestrate) | ✕ |
 | `trust-workspace [path]` | trust a folder for agent CLIs | ✕ |
 | `agent-hook-install` / `-uninstall` | install/remove status hooks | ✕ |

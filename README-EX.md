@@ -149,12 +149,12 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 
 | 기능 | 하는 일 | 설치 | 되돌리기 |
 |---|---|---|---|
-| **상태 훅** | 에이전트 실제 상태를 봇에 정확히 전달(터미널 스크래핑 대체) | `-cli agent-hook-install` | `-cli agent-hook-uninstall` |
+| **상태 훅** | 에이전트 실제 상태를 봇에 전달 — **Claude + Codex/Cursor**(설치된 CLI만) | `-cli agent-hook-install` | `-cli agent-hook-uninstall` |
 | **폴더 신뢰** | "이 폴더 신뢰?" 프롬프트가 자동입력을 가로채지 않게 미리 신뢰 | `-cli trust-workspace [경로]` | 신뢰 파일 수동 삭제 |
 | **가이드 스텁** | 에이전트가 위 CLI 사용법을 스스로 학습(`-cli help`로 조회) | `-cli skill-stub-install` | `-cli skill-stub-uninstall` |
 
 ```powershell
-& $AZ -cli agent-hook-install     # ~/.claude*/settings.json 에 상태 훅 등록(백업됨)
+& $AZ -cli agent-hook-install     # ~/.claude*/settings.json + ~/.codex, ~/.cursor 훅 등록(백업됨)
 & $AZ -cli trust-workspace .      # 현재 폴더를 각 에이전트 CLI에 신뢰 등록
 & $AZ -cli skill-stub-install     # 에이전트 스킬 폴더에 사용법 스텁 주입
 ```
@@ -254,9 +254,12 @@ WebDev / Scrap / Note). 마우스로 ActivityBar를 오가지 않고 키보드�
 
 **대화 복원** — 폴더의 마지막 Claude 대화를 찾아 복원 커맨드를 출력:
 ```powershell
-& $AZ -cli agent-resume-cmd "C:\code\myproj"
+& $AZ -cli agent-resume-cmd "C:\code\myproj"   # 폴더로 직접
+& $AZ -cli agent-resume 5 0                     # 탭(그룹5 탭0)의 워크스페이스에서 자동 발견
 #  claude --resume 8151ecda-83b1-450d-...
 ```
+> 실행 중 터미널을 **자동 재시작하지 않습니다**(안전). `--resume`은 같은 대화를 복원하므로,
+> 준비되면(예: 에이전트 종료 후) 위 커맨드를 직접 실행하세요.
 
 ---
 
@@ -272,6 +275,7 @@ WebDev / Scrap / Note). 마우스로 ActivityBar를 오가지 않고 키보드�
 | `agent-state` | 터미널별 감지 상태 + 주의 롤업 | ○ |
 | `terminal-wait <g> <t> --until <state>` | 특정 상태(working/blocked/idle/done)까지 대기 | ○ |
 | `agent-resume-cmd [cwd]` | 폴더의 최신 Claude 대화 resume 커맨드 출력 | ✕ |
+| `agent-resume <g> <t>` | 탭의 워크스페이스에서 세션 자동 발견 → resume 커맨드 | ○ |
 | `help [topic]` | 가이드 서빙(agentzero/orchestrate) | ✕ |
 | `trust-workspace [경로]` | 폴더를 에이전트 CLI에 신뢰 등록 | ✕ |
 | `agent-hook-install` / `-uninstall` | 상태 훅 설치/제거 | ✕ |
