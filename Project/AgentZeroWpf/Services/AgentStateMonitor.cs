@@ -24,6 +24,7 @@ public sealed class AgentStateMonitor
     private readonly Func<(int g, int t)?> _active;
     private readonly DispatcherTimer _timer;
     private readonly Dictionary<string, TabState> _states = new();
+    private string _lastSignature = "";
 
     /// <summary>Raised (on the UI thread) after each detection pass.</summary>
     public event Action? Changed;
@@ -48,6 +49,10 @@ public sealed class AgentStateMonitor
             .OrderByDescending(s => Urgency(s))
             .ThenBy(s => s.Group).ThenBy(s => s.Tab)
             .ToList();
+
+    /// <summary>Detected state for a specific (group, tab), or null if not tracked.</summary>
+    public TabState? Lookup(int group, int tab)
+        => _states.Values.FirstOrDefault(s => s.Group == group && s.Tab == tab);
 
     /// <summary>How many tabs need the user right now (blocked or unseen-done).</summary>
     public int AttentionCount()
@@ -108,7 +113,15 @@ public sealed class AgentStateMonitor
             foreach (var stale in _states.Keys.Where(k => !live.Contains(k)).ToList())
                 _states.Remove(stale);
 
-            Changed?.Invoke();
+            // Only notify when something actually changed (avoids UI churn every tick).
+            var sig = string.Join("|", _states.Values
+                .OrderBy(s => s.Group).ThenBy(s => s.Tab)
+                .Select(s => $"{s.Group}:{s.Tab}:{s.Activity}:{s.Seen}"));
+            if (sig != _lastSignature)
+            {
+                _lastSignature = sig;
+                Changed?.Invoke();
+            }
         }
         catch (Exception ex)
         {

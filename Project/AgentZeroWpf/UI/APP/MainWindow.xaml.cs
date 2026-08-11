@@ -351,7 +351,11 @@ public partial class MainWindow : Window
             activeProvider: () => _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count
                 ? (_activeGroupIndex, _cliGroups[_activeGroupIndex].ActiveTabIndex)
                 : ((int, int)?)null);
-        _agentStateMonitor.Changed += UpdateAgentAttentionTitle;
+        _agentStateMonitor.Changed += () =>
+        {
+            UpdateAgentAttentionTitle();
+            RefreshSessionList(); // repaint state chips when a detected state changes
+        };
         _agentStateMonitor.Start();
 
         // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
@@ -3615,6 +3619,35 @@ public partial class MainWindow : Window
     /// Clicking a row switches to the owning workspace + tab in one action, saving the
     /// user from having to navigate via DIRECTORIES first.
     /// </summary>
+    /// <summary>
+    /// Maps a detected agent state to a session-row dot brush, chip label and
+    /// tooltip (herdr H2 UI). Blocked/unseen-done are the attention colors.
+    /// </summary>
+    private (System.Windows.Media.Brush Brush, string Label, string Tip) AgentStateVisual(
+        Services.AgentStateMonitor.TabState? s, bool isActive)
+    {
+        System.Windows.Media.Brush B(byte r, byte g, byte b)
+            => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(r, g, b));
+
+        if (s is null)
+        {
+            var fallback = isActive
+                ? (System.Windows.Media.Brush)FindResource("CyberCyanBrush")
+                : (System.Windows.Media.Brush)FindResource("CyberPurpleBrush");
+            return (fallback, "", isActive ? "활성 · 실행 중" : "실행 중");
+        }
+
+        return s.Activity switch
+        {
+            Agent.Common.Agents.AgentActivity.Blocked => (B(0xE0, 0x6C, 0x75), "blocked", "차단됨 — 입력/승인 대기"),
+            Agent.Common.Agents.AgentActivity.Working => (B(0xE5, 0xC0, 0x7B), "working", "작업 중"),
+            Agent.Common.Agents.AgentActivity.Done when !s.Seen => (B(0x61, 0xAF, 0xEF), "done", "완료 — 아직 확인 안 함"),
+            Agent.Common.Agents.AgentActivity.Done => (B(0x98, 0xC3, 0x79), "done", "완료 (확인함)"),
+            Agent.Common.Agents.AgentActivity.Idle => (B(0x7F, 0x84, 0x8E), "idle", "대기 중"),
+            _ => ((System.Windows.Media.Brush)FindResource("CyberPurpleBrush"), "", "실행 중"),
+        };
+    }
+
     private void RefreshSessionList()
     {
         if (pnlSessions is null) return;
@@ -3662,17 +3695,17 @@ public partial class MainWindow : Window
                 // Line 1: live dot + icon + session title
                 var line1 = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
-                // Status badge: green dot for running, cyan for active-running
+                // Status badge: colored by DETECTED agent state (herdr H1/H2).
+                var detected = _agentStateMonitor?.Lookup(gi, ti);
+                var (dotBrush, stateLabel, stateTip) = AgentStateVisual(detected, isActive);
                 var liveDot = new System.Windows.Shapes.Ellipse
                 {
                     Width = 6,
                     Height = 6,
                     Margin = new Thickness(0, 0, 6, 0),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Fill = isActive
-                        ? (System.Windows.Media.Brush)FindResource("CyberCyanBrush")
-                        : (System.Windows.Media.Brush)FindResource("CyberPurpleBrush"),
-                    ToolTip = isActive ? "활성 · 실행 중" : "실행 중",
+                    Fill = dotBrush,
+                    ToolTip = stateTip,
                 };
                 line1.Children.Add(liveDot);
 
@@ -3700,6 +3733,24 @@ public partial class MainWindow : Window
                 };
                 line1.Children.Add(icon);
                 line1.Children.Add(title);
+
+                // Detected-state chip (herdr H2) — e.g. "blocked"/"working"/"done".
+                if (!string.IsNullOrEmpty(stateLabel))
+                {
+                    bool attention = detected is not null
+                        && (detected.Activity == Agent.Common.Agents.AgentActivity.Blocked
+                            || (detected.Activity == Agent.Common.Agents.AgentActivity.Done && !detected.Seen));
+                    line1.Children.Add(new TextBlock
+                    {
+                        Text = stateLabel,
+                        FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                        FontSize = 9,
+                        Margin = new Thickness(8, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Foreground = dotBrush,
+                        FontWeight = attention ? FontWeights.Bold : FontWeights.Normal,
+                    });
+                }
                 stack.Children.Add(line1);
 
                 // Line 2: workspace origin + last activity hint
