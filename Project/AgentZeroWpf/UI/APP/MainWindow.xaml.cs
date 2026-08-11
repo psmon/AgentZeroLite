@@ -336,6 +336,14 @@ public partial class MainWindow : Window
         _sessionTickTimer.Tick += (_, _) => RefreshSessionList();
         _sessionTickTimer.Start();
 
+        // Scheduled automations — fire due prompts into the bot on a timer.
+        _automationScheduler = new Services.AutomationScheduler(prompt =>
+        {
+            if (_botWindow is null) OnSidebarBotClick(this, new RoutedEventArgs());
+            _botWindow?.PostAiRequest(prompt);
+        });
+        _automationScheduler.Start();
+
         // Wire up settings/CLI events BEFORE DB init so that a DB failure
         // never leaves the Settings close (X) button orphaned.
         SettingsPanel.CliDefinitionsChanged += RebuildCliContextMenu;
@@ -1580,6 +1588,7 @@ public partial class MainWindow : Window
     // =========================================================================
 
     private readonly List<CliGroupInfo> _cliGroups = [];
+    private Services.AutomationScheduler? _automationScheduler;
     private int _activeGroupIndex = -1;
 
     // Convenience accessors for active group

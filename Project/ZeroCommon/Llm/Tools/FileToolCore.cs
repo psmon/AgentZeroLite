@@ -173,6 +173,49 @@ public static class FileToolCore
         return JsonSerializer.Serialize(new { ok = true, count = matches.Count, truncated, matches });
     }
 
+    /// <summary>
+    /// Lists files and directories under the workspace root (optionally scoped to
+    /// a <paramref name="pathFilter"/> subdirectory), so the agent can discover
+    /// exact filenames instead of guessing. Ignored/build dirs are pruned; the
+    /// listing is bounded by <paramref name="maxEntries"/>.
+    /// </summary>
+    public static string ListFiles(string? root, string? pathFilter = null, int maxEntries = 300)
+    {
+        if (string.IsNullOrEmpty(root))
+            return Envelope(false, error: "no workspace root bound");
+
+        string start;
+        if (string.IsNullOrEmpty(pathFilter))
+            start = Path.GetFullPath(root);
+        else if (!TryResolve(root, pathFilter, out start!, out var perr))
+            return Envelope(false, error: perr);
+
+        if (!Directory.Exists(start))
+            return Envelope(false, error: "directory not found");
+
+        var entries = new List<object>();
+        bool truncated = false;
+        try
+        {
+            foreach (var dir in EnumerateDirs(start))
+            {
+                if (entries.Count >= maxEntries) { truncated = true; break; }
+                entries.Add(new { path = Rel(root, dir), dir = true });
+            }
+            if (!truncated)
+                foreach (var file in EnumerateTextFiles(start))
+                {
+                    if (entries.Count >= maxEntries) { truncated = true; break; }
+                    long size = 0;
+                    try { size = new FileInfo(file).Length; } catch { }
+                    entries.Add(new { path = Rel(root, file), dir = false, bytes = size });
+                }
+        }
+        catch (Exception ex) { return Envelope(false, error: ex.Message); }
+
+        return JsonSerializer.Serialize(new { ok = true, count = entries.Count, truncated, entries });
+    }
+
     // ------------------------------------------------------------------ helpers
 
     /// <summary>
@@ -237,6 +280,25 @@ public static class FileToolCore
             catch { continue; }
             foreach (var f in files)
                 yield return f;
+        }
+    }
+
+    private static IEnumerable<string> EnumerateDirs(string start)
+    {
+        var stack = new Stack<string>();
+        if (Directory.Exists(start)) stack.Push(start);
+        while (stack.Count > 0)
+        {
+            var dir = stack.Pop();
+            string[] subDirs;
+            try { subDirs = Directory.GetDirectories(dir); }
+            catch { continue; }
+            foreach (var sub in subDirs)
+            {
+                if (IgnoredDirs.Contains(Path.GetFileName(sub))) continue;
+                stack.Push(sub);
+                yield return sub;
+            }
         }
     }
 

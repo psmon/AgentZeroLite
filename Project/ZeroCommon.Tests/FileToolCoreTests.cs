@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Agent.Common.Llm.Tools;
 
@@ -172,6 +173,41 @@ public sealed class FileToolCoreTests : IDisposable
         Assert.True(Parse(res).GetProperty("truncated").GetBoolean());
     }
 
+    // -------------------------------------------------- list_files
+
+    [Fact]
+    public void ListFiles_ListsFilesAndDirs_SkipsIgnored()
+    {
+        FileToolCore.WriteFile(_root, "src/a.cs", "x");
+        FileToolCore.WriteFile(_root, "src/b.cs", "y");
+        Directory.CreateDirectory(Path.Combine(_root, "bin"));
+        File.WriteAllText(Path.Combine(_root, "bin", "gen.cs"), "z"); // ignored dir
+
+        var res = FileToolCore.ListFiles(_root);
+        Assert.True(Ok(res));
+        var entries = Parse(res).GetProperty("entries").EnumerateArray()
+            .Select(e => e.GetProperty("path").GetString()).ToList();
+        Assert.Contains("src", entries);
+        Assert.Contains("src/a.cs", entries);
+        Assert.DoesNotContain(entries, p => p!.StartsWith("bin"));
+    }
+
+    [Fact]
+    public void ListFiles_NoRoot_IsDenied()
+    {
+        Assert.False(Ok(FileToolCore.ListFiles(null)));
+    }
+
+    [Fact]
+    public void ListFiles_RespectsMaxEntries()
+    {
+        for (int i = 0; i < 10; i++) FileToolCore.WriteFile(_root, $"f{i}.txt", "x");
+        var res = FileToolCore.ListFiles(_root, maxEntries: 3);
+        Assert.True(Ok(res));
+        Assert.Equal(3, Parse(res).GetProperty("count").GetInt32());
+        Assert.True(Parse(res).GetProperty("truncated").GetBoolean());
+    }
+
     // -------------------------------------------------- grammar lockstep guard
 
     [Theory]
@@ -179,6 +215,7 @@ public sealed class FileToolCoreTests : IDisposable
     [InlineData("write_file")]
     [InlineData("edit_file")]
     [InlineData("grep")]
+    [InlineData("list_files")]
     public void FileTools_AreRegistered_InGrammarAndCatalog(string tool)
     {
         // The tool name must appear in all three lockstep locations, else the

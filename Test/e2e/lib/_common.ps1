@@ -42,10 +42,14 @@ function Invoke-Cli {
         [int]$TimeoutSec = 30
     )
     $all = @("-cli") + $CliArgs
+    # Start-Process does NOT auto-quote array elements containing spaces, so
+    # build a single properly-quoted command line ourselves (else e.g.
+    # "every 30m" splits into two tokens).
+    $argString = ($all | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
     $outFile = [System.IO.Path]::GetTempFileName()
     $errFile = [System.IO.Path]::GetTempFileName()
     try {
-        $p = Start-Process -FilePath $Exe -ArgumentList $all -PassThru `
+        $p = Start-Process -FilePath $Exe -ArgumentList $argString -PassThru `
                 -RedirectStandardOutput $outFile -RedirectStandardError $errFile
         if (-not $p.WaitForExit($TimeoutSec * 1000)) {
             try { $p.Kill() } catch {}

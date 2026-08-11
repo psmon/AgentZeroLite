@@ -376,4 +376,12 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
         AppLogger.Log($"[AIMODE] grep root=\"{root ?? "<none>"}\" pattern=\"{pattern}\" path=\"{pathFilter}\"");
         return Task.FromResult(result);
     }
+
+    public Task<string> ListFilesAsync(string? pathFilter, int maxEntries, CancellationToken ct)
+    {
+        var root = Root();
+        var result = FileToolCore.ListFiles(root, pathFilter, maxEntries);
+        AppLogger.Log($"[AIMODE] list_files root=\"{root ?? "<none>"}\" path=\"{pathFilter}\"");
+        return Task.FromResult(result);
+    }
 }

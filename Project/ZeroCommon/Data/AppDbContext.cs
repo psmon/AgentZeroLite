@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<OrchestrationRun> OrchestrationRuns => Set<OrchestrationRun>();
     public DbSet<OrchestrationTask> OrchestrationTasks => Set<OrchestrationTask>();
     public DbSet<OrchestrationDispatch> OrchestrationDispatches => Set<OrchestrationDispatch>();
+    public DbSet<Automation> Automations => Set<Automation>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -107,6 +108,10 @@ public class AppDbContext : DbContext
             .IsUnique();
         mb.Entity<OrchestrationDispatch>()
             .HasIndex(d => new { d.RunId, d.TaskId });
+
+        // Automation (scheduled runs) — enabled+next-run scan is the hot path.
+        mb.Entity<Automation>()
+            .HasIndex(a => new { a.Enabled, a.NextRunUtc });
     }
 
     public static void InitializeDatabase()

@@ -327,6 +327,13 @@ public sealed class LocalAgentLoop : IAgentLoop
                 return await _host.GrepAsync(pattern, string.IsNullOrEmpty(pathFilter) ? null : pathFilter, maxResults, ct);
             }
 
+            case "list_files":
+            {
+                var pathFilter = ReadString(call.Args, "path", "");
+                var maxEntries = ReadInt(call.Args, "max_entries", 300);
+                return await _host.ListFilesAsync(string.IsNullOrEmpty(pathFilter) ? null : pathFilter, maxEntries, ct);
+            }
+
             default:
                 return $"{{\"error\":\"unknown tool {EscapeJsonString(call.Tool)}\"}}";
         }

@@ -86,5 +86,29 @@ Test-Case "W6 orchestrate list includes the run" {
     Assert-Contains $r.Output "e2e-test-run"
 }
 
+# ── Automations: create → list → remove (local DB only) ──────────────────────
+$script:AutoId = $null
+Test-Case "Automation create computes next run" {
+    $r = Invoke-Cli -Exe $exe -CliArgs @("automation","create","--name","e2e-auto","--schedule","every 30m","--prompt","ping")
+    Assert-Exit0 $r
+    Assert-Contains $r.Output "Created automation #"
+    Assert-Contains $r.Output "next run"
+    if ($r.Output -match "automation #(\d+)") { $script:AutoId = [int]$Matches[1] }
+    Assert-True ($null -ne $script:AutoId) "could not parse automation id"
+}
+Test-Case "Automation invalid schedule rejected" {
+    $r = Invoke-Cli -Exe $exe -CliArgs @("automation","create","--schedule","nonsense","--prompt","x")
+    Assert-True ($r.ExitCode -ne 0) "expected non-zero for bad schedule"
+    Assert-Contains $r.Output "Invalid schedule"
+}
+Test-Case "Automation list then remove" {
+    $r = Invoke-Cli -Exe $exe -CliArgs @("automation","list")
+    Assert-Exit0 $r
+    Assert-Contains $r.Output "e2e-auto"
+    $rm = Invoke-Cli -Exe $exe -CliArgs @("automation","remove","$script:AutoId")
+    Assert-Exit0 $rm
+    Assert-Contains $rm.Output "Removed automation"
+}
+
 $fail = Write-Summary -Suite "Tier 1 (CLI in-process)" -RunDir $runDir
 exit $fail

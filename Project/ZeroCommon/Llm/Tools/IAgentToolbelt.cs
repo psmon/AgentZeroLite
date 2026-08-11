@@ -90,6 +90,10 @@ public interface IAgentToolbelt
     /// <summary>Regex search across text files under the workspace root. Returns JSON envelope.</summary>
     Task<string> GrepAsync(string pattern, string? pathFilter, int maxResults, CancellationToken ct)
         => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
+
+    /// <summary>List files/dirs under the workspace root so the agent can find exact names. JSON envelope.</summary>
+    Task<string> ListFilesAsync(string? pathFilter, int maxEntries, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
 }
 
 /// <summary>

@@ -88,6 +88,7 @@ internal static class CliHandler
             "skill-stub-install" => SkillStubInstall(),
             "skill-stub-uninstall" => SkillStubUninstall(),
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
+            "automation" => Automation(cliArgs.Skip(1).ToArray()),
             "os" => OsCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             _ => PrintUnknownCommand(command),
         };
@@ -843,6 +844,97 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  automation <create|list|remove|due> ...
+    //      : scheduled agent runs. create computes the next fire time; the GUI
+    //      scheduler dispatches due automations to the bot. In-process DB.
+    //      create --name X --schedule "every 30m|hourly|daily HH:mm" --prompt "..." [--workspace path]
+    // =========================================================================
+    private static int Automation(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.Error.WriteLine("Usage: automation <create|list|remove <id>|due>");
+            Console.Error.WriteLine("  create --name X --schedule \"every 30m|hourly|daily HH:mm\" --prompt \"...\" [--workspace path]");
+            return 1;
+        }
+        try
+        {
+            EnsureDbReady();
+            using var db = new Agent.Common.Data.AppDbContext();
+            var sub = args[0].ToLowerInvariant();
+            switch (sub)
+            {
+                case "list":
+                {
+                    var all = db.Automations.OrderBy(a => a.Id).ToList();
+                    if (all.Count == 0) { Console.WriteLine("No automations."); return 0; }
+                    foreach (var a in all)
+                        Console.WriteLine($"  #{a.Id,-3} {(a.Enabled ? "on " : "off")} [{a.Schedule,-14}] next={a.NextRunUtc:u}  {a.Name}");
+                    return 0;
+                }
+                case "due":
+                {
+                    var nowUtc = DateTime.UtcNow;
+                    var due = db.Automations.Where(a => a.Enabled && a.NextRunUtc != null && a.NextRunUtc <= nowUtc).ToList();
+                    Console.WriteLine(due.Count == 0 ? "Nothing due." : $"{due.Count} due now:");
+                    foreach (var a in due) Console.WriteLine($"  #{a.Id} {a.Name}");
+                    return 0;
+                }
+                case "remove":
+                {
+                    if (args.Length < 2 || !int.TryParse(args[1], out var id)) { Console.Error.WriteLine("Usage: automation remove <id>"); return 1; }
+                    var a = db.Automations.Find(id);
+                    if (a is null) { Console.Error.WriteLine($"#{id} not found."); return 1; }
+                    db.Automations.Remove(a); db.SaveChanges();
+                    Console.WriteLine($"Removed automation #{id}.");
+                    return 0;
+                }
+                case "create":
+                {
+                    string name = "", schedule = "", prompt = "", workspace = "";
+                    for (int i = 1; i < args.Length; i++)
+                    {
+                        switch (args[i].ToLowerInvariant())
+                        {
+                            case "--name" when i + 1 < args.Length: name = args[++i]; break;
+                            case "--schedule" when i + 1 < args.Length: schedule = args[++i]; break;
+                            case "--prompt" when i + 1 < args.Length: prompt = args[++i]; break;
+                            case "--workspace" when i + 1 < args.Length: workspace = args[++i]; break;
+                        }
+                    }
+                    if (string.IsNullOrWhiteSpace(schedule) || string.IsNullOrWhiteSpace(prompt))
+                    {
+                        Console.Error.WriteLine("create requires --schedule and --prompt");
+                        return 1;
+                    }
+                    if (!Agent.Common.Automations.AutomationSchedule.TryComputeNext(schedule, DateTime.UtcNow, out var next, out var err))
+                    {
+                        Console.Error.WriteLine($"Invalid schedule: {err}");
+                        return 1;
+                    }
+                    var auto = new Agent.Common.Data.Entities.Automation
+                    {
+                        Name = string.IsNullOrWhiteSpace(name) ? "automation" : name,
+                        Schedule = schedule, Prompt = prompt, WorkspacePath = workspace,
+                        Enabled = true, NextRunUtc = next, CreatedAtUtc = DateTime.UtcNow,
+                    };
+                    db.Automations.Add(auto); db.SaveChanges();
+                    Console.WriteLine($"Created automation #{auto.Id} '{auto.Name}' — next run {next:u}");
+                    return 0;
+                }
+                default:
+                    Console.Error.WriteLine($"Unknown automation subcommand: {sub}");
+                    return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    // =========================================================================
     //  skill-stub-install / skill-stub-uninstall  (mission W5)
     //      : write the anti-drift AgentZero skill STUB into each ~/.claude*
     //      skills folder. Explicit/consented; the full guide stays served by
@@ -1248,6 +1340,7 @@ internal static class CliHandler
         Console.WriteLine("  terminal-wait <grp> <tab> [--idle-ms N] Block until a terminal goes idle");
         Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
         Console.WriteLine("  orchestrate <list|create|status> ...    Supervised multi-agent runs (durable)");
+        Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");
         Console.WriteLine("  skill-stub-install                      Inject anti-drift AgentZero skill stub");
         Console.WriteLine("  bot-chat <message> [--from name]        Display external chat in AgentBot");
         Console.WriteLine("  agent-hook --event <name> [--state p]   Report hosted-agent state (fire-and-forget)");
