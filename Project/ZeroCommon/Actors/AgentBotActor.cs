@@ -162,6 +162,21 @@ public sealed class AgentBotActor : ReceiveActor
 
         Receive<CancelAgentLoop>(_ => _agentLoop?.Tell(new CancelAgentLoop()));
 
+        // ── Agent hooks (mission W1) ──
+        // A hosted agent CLI (e.g. Claude Code) reports its real state via
+        // `-cli agent-hook`, routed here by MainWindow. The Bot is the single UI
+        // gateway that owns the progress callback, and the hosted CLI runs in a
+        // terminal independent of any on-device loop — so resolve the phase here
+        // and drive the SAME progress path the internal FSM uses, replacing
+        // terminal-output scraping as the state source.
+        Receive<AgentHookEvent>(evt =>
+        {
+            var (phase, text) = AgentHookMapper.Resolve(evt);
+            _log.Info("[Bot] agent-hook event={0} session={1} → phase={2}",
+                evt.HookEvent, evt.Session, phase);
+            _agentLoopOnProgress?.Invoke(new AgentLoopProgress(phase, text, 0));
+        });
+
         // ── Delegation mode toggle (M0017) ──
         Receive<SetDelegationMode>(msg =>
         {

@@ -31,10 +31,14 @@ namespace AgentZeroWpf.Services;
 public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
 {
     private readonly System.Func<IReadOnlyList<CliGroupInfo>> _groupsProvider;
+    private readonly System.Func<string?>? _workspaceRootProvider;
 
-    public WorkspaceTerminalToolHost(System.Func<IReadOnlyList<CliGroupInfo>> groupsProvider)
+    public WorkspaceTerminalToolHost(
+        System.Func<IReadOnlyList<CliGroupInfo>> groupsProvider,
+        System.Func<string?>? workspaceRootProvider = null)
     {
         _groupsProvider = groupsProvider;
+        _workspaceRootProvider = workspaceRootProvider;
     }
 
     public Task<string> ListTerminalsAsync(CancellationToken ct)
@@ -330,5 +334,54 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
     {
         bool gateOk = OsApprovalGate.IsInputAllowedByEnv();
         return Task.FromResult(OsControlService.KeyPress(keySpec, gateOk, OsAuditLog.Caller.Llm));
+    }
+
+    // ====================== File surface (mission W8, orca-adoption) =========
+    // Delegates to the pure, headlessly-tested FileToolCore, sandboxed to the
+    // active workspace root. A null root (no workspace bound) makes FileToolCore
+    // return a default-deny envelope — the model cannot touch the disk until a
+    // workspace folder is active. Writes/edits are additionally confined to the
+    // root; escaping paths are rejected inside FileToolCore.
+
+    private string? Root() => _workspaceRootProvider?.Invoke();
+
+    public Task<string> ReadFileAsync(string path, int maxBytes, CancellationToken ct)
+    {
+        var root = Root();
+        var result = FileToolCore.ReadFile(root, path, maxBytes);
+        AppLogger.Log($"[AIMODE] read_file root=\"{root ?? "<none>"}\" path=\"{path}\"");
+        return Task.FromResult(result);
+    }
+
+    public Task<string> WriteFileAsync(string path, string content, CancellationToken ct)
+    {
+        var root = Root();
+        var result = FileToolCore.WriteFile(root, path, content);
+        AppLogger.Log($"[AIMODE] write_file root=\"{root ?? "<none>"}\" path=\"{path}\" len={content.Length}");
+        return Task.FromResult(result);
+    }
+
+    public Task<string> EditFileAsync(string path, string oldString, string newString, bool replaceAll, CancellationToken ct)
+    {
+        var root = Root();
+        var result = FileToolCore.Edit(root, path, oldString, newString, replaceAll);
+        AppLogger.Log($"[AIMODE] edit_file root=\"{root ?? "<none>"}\" path=\"{path}\" replace_all={replaceAll}");
+        return Task.FromResult(result);
+    }
+
+    public Task<string> GrepAsync(string pattern, string? pathFilter, int maxResults, CancellationToken ct)
+    {
+        var root = Root();
+        var result = FileToolCore.Grep(root, pattern, pathFilter, maxResults);
+        AppLogger.Log($"[AIMODE] grep root=\"{root ?? "<none>"}\" pattern=\"{pattern}\" path=\"{pathFilter}\"");
+        return Task.FromResult(result);
+    }
+
+    public Task<string> ListFilesAsync(string? pathFilter, int maxEntries, CancellationToken ct)
+    {
+        var root = Root();
+        var result = FileToolCore.ListFiles(root, pathFilter, maxEntries);
+        AppLogger.Log($"[AIMODE] list_files root=\"{root ?? "<none>"}\" path=\"{pathFilter}\"");
+        return Task.FromResult(result);
     }
 }

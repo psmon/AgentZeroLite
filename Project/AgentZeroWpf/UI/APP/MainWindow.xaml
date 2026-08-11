@@ -629,6 +629,12 @@
                                         Content="&#xE70B;" ToolTip="Note — markdown / files / clipboard"
                                         Click="OnActivityNoteClick"/>
 
+                                <!-- Diff Review Icon (W3, orca-adoption) — WebView2 diff
+                                     viewer with inline comments shipped back to the agent. -->
+                                <Button x:Name="btnActivityDiff" Style="{StaticResource ActivityBarIcon}"
+                                        Content="&#xE7A7;" ToolTip="Diff Review — comment &amp; ship to agent"
+                                        Click="OnActivityDiffClick"/>
+
                             </StackPanel>
                         </DockPanel>
                     </Border>
@@ -919,6 +925,14 @@
                                                  Grid.Column="1" Grid.ColumnSpan="3"
                                                  Grid.Row="0" Grid.RowSpan="3"
                                                  Visibility="Collapsed"/>
+
+                    <!-- ===== Diff Review Page (full overlay) — W3, orca-adoption =====
+                         WebView2 git-diff viewer with inline comments shipped to
+                         the agent. Same overlay pattern; toggled from OnActivityDiffClick. -->
+                    <components:DiffReviewPanel x:Name="DiffReviewPage"
+                                                Grid.Column="1" Grid.ColumnSpan="3"
+                                                Grid.Row="0" Grid.RowSpan="3"
+                                                Visibility="Collapsed"/>
 
                     <!-- ===== Note Page (full overlay) — M0022-7 =====
                          Hosts the reparented NoteWindow Grid (file tree +

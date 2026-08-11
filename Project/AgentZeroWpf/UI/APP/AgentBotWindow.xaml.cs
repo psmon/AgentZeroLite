@@ -1044,6 +1044,17 @@ public partial class AgentBotWindow : Window
     }
 
     /// <summary>
+    /// Programmatically submits a request through the AI tool loop (W3 diff-review
+    /// ship path). Reuses <see cref="SendThroughAiToolLoopAsync"/> so the loop
+    /// bindings/callbacks are wired exactly as for typed input.
+    /// </summary>
+    public void PostAiRequest(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        _ = SendThroughAiToolLoopAsync(text, text);
+    }
+
+    /// <summary>
     /// AI mode entry — Tell-based send through AgentBotActor → AgentLoopActor.
     /// Inference no longer runs on the UI task; this method just (a) handles
     /// lazy-load + readiness checks, (b) renders the user bubble, and
@@ -1218,8 +1229,26 @@ public partial class AgentBotWindow : Window
             OnResult: r => Dispatcher.BeginInvoke(new Action(() => HandleAgentLoopResult(r)))));
 
         var getGroups = _getGroups;
+        var getActiveDir = _getActiveDirectory;
+        // Workspace root for the file tools (W8): the ACTIVE workspace folder
+        // (the group the user is currently in) — NOT the first group. File ops
+        // are sandboxed to this root; null ⇒ the model is denied disk access
+        // (FileToolCore default-deny). Falls back to the first real folder only
+        // when no active directory is resolvable.
+        System.Func<string?> getWorkspaceRoot = () =>
+        {
+            var active = getActiveDir?.Invoke();
+            if (!string.IsNullOrWhiteSpace(active) && System.IO.Directory.Exists(active))
+                return active;
+            var groups = getGroups?.Invoke();
+            if (groups is null) return null;
+            foreach (var g in groups)
+                if (!string.IsNullOrWhiteSpace(g.DirectoryPath) && System.IO.Directory.Exists(g.DirectoryPath))
+                    return g.DirectoryPath;
+            return null;
+        };
         _botActorRef.Tell(new Agent.Common.Actors.AgentLoopBindings(
-            ToolbeltFactory: () => new WorkspaceTerminalToolHost(getGroups),
+            ToolbeltFactory: () => new WorkspaceTerminalToolHost(getGroups, getWorkspaceRoot),
             OptionsFactory: () =>
             {
                 // Options are read from whichever backend is the source of

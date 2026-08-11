@@ -336,6 +336,25 @@ public partial class MainWindow : Window
         _sessionTickTimer.Tick += (_, _) => RefreshSessionList();
         _sessionTickTimer.Start();
 
+        // Scheduled automations — fire due prompts into the bot on a timer.
+        _automationScheduler = new Services.AutomationScheduler(prompt =>
+        {
+            if (_botWindow is null) OnSidebarBotClick(this, new RoutedEventArgs());
+            _botWindow?.PostAiRequest(prompt);
+        });
+        _automationScheduler.Start();
+
+        // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
+        PreviewKeyDown += (_, ke) =>
+        {
+            if (ke.Key == System.Windows.Input.Key.J
+                && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            {
+                ShowCommandPalette();
+                ke.Handled = true;
+            }
+        };
+
         // Wire up settings/CLI events BEFORE DB init so that a DB failure
         // never leaves the Settings close (X) button orphaned.
         SettingsPanel.CliDefinitionsChanged += RebuildCliContextMenu;
@@ -497,6 +516,23 @@ public partial class MainWindow : Window
                 string from = root.TryGetProperty("from", out var fp) ? fp.GetString() ?? "CLI" : "CLI";
                 string message = root.GetProperty("message").GetString() ?? "";
                 HandleBotChat(from, message);
+                return;
+            }
+
+            if (command == "orchestrate-run")
+            {
+                int runId = root.TryGetProperty("run_id", out var rp) ? rp.GetInt32() : 0;
+                HandleOrchestrateRun(runId);
+                return;
+            }
+
+            if (command == "agent-hook")
+            {
+                string evt = root.TryGetProperty("event", out var ep) ? ep.GetString() ?? "" : "";
+                string state = root.TryGetProperty("state", out var sp) ? sp.GetString() ?? "" : "";
+                string session = root.TryGetProperty("session", out var ssp) ? ssp.GetString() ?? "" : "";
+                string detail = root.TryGetProperty("detail", out var dp) ? dp.GetString() ?? "" : "";
+                HandleAgentHook(evt, state, session, detail);
                 return;
             }
 
@@ -904,6 +940,120 @@ public partial class MainWindow : Window
         }
 
         IpcMemoryMappedResponseWriter.WriteJson(BotChatMmfName, BotChatMmfSize, resultJson, "[IPC] bot-chat 응답 쓰기 오류");
+    }
+
+    /// <summary>
+    /// Routes a hosted-agent hook report (mission W1) into the actor system.
+    /// Fire-and-forget: no MMF response is written because the CLI side never
+    /// waits. The AgentBotActor resolves the phase and drives the AI-mode
+    /// progress UI, replacing terminal-output scraping as the state source.
+    /// </summary>
+    private void HandleAgentHook(string evt, string state, string session, string detail)
+    {
+        try
+        {
+            Actors.ActorSystemManager.System
+                .ActorSelection("/user/stage/bot")
+                .Tell(new Agent.Common.Actors.AgentHookEvent(
+                    HookEvent: evt,
+                    StateOverride: string.IsNullOrWhiteSpace(state) ? null : state,
+                    Session: session,
+                    Detail: detail));
+            AppLogger.Log($"[IPC] agent-hook event={evt} state={state} session={session}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[IPC] agent-hook 라우팅 오류: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Executes a persisted orchestration run against the live terminal agents
+    /// (W6 activation). Builds one WorkerSinkActor per running terminal, a router
+    /// over them, and a coordinator that drives the task DAG. Runs asynchronously;
+    /// track progress via `-cli orchestrate status`.
+    /// </summary>
+    private void HandleOrchestrateRun(int runId)
+    {
+        try
+        {
+            using var db = new Agent.Common.Data.AppDbContext();
+            var run = db.OrchestrationRuns.FirstOrDefault(r => r.Id == runId);
+            if (run is null) { AppLogger.Log($"[Orchestrate] run #{runId} not found"); return; }
+            var specs = Agent.Common.Orchestration.OrchestrationStore.LoadSpecs(db, runId);
+            if (specs.Count == 0) { AppLogger.Log($"[Orchestrate] run #{runId} has no tasks"); return; }
+
+            // Collect running terminals to use as workers.
+            var targets = new List<(int g, int t)>();
+            for (int gi = 0; gi < _cliGroups.Count; gi++)
+                for (int ti = 0; ti < _cliGroups[gi].Tabs.Count; ti++)
+                    if (_cliGroups[gi].Tabs[ti].IsTerminalStarted)
+                        targets.Add((gi, ti));
+
+            if (targets.Count == 0) { AppLogger.Log("[Orchestrate] no running terminals to use as workers"); return; }
+
+            var system = Actors.ActorSystemManager.System;
+            var toolbelt = new Services.WorkspaceTerminalToolHost(() => _cliGroups, GetActiveWorkspaceRoot);
+
+            var sinks = targets.Select((tg, i) =>
+                system.ActorOf(Akka.Actor.Props.Create(() =>
+                    new Agent.Common.Actors.WorkerSinkActor(toolbelt, tg.g, tg.t, null)),
+                    $"orch-sink-{runId}-{i}")).ToList();
+            var router = system.ActorOf(Agent.Common.Actors.WorkerRouterActor.Props(sinks), $"orch-router-{runId}");
+            var coord = system.ActorOf(Akka.Actor.Props.Create(() =>
+                new Agent.Common.Actors.CoordinatorActor(router)), $"orch-coord-{runId}");
+
+            AppLogger.Log($"[Orchestrate] run #{runId} started: {specs.Count} tasks, {sinks.Count} workers");
+
+            coord.Ask<Agent.Common.Actors.OrchestrationRunCompleted>(
+                    new Agent.Common.Actors.StartOrchestrationRun(run.Name, specs),
+                    TimeSpan.FromMinutes(30))
+                .ContinueWith(t =>
+                {
+                    try
+                    {
+                        using var db2 = new Agent.Common.Data.AppDbContext();
+                        bool ok = t.IsCompletedSuccessfully && t.Result.Success;
+                        Agent.Common.Orchestration.OrchestrationStore.FinishRun(db2, runId, ok);
+                        AppLogger.Log($"[Orchestrate] run #{runId} finished: success={ok}");
+                    }
+                    catch (Exception ex) { AppLogger.Log($"[Orchestrate] finish #{runId} failed: {ex.Message}"); }
+                    finally
+                    {
+                        foreach (var s in sinks) system.Stop(s);
+                        system.Stop(router);
+                        system.Stop(coord);
+                    }
+                });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Orchestrate] run #{runId} error: {ex.Message}");
+        }
+    }
+
+    /// <summary>Builds palette items (workspaces + commands) and shows the Ctrl+J palette.</summary>
+    private void ShowCommandPalette()
+    {
+        var items = new List<UI.Components.PaletteItem>();
+
+        for (int i = 0; i < _cliGroups.Count; i++)
+        {
+            int idx = i;
+            var name = _cliGroups[i].DisplayName;
+            items.Add(new UI.Components.PaletteItem(name, "Workspace", () => ActivateGroup(idx)));
+        }
+
+        void Cmd(string label, Action a) => items.Add(new UI.Components.PaletteItem(label, "Command", a));
+        Cmd("Diff Review", () => OnActivityDiffClick(this, new RoutedEventArgs()));
+        Cmd("Bot (AgentCLI)", () => OnSidebarBotClick(this, new RoutedEventArgs()));
+        Cmd("Harness View", () => OnActivityHarnessClick(this, new RoutedEventArgs()));
+        Cmd("WebDev", () => OnActivityWebDevClick(this, new RoutedEventArgs()));
+        Cmd("Scrap", () => OnActivityScrapClick(this, new RoutedEventArgs()));
+        Cmd("Note", () => OnActivityNoteClick(this, new RoutedEventArgs()));
+
+        var palette = new UI.Components.CommandPaletteWindow(this, items);
+        palette.Show();
     }
 
     // =========================================================================
@@ -1491,6 +1641,9 @@ public partial class MainWindow : Window
         DumpDockLayout("settings-open-before");
         CloseWebDev();
         CloseScrap();
+        CloseHarnessView();
+        CloseNote();
+        CloseDiffReview();
         EnterOverlayMode();
         SettingsPanel.Visibility = Visibility.Visible;
         DumpDockLayout("settings-open-after");
@@ -1542,6 +1695,7 @@ public partial class MainWindow : Window
     // =========================================================================
 
     private readonly List<CliGroupInfo> _cliGroups = [];
+    private Services.AutomationScheduler? _automationScheduler;
     private int _activeGroupIndex = -1;
 
     // Convenience accessors for active group
@@ -1849,6 +2003,7 @@ public partial class MainWindow : Window
         CloseSettings();
         CloseScrap();
         CloseHarnessView();
+        CloseDiffReview();
         EnterOverlayMode();
         NotePage.Visibility = Visibility.Visible;
     }
@@ -3076,6 +3231,7 @@ public partial class MainWindow : Window
         CloseSettings();
         CloseHarnessView();
         CloseNote();
+        CloseDiffReview();
         OnSidebarBotClick(sender, e);
     }
 
@@ -3105,6 +3261,8 @@ public partial class MainWindow : Window
         CloseWebDev();
         CloseSettings();
         CloseHarnessView();
+        CloseNote();
+        CloseDiffReview();
         EnterOverlayMode();
         ScrapPage.Visibility = Visibility.Visible;
     }
@@ -3134,8 +3292,90 @@ public partial class MainWindow : Window
         if (WebDevPage.Visibility != Visibility.Visible &&
             SettingsPanel.Visibility != Visibility.Visible &&
             ScrapPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible)
+            NotePage.Visibility != Visibility.Visible &&
+            DiffReviewPage.Visibility != Visibility.Visible)
             ExitOverlayMode();
+    }
+
+    // ====================================================================
+    //  W3 (orca-adoption) — Diff Review overlay toggle. Renders the active
+    //  workspace's git diff; comments ship back to the agent via StartAgentLoop.
+    // ====================================================================
+
+    private void OnActivityDiffClick(object sender, RoutedEventArgs e)
+    {
+        if (DiffReviewPage.Visibility == Visibility.Visible)
+        {
+            CloseDiffReview();
+            return;
+        }
+        CloseWebDev();
+        CloseSettings();
+        CloseScrap();
+        CloseHarnessView();
+        ConfigureDiffReviewPanel();
+        EnterOverlayMode();
+        DiffReviewPage.Visibility = Visibility.Visible;
+    }
+
+    private void CloseDiffReview()
+    {
+        if (DiffReviewPage.Visibility != Visibility.Visible) return;
+        DiffReviewPage.Visibility = Visibility.Collapsed;
+        if (WebDevPage.Visibility != Visibility.Visible &&
+            SettingsPanel.Visibility != Visibility.Visible &&
+            ScrapPage.Visibility != Visibility.Visible &&
+            NotePage.Visibility != Visibility.Visible &&
+            HarnessViewPage.Visibility != Visibility.Visible)
+            ExitOverlayMode();
+    }
+
+    private bool _diffReviewConfigured;
+
+    /// <summary>
+    /// Wires the Diff Review panel to the active workspace root and the agent
+    /// ship path (StartAgentLoop). Idempotent — only wires once.
+    /// </summary>
+    private void ConfigureDiffReviewPanel()
+    {
+        if (_diffReviewConfigured) return;
+        _diffReviewConfigured = true;
+
+        DiffReviewPage.Configure(
+            workspaceRootProvider: GetActiveWorkspaceRoot,
+            shipPrompt: prompt =>
+            {
+                try
+                {
+                    // Ensure the bot exists (it wires the AI loop bindings), then
+                    // run the review as an AI request through the same path as
+                    // typed input.
+                    if (_botWindow is null)
+                        OnSidebarBotClick(this, new RoutedEventArgs());
+                    _botWindow?.PostAiRequest(prompt);
+                    AppLogger.Log($"[DiffReview] shipped review to agent (len={prompt.Length})");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Log($"[DiffReview] ship failed: {ex.Message}");
+                }
+            });
+    }
+
+    /// <summary>Returns the ACTIVE workspace folder (falling back to the first real folder).</summary>
+    private string? GetActiveWorkspaceRoot()
+    {
+        try
+        {
+            var active = GetActiveDirectoryPath();
+            if (!string.IsNullOrWhiteSpace(active) && System.IO.Directory.Exists(active))
+                return active;
+            foreach (var g in _cliGroups)
+                if (!string.IsNullOrWhiteSpace(g.DirectoryPath) && System.IO.Directory.Exists(g.DirectoryPath))
+                    return g.DirectoryPath;
+        }
+        catch { /* fall through */ }
+        return null;
     }
 
     // ====================================================================
@@ -3261,6 +3501,7 @@ public partial class MainWindow : Window
         CloseSettings();
         CloseScrap();
         CloseHarnessView();
+        CloseDiffReview();
         EnterOverlayMode();
         WebDevPage.Visibility = Visibility.Visible;
     }

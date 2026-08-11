@@ -65,7 +65,7 @@ internal static class CliHandler
 
         return command switch
         {
-            "help" or "--help" or "-h" or "/?" => PrintHelp(),
+            "help" or "--help" or "-h" or "/?" => Help(cliArgs.Skip(1).ToArray()),
             "version" or "--version" or "-v" => PrintVersion(),
             "status" => GetStatus(),
             "copy" => CopyToClipboard(),
@@ -78,6 +78,17 @@ internal static class CliHandler
             "terminal-key" => TerminalKey(cliArgs.Skip(1).ToArray()),
             "terminal-read" => TerminalRead(cliArgs.Skip(1).ToArray()),
             "bot-chat" => BotChat(cliArgs.Skip(1).ToArray()),
+            "agent-hook" => AgentHook(cliArgs.Skip(1).ToArray()),
+            "agent-hook-install" => AgentHookInstall(),
+            "agent-hook-uninstall" => AgentHookUninstall(),
+            "trust-workspace" => TrustWorkspace(cliArgs.Skip(1).ToArray()),
+            "cost" => ShowCost(),
+            "worktree" => Worktree(cliArgs.Skip(1).ToArray()),
+            "terminal-wait" => TerminalWait(cliArgs.Skip(1).ToArray()),
+            "skill-stub-install" => SkillStubInstall(),
+            "skill-stub-uninstall" => SkillStubUninstall(),
+            "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
+            "automation" => Automation(cliArgs.Skip(1).ToArray()),
             "os" => OsCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             _ => PrintUnknownCommand(command),
         };
@@ -693,6 +704,338 @@ internal static class CliHandler
         return 0;
     }
 
+    /// <summary>Reads a terminal's recent output text over IPC (helper for terminal-wait).</summary>
+    private static string? ReadTerminalTextRaw(IntPtr agentWnd, int groupIdx, int tabIdx, int lastN)
+    {
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"terminal-read\"");
+        sb.Append($",\"group_index\":{groupIdx}");
+        sb.Append($",\"tab_index\":{tabIdx}");
+        sb.Append($",\"last\":{lastN}");
+        sb.Append('}');
+        if (!SendWpfCommand(agentWnd, sb.ToString())) return null;
+        var json = TryReadMmf(TerminalReadMmfName, TerminalReadMmfSize);
+        if (json == null) return null;
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        return root.TryGetProperty("ok", out var ok) && ok.GetBoolean()
+            ? root.GetProperty("text").GetString() ?? ""
+            : null;
+    }
+
+    // =========================================================================
+    //  terminal-wait <grp> <tab> [--timeout-ms N] [--idle-ms N]  (mission W4)
+    //      : block until a terminal's output stops changing (TUI-idle), so an
+    //      agent can wait for a peer instead of polling read in a loop.
+    // =========================================================================
+    private static int TerminalWait(string[] args)
+    {
+        if (args.Length < 2 || !int.TryParse(args[0], out int grp) || !int.TryParse(args[1], out int tab))
+        {
+            Console.Error.WriteLine("Usage: terminal-wait <group> <tab> [--timeout-ms N] [--idle-ms N]");
+            return 1;
+        }
+        int timeoutMs = 60000, idleMs = 1500, pollMs = 400;
+        for (int i = 2; i < args.Length - 1; i++)
+        {
+            if (args[i].Equals("--timeout-ms", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var t)) timeoutMs = t;
+            else if (args[i].Equals("--idle-ms", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var d)) idleMs = d;
+        }
+
+        IntPtr agentWnd = FindAgentZero();
+        if (agentWnd == IntPtr.Zero) return 1;
+
+        var total = Stopwatch.StartNew();
+        var idle = Stopwatch.StartNew();
+        string last = ReadTerminalTextRaw(agentWnd, grp, tab, 2000) ?? "";
+        while (total.ElapsedMilliseconds < timeoutMs)
+        {
+            Thread.Sleep(pollMs);
+            var cur = ReadTerminalTextRaw(agentWnd, grp, tab, 2000) ?? last;
+            if (!string.Equals(cur, last, StringComparison.Ordinal))
+            {
+                last = cur;
+                idle.Restart();
+            }
+            else if (idle.ElapsedMilliseconds >= idleMs)
+            {
+                Console.WriteLine($"idle (stable {idleMs}ms) after {total.ElapsedMilliseconds}ms");
+                return 0;
+            }
+        }
+        Console.Error.WriteLine($"terminal-wait: timed out after {timeoutMs}ms without going idle");
+        return 2;
+    }
+
+    // =========================================================================
+    //  orchestrate <list | create <file.json> | status <runId>>  (mission W6)
+    //      : manage supervised multi-agent runs in the local DB (in-process).
+    //      create JSON: { "name": "...", "tasks": [ { "key","prompt","deps":[] } ] }
+    //      NOTE: actual execution (dispatching to live agents) runs inside the
+    //      GUI coordinator — this CLI covers durable create/inspect. (follow-up)
+    // =========================================================================
+    private static int Orchestrate(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.Error.WriteLine("Usage: orchestrate <list | create <file.json> | status <runId>>");
+            return 1;
+        }
+        try
+        {
+            EnsureDbReady();
+            using var db = new Agent.Common.Data.AppDbContext();
+            var sub = args[0].ToLowerInvariant();
+            switch (sub)
+            {
+                case "list":
+                {
+                    var runs = db.OrchestrationRuns.OrderByDescending(r => r.Id).Take(20).ToList();
+                    if (runs.Count == 0) { Console.WriteLine("No orchestration runs."); return 0; }
+                    foreach (var r in runs)
+                        Console.WriteLine($"  #{r.Id,-4} {r.Status,-9} {r.Name}");
+                    return 0;
+                }
+                case "create":
+                {
+                    if (args.Length < 2) { Console.Error.WriteLine("Usage: orchestrate create <file.json>"); return 1; }
+                    if (!File.Exists(args[1])) { Console.Error.WriteLine($"File not found: {args[1]}"); return 1; }
+                    using var doc = JsonDocument.Parse(File.ReadAllText(args[1]));
+                    var root = doc.RootElement;
+                    var name = root.TryGetProperty("name", out var np) ? np.GetString() ?? "run" : "run";
+                    var specs = new List<Agent.Common.Actors.OrchestrationTaskSpec>();
+                    foreach (var t in root.GetProperty("tasks").EnumerateArray())
+                    {
+                        var key = t.GetProperty("key").GetString() ?? "";
+                        var prompt = t.TryGetProperty("prompt", out var pp) ? pp.GetString() ?? "" : "";
+                        var deps = t.TryGetProperty("deps", out var dp) && dp.ValueKind == JsonValueKind.Array
+                            ? dp.EnumerateArray().Select(e => e.GetString() ?? "").Where(s => s.Length > 0).ToList()
+                            : new List<string>();
+                        specs.Add(new Agent.Common.Actors.OrchestrationTaskSpec(key, prompt, deps));
+                    }
+                    var runId = Agent.Common.Orchestration.OrchestrationStore.CreateRun(db, name, specs);
+                    Console.WriteLine($"Created run #{runId} '{name}' with {specs.Count} task(s).");
+                    return 0;
+                }
+                case "run":
+                {
+                    if (args.Length < 2 || !int.TryParse(args[1], out var runId)) { Console.Error.WriteLine("Usage: orchestrate run <runId>"); return 1; }
+                    // Execution needs the live actor system + terminals → hand off to the GUI.
+                    IntPtr wnd = FindAgentZero();
+                    if (wnd == IntPtr.Zero) return 1;
+                    var sb = new StringBuilder();
+                    sb.Append("{\"command\":\"orchestrate-run\"");
+                    sb.Append($",\"run_id\":{runId}");
+                    sb.Append('}');
+                    if (!SendWpfCommand(wnd, sb.ToString())) return 1;
+                    Console.WriteLine($"Requested run #{runId} start. Track with: orchestrate status {runId}");
+                    return 0;
+                }
+                case "status":
+                {
+                    if (args.Length < 2 || !int.TryParse(args[1], out var runId)) { Console.Error.WriteLine("Usage: orchestrate status <runId>"); return 1; }
+                    var run = db.OrchestrationRuns.FirstOrDefault(r => r.Id == runId);
+                    if (run is null) { Console.Error.WriteLine($"Run #{runId} not found."); return 1; }
+                    Console.WriteLine($"Run #{run.Id} '{run.Name}' — {run.Status}");
+                    foreach (var t in db.OrchestrationTasks.Where(t => t.RunId == runId).OrderBy(t => t.Id))
+                    {
+                        var deps = Agent.Common.Orchestration.OrchestrationMapper.ParseDeps(t.DependsOnJson);
+                        var depStr = deps.Count > 0 ? $" ← [{string.Join(",", deps)}]" : "";
+                        Console.WriteLine($"  {t.TaskKey,-12} {t.Status,-10}{depStr}");
+                    }
+                    return 0;
+                }
+                default:
+                    Console.Error.WriteLine($"Unknown orchestrate subcommand: {sub}");
+                    return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    // =========================================================================
+    //  automation <create|list|remove|due> ...
+    //      : scheduled agent runs. create computes the next fire time; the GUI
+    //      scheduler dispatches due automations to the bot. In-process DB.
+    //      create --name X --schedule "every 30m|hourly|daily HH:mm" --prompt "..." [--workspace path]
+    // =========================================================================
+    private static int Automation(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.Error.WriteLine("Usage: automation <create|list|remove <id>|due>");
+            Console.Error.WriteLine("  create --name X --schedule \"every 30m|hourly|daily HH:mm\" --prompt \"...\" [--workspace path]");
+            return 1;
+        }
+        try
+        {
+            EnsureDbReady();
+            using var db = new Agent.Common.Data.AppDbContext();
+            var sub = args[0].ToLowerInvariant();
+            switch (sub)
+            {
+                case "list":
+                {
+                    var all = db.Automations.OrderBy(a => a.Id).ToList();
+                    if (all.Count == 0) { Console.WriteLine("No automations."); return 0; }
+                    foreach (var a in all)
+                        Console.WriteLine($"  #{a.Id,-3} {(a.Enabled ? "on " : "off")} [{a.Schedule,-14}] next={a.NextRunUtc:u}  {a.Name}");
+                    return 0;
+                }
+                case "due":
+                {
+                    var nowUtc = DateTime.UtcNow;
+                    var due = db.Automations.Where(a => a.Enabled && a.NextRunUtc != null && a.NextRunUtc <= nowUtc).ToList();
+                    Console.WriteLine(due.Count == 0 ? "Nothing due." : $"{due.Count} due now:");
+                    foreach (var a in due) Console.WriteLine($"  #{a.Id} {a.Name}");
+                    return 0;
+                }
+                case "remove":
+                {
+                    if (args.Length < 2 || !int.TryParse(args[1], out var id)) { Console.Error.WriteLine("Usage: automation remove <id>"); return 1; }
+                    var a = db.Automations.Find(id);
+                    if (a is null) { Console.Error.WriteLine($"#{id} not found."); return 1; }
+                    db.Automations.Remove(a); db.SaveChanges();
+                    Console.WriteLine($"Removed automation #{id}.");
+                    return 0;
+                }
+                case "create":
+                {
+                    string name = "", schedule = "", prompt = "", workspace = "";
+                    for (int i = 1; i < args.Length; i++)
+                    {
+                        switch (args[i].ToLowerInvariant())
+                        {
+                            case "--name" when i + 1 < args.Length: name = args[++i]; break;
+                            case "--schedule" when i + 1 < args.Length: schedule = args[++i]; break;
+                            case "--prompt" when i + 1 < args.Length: prompt = args[++i]; break;
+                            case "--workspace" when i + 1 < args.Length: workspace = args[++i]; break;
+                        }
+                    }
+                    if (string.IsNullOrWhiteSpace(schedule) || string.IsNullOrWhiteSpace(prompt))
+                    {
+                        Console.Error.WriteLine("create requires --schedule and --prompt");
+                        return 1;
+                    }
+                    if (!Agent.Common.Automations.AutomationSchedule.TryComputeNext(schedule, DateTime.UtcNow, out var next, out var err))
+                    {
+                        Console.Error.WriteLine($"Invalid schedule: {err}");
+                        return 1;
+                    }
+                    var auto = new Agent.Common.Data.Entities.Automation
+                    {
+                        Name = string.IsNullOrWhiteSpace(name) ? "automation" : name,
+                        Schedule = schedule, Prompt = prompt, WorkspacePath = workspace,
+                        Enabled = true, NextRunUtc = next, CreatedAtUtc = DateTime.UtcNow,
+                    };
+                    db.Automations.Add(auto); db.SaveChanges();
+                    Console.WriteLine($"Created automation #{auto.Id} '{auto.Name}' — next run {next:u}");
+                    return 0;
+                }
+                default:
+                    Console.Error.WriteLine($"Unknown automation subcommand: {sub}");
+                    return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    // =========================================================================
+    //  skill-stub-install / skill-stub-uninstall  (mission W5)
+    //      : write the anti-drift AgentZero skill STUB into each ~/.claude*
+    //      skills folder. Explicit/consented; the full guide stays served by
+    //      `-cli help agentzero`.
+    // =========================================================================
+    private static int SkillStubInstall()
+    {
+        var results = AgentZeroWpf.Services.SkillStubInjector.InstallAll();
+        if (results.Count == 0) { Console.WriteLine("No Claude Code profiles (~/.claude*) found."); return 0; }
+        int failed = 0;
+        foreach (var r in results)
+        {
+            if (r.Ok) Console.WriteLine($"  [{r.AccountKey}] {r.Action}");
+            else { Console.Error.WriteLine($"  [{r.AccountKey}] FAILED: {r.Error}"); failed++; }
+        }
+        Console.WriteLine(failed == 0 ? "Skill stub installed (full guide via `-cli help agentzero`)." : $"Completed with {failed} failure(s).");
+        return failed == 0 ? 0 : 1;
+    }
+
+    private static int SkillStubUninstall()
+    {
+        var results = AgentZeroWpf.Services.SkillStubInjector.UninstallAll();
+        if (results.Count == 0) { Console.WriteLine("No Claude Code profiles (~/.claude*) found."); return 0; }
+        foreach (var r in results)
+            Console.WriteLine(r.Ok ? $"  [{r.AccountKey}] {r.Action}" : $"  [{r.AccountKey}] FAILED: {r.Error}");
+        return 0;
+    }
+
+    // =========================================================================
+    //  worktree <list|add|remove> ...  (missions W4/W7)
+    //      : git worktree management in the current directory's repo. In-process.
+    // =========================================================================
+    private static int Worktree(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.Error.WriteLine("Usage: worktree <list | add <path> [branch] | remove <path> [--force]>");
+            return 1;
+        }
+        var cwd = Directory.GetCurrentDirectory();
+        var sub = args[0].ToLowerInvariant();
+        switch (sub)
+        {
+            case "list":
+            {
+                var list = System.Threading.Tasks.Task.Run(() => Agent.Common.Module.GitWorktreeBuilder.ListAsync(cwd)).GetAwaiter().GetResult();
+                if (list.Count == 0) { Console.WriteLine("No worktrees (or not a git repo)."); return 0; }
+                foreach (var w in list)
+                {
+                    var label = w.Detached ? "detached" : (string.IsNullOrEmpty(w.Branch) ? "?" : w.Branch);
+                    var head = w.Head.Length >= 7 ? w.Head[..7] : w.Head;
+                    Console.WriteLine($"  {w.Path}  [{label}]  {head}");
+                }
+                return 0;
+            }
+            case "add":
+            {
+                if (args.Length < 2) { Console.Error.WriteLine("Usage: worktree add <path> [branch] [--trust]"); return 1; }
+                var branch = args.Length > 2 && !args[2].StartsWith("--") ? args[2] : null;
+                var res = System.Threading.Tasks.Task.Run(() => Agent.Common.Module.GitWorktreeBuilder.AddAsync(cwd, args[1], branch)).GetAwaiter().GetResult();
+                if (!res.Ok) { Console.Error.WriteLine(res.StdErr.Trim()); return 1; }
+                Console.WriteLine($"Added worktree: {args[1]}" + (branch is null ? " (detached)" : $" (branch {branch})"));
+
+                // W7↔W2 integration: optionally pre-trust the new worktree so a
+                // hosted agent CLI can launch in it without a trust prompt.
+                if (args.Contains("--trust"))
+                {
+                    var abs = Path.GetFullPath(Path.IsPathRooted(args[1]) ? args[1] : Path.Combine(cwd, args[1]));
+                    foreach (var t in Agent.Common.Agents.TrustPresetWriter.MarkAllTrusted(abs))
+                        Console.WriteLine($"    trust[{t.Agent}]: {(t.Ok ? t.Detail : "FAILED " + t.Detail)}");
+                }
+                return 0;
+            }
+            case "remove":
+            {
+                if (args.Length < 2) { Console.Error.WriteLine("Usage: worktree remove <path> [--force]"); return 1; }
+                bool force = args.Contains("--force");
+                var res = System.Threading.Tasks.Task.Run(() => Agent.Common.Module.GitWorktreeBuilder.RemoveAsync(cwd, args[1], force)).GetAwaiter().GetResult();
+                if (res.Ok) { Console.WriteLine($"Removed worktree: {args[1]}"); return 0; }
+                Console.Error.WriteLine(res.StdErr.Trim()); return 1;
+            }
+            default:
+                Console.Error.WriteLine($"Unknown worktree subcommand: {sub}");
+                return 1;
+        }
+    }
+
     // =========================================================================
     //  bot-chat <text...>  : send chat message to AgentBot
     // =========================================================================
@@ -767,6 +1110,164 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  agent-hook --event <name> [--state <phase>] [--session <id>] [--detail <t>]
+    //      : fire-and-forget agent-CLI hook report (mission W1, orca-adoption).
+    //      Installed into a hosted agent CLI (Claude Code) via AgentHookInstaller;
+    //      the hook invokes this so the GUI knows the agent's real state without
+    //      scraping terminal output. Always fire-and-forget (no MMF round-trip).
+    // =========================================================================
+    private static int AgentHook(string[] args)
+    {
+        string evt = "", state = "", session = "", detail = "";
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i].ToLowerInvariant())
+            {
+                case "--event"   when i + 1 < args.Length: evt = args[++i]; break;
+                case "--state"   when i + 1 < args.Length: state = args[++i]; break;
+                case "--session" when i + 1 < args.Length: session = args[++i]; break;
+                case "--detail"  when i + 1 < args.Length: detail = args[++i]; break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(evt))
+        {
+            Console.Error.WriteLine("Usage: agent-hook --event <name> [--state <phase>] [--session <id>] [--detail <text>]");
+            return 1;
+        }
+
+        IntPtr agentWnd = FindAgentZero();
+        if (agentWnd == IntPtr.Zero) return 1;
+
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"agent-hook\"");
+        sb.Append($",\"event\":\"{EscapeJson(evt)}\"");
+        sb.Append($",\"state\":\"{EscapeJson(state)}\"");
+        sb.Append($",\"session\":\"{EscapeJson(session)}\"");
+        sb.Append($",\"detail\":\"{EscapeJson(detail)}\"");
+        sb.Append('}');
+
+        // Fire-and-forget by design — hooks fire on the agent's hot path, so we
+        // never block them on an MMF response (mirrors --no-wait semantics).
+        SendWpfCommand(agentWnd, sb.ToString());
+        return 0;
+    }
+
+    // =========================================================================
+    //  agent-hook-install / agent-hook-uninstall
+    //      : install/remove AgentZero state-reporting hooks into every
+    //      ~/.claude*/settings.json. Runs IN-PROCESS (no GUI/IPC needed) — this
+    //      is the explicit, consented entry point for modifying Claude settings.
+    // =========================================================================
+    private static int AgentHookInstall()
+    {
+        var results = AgentZeroWpf.Services.AgentHookInstaller.InstallAll();
+        if (results.Count == 0)
+        {
+            Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
+            return 0;
+        }
+        int failed = 0;
+        foreach (var r in results)
+        {
+            if (r.Ok) Console.WriteLine($"  [{r.AccountKey}] {r.Action}" + (r.BackupPath is null ? "" : $"  (backup: {r.BackupPath})"));
+            else { Console.Error.WriteLine($"  [{r.AccountKey}] FAILED: {r.Error}"); failed++; }
+        }
+        Console.WriteLine(failed == 0 ? "Agent hooks installed." : $"Completed with {failed} failure(s).");
+        return failed == 0 ? 0 : 1;
+    }
+
+    private static int AgentHookUninstall()
+    {
+        var results = AgentZeroWpf.Services.AgentHookInstaller.UninstallAll();
+        if (results.Count == 0)
+        {
+            Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
+            return 0;
+        }
+        int failed = 0;
+        foreach (var r in results)
+        {
+            if (r.Ok) Console.WriteLine($"  [{r.AccountKey}] {r.Action}");
+            else { Console.Error.WriteLine($"  [{r.AccountKey}] FAILED: {r.Error}"); failed++; }
+        }
+        Console.WriteLine(failed == 0 ? "Agent hooks removed." : $"Completed with {failed} failure(s).");
+        return failed == 0 ? 0 : 1;
+    }
+
+    // =========================================================================
+    //  trust-workspace [path]
+    //      : pre-mark a folder as trusted in each agent CLI's trust store
+    //      (Cursor / Copilot / Codex) so their "trust this folder?" prompt
+    //      won't intercept injected keystrokes (mission W2, orca-adoption).
+    //      Runs IN-PROCESS (no GUI). Explicit, consented — modifies ~/.cursor,
+    //      ~/.copilot, ~/.codex. Defaults to the current directory.
+    // =========================================================================
+    private static int TrustWorkspace(string[] args)
+    {
+        var path = args.Length > 0 && !args[0].StartsWith("--")
+            ? args[0]
+            : Directory.GetCurrentDirectory();
+
+        if (!Directory.Exists(path))
+        {
+            Console.Error.WriteLine($"Error: folder not found: {path}");
+            return 1;
+        }
+
+        var results = Agent.Common.Agents.TrustPresetWriter.MarkAllTrusted(path);
+        Console.WriteLine($"Trusting workspace: {System.IO.Path.GetFullPath(path)}");
+        int failed = 0;
+        foreach (var r in results)
+        {
+            if (r.Ok) Console.WriteLine($"  [{r.Agent}] {r.Detail}");
+            else { Console.Error.WriteLine($"  [{r.Agent}] FAILED: {r.Detail}"); failed++; }
+        }
+        return failed == 0 ? 0 : 1;
+    }
+
+    // =========================================================================
+    //  cost : estimated USD cost from recorded token usage (mission W9).
+    //      Reads the local telemetry DB in-process (no GUI) and prints a
+    //      per-model breakdown via TokenCostCalculator.
+    // =========================================================================
+    // The in-process DB CLI commands may run before the GUI ever launched with
+    // this build, so the SQLite file might be missing the latest migrations.
+    // Ensure it's created + migrated (idempotent; no-op if the GUI already did).
+    private static void EnsureDbReady()
+    {
+        try { Agent.Common.Data.AppDbContext.InitializeDatabase(); }
+        catch (Exception ex) { AppLogger.Log($"[CLI] EnsureDbReady failed: {ex.Message}"); }
+    }
+
+    private static int ShowCost()
+    {
+        try
+        {
+            EnsureDbReady();
+            using var db = new Agent.Common.Data.AppDbContext();
+            var records = db.TokenUsageRecords.ToList();
+            if (records.Count == 0)
+            {
+                Console.WriteLine("No token usage recorded yet.");
+                return 0;
+            }
+            var total = Agent.Common.Telemetry.TokenCostCalculator.TotalUsd(records);
+            Console.WriteLine($"Estimated cost (all recorded turns): ${total:F2}  ({records.Count} turns)");
+            Console.WriteLine("By model:");
+            foreach (var (model, usd, count) in Agent.Common.Telemetry.TokenCostCalculator.ByModel(records))
+                Console.WriteLine($"  {model,-32} ${usd,10:F2}   ({count} turns)");
+            Console.WriteLine("(estimate — prices are editable defaults, not a live feed)");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    // =========================================================================
     //  bot-signal <kind> [--from name] [--to name] [--message text...]
     //      : send structured peer signal to AgentBot broker
     // =========================================================================
@@ -788,6 +1289,23 @@ internal static class CliHandler
         => Process.GetCurrentProcess().MainModule?.FileName
            ?? Path.Combine(AppContext.BaseDirectory, "AgentZeroLite.exe");
 
+    // help [topic] — with a known topic, serve the full agent skill guide
+    // (mission W4/W5 anti-drift: the guide is served by the live binary, never
+    // cached into the agent's skills folder). No topic → general usage.
+    private static int Help(string[] args)
+    {
+        if (args.Length > 0 && !args[0].StartsWith("--"))
+        {
+            var topic = args[0];
+            var guide = Agent.Common.Agents.AgentSkillGuides.Get(topic);
+            if (guide is not null) { Console.WriteLine(guide); return 0; }
+            Console.Error.WriteLine($"Unknown help topic: {topic}");
+            Console.WriteLine("Topics: " + string.Join(", ", Agent.Common.Agents.AgentSkillGuides.Topics));
+            return 1;
+        }
+        return PrintHelp();
+    }
+
     private static int PrintHelp()
     {
         PrintUsage();
@@ -799,6 +1317,10 @@ internal static class CliHandler
         Console.WriteLine("  AgentZeroLite.ps1 terminal-key  0 0 Interrupt");
         Console.WriteLine("  AgentZeroLite.ps1 bot-chat \"build finished\" --from CI");
         Console.WriteLine("  AgentZeroLite.ps1 status --no-wait");
+        Console.WriteLine("  AgentZeroLite.ps1 worktree list");
+        Console.WriteLine("  AgentZeroLite.ps1 cost");
+        Console.WriteLine("  AgentZeroLite.ps1 automation create --name daily --schedule \"daily 09:00\" --prompt \"summarize changes\"");
+        Console.WriteLine("  AgentZeroLite.ps1 orchestrate run 1");
         Console.WriteLine();
         Console.WriteLine("Notes:");
         Console.WriteLine("  * The GUI must already be running. Start it via open-win if needed.");
@@ -833,7 +1355,17 @@ internal static class CliHandler
         Console.WriteLine("  terminal-send <grp> <tab> <text>        Send text to a terminal");
         Console.WriteLine("  terminal-key  <grp> <tab> <key>         Send a control key to a terminal");
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
+        Console.WriteLine("  terminal-wait <grp> <tab> [--idle-ms N] Block until a terminal goes idle");
+        Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
+        Console.WriteLine("  orchestrate <list|create|status|run> .. Supervised multi-agent runs ('run' dispatches live)");
+        Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");
+        Console.WriteLine("  skill-stub-install / -uninstall         Inject/remove anti-drift AgentZero skill stub");
         Console.WriteLine("  bot-chat <message> [--from name]        Display external chat in AgentBot");
+        Console.WriteLine("  agent-hook --event <name> [--state p]   Report hosted-agent state (fire-and-forget)");
+        Console.WriteLine("  agent-hook-install                      Install state hooks into ~/.claude*/settings.json");
+        Console.WriteLine("  agent-hook-uninstall                    Remove AgentZero hooks from ~/.claude*/settings.json");
+        Console.WriteLine("  trust-workspace [path]                  Pre-trust a folder for Cursor/Copilot/Codex CLIs");
+        Console.WriteLine("  cost                                    Estimated USD cost from recorded token usage");
         Console.WriteLine("  os <verb> [args]                        OS-control: window/screenshot/input (see 'os help')");
         Console.WriteLine("  help                                    Show detailed help");
         Console.WriteLine("  version, --version, -v                  Print CLI build identity (no GUI needed)");

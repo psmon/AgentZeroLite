@@ -197,6 +197,21 @@ public sealed record AgentLoopToolCallInfo(
     string ArgsJson,
     string Result);
 
+/// <summary>
+/// 외부 에이전트 CLI(예: Claude Code) 훅이 IPC(-cli agent-hook)로 보고하는
+/// 상태 이벤트 (MainWindow → Bot → AgentLoop). 터미널 출력 스크래핑 대신
+/// 훅으로 실제 상태를 받는다 (mission W1, orca-adoption).
+///   - HookEvent : Claude Code 훅 이름 (PreToolUse/PostToolUse/Stop/...).
+///   - StateOverride : 훅 스크립트가 phase를 직접 지정한 경우 (없으면 HookEvent로 매핑).
+///   - Session : 세션 식별자 (라우팅/표시용, 선택).
+///   - Detail : 도구명 등 부가 정보 (선택).
+/// </summary>
+public sealed record AgentHookEvent(
+    string HookEvent,
+    string? StateOverride,
+    string Session,
+    string Detail);
+
 /// <summary>AgentLoop FSM 단계.</summary>
 public enum AgentLoopPhase
 {
@@ -337,3 +352,47 @@ public sealed record QueryDelegationMode;
 
 /// <summary>Reply for QueryDelegationMode.</summary>
 public sealed record DelegationModeReply(bool Enabled);
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  9. Orchestration (mission W6, orca-adoption) — supervised multi-agent
+//     Run/Task/Dispatch. A CoordinatorActor owns a DAG of tasks, dispatches
+//     ready ones to worker agents, and advances as WorkerDone signals arrive.
+//     Mirrors orca skill-guides/orchestration.md; the DAG logic itself is the
+//     pure Agent.Common.Orchestration.OrchestrationDag.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// <summary>One task in a run: a stable key, the worker prompt, and its deps.</summary>
+public sealed record OrchestrationTaskSpec(
+    string TaskKey,
+    string Prompt,
+    IReadOnlyList<string> DependsOn);
+
+/// <summary>Requester → Coordinator: begin a run over the given task DAG.</summary>
+public sealed record StartOrchestrationRun(string Name, IReadOnlyList<OrchestrationTaskSpec> Tasks);
+
+/// <summary>Coordinator → worker router: dispatch one ready task attempt.</summary>
+public sealed record DispatchTaskToWorker(string TaskKey, string Prompt);
+
+/// <summary>Worker → Coordinator: a dispatched task finished (or failed).</summary>
+public sealed record WorkerDone(string TaskKey, bool Success, string Message);
+
+/// <summary>Worker → Coordinator: liveness ping while a task runs.</summary>
+public sealed record WorkerHeartbeat(string TaskKey);
+
+/// <summary>Worker → Coordinator: blocking question needing a decision.</summary>
+public sealed record AskCoordinator(string TaskKey, string Question);
+
+/// <summary>Coordinator → worker: answer to <see cref="AskCoordinator"/>.</summary>
+public sealed record AskCoordinatorReply(string TaskKey, string Answer);
+
+/// <summary>Worker → Coordinator: escalate a problem the worker can't resolve.</summary>
+public sealed record Escalation(string TaskKey, string Reason);
+
+/// <summary>Ask pattern → <see cref="RunStatusReply"/>.</summary>
+public sealed record QueryRunStatus;
+
+/// <summary>Snapshot of a run's progress.</summary>
+public sealed record RunStatusReply(int Total, int Completed, int Failed, int InFlight, bool Done);
+
+/// <summary>Coordinator → requester: the run terminated.</summary>
+public sealed record OrchestrationRunCompleted(bool Success, int Completed, int Failed);

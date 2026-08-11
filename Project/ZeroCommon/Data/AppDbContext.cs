@@ -19,6 +19,11 @@ public class AppDbContext : DbContext
     public DbSet<SessionHeartbeat> SessionHeartbeats => Set<SessionHeartbeat>();
     public DbSet<Mp3Track> Mp3Tracks => Set<Mp3Track>();
     public DbSet<Mp3MoodCard> Mp3MoodCards => Set<Mp3MoodCard>();
+    public DbSet<DiffComment> DiffComments => Set<DiffComment>();
+    public DbSet<OrchestrationRun> OrchestrationRuns => Set<OrchestrationRun>();
+    public DbSet<OrchestrationTask> OrchestrationTasks => Set<OrchestrationTask>();
+    public DbSet<OrchestrationDispatch> OrchestrationDispatches => Set<OrchestrationDispatch>();
+    public DbSet<Automation> Automations => Set<Automation>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -87,6 +92,26 @@ public class AppDbContext : DbContext
         mb.Entity<Mp3Track>()
             .HasIndex(t => t.FilePath)
             .IsUnique();
+
+        // DiffComment (W3) — comments fetched per review session, newest first.
+        mb.Entity<DiffComment>()
+            .HasIndex(c => new { c.SessionId, c.CreatedAtUtc });
+
+        // Orchestration (W6) — Run 1—* Task; cascade delete tasks with the run.
+        mb.Entity<OrchestrationTask>()
+            .HasOne(t => t.Run)
+            .WithMany(r => r.Tasks)
+            .HasForeignKey(t => t.RunId)
+            .OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<OrchestrationTask>()
+            .HasIndex(t => new { t.RunId, t.TaskKey })
+            .IsUnique();
+        mb.Entity<OrchestrationDispatch>()
+            .HasIndex(d => new { d.RunId, d.TaskId });
+
+        // Automation (scheduled runs) — enabled+next-run scan is the hot path.
+        mb.Entity<Automation>()
+            .HasIndex(a => new { a.Enabled, a.NextRunUtc });
     }
 
     public static void InitializeDatabase()
