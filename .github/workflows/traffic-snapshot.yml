@@ -32,27 +32,32 @@ jobs:
           GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN || secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           mkdir -p traffic-history
           DATE=$(date -u +%F)
 
-          # --- views: merge 14-day window into a date-keyed map (new wins) ---
-          views_new=$(gh api "repos/$REPO/traffic/views")
-          [ -f traffic-history/views.json ] || echo '{}' > traffic-history/views.json
-          jq --argjson new "$views_new" '
-            reduce ($new.views[]?) as $v (.;
-              .[$v.timestamp[0:10]] = {count: $v.count, uniques: $v.uniques})
-          ' traffic-history/views.json > traffic-history/views.json.tmp
-          mv traffic-history/views.json.tmp traffic-history/views.json
+          # --- views + clones: require a PAT (default GITHUB_TOKEN gets 403 on
+          #     the Traffic API). If unavailable, warn and skip — downloads still
+          #     record, and traffic turns on automatically once TRAFFIC_TOKEN is set.
+          if views_new=$(gh api "repos/$REPO/traffic/views" 2>/dev/null); then
+            [ -f traffic-history/views.json ] || echo '{}' > traffic-history/views.json
+            jq --argjson new "$views_new" '
+              reduce ($new.views[]?) as $v (.;
+                .[$v.timestamp[0:10]] = {count: $v.count, uniques: $v.uniques})
+            ' traffic-history/views.json > traffic-history/views.json.tmp
+            mv traffic-history/views.json.tmp traffic-history/views.json
 
-          # --- clones: same date-keyed merge ---
-          clones_new=$(gh api "repos/$REPO/traffic/clones")
-          [ -f traffic-history/clones.json ] || echo '{}' > traffic-history/clones.json
-          jq --argjson new "$clones_new" '
-            reduce ($new.clones[]?) as $c (.;
-              .[$c.timestamp[0:10]] = {count: $c.count, uniques: $c.uniques})
-          ' traffic-history/clones.json > traffic-history/clones.json.tmp
-          mv traffic-history/clones.json.tmp traffic-history/clones.json
+            clones_new=$(gh api "repos/$REPO/traffic/clones")
+            [ -f traffic-history/clones.json ] || echo '{}' > traffic-history/clones.json
+            jq --argjson new "$clones_new" '
+              reduce ($new.clones[]?) as $c (.;
+                .[$c.timestamp[0:10]] = {count: $c.count, uniques: $c.uniques})
+            ' traffic-history/clones.json > traffic-history/clones.json.tmp
+            mv traffic-history/clones.json.tmp traffic-history/clones.json
+            echo "Traffic (views/clones) recorded."
+          else
+            echo "::warning::Traffic API not accessible with the current token. Add a TRAFFIC_TOKEN secret (classic PAT with 'repo' scope) to record views/clones. Recording downloads only."
+          fi
 
           # --- release downloads: cumulative totals, one row per run date ---
           rel=$(gh api "repos/$REPO/releases" --paginate)
@@ -89,10 +94,10 @@ jobs:
             echo ""
             echo "| Metric | Value |"
             echo "|---|---|"
-            v_days=$(jq 'length' traffic-history/views.json)
-            v_sum=$(jq '[.[].count] | add // 0' traffic-history/views.json)
-            c_days=$(jq 'length' traffic-history/clones.json)
-            c_sum=$(jq '[.[].count] | add // 0' traffic-history/clones.json)
+            v_days=$( [ -f traffic-history/views.json ]  && jq 'length'                 traffic-history/views.json  || echo 0)
+            v_sum=$(  [ -f traffic-history/views.json ]  && jq '[.[].count] | add // 0' traffic-history/views.json  || echo 0)
+            c_days=$( [ -f traffic-history/clones.json ] && jq 'length'                 traffic-history/clones.json || echo 0)
+            c_sum=$(  [ -f traffic-history/clones.json ] && jq '[.[].count] | add // 0' traffic-history/clones.json || echo 0)
             echo "| Recorded days (views) | ${v_days} |"
             echo "| Cumulative views | ${v_sum} |"
             echo "| Recorded days (clones) | ${c_days} |"
