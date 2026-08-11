@@ -732,18 +732,59 @@ internal static class CliHandler
     {
         if (args.Length < 2 || !int.TryParse(args[0], out int grp) || !int.TryParse(args[1], out int tab))
         {
-            Console.Error.WriteLine("Usage: terminal-wait <group> <tab> [--timeout-ms N] [--idle-ms N]");
+            Console.Error.WriteLine("Usage: terminal-wait <group> <tab> [--until <working|blocked|idle|done>] [--agent <name>] [--timeout-ms N] [--idle-ms N] [--stall-ms N]");
             return 1;
         }
-        int timeoutMs = 60000, idleMs = 1500, pollMs = 400;
-        for (int i = 2; i < args.Length - 1; i++)
+        int timeoutMs = 60000, idleMs = 1500, pollMs = 400, stallMs = 8000;
+        string? until = null, agentHint = "";
+        for (int i = 2; i < args.Length; i++)
         {
-            if (args[i].Equals("--timeout-ms", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var t)) timeoutMs = t;
-            else if (args[i].Equals("--idle-ms", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var d)) idleMs = d;
+            if (args[i].Equals("--timeout-ms", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && int.TryParse(args[i + 1], out var t)) timeoutMs = t;
+            else if (args[i].Equals("--idle-ms", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && int.TryParse(args[i + 1], out var d)) idleMs = d;
+            else if (args[i].Equals("--stall-ms", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && int.TryParse(args[i + 1], out var sm)) stallMs = sm;
+            else if (args[i].Equals("--until", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) until = args[i + 1];
+            else if (args[i].Equals("--agent", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) agentHint = args[i + 1];
         }
 
         IntPtr agentWnd = FindAgentZero();
         if (agentWnd == IntPtr.Zero) return 1;
+
+        // --until: wait for the agent to reach a lifecycle STATE (herdr H5),
+        // detected from the terminal screen via the manifest engine. Stall guard
+        // returns if the state stops changing before the target is reached.
+        if (until is not null)
+        {
+            if (!Enum.TryParse<Agent.Common.Agents.AgentActivity>(until, ignoreCase: true, out var target))
+            {
+                Console.Error.WriteLine($"Invalid --until state '{until}' (working|blocked|idle|done)");
+                return 1;
+            }
+            var manifest = Agent.Common.Agents.AgentManifestCatalog.ForAgent(agentHint);
+            var totalU = Stopwatch.StartNew();
+            var sinceChange = Stopwatch.StartNew();
+            var prev = Agent.Common.Agents.AgentActivity.Unknown;
+            while (totalU.ElapsedMilliseconds < timeoutMs)
+            {
+                var text = ReadTerminalTextRaw(agentWnd, grp, tab, 4000) ?? "";
+                var snap = new Agent.Common.Agents.ScreenSnapshot(text.Replace("\r\n", "\n").Split('\n'));
+                var res = Agent.Common.Agents.AgentStateDetector.Detect(manifest, snap);
+                var state = res.StateChanged ? res.State : prev;
+                if (state == target)
+                {
+                    Console.WriteLine($"reached {target} after {totalU.ElapsedMilliseconds}ms" + (res.MatchedRuleId is null ? "" : $" (rule {res.MatchedRuleId})"));
+                    return 0;
+                }
+                if (state != prev) { prev = state; sinceChange.Restart(); }
+                else if (sinceChange.ElapsedMilliseconds >= stallMs)
+                {
+                    Console.Error.WriteLine($"stalled: state '{state}' unchanged {stallMs}ms, target '{target}' not reached");
+                    return 3;
+                }
+                Thread.Sleep(pollMs);
+            }
+            Console.Error.WriteLine($"terminal-wait: timed out after {timeoutMs}ms waiting for {target}");
+            return 2;
+        }
 
         var total = Stopwatch.StartNew();
         var idle = Stopwatch.StartNew();
@@ -1355,7 +1396,7 @@ internal static class CliHandler
         Console.WriteLine("  terminal-send <grp> <tab> <text>        Send text to a terminal");
         Console.WriteLine("  terminal-key  <grp> <tab> <key>         Send a control key to a terminal");
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
-        Console.WriteLine("  terminal-wait <grp> <tab> [--idle-ms N] Block until a terminal goes idle");
+        Console.WriteLine("  terminal-wait <grp> <tab> [--until S]   Block until idle, or until state S (working|blocked|idle|done)");
         Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
         Console.WriteLine("  orchestrate <list|create|status|run> .. Supervised multi-agent runs ('run' dispatches live)");
         Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");
