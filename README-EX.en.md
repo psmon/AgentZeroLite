@@ -7,7 +7,7 @@ features**. For the core product, see [`README.md`](README.md).
 
 Extension features come in two forms:
 - **CLI extensions** — script the app via `AgentZeroLite.exe -cli <command>`
-- **GUI / bot extensions** — new in-app features (file tools, Diff Review, Ctrl+J command palette)
+- **GUI / bot extensions** — new in-app features (file tools, Diff Review, Ctrl+J command palette, agent state detection)
 
 ---
 
@@ -230,6 +230,43 @@ ActivityBar with the mouse.
 
 ---
 
+## 11. Agent State Detection 🚦
+
+Detects the **live state** of your hosted coding agents (Claude/Codex/…) so you can
+see at a glance **which of many agents is waiting on you**.
+
+- **SESSIONS state chip** — each session row shows a colored chip:
+  🔴 `blocked` (waiting on approval/input) · 🟡 `working` (generating) · 🔵 `done`
+  (finished but not yet seen) · ⚪ `idle`. Blocked / unseen-done are bolded.
+- **Title bar** — `AgentZero Lite ● N need attention`.
+- **Taskbar flash** — when an agent newly becomes blocked/done, the taskbar flashes
+  (only while the window is in the background).
+
+```powershell
+& $AZ -cli agent-state
+#  Agents needing attention: 1
+#    [5:0] blocked  * Claude ←     ← waiting on approval (* = unseen)
+```
+
+**How it works**: covers CLIs without hooks too. It reads the terminal screen against
+rules (manifests) to classify state. Rules are **data you can tune** — drop
+`%LOCALAPPDATA%\AgentZeroLite\agent-detection\<agent>.json` to override the built-ins
+(claude/codex/generic) without a rebuild.
+
+**Wait for a state** (for scripts/agents):
+```powershell
+& $AZ -cli terminal-wait 0 1 --until blocked --agent claude   # until it waits on approval
+& $AZ -cli terminal-wait 0 1 --until idle                     # until it finishes
+```
+
+**Restore a conversation** — find a folder's latest Claude session and print the resume command:
+```powershell
+& $AZ -cli agent-resume-cmd "C:\code\myproj"
+#  claude --resume 8151ecda-83b1-450d-...
+```
+
+---
+
 ## CLI Command Summary
 
 | Command | Description | Needs GUI |
@@ -239,6 +276,9 @@ ActivityBar with the mouse.
 | `orchestrate <list\|create\|status>` | create/inspect supervised runs | ✕ |
 | `orchestrate run <id>` | run — dispatch/supervise across terminal agents | ○ |
 | `automation <create\|list\|remove\|due>` | scheduled runs (every/hourly/daily) | ✕ |
+| `agent-state` | detected state per terminal + attention rollup | ○ |
+| `terminal-wait <g> <t> --until <state>` | wait until a state (working/blocked/idle/done) | ○ |
+| `agent-resume-cmd [cwd]` | print resume command for a folder's latest Claude session | ✕ |
 | `help [topic]` | serve guides (agentzero/orchestrate) | ✕ |
 | `trust-workspace [path]` | trust a folder for agent CLIs | ✕ |
 | `agent-hook-install` / `-uninstall` | install/remove status hooks | ✕ |

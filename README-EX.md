@@ -7,7 +7,7 @@
 
 확장 기능은 두 갈래입니다.
 - **CLI 확장** — `AgentZeroLite.exe -cli <명령>` 으로 앱을 스크립팅
-- **GUI/봇 확장** — 화면 안에서 쓰는 신규 기능(파일 도구, Diff 리뷰, 커맨드 팔레트 Ctrl+J)
+- **GUI/봇 확장** — 화면 안에서 쓰는 신규 기능(파일 도구, Diff 리뷰, 커맨드 팔레트 Ctrl+J, 에이전트 상태 감지)
 
 ---
 
@@ -224,6 +224,42 @@ WebDev / Scrap / Note). 마우스로 ActivityBar를 오가지 않고 키보드�
 
 ---
 
+## 11. 에이전트 상태 감지 🚦
+
+호스팅한 코딩 에이전트(Claude/Codex 등)의 **상태를 실시간 감지**해서, 여러 에이전트 중
+**누가 나를 기다리는지** 바로 보이게 합니다.
+
+- **SESSIONS 상태 칩** — 세션 목록 각 행에 감지 상태가 색상 칩으로:
+  🔴 `blocked`(승인/입력 대기) · 🟡 `working`(생성 중) · 🔵 `done`(끝났는데 아직 확인 안 함) ·
+  ⚪ `idle`(대기). blocked/미확인 done은 굵게 강조.
+- **타이틀바** — `AgentZero Lite ● N need attention` (주의 필요 개수).
+- **작업표시줄 플래시** — 에이전트가 새로 blocked/done되면 창이 비활성일 때 깜빡여 알림.
+
+```powershell
+& $AZ -cli agent-state
+#  Agents needing attention: 1
+#    [5:0] blocked  * Claude ←     ← 승인 대기 (별표 = 아직 확인 안 함)
+```
+
+**어떻게 동작하나**: 훅이 없는 CLI도 커버합니다. 터미널 화면을 규칙(매니페스트)으로 읽어
+상태를 판정합니다. 규칙은 **데이터라 튜닝 가능** —
+`%LOCALAPPDATA%\AgentZeroLite\agent-detection\<agent>.json` 을 두면 빌드 없이 규칙을
+덮어씁니다(claude/codex/generic).
+
+**상태까지 대기** (스크립트/에이전트용):
+```powershell
+& $AZ -cli terminal-wait 0 1 --until blocked --agent claude   # 상대가 승인 대기할 때까지
+& $AZ -cli terminal-wait 0 1 --until idle                     # 작업 끝날 때까지
+```
+
+**대화 복원** — 폴더의 마지막 Claude 대화를 찾아 복원 커맨드를 출력:
+```powershell
+& $AZ -cli agent-resume-cmd "C:\code\myproj"
+#  claude --resume 8151ecda-83b1-450d-...
+```
+
+---
+
 ## CLI 명령 요약
 
 | 명령 | 설명 | GUI 필요 |
@@ -233,6 +269,9 @@ WebDev / Scrap / Note). 마우스로 ActivityBar를 오가지 않고 키보드�
 | `orchestrate <list\|create\|status>` | 감독 실행 생성/조회 | ✕ |
 | `orchestrate run <id>` | 실행 — 터미널 에이전트에 배분·감독 | ○ |
 | `automation <create\|list\|remove\|due>` | 예약 자동화 (every/hourly/daily) | ✕ |
+| `agent-state` | 터미널별 감지 상태 + 주의 롤업 | ○ |
+| `terminal-wait <g> <t> --until <state>` | 특정 상태(working/blocked/idle/done)까지 대기 | ○ |
+| `agent-resume-cmd [cwd]` | 폴더의 최신 Claude 대화 resume 커맨드 출력 | ✕ |
 | `help [topic]` | 가이드 서빙(agentzero/orchestrate) | ✕ |
 | `trust-workspace [경로]` | 폴더를 에이전트 CLI에 신뢰 등록 | ✕ |
 | `agent-hook-install` / `-uninstall` | 상태 훅 설치/제거 | ✕ |
