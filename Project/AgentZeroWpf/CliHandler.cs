@@ -87,6 +87,7 @@ internal static class CliHandler
             "terminal-wait" => TerminalWait(cliArgs.Skip(1).ToArray()),
             "agent-state" => AgentState(),
             "agent-resume-cmd" => AgentResumeCmd(cliArgs.Skip(1).ToArray()),
+            "agent-resume" => AgentResume(cliArgs.Skip(1).ToArray()),
             "skill-stub-install" => SkillStubInstall(),
             "skill-stub-uninstall" => SkillStubUninstall(),
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
@@ -1040,6 +1041,43 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  agent-resume <grp> <tab>  (herdr H3)
+    //      : discover the latest Claude conversation for a tab's workspace and
+    //      print the resume command. Does NOT auto-restart the live terminal —
+    //      resuming restores the SAME conversation, so run it yourself when ready
+    //      (e.g. after the agent exits). Needs the GUI (resolves the tab's cwd).
+    // =========================================================================
+    private const string AgentResumeMmfName = "AgentZeroLite_AgentResume_Response";
+    private const int AgentResumeMmfSize = 4096;
+
+    private static int AgentResume(string[] args)
+    {
+        if (args.Length < 2 || !int.TryParse(args[0], out int g) || !int.TryParse(args[1], out int t))
+        {
+            Console.Error.WriteLine("Usage: agent-resume <group> <tab>");
+            return 1;
+        }
+        IntPtr wnd = FindAgentZero();
+        if (wnd == IntPtr.Zero) return 1;
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"agent-resume\"");
+        sb.Append($",\"group_index\":{g},\"tab_index\":{t}");
+        sb.Append('}');
+        if (!SendWpfCommand(wnd, sb.ToString())) return 1;
+        var json = TryReadMmf(AgentResumeMmfName, AgentResumeMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+        using var doc = JsonDocument.Parse(json);
+        var cmd = doc.RootElement.TryGetProperty("cmd", out var cp) ? cp.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(cmd))
+        {
+            Console.WriteLine("No prior Claude session found for this tab's workspace.");
+            return 0;
+        }
+        Console.WriteLine(cmd);
+        return 0;
+    }
+
+    // =========================================================================
     //  agent-state  (herdr H1/H2) — detected lifecycle state per terminal + rollup
     // =========================================================================
     private const string AgentStateMmfName = "AgentZeroLite_AgentState_Response";
@@ -1257,7 +1295,9 @@ internal static class CliHandler
     // =========================================================================
     private static int AgentHookInstall()
     {
-        var results = AgentZeroWpf.Services.AgentHookInstaller.InstallAll();
+        var results = AgentZeroWpf.Services.AgentHookInstaller.InstallAll().ToList();
+        // herdr H4: also install Codex / Cursor hooks (skipped if not installed).
+        results.AddRange(AgentZeroWpf.Services.AgentHookInstaller.InstallExtraClis());
         if (results.Count == 0)
         {
             Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
@@ -1275,7 +1315,8 @@ internal static class CliHandler
 
     private static int AgentHookUninstall()
     {
-        var results = AgentZeroWpf.Services.AgentHookInstaller.UninstallAll();
+        var results = AgentZeroWpf.Services.AgentHookInstaller.UninstallAll().ToList();
+        results.AddRange(AgentZeroWpf.Services.AgentHookInstaller.UninstallExtraClis());
         if (results.Count == 0)
         {
             Console.WriteLine("No Claude Code profiles (~/.claude*) found.");
@@ -1454,6 +1495,7 @@ internal static class CliHandler
         Console.WriteLine("  terminal-wait <grp> <tab> [--until S]   Block until idle, or until state S (working|blocked|idle|done)");
         Console.WriteLine("  agent-state                             Detected agent state per terminal + attention rollup");
         Console.WriteLine("  agent-resume-cmd [cwd]                  Print 'claude --resume <id>' for a folder's latest session");
+        Console.WriteLine("  agent-resume <grp> <tab>                Resume command for a tab's workspace (auto-resolves cwd)");
         Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
         Console.WriteLine("  orchestrate <list|create|status|run> .. Supervised multi-agent runs ('run' dispatches live)");
         Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");

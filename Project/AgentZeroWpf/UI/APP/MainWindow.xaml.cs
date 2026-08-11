@@ -548,6 +548,14 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (command == "agent-resume")
+            {
+                int g = root.TryGetProperty("group_index", out var grp) ? grp.GetInt32() : -1;
+                int t = root.TryGetProperty("tab_index", out var tp) ? tp.GetInt32() : -1;
+                HandleAgentResume(g, t);
+                return;
+            }
+
             if (command == "orchestrate-run")
             {
                 int runId = root.TryGetProperty("run_id", out var rp) ? rp.GetInt32() : 0;
@@ -645,6 +653,22 @@ public partial class MainWindow : Window
         AppLogger.Log($"[IPC] terminal-list | groups={_cliGroups.Count} tabs={totalTabs} bytes={json.Length}");
         if (inv.Length > 0)
             AppLogger.Log($"[IPC] terminal-list inventory | {inv}");
+    }
+
+    // =========================================================================
+    //  Agent resume (herdr H3) — discover a tab's latest conversation + command
+    // =========================================================================
+    private const string AgentResumeMmfName = "AgentZeroLite_AgentResume_Response";
+    private const int AgentResumeMmfSize = 4096;
+
+    private void HandleAgentResume(int g, int t)
+    {
+        string cwd = (g >= 0 && g < _cliGroups.Count) ? _cliGroups[g].DirectoryPath : "";
+        string title = (g >= 0 && g < _cliGroups.Count && t >= 0 && t < _cliGroups[g].Tabs.Count)
+            ? _cliGroups[g].Tabs[t].Title : "";
+        var cmd = Agent.Common.Agents.ClaudeSessionLocator.BuildResumeCommand(cwd) ?? "";
+        var json = $"{{\"ok\":true,\"cwd\":\"{EscapeJson(cwd)}\",\"title\":\"{EscapeJson(title)}\",\"cmd\":\"{EscapeJson(cmd)}\"}}";
+        IpcMemoryMappedResponseWriter.WriteJson(AgentResumeMmfName, AgentResumeMmfSize, json, "[IPC] agent-resume 응답 쓰기 오류");
     }
 
     // =========================================================================
