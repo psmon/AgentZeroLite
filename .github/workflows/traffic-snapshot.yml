@@ -1,0 +1,113 @@
+name: Traffic Snapshot
+
+# GitHub keeps traffic (views/clones) only for the trailing 14 days and offers
+# no history for release-asset download counts. This job snapshots both every
+# day and merges them — keyed by date — into traffic-history/ so the long-term
+# trend accumulates in-repo instead of evaporating.
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 03:00 KST daily
+  workflow_dispatch: {}      # manual run button
+
+concurrency:
+  group: traffic-snapshot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect + merge traffic and download counts
+        env:
+          # Traffic API needs push access; the default GITHUB_TOKEN has it for
+          # this repo. Set a TRAFFIC_TOKEN secret (repo PAT) only if you ever
+          # move this to a fork/org where the default token is insufficient.
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN || secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p traffic-history
+          DATE=$(date -u +%F)
+
+          # --- views: merge 14-day window into a date-keyed map (new wins) ---
+          views_new=$(gh api "repos/$REPO/traffic/views")
+          [ -f traffic-history/views.json ] || echo '{}' > traffic-history/views.json
+          jq --argjson new "$views_new" '
+            reduce ($new.views[]?) as $v (.;
+              .[$v.timestamp[0:10]] = {count: $v.count, uniques: $v.uniques})
+          ' traffic-history/views.json > traffic-history/views.json.tmp
+          mv traffic-history/views.json.tmp traffic-history/views.json
+
+          # --- clones: same date-keyed merge ---
+          clones_new=$(gh api "repos/$REPO/traffic/clones")
+          [ -f traffic-history/clones.json ] || echo '{}' > traffic-history/clones.json
+          jq --argjson new "$clones_new" '
+            reduce ($new.clones[]?) as $c (.;
+              .[$c.timestamp[0:10]] = {count: $c.count, uniques: $c.uniques})
+          ' traffic-history/clones.json > traffic-history/clones.json.tmp
+          mv traffic-history/clones.json.tmp traffic-history/clones.json
+
+          # --- release downloads: cumulative totals, one row per run date ---
+          rel=$(gh api "repos/$REPO/releases" --paginate)
+          setup=$(echo "$rel" | jq '[.[].assets[]? | select(.name|endswith("Setup.exe")) | .download_count] | add // 0')
+          zip=$(echo   "$rel" | jq '[.[].assets[]? | select(.name|endswith(".zip"))       | .download_count] | add // 0')
+          total=$((setup + zip))
+          [ -f traffic-history/downloads.json ] || echo '{}' > traffic-history/downloads.json
+          jq --arg d "$DATE" --argjson s "$setup" --argjson z "$zip" --argjson t "$total" '
+            .[$d] = {setup: $s, zip: $z, total: $t}
+          ' traffic-history/downloads.json > traffic-history/downloads.json.tmp
+          mv traffic-history/downloads.json.tmp traffic-history/downloads.json
+
+          # --- per-release cumulative snapshot (latest-known counts per tag) ---
+          echo "$rel" | jq '[.[] | {tag: .tag_name, published: .published_at,
+            setup: ([.assets[]? | select(.name|endswith("Setup.exe")) | .download_count] | add // 0),
+            zip:   ([.assets[]? | select(.name|endswith(".zip"))       | .download_count] | add // 0)}]' \
+            > traffic-history/releases.json
+
+          # --- human-readable summary ---
+          {
+            echo "# Traffic & Download History"
+            echo ""
+            echo "_Last snapshot: ${DATE} (UTC). Updated daily by \`.github/workflows/traffic-snapshot.yml\`._"
+            echo ""
+            echo "## Downloads (cumulative)"
+            echo ""
+            echo "| Metric | Total |"
+            echo "|---|---|"
+            echo "| Setup.exe | ${setup} |"
+            echo "| win-x64.zip | ${zip} |"
+            echo "| **Grand total** | **${total}** |"
+            echo ""
+            echo "## Views (all recorded days)"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|---|---|"
+            v_days=$(jq 'length' traffic-history/views.json)
+            v_sum=$(jq '[.[].count] | add // 0' traffic-history/views.json)
+            c_days=$(jq 'length' traffic-history/clones.json)
+            c_sum=$(jq '[.[].count] | add // 0' traffic-history/clones.json)
+            echo "| Recorded days (views) | ${v_days} |"
+            echo "| Cumulative views | ${v_sum} |"
+            echo "| Recorded days (clones) | ${c_days} |"
+            echo "| Cumulative clones | ${c_sum} |"
+          } > traffic-history/SUMMARY.md
+
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add traffic-history/
+          if git diff --cached --quiet; then
+            echo "No traffic changes to commit."
+          else
+            git commit -m "chore(traffic): daily snapshot $(date -u +%F)"
+            git push
+          fi
