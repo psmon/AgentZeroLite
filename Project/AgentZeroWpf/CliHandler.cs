@@ -86,6 +86,7 @@ internal static class CliHandler
             "worktree" => Worktree(cliArgs.Skip(1).ToArray()),
             "terminal-wait" => TerminalWait(cliArgs.Skip(1).ToArray()),
             "agent-state" => AgentState(),
+            "agent-resume-cmd" => AgentResumeCmd(cliArgs.Skip(1).ToArray()),
             "skill-stub-install" => SkillStubInstall(),
             "skill-stub-uninstall" => SkillStubUninstall(),
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
@@ -1020,6 +1021,25 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  agent-resume-cmd [cwd]  (herdr H3)
+    //      : discover the latest Claude conversation for a folder and print the
+    //      command to resume it (`claude --resume <id>`). In-process. Defaults
+    //      to the current directory.
+    // =========================================================================
+    private static int AgentResumeCmd(string[] args)
+    {
+        var cwd = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : Directory.GetCurrentDirectory();
+        var cmd = Agent.Common.Agents.ClaudeSessionLocator.BuildResumeCommand(cwd);
+        if (cmd is null)
+        {
+            Console.WriteLine($"No prior Claude session found for {System.IO.Path.GetFullPath(cwd)}.");
+            return 0;
+        }
+        Console.WriteLine(cmd);
+        return 0;
+    }
+
+    // =========================================================================
     //  agent-state  (herdr H1/H2) — detected lifecycle state per terminal + rollup
     // =========================================================================
     private const string AgentStateMmfName = "AgentZeroLite_AgentState_Response";
@@ -1433,6 +1453,7 @@ internal static class CliHandler
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
         Console.WriteLine("  terminal-wait <grp> <tab> [--until S]   Block until idle, or until state S (working|blocked|idle|done)");
         Console.WriteLine("  agent-state                             Detected agent state per terminal + attention rollup");
+        Console.WriteLine("  agent-resume-cmd [cwd]                  Print 'claude --resume <id>' for a folder's latest session");
         Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
         Console.WriteLine("  orchestrate <list|create|status|run> .. Supervised multi-agent runs ('run' dispatches live)");
         Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");
