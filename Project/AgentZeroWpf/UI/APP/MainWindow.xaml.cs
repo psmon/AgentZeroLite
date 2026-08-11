@@ -508,6 +508,13 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (command == "orchestrate-run")
+            {
+                int runId = root.TryGetProperty("run_id", out var rp) ? rp.GetInt32() : 0;
+                HandleOrchestrateRun(runId);
+                return;
+            }
+
             if (command == "agent-hook")
             {
                 string evt = root.TryGetProperty("event", out var ep) ? ep.GetString() ?? "" : "";
@@ -946,6 +953,71 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             AppLogger.Log($"[IPC] agent-hook 라우팅 오류: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Executes a persisted orchestration run against the live terminal agents
+    /// (W6 activation). Builds one WorkerSinkActor per running terminal, a router
+    /// over them, and a coordinator that drives the task DAG. Runs asynchronously;
+    /// track progress via `-cli orchestrate status`.
+    /// </summary>
+    private void HandleOrchestrateRun(int runId)
+    {
+        try
+        {
+            using var db = new Agent.Common.Data.AppDbContext();
+            var run = db.OrchestrationRuns.FirstOrDefault(r => r.Id == runId);
+            if (run is null) { AppLogger.Log($"[Orchestrate] run #{runId} not found"); return; }
+            var specs = Agent.Common.Orchestration.OrchestrationStore.LoadSpecs(db, runId);
+            if (specs.Count == 0) { AppLogger.Log($"[Orchestrate] run #{runId} has no tasks"); return; }
+
+            // Collect running terminals to use as workers.
+            var targets = new List<(int g, int t)>();
+            for (int gi = 0; gi < _cliGroups.Count; gi++)
+                for (int ti = 0; ti < _cliGroups[gi].Tabs.Count; ti++)
+                    if (_cliGroups[gi].Tabs[ti].IsTerminalStarted)
+                        targets.Add((gi, ti));
+
+            if (targets.Count == 0) { AppLogger.Log("[Orchestrate] no running terminals to use as workers"); return; }
+
+            var system = Actors.ActorSystemManager.System;
+            var toolbelt = new Services.WorkspaceTerminalToolHost(() => _cliGroups, GetActiveWorkspaceRoot);
+
+            var sinks = targets.Select((tg, i) =>
+                system.ActorOf(Akka.Actor.Props.Create(() =>
+                    new Agent.Common.Actors.WorkerSinkActor(toolbelt, tg.g, tg.t, null)),
+                    $"orch-sink-{runId}-{i}")).ToList();
+            var router = system.ActorOf(Agent.Common.Actors.WorkerRouterActor.Props(sinks), $"orch-router-{runId}");
+            var coord = system.ActorOf(Akka.Actor.Props.Create(() =>
+                new Agent.Common.Actors.CoordinatorActor(router)), $"orch-coord-{runId}");
+
+            AppLogger.Log($"[Orchestrate] run #{runId} started: {specs.Count} tasks, {sinks.Count} workers");
+
+            coord.Ask<Agent.Common.Actors.OrchestrationRunCompleted>(
+                    new Agent.Common.Actors.StartOrchestrationRun(run.Name, specs),
+                    TimeSpan.FromMinutes(30))
+                .ContinueWith(t =>
+                {
+                    try
+                    {
+                        using var db2 = new Agent.Common.Data.AppDbContext();
+                        bool ok = t.IsCompletedSuccessfully && t.Result.Success;
+                        Agent.Common.Orchestration.OrchestrationStore.FinishRun(db2, runId, ok);
+                        AppLogger.Log($"[Orchestrate] run #{runId} finished: success={ok}");
+                    }
+                    catch (Exception ex) { AppLogger.Log($"[Orchestrate] finish #{runId} failed: {ex.Message}"); }
+                    finally
+                    {
+                        foreach (var s in sinks) system.Stop(s);
+                        system.Stop(router);
+                        system.Stop(coord);
+                    }
+                });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Orchestrate] run #{runId} error: {ex.Message}");
         }
     }
 

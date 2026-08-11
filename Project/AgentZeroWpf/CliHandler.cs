@@ -817,6 +817,20 @@ internal static class CliHandler
                     Console.WriteLine($"Created run #{runId} '{name}' with {specs.Count} task(s).");
                     return 0;
                 }
+                case "run":
+                {
+                    if (args.Length < 2 || !int.TryParse(args[1], out var runId)) { Console.Error.WriteLine("Usage: orchestrate run <runId>"); return 1; }
+                    // Execution needs the live actor system + terminals → hand off to the GUI.
+                    IntPtr wnd = FindAgentZero();
+                    if (wnd == IntPtr.Zero) return 1;
+                    var sb = new StringBuilder();
+                    sb.Append("{\"command\":\"orchestrate-run\"");
+                    sb.Append($",\"run_id\":{runId}");
+                    sb.Append('}');
+                    if (!SendWpfCommand(wnd, sb.ToString())) return 1;
+                    Console.WriteLine($"Requested run #{runId} start. Track with: orchestrate status {runId}");
+                    return 0;
+                }
                 case "status":
                 {
                     if (args.Length < 2 || !int.TryParse(args[1], out var runId)) { Console.Error.WriteLine("Usage: orchestrate status <runId>"); return 1; }

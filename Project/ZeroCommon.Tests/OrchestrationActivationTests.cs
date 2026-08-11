@@ -1,9 +1,13 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using Agent.Common.Actors;
 using Agent.Common.Data.Entities;
+using Agent.Common.Llm.Tools;
 using Agent.Common.Orchestration;
 
 namespace ZeroCommon.Tests;
@@ -99,5 +103,66 @@ public sealed class WorkerRouterActorTests : TestKit
         var done = ExpectMsg<OrchestrationRunCompleted>();
         Assert.True(done.Success);
         Assert.Equal(2, done.Completed);
+    }
+}
+
+/// <summary>
+/// Live wiring: coordinator → router → WorkerSinkActor → (mock terminal) →
+/// WorkerDone → run completes. Proves the full orchestration loop drives a
+/// terminal-agent abstraction end to end without any real agent.
+/// </summary>
+public sealed class WorkerSinkActorTests : TestKit
+{
+    // Mock terminal agent: records prompts sent, returns a constant reply so the
+    // sink's idle-detection stabilizes immediately.
+    private sealed class MockTerminalToolbelt : IAgentToolbelt
+    {
+        public readonly List<string> Sent = new();
+        public Task<string> ListTerminalsAsync(CancellationToken ct) => Task.FromResult("{}");
+        public Task<string> ReadTerminalAsync(int g, int t, int n, CancellationToken ct) => Task.FromResult("agent reply: done");
+        public Task<bool> SendToTerminalAsync(int g, int t, string text, CancellationToken ct) { lock (Sent) Sent.Add(text); return Task.FromResult(true); }
+        public Task<bool> SendKeyAsync(int g, int t, string key, CancellationToken ct) => Task.FromResult(true);
+    }
+
+    private static readonly WorkerSinkOptions Fast =
+        new() { PollDelay = TimeSpan.FromMilliseconds(10), StableRounds = 1, MaxReads = 5, ReadChars = 500 };
+
+    [Fact]
+    public void Sink_SendsPrompt_ReadsIdle_ReportsDone()
+    {
+        var tb = new MockTerminalToolbelt();
+        var sink = Sys.ActorOf(Props.Create(() => new WorkerSinkActor(tb, 0, 0, Fast)), "sink");
+
+        sink.Tell(new DispatchTaskToWorker("a", "do a"), TestActor);
+        var done = ExpectMsg<WorkerDone>(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("a", done.TaskKey);
+        Assert.True(done.Success);
+        Assert.Contains("do a", tb.Sent);
+        Assert.Contains("done", done.Message);
+    }
+
+    [Fact]
+    public void EndToEnd_Coordinator_Router_Sink_CompletesDagOnMockTerminals()
+    {
+        var tb = new MockTerminalToolbelt();
+        var sink0 = Sys.ActorOf(Props.Create(() => new WorkerSinkActor(tb, 0, 0, Fast)), "e2e-sink0");
+        var sink1 = Sys.ActorOf(Props.Create(() => new WorkerSinkActor(tb, 0, 1, Fast)), "e2e-sink1");
+        var router = Sys.ActorOf(WorkerRouterActor.Props(new[] { sink0, sink1 }), "e2e-sink-router");
+        var coord = Sys.ActorOf(Props.Create(() => new CoordinatorActor(router)), "e2e-sink-coord");
+
+        coord.Tell(new StartOrchestrationRun("live", new[]
+        {
+            new OrchestrationTaskSpec("a", "task a", new string[0]),
+            new OrchestrationTaskSpec("b", "task b", new[] { "a" }),
+        }), TestActor);
+
+        // No manual WorkerDone here — the sinks drive real completion via the
+        // mock terminal. The whole DAG should finish on its own.
+        var done = ExpectMsg<OrchestrationRunCompleted>(TimeSpan.FromSeconds(10));
+        Assert.True(done.Success);
+        Assert.Equal(2, done.Completed);
+        Assert.Contains("task a", tb.Sent);
+        Assert.Contains("task b", tb.Sent);
     }
 }
