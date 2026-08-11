@@ -353,6 +353,15 @@ public partial class MainWindow : Window
                 : ((int, int)?)null);
         _agentStateMonitor.Changed += () =>
         {
+            int attention = _agentStateMonitor?.AttentionCount() ?? 0;
+            // Flash the taskbar only when a NEW agent starts needing the user.
+            if (attention > _prevAttention)
+            {
+                try { Services.TaskbarFlasher.Flash(new WindowInteropHelper(this).Handle); }
+                catch { }
+                AppLogger.Log($"[AgentState] attention rose to {attention} — flashing taskbar");
+            }
+            _prevAttention = attention;
             UpdateAgentAttentionTitle();
             RefreshSessionList(); // repaint state chips when a detected state changes
         };
@@ -1752,6 +1761,7 @@ public partial class MainWindow : Window
     private readonly List<CliGroupInfo> _cliGroups = [];
     private Services.AutomationScheduler? _automationScheduler;
     private Services.AgentStateMonitor? _agentStateMonitor;
+    private int _prevAttention;
     private int _activeGroupIndex = -1;
 
     // Convenience accessors for active group
