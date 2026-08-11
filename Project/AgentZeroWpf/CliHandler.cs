@@ -1317,6 +1317,10 @@ internal static class CliHandler
         Console.WriteLine("  AgentZeroLite.ps1 terminal-key  0 0 Interrupt");
         Console.WriteLine("  AgentZeroLite.ps1 bot-chat \"build finished\" --from CI");
         Console.WriteLine("  AgentZeroLite.ps1 status --no-wait");
+        Console.WriteLine("  AgentZeroLite.ps1 worktree list");
+        Console.WriteLine("  AgentZeroLite.ps1 cost");
+        Console.WriteLine("  AgentZeroLite.ps1 automation create --name daily --schedule \"daily 09:00\" --prompt \"summarize changes\"");
+        Console.WriteLine("  AgentZeroLite.ps1 orchestrate run 1");
         Console.WriteLine();
         Console.WriteLine("Notes:");
         Console.WriteLine("  * The GUI must already be running. Start it via open-win if needed.");
@@ -1353,9 +1357,9 @@ internal static class CliHandler
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
         Console.WriteLine("  terminal-wait <grp> <tab> [--idle-ms N] Block until a terminal goes idle");
         Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
-        Console.WriteLine("  orchestrate <list|create|status> ...    Supervised multi-agent runs (durable)");
+        Console.WriteLine("  orchestrate <list|create|status|run> .. Supervised multi-agent runs ('run' dispatches live)");
         Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");
-        Console.WriteLine("  skill-stub-install                      Inject anti-drift AgentZero skill stub");
+        Console.WriteLine("  skill-stub-install / -uninstall         Inject/remove anti-drift AgentZero skill stub");
         Console.WriteLine("  bot-chat <message> [--from name]        Display external chat in AgentBot");
         Console.WriteLine("  agent-hook --event <name> [--state p]   Report hosted-agent state (fire-and-forget)");
         Console.WriteLine("  agent-hook-install                      Install state hooks into ~/.claude*/settings.json");
