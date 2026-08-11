@@ -344,6 +344,16 @@ public partial class MainWindow : Window
         });
         _automationScheduler.Start();
 
+        // Agent-state monitor (herdr H1/H2) — detect per-terminal agent state and
+        // surface an attention count in the title bar.
+        _agentStateMonitor = new Services.AgentStateMonitor(
+            groupsProvider: () => _cliGroups,
+            activeProvider: () => _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count
+                ? (_activeGroupIndex, _cliGroups[_activeGroupIndex].ActiveTabIndex)
+                : ((int, int)?)null);
+        _agentStateMonitor.Changed += UpdateAgentAttentionTitle;
+        _agentStateMonitor.Start();
+
         // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
         PreviewKeyDown += (_, ke) =>
         {
@@ -519,6 +529,12 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (command == "agent-state")
+            {
+                HandleAgentState();
+                return;
+            }
+
             if (command == "orchestrate-run")
             {
                 int runId = root.TryGetProperty("run_id", out var rp) ? rp.GetInt32() : 0;
@@ -616,6 +632,41 @@ public partial class MainWindow : Window
         AppLogger.Log($"[IPC] terminal-list | groups={_cliGroups.Count} tabs={totalTabs} bytes={json.Length}");
         if (inv.Length > 0)
             AppLogger.Log($"[IPC] terminal-list inventory | {inv}");
+    }
+
+    // =========================================================================
+    //  Agent state (herdr H1/H2) — detected per-terminal lifecycle state + rollup
+    // =========================================================================
+    private const string AgentStateMmfName = "AgentZeroLite_AgentState_Response";
+    private const int AgentStateMmfSize = 32768;
+
+    /// <summary>Reflects the attention count (blocked / unseen-done agents) into the title bar.</summary>
+    private void UpdateAgentAttentionTitle()
+    {
+        int n = _agentStateMonitor?.AttentionCount() ?? 0;
+        Title = n > 0 ? $"AgentZero Lite  ● {n} need attention" : "AgentZero Lite";
+    }
+
+    private void HandleAgentState()
+    {
+        var snap = _agentStateMonitor?.Snapshot() ?? System.Array.Empty<Services.AgentStateMonitor.TabState>();
+        int attention = _agentStateMonitor?.AttentionCount() ?? 0;
+        var sb = new StringBuilder();
+        sb.Append("{\"ok\":true,\"attention\":").Append(attention).Append(",\"tabs\":[");
+        for (int i = 0; i < snap.Count; i++)
+        {
+            var s = snap[i];
+            if (i > 0) sb.Append(',');
+            sb.Append('{');
+            sb.Append($"\"group\":{s.Group},\"tab\":{s.Tab}");
+            sb.Append($",\"title\":\"{EscapeJson(s.Title)}\"");
+            sb.Append($",\"state\":\"{s.Activity.ToString().ToLowerInvariant()}\"");
+            sb.Append($",\"seen\":{(s.Seen ? "true" : "false")}");
+            sb.Append($",\"rule\":\"{EscapeJson(s.Rule ?? "")}\"");
+            sb.Append('}');
+        }
+        sb.Append("]}");
+        IpcMemoryMappedResponseWriter.WriteJson(AgentStateMmfName, AgentStateMmfSize, sb.ToString(), "[IPC] agent-state 응답 쓰기 오류");
     }
 
     // =========================================================================
@@ -1696,6 +1747,7 @@ public partial class MainWindow : Window
 
     private readonly List<CliGroupInfo> _cliGroups = [];
     private Services.AutomationScheduler? _automationScheduler;
+    private Services.AgentStateMonitor? _agentStateMonitor;
     private int _activeGroupIndex = -1;
 
     // Convenience accessors for active group

@@ -85,6 +85,7 @@ internal static class CliHandler
             "cost" => ShowCost(),
             "worktree" => Worktree(cliArgs.Skip(1).ToArray()),
             "terminal-wait" => TerminalWait(cliArgs.Skip(1).ToArray()),
+            "agent-state" => AgentState(),
             "skill-stub-install" => SkillStubInstall(),
             "skill-stub-uninstall" => SkillStubUninstall(),
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
@@ -1019,6 +1020,40 @@ internal static class CliHandler
     }
 
     // =========================================================================
+    //  agent-state  (herdr H1/H2) — detected lifecycle state per terminal + rollup
+    // =========================================================================
+    private const string AgentStateMmfName = "AgentZeroLite_AgentState_Response";
+    private const int AgentStateMmfSize = 32768;
+
+    private static int AgentState()
+    {
+        IntPtr wnd = FindAgentZero();
+        if (wnd == IntPtr.Zero) return 1;
+        if (!SendWpfCommand(wnd, "{\"command\":\"agent-state\"}")) return 1;
+        var json = TryReadMmf(AgentStateMmfName, AgentStateMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        int attention = root.TryGetProperty("attention", out var ap) ? ap.GetInt32() : 0;
+        Console.WriteLine($"Agents needing attention: {attention}");
+        if (root.TryGetProperty("tabs", out var tabs) && tabs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var t in tabs.EnumerateArray())
+            {
+                var g = t.GetProperty("group").GetInt32();
+                var tb = t.GetProperty("tab").GetInt32();
+                var title = t.GetProperty("title").GetString() ?? "";
+                var state = t.GetProperty("state").GetString() ?? "";
+                var seen = t.TryGetProperty("seen", out var sp) && sp.GetBoolean();
+                var flag = state == "blocked" || (state == "done" && !seen) ? " ←" : "";
+                Console.WriteLine($"  [{g}:{tb}] {state,-8} {(seen ? " " : "*")} {title}{flag}");
+            }
+        }
+        return 0;
+    }
+
+    // =========================================================================
     //  worktree <list|add|remove> ...  (missions W4/W7)
     //      : git worktree management in the current directory's repo. In-process.
     // =========================================================================
@@ -1397,6 +1432,7 @@ internal static class CliHandler
         Console.WriteLine("  terminal-key  <grp> <tab> <key>         Send a control key to a terminal");
         Console.WriteLine("  terminal-read <grp> <tab> [--last N]    Read terminal output text");
         Console.WriteLine("  terminal-wait <grp> <tab> [--until S]   Block until idle, or until state S (working|blocked|idle|done)");
+        Console.WriteLine("  agent-state                             Detected agent state per terminal + attention rollup");
         Console.WriteLine("  worktree <list|add|remove> ...          Manage git worktrees (current repo)");
         Console.WriteLine("  orchestrate <list|create|status|run> .. Supervised multi-agent runs ('run' dispatches live)");
         Console.WriteLine("  automation <create|list|remove|due>     Scheduled agent runs (every/hourly/daily)");
