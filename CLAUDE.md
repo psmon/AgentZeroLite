@@ -75,6 +75,9 @@ Actor names sometimes contain user input (workspace names, terminal IDs). Route 
 ### CLI ↔ GUI IPC
 `AgentZeroLite.exe -cli <cmd>` talks to the running GUI over `WM_COPYDATA` with marker `0x414C "AL"` (send side in `CliHandler.cs`, receive in `CliTerminalIpcHelper.cs` / `MainWindow`). The GUI writes JSON responses to named memory-mapped files with the `AgentZeroLite_*` prefix; the CLI side polls (default 5s timeout; `--no-wait` skips the wait entirely). Helper wrapper: `Project/AgentZeroWpf/AgentZeroLite.ps1` (launches with `-NoNewWindow -Wait` to make stdio visible).
 
+### CLI test skills (agent-facing usage guides)
+`.claude/skills/agentzero-cli/` is a **guide-level skill authored to exercise the `-cli` surface** — it teaches an agent to locate the exe (Debug build preferred for internal testing), invoke it on Windows (WinExe → `Start-Process -NoNewWindow -Wait` or the `.ps1` wrapper), drive terminal tabs, run the handshake / `DONE()` reverse channel and two-terminal discussion loop, and use the native `os` control verbs. It's a testing/dev aid, not product code; `dotnet` builds ignore it. `scripts/find-cli.ps1` resolves the exe by priority; `references/` holds the full command + interaction detail. `codex/prompts/agentzero-cli.md` is the project-bundled Codex analog (Codex has no `skills/` auto-discovery — copy/symlink it into `~/.codex/prompts/` to get `/agentzero-cli`). Both stay thin pointers to `-cli help agentzero` so they can't drift from the binary. Official plugin packaging is tracked separately.
+
 ### Persistence
 EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude) are marked `IsBuiltIn = true` and must not be deletable from the UI.
 
