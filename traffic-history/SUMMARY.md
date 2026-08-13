@@ -1,6 +1,6 @@
 # Traffic & Download History
 
-_Last snapshot: 2026-08-12 (UTC). Updated daily by `.github/workflows/traffic-snapshot.yml`._
+_Last snapshot: 2026-08-13 (UTC). Updated daily by `.github/workflows/traffic-snapshot.yml`._
 
 ## Downloads (cumulative)
 
