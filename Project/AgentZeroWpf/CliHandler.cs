@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Agent.Common.Module;
+using AgentZeroWpf.AiControl;
 using AgentZeroWpf.Module;
 using AgentZeroWpf.OsControl;
 using Microsoft.Win32.SafeHandles;
@@ -93,6 +94,7 @@ internal static class CliHandler
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
             "automation" => Automation(cliArgs.Skip(1).ToArray()),
             "os" => OsCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
+            "ai" => AiCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             _ => PrintUnknownCommand(command),
         };
     }
@@ -1507,6 +1509,7 @@ internal static class CliHandler
         Console.WriteLine("  trust-workspace [path]                  Pre-trust a folder for Cursor/Copilot/Codex CLIs");
         Console.WriteLine("  cost                                    Estimated USD cost from recorded token usage");
         Console.WriteLine("  os <verb> [args]                        OS-control: window/screenshot/input (see 'os help')");
+        Console.WriteLine("  ai <verb> [args]                        Voice AI: TTS / STT via configured provider (see 'ai help')");
         Console.WriteLine("  help                                    Show detailed help");
         Console.WriteLine("  version, --version, -v                  Print CLI build identity (no GUI needed)");
     }
