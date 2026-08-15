@@ -33,6 +33,14 @@ internal static class AiCliCommands
 {
     public static int Dispatch(string[] args)
     {
+        // -cli runs ON the WPF Dispatcher thread but never pumps its message
+        // loop. Libraries that capture SynchronizationContext.Current — NAudio's
+        // PlaybackStopped event, awaited continuations resumed via .GetResult() —
+        // would post to that dead context and hang forever (audio plays but the
+        // completion callback never fires; STT continuations never resume).
+        // Detach it so events/continuations run inline on the calling thread.
+        SynchronizationContext.SetSynchronizationContext(null);
+
         if (args.Length == 0)
         {
             PrintUsage();
@@ -71,11 +79,16 @@ internal static class AiCliCommands
         {
             var voices = tts.GetAvailableVoicesAsync().GetAwaiter().GetResult();
             var current = ResolveDefaultVoice(v);
+            var isSupertonic = v.TtsProvider == TtsProviderNames.Supertonic;
             Console.WriteLine($"Available voices ({voices.Count}):");
             foreach (var voice in voices)
-                Console.WriteLine($"  {(voice == current ? "*" : " ")} {voice}");
+                Console.WriteLine($"  {(voice == current ? "*" : " ")} {voice}{VoiceHint(voice, isSupertonic)}");
+            Console.WriteLine();
             if (!string.IsNullOrEmpty(current))
-                Console.WriteLine($"\n  '*' = configured default ({current}). Override per call with 'ai tts --voice <id>'.");
+                Console.WriteLine($"  '*' = current voice ({current}).");
+            Console.WriteLine("  Pick one per call:   ai tts \"안녕하세요\" --voice F3 --speaker");
+            if (isSupertonic)
+                Console.WriteLine("  Supertonic: M1–M5 = male, F1–F5 = female. Change the saved default in Settings → Voice.");
             return 0;
         }
         catch (Exception ex)
@@ -85,6 +98,18 @@ internal static class AiCliCommands
         }
     }
 
+    /// <summary>Human hint next to a voice id — gender for Supertonic's M#/F# ids, nothing otherwise.</summary>
+    private static string VoiceHint(string voice, bool isSupertonic)
+    {
+        if (!isSupertonic || voice.Length < 2) return "";
+        return char.ToUpperInvariant(voice[0]) switch
+        {
+            'M' when char.IsDigit(voice[1]) => "   (male)",
+            'F' when char.IsDigit(voice[1]) => "   (female)",
+            _ => "",
+        };
+    }
+
     // =============================================================== TTS: tts
 
     private static int Tts(string[] args)
@@ -92,6 +117,7 @@ internal static class AiCliCommands
         string? outPath = null;
         string? voice = null;
         int outDevice = -1;
+        float? speed = null;
         var textParts = new List<string>();
         for (int i = 0; i < args.Length; i++)
         {
@@ -103,6 +129,10 @@ internal static class AiCliCommands
                     voice = args[++i]; break;
                 case "--device" when i + 1 < args.Length && int.TryParse(args[i + 1], out var dn):
                     outDevice = dn; i++; break;
+                case "--speed" when i + 1 < args.Length
+                        && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float,
+                                          System.Globalization.CultureInfo.InvariantCulture, out var sp):
+                    speed = Math.Clamp(sp, 0.7f, 2.0f); i++; break;
                 case "--speaker":
                     break; // speaker is the default when no --out; flag is accepted for clarity
                 default:
@@ -115,11 +145,16 @@ internal static class AiCliCommands
             text = Console.In.ReadToEnd().Trim();
         if (text.Length == 0)
         {
-            Console.Error.WriteLine("Usage: ai tts <text> [--voice V] [--out FILE.wav | --speaker] [--device N]");
+            Console.Error.WriteLine("Usage: ai tts <text> [--voice V] [--speed S] [--out FILE.wav | --speaker] [--device N]");
             return 1;
         }
 
         var v = VoiceSettingsStore.Load();
+        // --speed overrides the configured Supertonic speed for THIS call only
+        // (0.7 slow … 2.0 fast; lower = slower). Not persisted. Ignored by the
+        // non-Supertonic providers, which don't take a speed knob.
+        if (speed.HasValue)
+            v.SupertonicSpeed = speed.Value;
         var tts = VoiceRuntimeFactory.BuildTts(v);
         if (tts is null)
         {
@@ -129,11 +164,12 @@ internal static class AiCliCommands
         }
 
         var useVoice = voice ?? ResolveDefaultVoice(v);
+        var speedNote = v.TtsProvider == TtsProviderNames.Supertonic ? $", speed={v.SupertonicSpeed:0.##}" : "";
         byte[] audio;
         try
         {
             Console.Error.WriteLine($"[ai] synthesizing via {tts.ProviderName} " +
-                                    $"(voice={(string.IsNullOrEmpty(useVoice) ? "default" : useVoice)}) …");
+                                    $"(voice={(string.IsNullOrEmpty(useVoice) ? "default" : useVoice)}{speedNote}) …");
             audio = tts.SynthesizeAsync(text, useVoice).GetAwaiter().GetResult();
         }
         catch (Exception ex)
@@ -180,12 +216,14 @@ internal static class AiCliCommands
             var effective = VoicePlaybackService.DetectFormat(audio, format);
             using var src = VoicePlaybackService.CreateSource(audio, effective);
             using var output = new WaveOutEvent { DeviceNumber = deviceNumber };
-            using var done = new ManualResetEventSlim(false);
-            output.PlaybackStopped += (_, __) => done.Set();
             output.Init(src);
             output.Play();
             Console.Error.WriteLine($"[ai] playing {audio.Length} bytes ({effective}) on output device {deviceNumber} …");
-            done.Wait();
+            // Poll PlaybackState rather than waiting on PlaybackStopped: the state
+            // flips to Stopped on NAudio's own thread when the source ends, needing
+            // no SynchronizationContext — robust in a CLI with no message pump.
+            while (output.PlaybackState == PlaybackState.Playing)
+                Thread.Sleep(100);
             Console.WriteLine("Playback complete.");
             return 0;
         }
@@ -393,8 +431,9 @@ internal static class AiCliCommands
         Console.WriteLine();
         Console.WriteLine("Voice — TTS (text → speech):");
         Console.WriteLine("  voices                                   List voices for the active TTS provider");
-        Console.WriteLine("  tts <text> [--voice V] [--out FILE.wav]  Synthesize speech. Default plays on the speaker;");
-        Console.WriteLine("             [--speaker] [--device N]         --out writes a WAV file instead. --device picks the speaker.");
+        Console.WriteLine("  tts <text> [--voice V] [--speed S]       Synthesize speech. Default plays on the speaker;");
+        Console.WriteLine("             [--out FILE.wav] [--speaker]      --out writes a WAV file instead. --device picks the speaker.");
+        Console.WriteLine("             [--device N]                      --speed 0.7..2.0 (lower = slower; Supertonic only).");
         Console.WriteLine();
         Console.WriteLine("Voice — STT (speech → text):");
         Console.WriteLine("  stt --in FILE.wav [--lang XX]            Transcribe an audio file");
