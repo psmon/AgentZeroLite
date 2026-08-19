@@ -114,7 +114,7 @@ internal static class OsCliCommands
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: os element-tree <hwnd> [--depth N] [--search keyword]");
+            Console.Error.WriteLine("Usage: os element-tree <hwnd> [--depth N] [--search keyword] [--timeout-sec N]");
             return 1;
         }
         if (!TryParseHwnd(args[0], out long hwnd))
@@ -124,6 +124,7 @@ internal static class OsCliCommands
         }
         int depth = 30;
         string? search = null;
+        int timeoutSec = 15;
         for (int i = 1; i < args.Length; i++)
         {
             switch (args[i].ToLowerInvariant())
@@ -132,9 +133,11 @@ internal static class OsCliCommands
                     depth = Math.Clamp(d, 1, 100); i++; break;
                 case "--search" when i + 1 < args.Length:
                     search = args[++i]; break;
+                case "--timeout-sec" when i + 1 < args.Length && int.TryParse(args[i + 1], out int ts):
+                    timeoutSec = Math.Clamp(ts, 1, 300); i++; break;
             }
         }
-        var json = OsControlService.ElementTreeAsync(hwnd, depth, search, OsAuditLog.Caller.Cli)
+        var json = OsControlService.ElementTreeAsync(hwnd, depth, search, OsAuditLog.Caller.Cli, timeoutSec)
             .GetAwaiter().GetResult();
         return PrintJson(json);
     }

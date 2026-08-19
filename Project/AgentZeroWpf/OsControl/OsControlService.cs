@@ -106,30 +106,62 @@ internal static class OsControlService
         }
     }
 
-    public static async Task<string> ElementTreeAsync(long hwnd, int maxDepth, string? search, OsAuditLog.Caller caller = OsAuditLog.Caller.Cli)
+    public static async Task<string> ElementTreeAsync(long hwnd, int maxDepth, string? search, OsAuditLog.Caller caller = OsAuditLog.Caller.Cli, int timeoutSec = 15, CancellationToken ct = default)
     {
+        // GitHub #13 (finding 2): the UIA walk can hang — a blocking cross-thread
+        // UIA call against a WPF window that owns ConPTY children can wait on
+        // the UI thread indefinitely. A warn-only rubric cannot downgrade a
+        // hang (the run never reaches the warn), and in CI it blocks until the
+        // job timeout. So we bound the walk with a hard timeout and return a
+        // structured `uia_timeout` error instead of hanging forever.
+        //
+        // The STA thread is joined with a timeout; if it is still running we
+        // leave it to finish in the background (UIA is not cooperatively
+        // cancellable mid-call) and report the timeout to the caller. For the
+        // CLI case the process exits and reaps the thread; for the in-process
+        // LLM case it is bounded by the UIA call eventually returning.
+        var timeoutMs = Math.Max(1, timeoutSec) * 1000;
         try
         {
             // ElementTreeScanner uses System.Windows.Automation which requires
             // an STA thread. Marshall onto a fresh STA thread to keep callers
             // (Akka / async LLM loop) happy.
+            //
+            // CRITICAL — ConfigureAwait(false): the CLI path runs this on the
+            // WPF main/Dispatcher thread via ElementTreeAsync(...).GetAwaiter()
+            // .GetResult(). Without ConfigureAwait(false) the continuation is
+            // posted back onto the Dispatcher SynchronizationContext, but the
+            // main thread is blocked in GetResult() and never pumps the
+            // Dispatcher — so the join's 15s timeout fires yet the result can
+            // never get back to the caller (deadlock; the process ran >60s in
+            // testing). ConfigureAwait(false) runs the continuation on a
+            // threadpool thread, unblocking the caller.
             var result = await Task.Run(() =>
             {
                 ElementTreeScanResult? local = null;
                 var t = new System.Threading.Thread(() =>
                 {
-                    local = ElementTreeScanner.Scan((IntPtr)hwnd, maxDepth);
+                    local = ElementTreeScanner.Scan((IntPtr)hwnd, maxDepth, ct: ct);
                 });
                 t.SetApartmentState(System.Threading.ApartmentState.STA);
+                t.IsBackground = true; // never keep the CLI host alive on its own
                 t.Start();
-                t.Join();
+                var completed = t.Join(timeoutMs);
+                if (!completed)
+                    return new ElementTreeScanResult(TimeoutSentinel.Instance, 0, "");
                 return local;
-            });
+            }).ConfigureAwait(false);
 
             if (result is null)
             {
                 OsAuditLog.Record(caller, "element_tree", new { hwnd, maxDepth, search }, ok: false, error: "scan failed");
                 return JsonSerializer.Serialize(new { ok = false, error = "element tree scan failed (window invalid or UIA unavailable)" }, JsonOpts);
+            }
+
+            if (ReferenceEquals(result.RootNode, TimeoutSentinel.Instance))
+            {
+                OsAuditLog.Record(caller, "element_tree", new { hwnd, maxDepth, search }, ok: false, error: $"uia_timeout ({timeoutSec}s)");
+                return JsonSerializer.Serialize(new { ok = false, error = "uia_timeout", timeoutSec, hwnd }, JsonOpts);
             }
 
             string treeText = result.TreeText;
@@ -153,6 +185,13 @@ internal static class OsControlService
             OsAuditLog.Record(caller, "element_tree", new { hwnd, maxDepth, search }, ok: false, error: ex.Message);
             return Err(ex);
         }
+    }
+
+    // Sentinel RootNode used to flag a timed-out scan without allocating a real
+    // tree. ElementTreeNode is internal; we only need a distinct reference.
+    private static class TimeoutSentinel
+    {
+        public static readonly ElementTreeNode Instance = new() { TypeTag = "", DisplayName = "", BoundsText = "" };
     }
 
     public static string TextCapture(long hwnd, OsAuditLog.Caller caller = OsAuditLog.Caller.Cli)

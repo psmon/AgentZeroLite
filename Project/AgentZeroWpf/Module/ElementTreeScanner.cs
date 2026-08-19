@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading;
 using System.Windows.Automation;
 
 namespace AgentZeroWpf.Module;
@@ -7,7 +8,7 @@ internal sealed record ElementTreeScanResult(ElementTreeNode RootNode, int NodeC
 
 internal static class ElementTreeScanner
 {
-    public static ElementTreeScanResult? Scan(IntPtr hwnd, int maxDepth = 30, int maxLogLines = 50)
+    public static ElementTreeScanResult? Scan(IntPtr hwnd, int maxDepth = 30, int maxLogLines = 50, CancellationToken ct = default)
     {
         try
         {
@@ -19,7 +20,7 @@ internal static class ElementTreeScanner
             root.FindAll(TreeScope.Children, Condition.TrueCondition);
 
             var count = 0;
-            var rootNode = BuildTreeNode(root, TreeWalker.ControlViewWalker, 0, ref count, maxDepth);
+            var rootNode = BuildTreeNode(root, TreeWalker.ControlViewWalker, 0, ref count, maxDepth, ct);
 
             DumpTreeToLog(rootNode, "", 0, maxLogLines);
 
@@ -71,8 +72,11 @@ internal static class ElementTreeScanner
         return count;
     }
 
-    private static ElementTreeNode BuildTreeNode(AutomationElement element, TreeWalker walker, int depth, ref int count, int maxDepth)
+    private static ElementTreeNode BuildTreeNode(AutomationElement element, TreeWalker walker, int depth, ref int count, int maxDepth, CancellationToken ct)
     {
+        if (ct.IsCancellationRequested)
+            throw new OperationCanceledException(ct);
+
         count++;
 
         var controlType = "?";
@@ -110,7 +114,7 @@ internal static class ElementTreeScanner
             var child = walker.GetFirstChild(element);
             while (child != null)
             {
-                node.Children.Add(BuildTreeNode(child, walker, depth + 1, ref count, maxDepth));
+                node.Children.Add(BuildTreeNode(child, walker, depth + 1, ref count, maxDepth, ct));
                 child = walker.GetNextSibling(child);
             }
         }

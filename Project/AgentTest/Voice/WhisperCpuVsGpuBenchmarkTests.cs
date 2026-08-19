@@ -38,7 +38,7 @@ public class WhisperCpuVsGpuBenchmarkTests
         Directory.CreateDirectory(OutputDir);
     }
 
-    [Fact]
+    [WhisperNativeFact]
     public async Task Cpu_vs_GpuVulkan_korean_weather_sentence()
     {
         var bar = new string('═', 70);

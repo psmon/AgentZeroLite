@@ -48,11 +48,44 @@ function Write-Step($msg) {
     Add-Content -Path $logFile -Value "[$stamp] $msg"
 }
 
-function Run-OsCli($args) {
-    $argList = @("-cli", "os") + $args
-    $output = & $exe @argList 2>&1
-    $exit = $LASTEXITCODE
-    return @{ Output = ($output -join [Environment]::NewLine); ExitCode = $exit }
+# WinExe-safe invocation. AgentZeroLite.exe is <OutputType>WinExe</OutputType>
+# (the -cli path is chosen at runtime in App.OnStartup, not by subsystem), so
+# the call operator `& $exe @args` DETACHES the process from the console:
+# $output is empty and $LASTEXITCODE is never set (GitHub #13, finding 1).
+# Start-Process -NoNewWindow -Wait -PassThru with redirected stdout/stderr is
+# the documented WinExe convention (agentzero-cli skill) and yields a real
+# exit code plus the JSON payload.
+#
+# NOTE on quoting: `Start-Process -ArgumentList` does NOT auto-quote its
+# elements — it joins them verbatim. An argument with a space (e.g. the
+# window title "AgentZero Lite") would be split into two tokens. We quote any
+# argument that contains whitespace ourselves, then hand Start-Process a
+# single pre-quoted string (the nested-quote depth here is only 1 level —
+# the title has no embedded quotes — so cmd's parser handles it reliably).
+function Run-OsCli($cliArgs) {
+    # NOTE: the parameter MUST NOT be named `$args` — `$args` is PowerShell's
+    # reserved automatic variable. A caller splatting `Run-OsCli @("list-windows",
+    # "--filter", "AgentZero Lite")` would land those tokens in the automatic
+    # `$args`, leaving the declared `$args` empty (only @("-cli","os") reached
+    # the exe and it printed usage). `$cliArgs` is a safe, non-reserved name.
+    $argList = @("-cli", "os") + $cliArgs
+    $quoted = $argList | ForEach-Object {
+        if ($_ -match '\s') { '"' + $_.Replace('"', '\\"') + '"' } else { $_ }
+    }
+    $argString = $quoted -join ' '
+    $outFile = [IO.Path]::GetTempFileName()
+    $errFile = [IO.Path]::GetTempFileName()
+    try {
+        $p = Start-Process -FilePath $exe -ArgumentList $argString `
+             -NoNewWindow -Wait -PassThru `
+             -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        $stdout = (Get-Content $outFile -Raw)
+        $stderr = (Get-Content $errFile -Raw)
+        # Output carries the JSON (stdout); stderr is surfaced separately so
+        # callers can log it without corrupting the ConvertFrom-Json parse.
+        return @{ Output = $stdout; Stderr = $stderr; ExitCode = $p.ExitCode }
+    }
+    finally { Remove-Item $outFile, $errFile -ErrorAction SilentlyContinue }
 }
 
 Write-Step "===== M0014 launch-self-smoke ($timeStr) ====="
@@ -116,10 +149,13 @@ $shot = $shotResult.Output | ConvertFrom-Json
 Write-Step "  saved $($shot.path) ($($shot.width)x$($shot.height))"
 
 # ---- Step 5: element-tree depth=3 (sanity only) ----
-Write-Step "Step 5: os element-tree $hwnd --depth 3"
-$treeResult = Run-OsCli @("element-tree", "$hwnd", "--depth", "3")
+# --timeout-sec bounds the UIA walk so a hang returns {ok:false,error:uia_timeout}
+# (exit 1) instead of stalling the run forever — see GitHub #13 finding 2.
+Write-Step "Step 5: os element-tree $hwnd --depth 3 --timeout-sec 15"
+$treeResult = Run-OsCli @("element-tree", "$hwnd", "--depth", "3", "--timeout-sec", "15")
 if ($treeResult.ExitCode -ne 0) {
-    Write-Step "WARN: element-tree returned non-zero (window may have been minimized)"
+    Write-Step "WARN: element-tree failed (exit=$($treeResult.ExitCode)) — likely uia_timeout or window minimized"
+    if ($treeResult.Stderr) { Write-Step $treeResult.Stderr }
 } else {
     $tree = $treeResult.Output | ConvertFrom-Json
     Write-Step "  nodeCount=$($tree.nodeCount)"
