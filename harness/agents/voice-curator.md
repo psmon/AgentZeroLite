@@ -116,6 +116,13 @@ reviews. Treat them as binding for the file types they cover:
   unknown), edge cases (overlapping speech, single-speaker clips,
   sub-word boundaries).
 
+- **`harness/knowledge/voice-curator/native-inference-lifetime.md`** —
+  The two crash-derived contracts: chunk-scoped native lifetime
+  (per-utterance `OfflineSpeakerDiarization` build/dispose, recycle-every-N
+  escape hatch) and the `_noteInferGate` single-choke-point serialization
+  discipline (blocking wait for finals, try-acquire-skip for partials,
+  every new native surface must route through the same gate).
+
 ## Evaluation rubric
 
 | Axis | Measure | Scale |

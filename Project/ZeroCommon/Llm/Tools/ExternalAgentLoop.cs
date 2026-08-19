@@ -35,12 +35,21 @@ public sealed class ExternalAgentLoop : IAgentLoop
     private bool _isFirstUserSend = true;
     private int _userSendCount;
     private bool _envelopeRepairUsed;
+    private int _formatCorrections;
     private bool _disposed;
 
     public int UserSendCount => _userSendCount;
 
     /// <summary>Whether the once-per-session inner-args repair has fired.</summary>
     internal bool EnvelopeRepairUsed => _envelopeRepairUsed;
+
+    /// <summary>
+    /// How many self-correction feedback turns have been injected this
+    /// session. Per-instance (like <see cref="EnvelopeRepairUsed"/>) so a
+    /// chronically non-conforming model can't burn the correction budget on
+    /// every single user message.
+    /// </summary>
+    internal int FormatCorrectionsUsed => _formatCorrections;
 
     public ExternalAgentLoop(ILlmProvider provider, string model, IAgentToolbelt host,
         AgentLoopOptions? opts = null)
@@ -88,10 +97,37 @@ public sealed class ExternalAgentLoop : IAgentLoop
 
             _messages.Add(LlmMessage.Assistant(assistantText!));
 
+            // RCA #3 (2026-05-25 Gemma toolcall RCA): the loop used to
+            // `break` on the first unparseable turn. On a REST provider that
+            // single bad turn is often transient — a follow-up user-role
+            // instruction naming the exact envelope shape lets the model
+            // self-repair within the same run. The cap is per-instance so a
+            // chronically non-conforming model still fails fast (and can't
+            // burn the budget every user message). `return false` = budget
+            // exhausted → caller sets `failure` and `break`s.
+            bool TryOfferFormatCorrection(string detail, string? offendingPreview, out string instruction)
+            {
+                instruction = "";
+                if (_formatCorrections >= _opts.MaxFormatCorrections) return false;
+                _formatCorrections++;
+                instruction = BuildFormatCorrectionInstruction(offendingPreview);
+                AppLogger.Log(
+                    $"[ExternalAgentLoop] format correction {_formatCorrections}/{_opts.MaxFormatCorrections} " +
+                    $"injected — {detail}");
+                return true;
+            }
+
             var rawJson = ExtractFirstJsonObject(assistantText!);
             if (rawJson is null)
             {
-                failure = $"model emitted no JSON envelope at iteration {iter} (non-Gemma toolchain mismatch?): \"{Truncate(assistantText!, 200)}\"";
+                if (TryOfferFormatCorrection(
+                        $"model emitted no JSON envelope at iteration {iter} (non-Gemma toolchain mismatch?)",
+                        Truncate(assistantText!, 200), out var noEnvelopeInstruction))
+                {
+                    _messages.Add(LlmMessage.User(noEnvelopeInstruction));
+                    continue;
+                }
+                failure = $"model emitted no JSON envelope at iteration {iter} after {_formatCorrections} correction(s): \"{Truncate(assistantText!, 200)}\"";
                 break;
             }
 
@@ -324,6 +360,27 @@ public sealed class ExternalAgentLoop : IAgentLoop
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Builds the self-correction feedback instruction injected (as a user
+    /// message) when the model emits a turn we can't route — no JSON envelope
+    /// at all, or an unparseable JSON object. It names the exact envelope
+    /// shape so the next turn has a concrete target rather than an abstract
+    /// "you were wrong". Keeping it terse and imperative matches the
+    /// system-prompt tool-calling voice (R-1..R-5, prompts default English).
+    /// </summary>
+    internal static string BuildFormatCorrectionInstruction(string? offendingPreview)
+    {
+        var offending = offendingPreview is null
+            ? ""
+            : $"\n\nYour previous turn was not a valid tool call (it started with: \"{offendingPreview}\").";
+        return "FORMAT ERROR — reply with EXACTLY one JSON tool call and nothing else. " +
+               "No prose before or after. The envelope is: " +
+               "{\"tool\":\"<tool_name>\",\"args\":{...}} " +
+               "where <tool_name> is one of " +
+               string.Join(", ", AgentToolGrammar.KnownTools) + ". " +
+               "Call done when the user's request is satisfied." + offending;
     }
 
     internal static string? ExtractFirstJsonObject(string text)

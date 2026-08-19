@@ -177,6 +177,113 @@ public sealed class ExternalAgentLoopTests
         Assert.False(loop.EnvelopeRepairUsed);
     }
 
+    // ── RCA #3 (2026-05-25) — format self-correction feedback turn ──────
+    //
+    // Pre-fix: the loop `break`'d on the first turn that produced no JSON
+    // envelope (the non-Gemma "toolchain mismatch" failure). On a REST
+    // provider that single bad turn is often transient — a follow-up
+    // user-role instruction naming the exact envelope shape lets the model
+    // self-repair within the same run. The cap is per-instance.
+
+    [Fact]
+    public void BuildFormatCorrectionInstruction_names_envelope_shape_and_known_tools()
+    {
+        var instruction = ExternalAgentLoop.BuildFormatCorrectionInstruction("Sure, let me");
+        Assert.Contains("FORMAT ERROR", instruction);
+        Assert.Contains("\"tool\":\"<tool_name>\"", instruction);
+        Assert.Contains(AgentToolGrammar.DoneToolName, instruction);
+        Assert.Contains("Sure, let me", instruction);
+    }
+
+    [Fact]
+    public void BuildFormatCorrectionInstruction_omits_offending_preview_when_null()
+    {
+        var instruction = ExternalAgentLoop.BuildFormatCorrectionInstruction(null);
+        Assert.DoesNotContain("started with", instruction);
+        Assert.Contains("\"tool\":\"<tool_name>\"", instruction);
+    }
+
+    [Fact]
+    public async Task Loop_self_corrects_no_json_turn_then_done()
+    {
+        // Turn 0: model emits free-form prose (no JSON) — the non-Gemma
+        // failure. The loop must inject a format-correction user message and
+        // continue rather than break.
+        // Turn 1: model emits a valid done envelope → clean termination.
+        var provider = new ScriptedProvider(new[]
+        {
+            "Sure, let me look into that for you.",
+            "{\"tool\":\"done\",\"args\":{\"message\":\"all set\"}}",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 6 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("hi");
+
+        Assert.True(run.TerminatedCleanly, $"Loop should self-correct. FailureReason: {run.FailureReason}");
+        Assert.Equal("all set", run.FinalMessage);
+        Assert.True(loop.FormatCorrectionsUsed == 1, "Exactly one correction turn should have been injected.");
+    }
+
+    [Fact]
+    public async Task Loop_fails_fast_when_no_json_repeated_beyond_correction_cap()
+    {
+        // Every turn is prose. With MaxFormatCorrections=2 and MaxIterations
+        // high enough that the correction cap (not the iteration cap) is what
+        // stops the loop, the loop must fail with a clear "no JSON envelope"
+        // reason and not hang or burn the iteration budget.
+        var provider = new ScriptedProvider(new[]
+        {
+            "thinking out loud, no json here",
+            "still no json envelope",
+            "definitely not json",
+            "fourth prose turn",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 10, MaxFormatCorrections = 2 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("hi");
+
+        Assert.False(run.TerminatedCleanly);
+        Assert.NotNull(run.FailureReason);
+        Assert.Contains("no JSON envelope", run.FailureReason);
+        Assert.True(loop.FormatCorrectionsUsed == 2, "Correction budget must be respected (2 used, then fail).");
+    }
+
+    [Fact]
+    public async Task Loop_format_correction_cap_is_per_instance()
+    {
+        // A single RunAsync that exhausts the correction cap must not leak the
+        // counter into the next send — each send gets a fresh run, but the
+        // per-instance counter (like EnvelopeRepairUsed) persists across sends
+        // so a chronically non-conforming model can't re-burn the budget on
+        // every user message.
+        var provider = new ScriptedProvider(new[]
+        {
+            "prose one",
+            "prose two",
+            "prose three",
+            "prose four",
+            "prose five",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 10, MaxFormatCorrections = 2 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        // First send: exhausts the 2-correction budget on prose, fails.
+        var first = await loop.RunAsync("hi");
+        Assert.False(first.TerminatedCleanly);
+        Assert.Equal(2, loop.FormatCorrectionsUsed);
+
+        // Second send: budget already spent → fails on the very first prose
+        // turn with zero new corrections (cap is per-instance, not per-run).
+        var second = await loop.RunAsync("hi again");
+        Assert.False(second.TerminatedCleanly);
+        Assert.True(loop.FormatCorrectionsUsed == 2, "Counter must not grow past the per-instance cap.");
+    }
+
     // ── M0017 후속 #2 — TurnTimeout regression guard ──────────────────────
     //
     // Repro for the hang the operator hit: send_to_terminal completed, the

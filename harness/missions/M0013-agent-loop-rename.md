@@ -3,10 +3,11 @@ id: M0013
 title: Reactor → AgentLoop 리네임 (Agent vocabulary 정렬)
 operator: psmon
 language: ko
-status: in_progress
+status: done
 priority: medium
 created: 2026-05-05
 started: 2026-05-05T10:50:00+09:00
+finished: 2026-08-19T00:00:00+09:00
 related: [M0004]
 ---
 

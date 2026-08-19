@@ -430,6 +430,17 @@ public sealed record AgentLoopOptions
     public int MaxIterations { get; init; } = 12;
 
     /// <summary>
+    /// How many self-correction feedback turns <see cref="ExternalAgentLoop"/>
+    /// injects when the model emits no parseable JSON envelope (RCA #3,
+    /// 2026-05-25 Gemma toolcall RCA). Each correction re-asks for the exact
+    /// envelope shape instead of failing the whole run; the cap keeps this
+    /// from becoming an infinite repair loop. The <c>done</c> envelope
+    /// self-heal wrap is a separate, once-per-session budget and is NOT
+    /// counted here.
+    /// </summary>
+    public int MaxFormatCorrections { get; init; } = 2;
+
+    /// <summary>
     /// Max tokens emitted per model turn. Pretty-printed JSON for tool calls
     /// (especially with `send_to_terminal` carrying a multi-word `text` arg)
     /// can run 80–250 tokens; under-sizing this caps the model mid-JSON and
