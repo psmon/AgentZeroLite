@@ -1,14 +1,14 @@
 # Traffic & Download History
 
-_Last snapshot: 2026-08-19 (UTC). Updated daily by `.github/workflows/traffic-snapshot.yml`._
+_Last snapshot: 2026-08-20 (UTC). Updated daily by `.github/workflows/traffic-snapshot.yml`._
 
 ## Downloads (cumulative)
 
 | Metric | Total |
 |---|---|
-| Setup.exe | 44 |
+| Setup.exe | 45 |
 | win-x64.zip | 19 |
-| **Grand total** | **63** |
+| **Grand total** | **64** |
 
 ## Views (all recorded days)
 
