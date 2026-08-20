@@ -168,6 +168,9 @@ yet. The v0.16.0 release (voice-note diarization chunk-scoping +
 agent-band loopback fix) is exactly the change class this engine would
 have routed to `voice-curator` + `music-curator`; it shipped before the
 engine existed. The next audio-touching release is the first live run.
-Wiring the `release-build-pipeline` auto-invoke into that engine's file is
-a follow-up the operator can approve separately — this engine is
-invocable standalone today via its trigger phrases.
+
+**Wiring — DONE.** The `release-build-pipeline` auto-invoke is now **Step 2**
+of `harness/engine/release-build-pipeline.md` (conditional on audio-watched
+paths, advisory by default, recommend-block escalates to operator, identical
+Waiver protocol). The engine is also invocable standalone via its trigger
+phrases.
