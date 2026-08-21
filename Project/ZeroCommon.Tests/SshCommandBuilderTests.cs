@@ -40,7 +40,7 @@ public class SshCommandBuilderTests
 
         var cmd = SshCommandBuilder.BuildSshCommand(ssh);
 
-        Assert.Equal(@"ssh -i ""C:\keys\id_rsa.pem"" psmac@192.168.0.50", cmd);
+        Assert.Equal(@"ssh -o StrictHostKeyChecking=accept-new -i ""C:\keys\id_rsa.pem"" psmac@192.168.0.50", cmd);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class SshCommandBuilderTests
         // ssh command so user can fix it interactively rather than getting a
         // silently-empty arg list.
         var ssh = new SshLaunchSettings(true, "host", "alice", SshAuthMode.PublicKey, KeyPath: null);
-        Assert.Equal("ssh alice@host", SshCommandBuilder.BuildSshCommand(ssh));
+        Assert.Equal("ssh -o StrictHostKeyChecking=accept-new alice@host", SshCommandBuilder.BuildSshCommand(ssh));
     }
 
     [Fact]
@@ -63,10 +63,24 @@ public class SshCommandBuilderTests
         // can't silently regress security by sneaking a flag into argv.
         var ssh = new SshLaunchSettings(true, "host", "alice", SshAuthMode.Password, KeyPath: null);
         var cmd = SshCommandBuilder.BuildSshCommand(ssh);
-        Assert.Equal("ssh alice@host", cmd);
+        Assert.Equal("ssh -o StrictHostKeyChecking=accept-new alice@host", cmd);
         Assert.DoesNotContain("-pw", cmd, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", cmd, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("plink", cmd, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildSshCommand_always_sets_accept_new_host_key_policy()
+    {
+        // First-connect host-key prompt (yes/no) blocks the connection AND hides
+        // the password prompt from SshPasswordAutofill. accept-new skips it for
+        // unknown hosts while still refusing a CHANGED key (MITM protection).
+        var pw = SshCommandBuilder.BuildSshCommand(new(true, "host", "alice", SshAuthMode.Password, null));
+        var key = SshCommandBuilder.BuildSshCommand(new(true, "host", "alice", SshAuthMode.PublicKey, @"C:\k.pem"));
+        Assert.Contains("-o StrictHostKeyChecking=accept-new", pw);
+        Assert.Contains("-o StrictHostKeyChecking=accept-new", key);
+        // Never the insecure blanket-accept that would also swallow changed keys.
+        Assert.DoesNotContain("StrictHostKeyChecking=no", pw);
     }
 
     [Fact]
@@ -88,7 +102,7 @@ public class SshCommandBuilderTests
     {
         var ssh = new SshLaunchSettings(true, "192.168.0.50", "psmac", SshAuthMode.PublicKey, null);
         var args = SshCommandBuilder.ComposeArguments("cmd.exe", baseArguments: null, ssh);
-        Assert.Equal("/K ssh psmac@192.168.0.50", args);
+        Assert.Equal("/K ssh -o StrictHostKeyChecking=accept-new psmac@192.168.0.50", args);
     }
 
     [Fact]
@@ -97,7 +111,7 @@ public class SshCommandBuilderTests
         var ssh = new SshLaunchSettings(true, "192.168.0.50", "psmac", SshAuthMode.PublicKey, null);
         var args = SshCommandBuilder.ComposeArguments("powershell.exe", baseArguments: "-NoExit -Command claude", ssh);
         // Mission body's example verbatim — keeps the contract honest.
-        Assert.Equal("-NoExit -Command ssh psmac@192.168.0.50", args);
+        Assert.Equal("-NoExit -Command ssh -o StrictHostKeyChecking=accept-new psmac@192.168.0.50", args);
     }
 
     [Fact]
@@ -105,7 +119,7 @@ public class SshCommandBuilderTests
     {
         var ssh = new SshLaunchSettings(true, "10.0.0.5", "root", SshAuthMode.PublicKey, @"C:\keys\prod.pem");
         var args = SshCommandBuilder.ComposeArguments(@"C:\Program Files\PowerShell\7\pwsh.exe", null, ssh);
-        Assert.Equal(@"-NoExit -Command ssh -i ""C:\keys\prod.pem"" root@10.0.0.5", args);
+        Assert.Equal(@"-NoExit -Command ssh -o StrictHostKeyChecking=accept-new -i ""C:\keys\prod.pem"" root@10.0.0.5", args);
     }
 
     [Fact]
@@ -116,7 +130,7 @@ public class SshCommandBuilderTests
         // accepts that their REPL will see it as the first command.
         var ssh = new SshLaunchSettings(true, "host", "alice", SshAuthMode.PublicKey, null);
         var args = SshCommandBuilder.ComposeArguments(@"C:\Program Files\Git\bin\bash.exe", "--login", ssh);
-        Assert.Equal("--login ssh alice@host", args);
+        Assert.Equal("--login ssh -o StrictHostKeyChecking=accept-new alice@host", args);
     }
 
     [Fact]

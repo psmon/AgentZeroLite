@@ -27,6 +27,17 @@ public static class SshCommandBuilder
     public const string AuthMethodPublicKey = "PublicKey";
     public const string AuthMethodPassword = "Password";
 
+    /// <summary>
+    /// Host-key policy applied to every launched ssh. <c>accept-new</c> auto-
+    /// accepts the key of a host we have never seen (skipping the interactive
+    /// <c>Are you sure you want to continue connecting (yes/no)?</c> prompt that
+    /// otherwise blocks the FIRST connection — and, because the password prompt
+    /// only appears AFTER it, blocks the password autofill too). A host whose
+    /// key has *changed* is still refused, so this keeps MITM protection for
+    /// known hosts while removing the first-connect speed bump.
+    /// </summary>
+    public const string HostKeyOption = "-o StrictHostKeyChecking=accept-new";
+
     public static SshShellKind DetectShellKind(string exePath)
     {
         if (string.IsNullOrWhiteSpace(exePath)) return SshShellKind.Other;
@@ -49,9 +60,10 @@ public static class SshCommandBuilder
     /// missing. PublicKey mode embeds <c>-i "&lt;key&gt;"</c>; Password mode emits
     /// plain ssh — OpenSSH refuses passwords on argv, so the caller is
     /// responsible for delivering the saved password out-of-band (clipboard
-    /// paste). Earlier follow-ups explored auto-fill via PTY output watching
-    /// (race-prone) and plink (requires PuTTY install); operator settled on
-    /// openssh + clipboard as the simplest reliable option.
+    /// paste, or the PTY-output-watching autofill in <c>SshPasswordAutofill</c>).
+    /// Every command carries <see cref="HostKeyOption"/> so a first-time
+    /// connection does not stall on the host-key <c>yes/no</c> prompt (which
+    /// also hid the password prompt from the autofill).
     /// </summary>
     public static string BuildSshCommand(SshLaunchSettings ssh)
     {
@@ -60,8 +72,8 @@ public static class SshCommandBuilder
 
         var target = $"{ssh.User!.Trim()}@{ssh.Host!.Trim()}";
         if (ssh.AuthMode == SshAuthMode.PublicKey && !string.IsNullOrWhiteSpace(ssh.KeyPath))
-            return $"ssh -i \"{ssh.KeyPath!.Trim()}\" {target}";
-        return $"ssh {target}";
+            return $"ssh {HostKeyOption} -i \"{ssh.KeyPath!.Trim()}\" {target}";
+        return $"ssh {HostKeyOption} {target}";
     }
 
     /// <summary>
