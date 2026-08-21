@@ -26,11 +26,16 @@
     <!-- Pin Microsoft.Build.Tasks.Core above EF Core Design's transitive 17.7.2
          (NU1903 / GHSA-h4j7-5rxr-p4wc, High). PrivateAssets=all keeps these
          build-time-only overrides. Also pin System.Security.Cryptography.Xml
-         above 17.14.28's bundled 9.0.0 (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf). -->
+         above 17.14.28's bundled 9.0.0 (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf).
+         Bumped 10.0.7 -> 10.0.11 (GitHub #15): 10.0.7 fell inside the affected
+         range (<= 10.0.9) of five 2026 .NET advisories — CVE-2026-47302 /
+         -47304 / -50527 / -50648 / -50525 (GHSA-cvvh-rhrc-wg4q, -g8r8-53c2-pm3f,
+         -mmjf-rqrv-855v, -23rf-6693-g89p, -8q5v-6pqq-x66h). 10.0.11 is outside
+         all five. Still PrivateAssets=all (build-time-only, not shipped). -->
     <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7">
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.11">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <!-- Pin SQLitePCLRaw above EF Core Sqlite's transitive 2.1.10 bundle.
