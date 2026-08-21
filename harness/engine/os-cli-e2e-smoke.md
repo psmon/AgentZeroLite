@@ -63,9 +63,13 @@ flowchart TD
 4. **`os get-window-info <hwnd>`** — capture rect/pid/process to log.
 5. **`os screenshot --hwnd <hwnd>`** — produces a PNG under
    `tmp/os-cli/screenshots/<date>/`. Path is logged.
-6. **`os element-tree <hwnd> --depth 3`** — proves UI Automation tree is
-   reachable. Failure here is a WARN (some shell states minimize the
-   window mid-run), not a hard fail.
+6. **`os element-tree <hwnd> --depth 3 --timeout-sec 15`** — proves UI
+   Automation tree is reachable. The UIA walk is bounded by a **hard 15s
+   timeout** (GitHub #13 finding 2): a hang returns `{ok:false,
+   error:"uia_timeout"}` (exit 1) instead of stalling the run forever.
+   Failure here is a WARN (timeout or minimized window), not a hard fail —
+   the timeout guard is what makes that warn-only rubric honest, because
+   before it the run would never reach the warn at all.
 7. **`os dpi`** — pure local probe; useful for diagnosing screenshot
    scaling regressions.
 8. **Summary log** — append to `tmp/os-cli/e2e/<date>.log`. The
@@ -89,7 +93,7 @@ flowchart TD
 |---|---|---|
 | Reachability | os list-windows returns ≥ 1 match for "AgentZero Lite" | Pass/Fail |
 | Capture integrity | screenshot PNG file exists and width/height > 0 | Pass/Fail |
-| UIA tree reachable | element-tree returns nodeCount ≥ 1 (depth 3) | Pass/Fail (warn-only) |
+| UIA tree reachable | element-tree (depth 3, --timeout-sec 15) returns nodeCount ≥ 1, OR a structured `uia_timeout` within 15s (warn-only — never hangs) | Pass/Fail (warn-only, bounded) |
 | Audit trail intact | tmp/os-cli/audit/<date>.jsonl gained ≥ 4 entries this run | Pass/Fail |
 | No input-simulation drift | no `mouse_*` or `key_press` rows in audit | Pass/Fail |
 

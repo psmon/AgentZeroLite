@@ -48,26 +48,26 @@ public class TtsSttRoundTripTests
 
     // ── Test cases (Korean + English, varying length) ────────────────────
 
-    [Fact]
+    [WhisperNativeFact]
     public Task Korean_short_안녕하세요() =>
         RunRoundTrip("안녕하세요", language: "ko", caseId: "ko-short");
 
-    [Fact]
+    [WhisperNativeFact]
     public Task Korean_question_today_weather() =>
         RunRoundTrip("오늘의 날씨는 어때?", language: "ko", caseId: "ko-question");
 
-    [Fact]
+    [WhisperNativeFact]
     public Task Korean_long_multi_clause() =>
         RunRoundTrip(
             "내일의 날씨는 말고 모래의날씨는 흐리고 그리고 주간내내 비올예정입니다.",
             language: "ko",
             caseId: "ko-long");
 
-    [Fact]
+    [WhisperNativeFact]
     public Task English_short_hello() =>
         RunRoundTrip("hello", language: "en", caseId: "en-short");
 
-    [Fact]
+    [WhisperNativeFact]
     public Task English_question_how_are_you() =>
         RunRoundTrip("how are you?", language: "en", caseId: "en-question");
 

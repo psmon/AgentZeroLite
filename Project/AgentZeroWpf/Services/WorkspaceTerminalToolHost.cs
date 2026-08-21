@@ -322,7 +322,7 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
         => Task.FromResult(OsControlService.Activate(hwnd, OsAuditLog.Caller.Llm));
 
     public Task<string> OsElementTreeAsync(long hwnd, int maxDepth, string? search, CancellationToken ct)
-        => OsControlService.ElementTreeAsync(hwnd, maxDepth, search, OsAuditLog.Caller.Llm);
+        => OsControlService.ElementTreeAsync(hwnd, maxDepth, search, OsAuditLog.Caller.Llm, timeoutSec: 15, ct: ct);
 
     public Task<string> OsMouseClickAsync(int x, int y, bool right, bool dbl, CancellationToken ct)
     {
