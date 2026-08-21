@@ -69,6 +69,11 @@ flowchart TD
    (`gh pr list --head $(git rev-parse --abbrev-ref HEAD) --state all`).
    Record the merge target; everything below compares against it, not
    against an assumed `main`.
+   When the report surveys sibling branches, **first read
+   `harness/knowledge/_shared/long-lived-branches.md`** — branches listed
+   there (e.g. `feat/avalonia-crossplatform`, an intentional cross-platform
+   experiment kept off `main`) are classified `intentional`, never flagged
+   `stale`/`rebase-or-discard` on drift alone.
 
 2. **Pre-flight** — `git status --short` must be empty. A dirty tree
    contaminates every measurement below. Stop and ask rather than stashing

@@ -93,7 +93,11 @@ operator 요청으로 "master 이후 작업된 브랜치 + 열린 PR"을 조사�
 - **[OOS-1] NU1903 / `System.Security.Cryptography.Xml` 10.0.7 취약점** — High
   severity advisory 다수. 패키지 pin 상향 또는 명시 제거 검토. PR #12와 무관한
   기존 부채이므로 이 PR 머지를 막지 않음. 별도 보안 이슈로 트래킹 권장.
-- **[OOS-2] `feat/avalonia-crossplatform`** — main 대비 71 커밋 뒤처짐. rebase 또는
-  폐기 결정 필요(방치 시 드리프트 확대).
+- **[OOS-2 — 정정]** `feat/avalonia-crossplatform`는 **stale 아님**. WPF 종속 Windows
+  앱을 크로스플랫폼(Avalonia)으로 전환 시도하는 **의도적 장기 실험 브랜치**이며
+  현재 상당수 호환 불가 — **당분간 master 합류 금지**가 정상. drift는 문제 아님.
+  registry 등재: `harness/knowledge/_shared/long-lived-branches.md` (pr-review 엔진이
+  브랜치 지형 평가 시 이 파일을 먼저 참조하도록 배선함). *초기 리뷰의 "rebase/폐기"
+  권고는 operator 정보로 철회.*
 - **[OOS-3] `fix/voice-note-loopback-crash`** — main 대비 고유 커밋 0. 이미 반영된
   것으로 보이므로 로컬 브랜치 정리 권장.
