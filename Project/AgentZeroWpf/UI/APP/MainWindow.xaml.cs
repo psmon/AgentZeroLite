@@ -2281,6 +2281,10 @@ public partial class MainWindow : Window
         }
 
         string workDir = _cliGroups[_activeGroupIndex].DirectoryPath;
+        // A double-quote is illegal in a Windows path, so any that slipped into
+        // DirectoryPath is malformed input — strip it defensively before it
+        // reaches pushd "{workDir}" and breaks the /c quote boundary (#2 S-A).
+        if (workDir.Contains('"')) workDir = workDir.Replace("\"", "");
         // cmd /c otherwise parses only the first whitespace-delimited token as the
         // executable, which breaks paths like "C:\Program Files\Git\usr\bin\bash.exe".
         var exePath = tab.ExePath.Trim();
@@ -3619,6 +3623,15 @@ public partial class MainWindow : Window
     {
         if (SettingsPanel.Visibility != Visibility.Visible) return;
         SettingsPanel.Visibility = Visibility.Collapsed;
+        // Defensive (#3): a future settings extension could delete/reorder
+        // CliGroup rows and leave _activeGroupIndex stale. Snap it back into
+        // range here WITHOUT calling ActivateGroup — ActivateGroup would rebuild
+        // the document pane and clobber the split layout this settings
+        // round-trip is meant to preserve.
+        if (_cliGroups.Count == 0)
+            _activeGroupIndex = -1;
+        else if (_activeGroupIndex < 0 || _activeGroupIndex >= _cliGroups.Count)
+            _activeGroupIndex = Math.Clamp(_activeGroupIndex, 0, _cliGroups.Count - 1);
         if (WebDevPage.Visibility != Visibility.Visible &&
             ScrapPage.Visibility != Visibility.Visible &&
             HarnessViewPage.Visibility != Visibility.Visible &&
