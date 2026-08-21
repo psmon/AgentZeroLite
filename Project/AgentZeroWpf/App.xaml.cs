@@ -21,6 +21,11 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Encrypt credential fields at rest (#6) for both GUI and CLI paths —
+        // LlmGateway (used by -cli too) loads settings, so register before the
+        // -cli branch below.
+        Agent.Common.Security.SecretProtection.Protector = new Security.DpapiSettingsProtector();
+
         // CLI mode: run console handler and exit without showing WPF window
         if (e.Args.Contains("-cli", StringComparer.OrdinalIgnoreCase))
         {

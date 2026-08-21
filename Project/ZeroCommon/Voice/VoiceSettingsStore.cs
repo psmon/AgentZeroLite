@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agent.Common.Security;
 
 namespace Agent.Common.Voice;
 
@@ -24,7 +25,12 @@ public static class VoiceSettingsStore
                 return new VoiceSettings();
 
             var json = File.ReadAllText(FilePath);
-            return JsonSerializer.Deserialize<VoiceSettings>(json) ?? new VoiceSettings();
+            var settings = JsonSerializer.Deserialize<VoiceSettings>(json) ?? new VoiceSettings();
+            // Decrypt credential fields at rest (#6). Legacy plaintext files
+            // pass through unchanged and migrate to ciphertext on next Save.
+            settings.SttOpenAIApiKey = SecretProtection.Unprotect(settings.SttOpenAIApiKey);
+            settings.TtsOpenAIApiKey = SecretProtection.Unprotect(settings.TtsOpenAIApiKey);
+            return settings;
         }
         catch
         {
@@ -36,6 +42,21 @@ public static class VoiceSettingsStore
     {
         var dir = Path.GetDirectoryName(FilePath)!;
         Directory.CreateDirectory(dir);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOpts));
+        // Encrypt credential fields for the file only; the caller's in-memory
+        // object keeps plaintext (restored in finally) so nothing downstream
+        // sees ciphertext.
+        var stt = settings.SttOpenAIApiKey;
+        var tts = settings.TtsOpenAIApiKey;
+        try
+        {
+            settings.SttOpenAIApiKey = SecretProtection.Protect(stt);
+            settings.TtsOpenAIApiKey = SecretProtection.Protect(tts);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOpts));
+        }
+        finally
+        {
+            settings.SttOpenAIApiKey = stt;
+            settings.TtsOpenAIApiKey = tts;
+        }
     }
 }

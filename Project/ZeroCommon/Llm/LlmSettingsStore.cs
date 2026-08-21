@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agent.Common.Security;
 
 namespace Agent.Common.Llm;
 
@@ -18,7 +19,12 @@ public static class LlmSettingsStore
                 return new LlmRuntimeSettings();
 
             var json = File.ReadAllText(FilePath);
-            return JsonSerializer.Deserialize<LlmRuntimeSettings>(json) ?? new LlmRuntimeSettings();
+            var settings = JsonSerializer.Deserialize<LlmRuntimeSettings>(json) ?? new LlmRuntimeSettings();
+            // Decrypt credential fields at rest (#6). Legacy plaintext files
+            // pass through unchanged and migrate to ciphertext on next Save.
+            settings.External.OpenAIApiKey = SecretProtection.Unprotect(settings.External.OpenAIApiKey);
+            settings.External.LMStudioApiKey = SecretProtection.Unprotect(settings.External.LMStudioApiKey);
+            return settings;
         }
         catch
         {
@@ -30,6 +36,20 @@ public static class LlmSettingsStore
     {
         var dir = Path.GetDirectoryName(FilePath)!;
         Directory.CreateDirectory(dir);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOpts));
+        // Encrypt credential fields for the file only; the caller's in-memory
+        // object keeps plaintext (restored in finally).
+        var openAi = settings.External.OpenAIApiKey;
+        var lmStudio = settings.External.LMStudioApiKey;
+        try
+        {
+            settings.External.OpenAIApiKey = SecretProtection.Protect(openAi);
+            settings.External.LMStudioApiKey = SecretProtection.Protect(lmStudio);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOpts));
+        }
+        finally
+        {
+            settings.External.OpenAIApiKey = openAi;
+            settings.External.LMStudioApiKey = lmStudio;
+        }
     }
 }
