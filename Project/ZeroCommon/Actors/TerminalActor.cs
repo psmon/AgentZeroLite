@@ -25,6 +25,10 @@ public sealed class TerminalActor : ReceiveActor
     private ITerminalSession? _session;
     private nint _hwnd;
 
+    // Captured on the actor thread so OnSessionOutput (invoked on the PTY poll-timer
+    // thread) can Tell without touching Self/Context, which throw off-thread.
+    private IActorRef? _self;
+
     public TerminalActor(string terminalId, string sessionId, string workspaceName)
     {
         _terminalId = terminalId;
@@ -116,11 +120,15 @@ public sealed class TerminalActor : ReceiveActor
 
     private void OnSessionOutput(TerminalOutputFrame frame)
     {
-        Self.Tell(new TerminalOutput(_terminalId, frame.Text, frame.Timestamp));
+        // Runs on the ConPTY poll-timer thread — Self/Context are unavailable here, so use
+        // the captured ref. (TerminalOutput is a no-op sink in Lite; kept for parity and so
+        // a future consumer can subscribe without re-plumbing.)
+        _self?.Tell(new TerminalOutput(_terminalId, frame.Text, frame.Timestamp), ActorRefs.NoSender);
     }
 
     protected override void PreStart()
     {
+        _self = Self;
         _log.Info("TerminalActor started: {0} (session: {1}, workspace: {2})",
             _terminalId, _sessionId, _workspaceName);
         base.PreStart();

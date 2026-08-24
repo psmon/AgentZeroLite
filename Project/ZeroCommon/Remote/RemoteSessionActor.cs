@@ -14,6 +14,7 @@
 
 using Akka.Actor;
 using Akka.Event;
+using Agent.Common;
 using Agent.Common.Actors;
 using Agent.Common.Services;
 
@@ -80,6 +81,7 @@ public sealed class RemoteSessionActor : ReceiveActor
         }
 
         _session.OutputReceived += OnSessionOutput;
+        AppLogger.Log($"[RemoteSession] {_sessionKey} subscribed OutputReceived | session={_session.SessionId} id={_session.InternalId} outLen={_session.OutputLength} running={_session.IsRunning}");
         _log.Info("RemoteSessionActor started: {0}", _sessionKey);
         base.PreStart();
     }

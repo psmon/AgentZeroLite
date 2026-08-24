@@ -339,7 +339,24 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
             _lastKnownOutputLen = currentLen;
 
             var newText = outputLog.ToString(lastLen, currentLen - lastLen);
-            OutputReceived?.Invoke(new TerminalOutputFrame(newText, DateTimeOffset.UtcNow));
+            // Invoke each subscriber in isolation. A single OutputReceived?.Invoke is a
+            // sequential multicast: if an earlier subscriber throws, every later one is
+            // skipped and the whole tick's frame is lost. That starved the remote-session
+            // subscriber (its handler was registered after the GUI's). Per-handler try/catch
+            // guarantees one bad consumer can't block the others.
+            var handlers = OutputReceived;
+            if (handlers is not null)
+            {
+                var frame = new TerminalOutputFrame(newText, DateTimeOffset.UtcNow);
+                foreach (var d in handlers.GetInvocationList())
+                {
+                    try { ((Action<TerminalOutputFrame>)d).Invoke(frame); }
+                    catch (Exception subEx)
+                    {
+                        AppLogger.Log($"[Session] OutputReceived subscriber threw | id={_internalId} target={d.Target?.GetType().Name ?? "?"} err={subEx.GetType().Name}: {subEx.Message}");
+                    }
+                }
+            }
             // Output growth = the channel just produced something. Reset the
             // no-echo counter and lift Stale/Dead back to Alive. Idempotent
             // so the 50ms poll thread can call this every tick safely.
