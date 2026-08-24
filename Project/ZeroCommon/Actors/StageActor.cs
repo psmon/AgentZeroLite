@@ -14,6 +14,7 @@
 using Akka.Actor;
 using Akka.Event;
 using Agent.Common;
+using Agent.Common.Remote;
 using Agent.Common.Voice.Streams;
 
 namespace Agent.Common.Actors;
@@ -25,6 +26,7 @@ public sealed class StageActor : ReceiveActor
     private readonly Dictionary<string, IActorRef> _workspaces = new();
     private IActorRef? _botActor;
     private IActorRef? _voiceActor;
+    private IActorRef? _remoteActor;
 
     private string? _activeWorkspace;
     private string? _activeTerminalId;
@@ -121,6 +123,20 @@ public sealed class StageActor : ReceiveActor
                 "voice");
             Sender.Tell(new VoiceStreamCreated(_voiceActor));
             _log.Info("Voice stream actor created: {0}", _voiceActor.Path);
+        });
+
+        Receive<CreateRemoteHub>(msg =>
+        {
+            if (_remoteActor is not null)
+            {
+                _remoteActor.Tell(new SetMaxConnections(msg.MaxConnections));
+                Sender.Tell(new RemoteHubCreated(_remoteActor));
+                return;
+            }
+            _remoteActor = Context.ActorOf(
+                Props.Create(() => new RemoteHubActor(msg.MaxConnections)), "remote");
+            Sender.Tell(new RemoteHubCreated(_remoteActor));
+            _log.Info("Remote hub actor created: {0}", _remoteActor.Path);
         });
 
         Receive<TerminalRegistered>(msg =>

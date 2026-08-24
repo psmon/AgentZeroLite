@@ -631,6 +631,13 @@
                                         Content="&#xE7A7;" ToolTip="Diff Review — comment &amp; ship to agent"
                                         Click="OnActivityDiffClick"/>
 
+                                <!-- Remote Icon — web terminal remote control. Serves a
+                                     browser client (xterm.js) over WebSocket that mirrors
+                                     and drives a live GUI terminal. -->
+                                <Button x:Name="btnActivityRemote" Style="{StaticResource ActivityBarIcon}"
+                                        Content="&#xE8CE;" ToolTip="Remote — 웹 원격 터미널 제어"
+                                        Click="OnActivityRemoteClick"/>
+
                             </StackPanel>
                         </DockPanel>
                     </Border>
@@ -926,6 +933,16 @@
                          WebView2 git-diff viewer with inline comments shipped to
                          the agent. Same overlay pattern; toggled from OnActivityDiffClick. -->
                     <components:DiffReviewPanel x:Name="DiffReviewPage"
+                                                Grid.Column="1" Grid.ColumnSpan="3"
+                                                Grid.Row="0" Grid.RowSpan="3"
+                                                Visibility="Collapsed"/>
+
+                    <!-- ===== Remote Page (full overlay) =====
+                         Web terminal remote-control admin surface (server start/stop,
+                         one-time PIN, connection cap, paired-device revoke). Same overlay
+                         pattern; toggled from OnActivityRemoteClick. Declared last so it
+                         renders on top when transiently visible with another overlay. -->
+                    <components:RemotePagePanel x:Name="RemotePage"
                                                 Grid.Column="1" Grid.ColumnSpan="3"
                                                 Grid.Row="0" Grid.RowSpan="3"
                                                 Visibility="Collapsed"/>

@@ -1,0 +1,153 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.RemotePagePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource EditorBg}">
+    <!--
+        Remote — 웹 원격 터미널 제어 패널.
+        설정(포트/최대커넥션/바인딩/활성화)과 라이브 제어(서버 시작·중지, 일회용 PIN
+        발급, 활성 커넥션, 페어링 토큰 revoke)를 한 화면에 둔다.
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- 0: Header -->
+            <RowDefinition Height="Auto"/>  <!-- 1: LAN warning -->
+            <RowDefinition Height="*"/>     <!-- 2: Content (scroll) -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource ToolbarBg}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" x:Name="btnClose" Content="✕"
+                        Style="{DynamicResource FlatButton}" FontSize="13"
+                        ToolTip="닫기" Click="OnCloseClick"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE968;" FontFamily="Segoe MDL2 Assets"
+                               Foreground="{DynamicResource CyberCyanBrush}"
+                               FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Remote — 웹 원격 터미널" FontSize="14" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- LAN warning banner -->
+        <Border Grid.Row="1" Background="#3A1D1D" BorderBrush="#7A2E2E" BorderThickness="1"
+                Padding="12,8" Margin="10,10,10,0" CornerRadius="4">
+            <TextBlock TextWrapping="Wrap" Foreground="#F0A0A0" FontSize="12">
+                ⚠ 이 기능은 네트워크에서 이 PC의 터미널을 제어(사실상 원격 실행)할 수 있게 합니다.
+                기본 바인딩은 <Run FontWeight="Bold">0.0.0.0(LAN 전체)</Run> 입니다.
+                신뢰된 네트워크에서만 사용하고, 연결 코드는 공유하지 마세요.
+            </TextBlock>
+        </Border>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="10">
+            <StackPanel MaxWidth="640" HorizontalAlignment="Left">
+
+                <!-- Config -->
+                <TextBlock Text="설정" FontWeight="Bold" Foreground="{DynamicResource CyberCyanBrush}"
+                           FontSize="12" Margin="0,6,0,6"/>
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <CheckBox Grid.Row="0" Grid.ColumnSpan="2" x:Name="chkEnabled"
+                              Content="시작 시 자동으로 Remote 서버 실행"
+                              Foreground="{DynamicResource TextPrimary}" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="바인딩 주소"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Row="1" Grid.Column="1" x:Name="cboBind" Width="200"
+                              HorizontalAlignment="Left" Margin="0,4">
+                        <ComboBoxItem Content="0.0.0.0 (LAN 전체)"/>
+                        <ComboBoxItem Content="127.0.0.1 (이 PC만)"/>
+                    </ComboBox>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="포트"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="txtPort" Width="120"
+                             HorizontalAlignment="Left" Style="{DynamicResource DarkTextBox}" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="최대 동시 커넥션"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="txtMaxConn" Width="120"
+                             HorizontalAlignment="Left" Style="{DynamicResource DarkTextBox}" Margin="0,4"/>
+                </Grid>
+                <Button x:Name="btnSaveApply" Content="저장 &amp; 적용"
+                        Style="{DynamicResource AccentButton}" Padding="14,5"
+                        HorizontalAlignment="Left" Click="OnSaveApplyClick"/>
+
+                <Border Height="1" Background="{DynamicResource BorderColor}" Margin="0,16"/>
+
+                <!-- Server status -->
+                <TextBlock Text="서버" FontWeight="Bold" Foreground="{DynamicResource CyberCyanBrush}"
+                           FontSize="12" Margin="0,0,0,6"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="상태:" Foreground="{DynamicResource TextDim}" Margin="0,0,6,0"/>
+                    <TextBlock x:Name="txtStatus" Text="중지됨" Foreground="{DynamicResource TextPrimary}" FontWeight="Bold"/>
+                    <TextBlock Text="  커넥션:" Foreground="{DynamicResource TextDim}" Margin="16,0,6,0"/>
+                    <TextBlock x:Name="txtConnCount" Text="0 / 3" Foreground="{DynamicResource TextPrimary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="주소:" Foreground="{DynamicResource TextDim}" Margin="0,0,6,0"/>
+                    <TextBox x:Name="txtUrl" Text="—" IsReadOnly="True" BorderThickness="0"
+                             Background="Transparent" Foreground="{DynamicResource CyberMintBrush}"/>
+                </StackPanel>
+                <TextBlock x:Name="txtError" Text="" Foreground="#F0A0A0" TextWrapping="Wrap"
+                           FontSize="11" Margin="0,0,0,6" Visibility="Collapsed"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="btnStart" Content="▶ 시작" Style="{DynamicResource FlatButton}"
+                            Padding="12,5" Click="OnStartClick"/>
+                    <Button x:Name="btnStop" Content="■ 중지" Style="{DynamicResource FlatButton}"
+                            Padding="12,5" Margin="6,0,0,0" Click="OnStopClick"/>
+                    <Button x:Name="btnRefresh" Content="↻ 새로고침" Style="{DynamicResource FlatButton}"
+                            Padding="12,5" Margin="6,0,0,0" Click="OnRefreshClick"/>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource BorderColor}" Margin="0,16"/>
+
+                <!-- Pairing -->
+                <TextBlock Text="연결 코드 (일회용 PIN)" FontWeight="Bold"
+                           Foreground="{DynamicResource CyberCyanBrush}" FontSize="12" Margin="0,0,0,6"/>
+                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextDim}" FontSize="11" Margin="0,0,0,8">
+                    브라우저로 위 주소에 접속한 뒤, 아래 코드를 입력하면 페어링됩니다.
+                    코드는 5분간 유효하며 1회만 사용됩니다.
+                </TextBlock>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="btnIssuePin" Content="코드 발급" Style="{DynamicResource AccentButton}"
+                            Padding="14,5" Click="OnIssuePinClick"/>
+                    <TextBlock x:Name="txtPin" Text="————" FontFamily="Consolas" FontSize="24"
+                               FontWeight="Bold" Foreground="{DynamicResource CyberYellowBrush}"
+                               VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    <TextBlock x:Name="txtPinExpiry" Text="" Foreground="{DynamicResource TextDim}"
+                               FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource BorderColor}" Margin="0,16"/>
+
+                <!-- Paired tokens -->
+                <DockPanel Margin="0,0,0,6">
+                    <Button DockPanel.Dock="Right" x:Name="btnRevokeAll" Content="모두 해제"
+                            Style="{DynamicResource FlatButton}" FontSize="11"
+                            Click="OnRevokeAllClick"/>
+                    <TextBlock Text="페어링된 기기" FontWeight="Bold"
+                               Foreground="{DynamicResource CyberCyanBrush}" FontSize="12"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <StackPanel x:Name="pnlTokens"/>
+                <TextBlock x:Name="txtNoTokens" Text="페어링된 기기가 없습니다."
+                           Foreground="{DynamicResource TextDim}" FontSize="11" Margin="0,4"/>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

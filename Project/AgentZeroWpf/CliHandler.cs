@@ -78,6 +78,7 @@ internal static class CliHandler
             "terminal-send" => TerminalSend(cliArgs.Skip(1).ToArray()),
             "terminal-key" => TerminalKey(cliArgs.Skip(1).ToArray()),
             "terminal-read" => TerminalRead(cliArgs.Skip(1).ToArray()),
+            "remote-pin" => RemotePin(),
             "bot-chat" => BotChat(cliArgs.Skip(1).ToArray()),
             "agent-hook" => AgentHook(cliArgs.Skip(1).ToArray()),
             "agent-hook-install" => AgentHookInstall(),
@@ -707,6 +708,38 @@ internal static class CliHandler
         }
 
         return 0;
+    }
+
+    // =========================================================================
+    //  remote-pin — issue a one-time Remote pairing PIN (starts the server if off)
+    // =========================================================================
+
+    private const string RemotePinMmfName = "AgentZeroLite_RemotePin_Response";
+    private const int RemotePinMmfSize = 1024;
+
+    private static int RemotePin()
+    {
+        IntPtr agentWnd = FindAgentZero();
+        if (agentWnd == IntPtr.Zero) return 1;
+
+        if (!SendWpfCommand(agentWnd, "{\"command\":\"remote-pin\"}"))
+            return 1;
+
+        string? json = TryReadMmf(RemotePinMmfName, RemotePinMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (root.TryGetProperty("ok", out var okP) && okP.GetBoolean())
+        {
+            Console.WriteLine(root.GetProperty("pin").GetString());
+            if (root.TryGetProperty("url", out var u)) Console.Error.WriteLine($"url: {u.GetString()}");
+            return 0;
+        }
+
+        var error = root.TryGetProperty("error", out var e) ? e.GetString() : "unknown";
+        Console.Error.WriteLine($"Error: {error}");
+        return 1;
     }
 
     /// <summary>Reads a terminal's recent output text over IPC (helper for terminal-wait).</summary>

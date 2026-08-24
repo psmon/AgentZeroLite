@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>AgentZero Remote</title>
+  <link rel="stylesheet" href="./vendor/xterm.css" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #0c0c0c; color: #ddd;
+      font-family: "Segoe UI", system-ui, sans-serif; }
+    #app { display: flex; flex-direction: column; height: 100%; }
+    header { display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+      background: #1b1b1b; border-bottom: 1px solid #2a2a2a; }
+    header .title { font-weight: 600; }
+    header .status { font-size: 12px; color: #888; }
+    header .status.ok { color: #4ec9b0; }
+    header .status.bad { color: #f48771; }
+    header select { margin-left: auto; background: #111; color: #ddd;
+      border: 1px solid #333; border-radius: 4px; padding: 4px 8px; }
+    #term { flex: 1; min-height: 0; padding: 4px; }
+    #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: #222; border: 1px solid #444; border-radius: 6px; padding: 8px 14px;
+      font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+    #toast.show { opacity: 1; }
+    /* Pairing overlay */
+    #pair { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.85); }
+    #pair.show { display: flex; }
+    #pair .card { background: #161616; border: 1px solid #2c2c2c; border-radius: 10px;
+      padding: 28px 32px; width: 320px; text-align: center; }
+    #pair h2 { margin: 0 0 6px; font-size: 18px; }
+    #pair p { margin: 0 0 18px; font-size: 13px; color: #999; }
+    #pin { width: 100%; font-size: 22px; letter-spacing: 6px; text-align: center;
+      padding: 10px; background: #0d0d0d; color: #fff; border: 1px solid #333; border-radius: 6px; }
+    #pair button { margin-top: 16px; width: 100%; padding: 10px; border: 0; border-radius: 6px;
+      background: #0e639c; color: #fff; font-size: 15px; cursor: pointer; }
+    #pair button:hover { background: #1177bb; }
+    #pair .err { color: #f48771; font-size: 12px; min-height: 16px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <span class="title">AgentZero Remote</span>
+      <span id="status" class="status">연결 대기</span>
+      <select id="termSelect" title="터미널 선택"></select>
+    </header>
+    <div id="term"></div>
+  </div>
+
+  <div id="pair">
+    <div class="card">
+      <h2>연결 코드 입력</h2>
+      <p>AgentZero 의 Remote 패널에서 발급한<br/>일회용 코드를 입력하세요.</p>
+      <input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="●●●●●●●●" />
+      <div class="err" id="pairErr"></div>
+      <button id="pairBtn">페어링</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="./vendor/xterm.js"></script>
+  <script src="./vendor/xterm-addon-fit.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

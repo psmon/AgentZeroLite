@@ -367,6 +367,23 @@ public partial class MainWindow : Window
         };
         _agentStateMonitor.Start();
 
+        // Remote (web terminal control) — host + settings + admin panel share ONE
+        // RemoteSettings instance so config edits and the auth service never desync.
+        _remoteSettings = Agent.Common.Remote.RemoteSettingsStore.Load();
+        var remoteAuth = new Agent.Common.Remote.RemoteAuthService(
+            _remoteSettings, () => Agent.Common.Remote.RemoteSettingsStore.Save(_remoteSettings));
+        _remoteHost = new Services.Remote.RemoteServerHost(
+            groupsProvider: () => _cliGroups,
+            activeProvider: () => _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count
+                ? (_activeGroupIndex, _cliGroups[_activeGroupIndex].ActiveTabIndex)
+                : ((int, int)?)null,
+            auth: remoteAuth,
+            webRoot: System.IO.Path.Combine(System.AppContext.BaseDirectory, "Wasm", "remote"));
+        RemotePage.Initialize(_remoteHost, _remoteSettings);
+        RemotePage.CloseRequested += CloseRemote;
+        if (_remoteSettings.Enabled)
+            _remoteHost.Start(_remoteSettings);
+
         // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
         PreviewKeyDown += (_, ke) =>
         {
@@ -444,6 +461,9 @@ public partial class MainWindow : Window
         }
 
         _botWindow?.Close();
+
+        // Stop the remote server so the listener + sockets release before process exit.
+        try { _remoteHost?.Stop(); } catch { }
 
         // Stop all embedded terminal processes
         foreach (var group in _cliGroups)
@@ -531,6 +551,12 @@ public partial class MainWindow : Window
                 int tabIdx = root.GetProperty("tab_index").GetInt32();
                 int lastN = root.TryGetProperty("last", out var lp) ? lp.GetInt32() : 0;
                 HandleTerminalRead(groupIdx, tabIdx, lastN);
+                return;
+            }
+
+            if (command == "remote-pin")
+            {
+                HandleRemotePin();
                 return;
             }
 
@@ -709,6 +735,41 @@ public partial class MainWindow : Window
     // =========================================================================
     //  IPC: terminal-send — send text to a specific terminal
     // =========================================================================
+
+    private const string RemotePinMmfName = "AgentZeroLite_RemotePin_Response";
+    private const int RemotePinMmfSize = 1024;
+
+    /// <summary>
+    /// CLI-driven Remote pairing-PIN issuance. Starts the server if it is enabled but not
+    /// yet running, then issues a fresh one-time PIN and returns it (with the bound URL) so a
+    /// headless client / test can pair without touching the GUI.
+    /// </summary>
+    private void HandleRemotePin()
+    {
+        string json;
+        try
+        {
+            if (_remoteHost is null || _remoteSettings is null)
+            {
+                json = "{\"ok\":false,\"error\":\"remote host not initialized\"}";
+            }
+            else
+            {
+                if (!_remoteHost.IsRunning)
+                    _remoteHost.Start(_remoteSettings);
+
+                var pin = _remoteHost.Auth.IssuePin();
+                var url = _remoteHost.BoundUrl ?? "";
+                json = $"{{\"ok\":true,\"pin\":\"{pin.Pin}\",\"url\":\"{EscapeJson(url)}\"}}";
+                AppLogger.Log($"[Remote] PIN issued via CLI (expires {pin.ExpiresAt:HH:mm:ss})");
+            }
+        }
+        catch (Exception ex)
+        {
+            json = $"{{\"ok\":false,\"error\":\"{EscapeJson(ex.Message)}\"}}";
+        }
+        IpcMemoryMappedResponseWriter.WriteJson(RemotePinMmfName, RemotePinMmfSize, json, "[IPC] remote-pin 응답 쓰기 오류");
+    }
 
     private const string TerminalSendMmfName = "AgentZeroLite_TerminalSend_Response";
     private const int TerminalSendMmfSize = 1024;
@@ -1784,6 +1845,8 @@ public partial class MainWindow : Window
     private readonly List<CliGroupInfo> _cliGroups = [];
     private Services.AutomationScheduler? _automationScheduler;
     private Services.AgentStateMonitor? _agentStateMonitor;
+    private Services.Remote.RemoteServerHost? _remoteHost;
+    private Agent.Common.Remote.RemoteSettings? _remoteSettings;
     private int _prevAttention;
     private int _activeGroupIndex = -1;
 
@@ -3649,6 +3712,43 @@ public partial class MainWindow : Window
         ScrapPage.Visibility = Visibility.Collapsed;
         if (WebDevPage.Visibility != Visibility.Visible &&
             SettingsPanel.Visibility != Visibility.Visible &&
+            HarnessViewPage.Visibility != Visibility.Visible &&
+            NotePage.Visibility != Visibility.Visible)
+            ExitOverlayMode();
+    }
+
+    /// <summary>
+    /// Toggle the Remote overlay. Mirrors <see cref="OnActivityWebDevClick"/>: closes the
+    /// other overlays, enters overlay mode, and shows the Remote admin panel.
+    /// </summary>
+    private void OnActivityRemoteClick(object sender, RoutedEventArgs e)
+    {
+        if (RemotePage.Visibility == Visibility.Visible)
+        {
+            CloseRemote();
+            return;
+        }
+        CloseSettings();
+        CloseWebDev();
+        CloseScrap();
+        CloseHarnessView();
+        CloseDiffReview();
+        EnterOverlayMode();
+        RemotePage.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Tear down the Remote overlay. Idempotent. Restores CLI + bot only when no other
+    /// overlay is also active. Does NOT stop the server — remote sessions keep running
+    /// while the admin panel is closed.
+    /// </summary>
+    private void CloseRemote()
+    {
+        if (RemotePage.Visibility != Visibility.Visible) return;
+        RemotePage.Visibility = Visibility.Collapsed;
+        if (WebDevPage.Visibility != Visibility.Visible &&
+            SettingsPanel.Visibility != Visibility.Visible &&
+            ScrapPage.Visibility != Visibility.Visible &&
             HarnessViewPage.Visibility != Visibility.Visible &&
             NotePage.Visibility != Visibility.Visible)
             ExitOverlayMode();
