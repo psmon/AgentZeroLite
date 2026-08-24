@@ -14,7 +14,7 @@ _Last snapshot: 2026-08-24 (UTC). Updated daily by `.github/workflows/traffic-sn
 
 | Metric | Value |
 |---|---|
-| Recorded days (views) | 0 |
-| Cumulative views | 0 |
-| Recorded days (clones) | 0 |
-| Cumulative clones | 0 |
+| Recorded days (views) | 14 |
+| Cumulative views | 69 |
+| Recorded days (clones) | 14 |
+| Cumulative clones | 231 |
