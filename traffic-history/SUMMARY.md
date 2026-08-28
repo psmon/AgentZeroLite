@@ -1,6 +1,6 @@
 # Traffic & Download History
 
-_Last snapshot: 2026-08-26 (UTC). Updated daily by `.github/workflows/traffic-snapshot.yml`._
+_Last snapshot: 2026-08-28 (UTC). Updated daily by `.github/workflows/traffic-snapshot.yml`._
 
 ## Downloads (cumulative)
 
@@ -14,7 +14,7 @@ _Last snapshot: 2026-08-26 (UTC). Updated daily by `.github/workflows/traffic-sn
 
 | Metric | Value |
 |---|---|
-| Recorded days (views) | 16 |
-| Cumulative views | 74 |
-| Recorded days (clones) | 16 |
-| Cumulative clones | 264 |
+| Recorded days (views) | 17 |
+| Cumulative views | 76 |
+| Recorded days (clones) | 17 |
+| Cumulative clones | 269 |
