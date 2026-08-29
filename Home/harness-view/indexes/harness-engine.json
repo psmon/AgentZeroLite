@@ -2,6 +2,13 @@
   "base": "harness/engine",
   "items": [
     {
+      "file": "audio-regression-review.md",
+      "title": "audio-regression-review",
+      "path": "audio-regression-review.md",
+      "size": 8910,
+      "modified": "2026-08-21"
+    },
+    {
       "file": "crash-dump-triage.md",
       "title": "crash-dump-triage",
       "path": "crash-dump-triage.md",
@@ -16,6 +23,13 @@
       "modified": "2026-05-28"
     },
     {
+      "file": "herdr-adoption.md",
+      "title": "herdr-adoption",
+      "path": "herdr-adoption.md",
+      "size": 2358,
+      "modified": "2026-08-11"
+    },
+    {
       "file": "mission-dispatch.md",
       "title": "mission-dispatch",
       "path": "mission-dispatch.md",
@@ -23,11 +37,25 @@
       "modified": "2026-05-28"
     },
     {
+      "file": "orca-adoption.md",
+      "title": "orca-adoption",
+      "path": "orca-adoption.md",
+      "size": 5056,
+      "modified": "2026-08-11"
+    },
+    {
       "file": "os-cli-e2e-smoke.md",
       "title": "os-cli-e2e-smoke",
       "path": "os-cli-e2e-smoke.md",
-      "size": 4330,
-      "modified": "2026-05-28"
+      "size": 4737,
+      "modified": "2026-08-21"
+    },
+    {
+      "file": "pr-review.md",
+      "title": "pr-review",
+      "path": "pr-review.md",
+      "size": 10643,
+      "modified": "2026-08-21"
     },
     {
       "file": "pre-commit-review.md",
@@ -40,8 +68,8 @@
       "file": "release-build-pipeline.md",
       "title": "release-build-pipeline",
       "path": "release-build-pipeline.md",
-      "size": 3294,
-      "modified": "2026-05-28"
+      "size": 5821,
+      "modified": "2026-08-21"
     }
   ]
 }

@@ -29,6 +29,24 @@
       "modified": "2026-05-28"
     },
     {
+      "id": "harness/knowledge/_shared/code-signing.md",
+      "file": "harness/knowledge/_shared/code-signing.md",
+      "name": "code-signing.md",
+      "title": "code-signing",
+      "heading": "Code Signing — 실행파일 서명 획득 지식 (AgentZero Lite)",
+      "size": 6332,
+      "modified": "2026-08-12"
+    },
+    {
+      "id": "harness/knowledge/_shared/long-lived-branches.md",
+      "file": "harness/knowledge/_shared/long-lived-branches.md",
+      "name": "long-lived-branches.md",
+      "title": "long-lived-branches",
+      "heading": "Long-lived & experimental branches — do NOT auto-flag as \"stale\"",
+      "size": 1454,
+      "modified": "2026-08-21"
+    },
+    {
       "id": "harness/knowledge/_shared/os-control.md",
       "file": "harness/knowledge/_shared/os-control.md",
       "name": "os-control.md",
@@ -178,8 +196,8 @@
       "name": "README.md",
       "title": "README",
       "heading": "harness/knowledge — per-agent expert knowledge",
-      "size": 4210,
-      "modified": "2026-05-28"
+      "size": 4310,
+      "modified": "2026-08-29"
     },
     {
       "id": "harness/knowledge/security-guard/crash-dump-forensics.md",
@@ -218,6 +236,15 @@
       "modified": "2026-05-28"
     },
     {
+      "id": "harness/knowledge/tamer/pdsa-cli.md",
+      "file": "harness/knowledge/tamer/pdsa-cli.md",
+      "name": "pdsa-cli.md",
+      "title": "pdsa-cli",
+      "heading": "PDSA CLI (`@webnori/pdsa`) — graph-memory improvement loop",
+      "size": 8327,
+      "modified": "2026-08-29"
+    },
+    {
       "id": "harness/knowledge/test-runner/dotnet-test-execution.md",
       "file": "harness/knowledge/test-runner/dotnet-test-execution.md",
       "name": "dotnet-test-execution.md",
@@ -243,6 +270,15 @@
       "heading": "Voice TTS↔STT Round-Trip Testing — Methodology",
       "size": 10274,
       "modified": "2026-05-28"
+    },
+    {
+      "id": "harness/knowledge/voice-curator/native-inference-lifetime.md",
+      "file": "harness/knowledge/voice-curator/native-inference-lifetime.md",
+      "name": "native-inference-lifetime.md",
+      "title": "native-inference-lifetime",
+      "heading": "Native inference lifetime & serialization — voice-note pipeline",
+      "size": 5177,
+      "modified": "2026-08-21"
     },
     {
       "id": "harness/knowledge/voice-curator/sherpa-onnx-integration.md",
@@ -380,8 +416,8 @@
       "type": "file",
       "name": "README.md",
       "path": "README.md",
-      "size": 4210,
-      "modified": "2026-05-28"
+      "size": 4310,
+      "modified": "2026-08-29"
     },
     {
       "type": "dir",
@@ -422,6 +458,13 @@
           "path": "tamer/missions-protocol.md",
           "size": 12278,
           "modified": "2026-05-28"
+        },
+        {
+          "type": "file",
+          "name": "pdsa-cli.md",
+          "path": "tamer/pdsa-cli.md",
+          "size": 8327,
+          "modified": "2026-08-29"
         }
       ]
     },
@@ -467,6 +510,13 @@
       "children": [
         {
           "type": "file",
+          "name": "native-inference-lifetime.md",
+          "path": "voice-curator/native-inference-lifetime.md",
+          "size": 5177,
+          "modified": "2026-08-21"
+        },
+        {
+          "type": "file",
           "name": "sherpa-onnx-integration.md",
           "path": "voice-curator/sherpa-onnx-integration.md",
           "size": 7369,
@@ -506,6 +556,20 @@
           "path": "_shared/agentzerolite-architecture.md",
           "size": 4682,
           "modified": "2026-05-28"
+        },
+        {
+          "type": "file",
+          "name": "code-signing.md",
+          "path": "_shared/code-signing.md",
+          "size": 6332,
+          "modified": "2026-08-12"
+        },
+        {
+          "type": "file",
+          "name": "long-lived-branches.md",
+          "path": "_shared/long-lived-branches.md",
+          "size": 1454,
+          "modified": "2026-08-21"
         },
         {
           "type": "file",

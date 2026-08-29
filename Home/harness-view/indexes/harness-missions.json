@@ -10,10 +10,10 @@
     "cancelled"
   ],
   "counts": {
-    "all": 31,
+    "all": 32,
     "inbox": 1,
-    "in_progress": 2,
-    "done": 28,
+    "in_progress": 1,
+    "done": 30,
     "partial": 0,
     "blocked": 0,
     "cancelled": 0
@@ -69,6 +69,23 @@
       "designFile": null,
       "modified": "2026-07-05",
       "size": 3014
+    },
+    {
+      "id": "M0028",
+      "file": "harness/missions/M0028-온디바이스-비전.md",
+      "title": "온디바이스 비전 사이클 — Florence-2 OD + 유튜브 프레임 캡처 + 악단 걸그룹 비전",
+      "operator": "psmon",
+      "language": "ko",
+      "status": "done",
+      "priority": "medium",
+      "created": "2026-07-05",
+      "recordFile": null,
+      "recordStatus": null,
+      "recordStarted": null,
+      "recordFinished": null,
+      "designFile": null,
+      "modified": "2026-08-21",
+      "size": 2369
     },
     {
       "id": "M0027",
@@ -314,7 +331,7 @@
       "title": "Reactor → AgentLoop 리네임 (Agent vocabulary 정렬)",
       "operator": "psmon",
       "language": "ko",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium",
       "created": "2026-05-05",
       "recordFile": "harness/logs/mission-records/M0013-수행결과.md",
@@ -322,8 +339,8 @@
       "recordStarted": null,
       "recordFinished": null,
       "designFile": null,
-      "modified": "2026-05-28",
-      "size": 5690
+      "modified": "2026-08-21",
+      "size": 5720
     },
     {
       "id": "M0012",

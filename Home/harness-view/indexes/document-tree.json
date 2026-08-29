@@ -3,6 +3,48 @@
   "tree": [
     {
       "type": "dir",
+      "name": "agent-herdr",
+      "path": "agent-herdr",
+      "children": [
+        {
+          "type": "file",
+          "name": "README.md",
+          "path": "agent-herdr/README.md",
+          "size": 2674,
+          "modified": "2026-08-11"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "name": "agent-orca",
+      "path": "agent-orca",
+      "children": [
+        {
+          "type": "file",
+          "name": "01-orca-feature-catalog.md",
+          "path": "agent-orca/01-orca-feature-catalog.md",
+          "size": 11064,
+          "modified": "2026-08-11"
+        },
+        {
+          "type": "file",
+          "name": "02-phase-plan.md",
+          "path": "agent-orca/02-phase-plan.md",
+          "size": 8312,
+          "modified": "2026-08-11"
+        },
+        {
+          "type": "file",
+          "name": "README.md",
+          "path": "agent-orca/README.md",
+          "size": 5121,
+          "modified": "2026-08-11"
+        }
+      ]
+    },
+    {
+      "type": "dir",
       "name": "agent-origin",
       "path": "agent-origin",
       "children": [

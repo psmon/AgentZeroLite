@@ -3,6 +3,36 @@
   "sort": "semver-desc",
   "items": [
     {
+      "file": "v1.12.0.md",
+      "title": "v1.12.0",
+      "heading": "PDSA CLI (`@webnori/pdsa`) integrated into the tamer garden",
+      "path": "v1.12.0.md",
+      "size": 3580,
+      "modified": "2026-08-29",
+      "author": null,
+      "committed": null
+    },
+    {
+      "file": "v1.11.0.md",
+      "title": "v1.11.0",
+      "heading": "pr-review engine (branch-level verification lane)",
+      "path": "v1.11.0.md",
+      "size": 4313,
+      "modified": "2026-08-21",
+      "author": "smpark-luna",
+      "committed": "2026-08-20"
+    },
+    {
+      "file": "v1.10.0.md",
+      "title": "v1.10.0",
+      "heading": "audio-regression-review engine (Music + Voice curator release lane)",
+      "path": "v1.10.0.md",
+      "size": 5851,
+      "modified": "2026-08-21",
+      "author": "smpark-luna",
+      "committed": "2026-08-20"
+    },
+    {
       "file": "v1.9.0.md",
       "title": "v1.9.0",
       "heading": "voice-curator specialist + Sherpa-ONNX diarization scaffold (M0024 Phase 1)",
@@ -187,58 +217,58 @@
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 83.1
+      "percent": 72.8
     },
     {
       "name": "smpark-luna",
-      "commits": 25,
-      "percent": 16.9
+      "commits": 46,
+      "percent": 27.2
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 83.1
+      "percent": 72.8
     },
     {
       "name": "smpark-luna",
-      "commits": 25,
-      "percent": 16.9
+      "commits": 46,
+      "percent": 27.2
     }
   ],
   "contributorsRecent": [
     {
       "name": "smpark-luna",
-      "commits": 6,
+      "commits": 5,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 148,
-    "last7d": 6,
-    "last30d": 24
+    "totalAllTime": 169,
+    "last7d": 0,
+    "last30d": 18
   },
   "topChangedFiles": [
     {
-      "path": "harness/knowledge/music-curator/agent-band-mapping.md",
-      "commits": 5
+      "path": "harness/harness.config.json",
+      "commits": 4
     },
     {
-      "path": "Home/harness-view/data/news.json",
-      "commits": 3
-    },
-    {
-      "path": "harness/logs/mission-records/M0030-\\354\\210\\230\\355\\226\\211\\352\\262\\260\\352\\263\\274.md",
+      "path": "harness/engine/pr-review.md",
       "commits": 2
     },
     {
-      "path": "Home/harness-view/data/models.json",
+      "path": "harness/logs/pr-review/2026-08-21-11-05-pr12-p0-cleanup-merge-approval.md",
       "commits": 2
     },
     {
-      "path": "harness/logs/mission-records/M0026-\\354\\210\\230\\355\\226\\211\\352\\262\\260\\352\\263\\274.md",
+      "path": "harness/docs/v1.10.0.md",
+      "commits": 2
+    },
+    {
+      "path": "harness/engine/audio-regression-review.md",
       "commits": 2
     }
   ]

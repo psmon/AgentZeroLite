@@ -2,29 +2,247 @@
   "base": "harness/logs",
   "categories": [
     "agent-band",
+    "audio-regression-review",
     "build-doctor",
     "code-coach",
+    "herdr-adoption",
     "kakashi-copy",
     "mission-records",
     "music-curator",
+    "orca-adoption",
+    "pr-review",
     "pre-commit-review",
     "release-build-pipeline",
     "security-guard",
-    "tamer"
+    "tamer",
+    "voice-curator"
   ],
   "counts": {
     "agent-band": 9,
+    "audio-regression-review": 1,
     "build-doctor": 6,
-    "code-coach": 24,
+    "code-coach": 25,
+    "herdr-adoption": 2,
     "kakashi-copy": 1,
     "mission-records": 28,
     "music-curator": 1,
+    "orca-adoption": 12,
+    "pr-review": 1,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
-    "tamer": 20
+    "tamer": 24,
+    "voice-curator": 5
   },
   "items": [
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-29-13-33-pdsa-cli-integration.md",
+      "date": "2026-08-29",
+      "time": "13:33",
+      "title": "pdsa cli integration",
+      "size": 2819
+    },
+    {
+      "category": "pr-review",
+      "file": "harness/logs/pr-review/2026-08-21-11-05-pr12-p0-cleanup-merge-approval.md",
+      "date": "2026-08-21",
+      "time": "11:05",
+      "title": "pr12 p0 cleanup merge approval",
+      "size": 5796
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-20-03-10-pr-review-engine-and-oos-issue-handoff.md",
+      "date": "2026-08-20",
+      "time": "03:10",
+      "title": "pr review engine and oos issue handoff",
+      "size": 5127
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-08-20-02-52-pr12-p0-cleanup-verification-review.md",
+      "date": "2026-08-20",
+      "time": "02:52",
+      "title": "pr12 p0 cleanup verification review",
+      "size": 6148
+    },
+    {
+      "category": "herdr-adoption",
+      "file": "harness/logs/herdr-adoption/2026-08-12-00-30-runtime-and-improvements.md",
+      "date": "2026-08-12",
+      "time": "00:30",
+      "title": "runtime and improvements",
+      "size": 2782
+    },
+    {
+      "category": "herdr-adoption",
+      "file": "harness/logs/herdr-adoption/2026-08-11-19-40-h1-h5-cores-done.md",
+      "date": "2026-08-11",
+      "time": "19:40",
+      "title": "h1 h5 cores done",
+      "size": 3142
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-11-18-05-w6-live-palette-done.md",
+      "date": "2026-08-11",
+      "time": "18:05",
+      "title": "w6 live palette done",
+      "size": 2966
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-11-17-50-list-files-and-automations-done.md",
+      "date": "2026-08-11",
+      "time": "17:50",
+      "title": "list files and automations done",
+      "size": 2504
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-23-15-e2e-suite-and-bugfixes.md",
+      "date": "2026-08-10",
+      "time": "23:15",
+      "title": "e2e suite and bugfixes",
+      "size": 4542
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-22-00-W6-activation-done.md",
+      "date": "2026-08-10",
+      "time": "22:00",
+      "title": "W6 activation done",
+      "size": 2940
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-21-30-W4-W5-W7-app-cli-batch-done.md",
+      "date": "2026-08-10",
+      "time": "21:30",
+      "title": "W4 W5 W7 app cli batch done",
+      "size": 2725
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-20-40-W9-cost-layer-done.md",
+      "date": "2026-08-10",
+      "time": "20:40",
+      "title": "W9 cost layer done",
+      "size": 2050
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-20-10-W2-trust-preset-done.md",
+      "date": "2026-08-10",
+      "time": "20:10",
+      "title": "W2 trust preset done",
+      "size": 2227
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-19-20-W6-orchestration-done.md",
+      "date": "2026-08-10",
+      "time": "19:20",
+      "title": "W6 orchestration done",
+      "size": 4188
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-18-10-W3-diff-review-done.md",
+      "date": "2026-08-10",
+      "time": "18:10",
+      "title": "W3 diff review done",
+      "size": 3926
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-16-40-W1-agent-hooks-done.md",
+      "date": "2026-08-10",
+      "time": "16:40",
+      "title": "W1 agent hooks done",
+      "size": 3425
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-15-30-W8-file-tools-done.md",
+      "date": "2026-08-10",
+      "time": "15:30",
+      "title": "W8 file tools done",
+      "size": 3148
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-10-14-00-P0-analysis-and-plan.md",
+      "date": "2026-08-10",
+      "time": "14:00",
+      "title": "P0 analysis and plan",
+      "size": 3126
+    },
+    {
+      "category": "audio-regression-review",
+      "file": "harness/logs/audio-regression-review/2026-08-09-09-24-v0160-first-run.md",
+      "date": "2026-08-09",
+      "time": "09:24",
+      "title": "v0160 first run",
+      "size": 3047
+    },
+    {
+      "category": "voice-curator",
+      "file": "harness/logs/voice-curator/2026-08-09-09-24-v0160-audio-regression-review.md",
+      "date": "2026-08-09",
+      "time": "09:24",
+      "title": "v0160 audio regression review",
+      "size": 4813
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-08-20-10-audio-regression-review-engine.md",
+      "date": "2026-08-08",
+      "time": "20:10",
+      "title": "audio regression review engine",
+      "size": 2698
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-08-19-57-agents-roster-analysis.md",
+      "date": "2026-08-08",
+      "time": "19:57",
+      "title": "agents roster analysis",
+      "size": 2667
+    },
+    {
+      "category": "voice-curator",
+      "file": "harness/logs/voice-curator/2026-07-15-17-30-diarizer-chunk-scoped-memory-model.md",
+      "date": "2026-07-15",
+      "time": "17:30",
+      "title": "diarizer chunk scoped memory model",
+      "size": 5046
+    },
+    {
+      "category": "voice-curator",
+      "file": "harness/logs/voice-curator/2026-07-15-16-40-diarizer-native-dispose-p1-patch.md",
+      "date": "2026-07-15",
+      "time": "16:40",
+      "title": "diarizer native dispose p1 patch",
+      "size": 3871
+    },
+    {
+      "category": "voice-curator",
+      "file": "harness/logs/voice-curator/2026-07-15-16-20-voice-note-infer-gate-p0-patch.md",
+      "date": "2026-07-15",
+      "time": "16:20",
+      "title": "voice note infer gate p0 patch",
+      "size": 3661
+    },
+    {
+      "category": "voice-curator",
+      "file": "harness/logs/voice-curator/2026-07-15-16-08-voice-note-loopback-concurrency-crash.md",
+      "date": "2026-07-15",
+      "time": "16:08",
+      "title": "voice note loopback concurrency crash",
+      "size": 6620
+    },
     {
       "category": "music-curator",
       "file": "harness/logs/music-curator/2026-07-05-20-33-mp3-local-playlist.md",

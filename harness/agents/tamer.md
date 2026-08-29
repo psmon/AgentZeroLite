@@ -21,6 +21,11 @@ triggers:
   - "run mission M\\d{4}"
   - "미션 목록"
   - "list missions"
+  - "PDSA 사이클 시작"
+  - "PDSA 회고"
+  - "개선 사이클 시작"
+  - "run pdsa cycle"
+  - "pdsa plan"
 description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)을 심고, 토양(지식)을 가꾸고, 물길(엔진)을 낸다. operator의 mission 파일(harness/missions/M{NNNN}-*.md)을 받으면 적절한 전문가에게 dispatch하고 결과를 harness/logs/mission-records/에 operator의 언어로 기록한다.
 ---
 
@@ -210,6 +215,34 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
   `harness/logs/mission-records/M{NNNN}-수행결과.md` 에 cancel rationale 한 단락
   기록 (mission language로). dispatch는 수행하지 않는다.
 
+### PDSA 개선 사이클 (PDSA 사이클 시작 / PDSA 회고 / 개선 사이클 시작 / run pdsa cycle / pdsa plan)
+
+`@webnori/pdsa` CLI 로 Deming 의 Plan→Do→Study→Act 지속개선 루프를 돌려
+프로젝트별 그래프 메모리에 학습을 누적한다.
+
+> **주의** — 여기서 말하는 PDSA 는 `@webnori/pdsa` **CLI(그래프 개선루프)** 다.
+> harness-view 대시보드의 `pdsa-insight.json` (표시용 요약) 과는 별개다. 계약과
+> 두 PDSA 의 구분은 `harness/knowledge/tamer/pdsa-cli.md` 참고.
+
+1. **`harness/knowledge/tamer/pdsa-cli.md` Read** — 명령 표면·인증·그래프 메모리
+   계약을 내재화한다.
+2. active project 확인: `pdsa status`. 이 레포가 아니면
+   `pdsa project set agentzero-lite`. (LLM 미검증이면 `pdsa check` 1회.)
+3. 한 사이클 구동 — 각 단계 출력을 읽고 실제 작업에 반영한다:
+   - `pdsa plan "무엇을 왜 어떻게"` → **[Hypothesis] / [Metrics]** 확인 후 그 방향으로 작업.
+   - `pdsa do "실제로 한 것"` → **[Plan→Do summary]** 로 계획 대비 갭 점검.
+   - `pdsa study "결과 수치·관찰"` → LLM 판정(met/partial/unmet) + **[Learnings & improvements]**.
+   - `pdsa act --note "메모"` → **[Next improvement action]** 을 다음 plan 으로 이월.
+   - 필요 시 `pdsa status` / `pdsa eval` 로 진행·충족률(recall) 보고.
+4. 의미 있는 개선 단위로만 사이클을 연다 — 사소한 편집마다 남발하지 않는다
+   (`pdsa-cli.md` anti-pattern b).
+5. **[필수] tamer Mode A 로그** `harness/logs/tamer/{yyyy-MM-dd-HH-mm-title}.md`
+   기록 + 3축 평가.
+
+> mission dispatch 완료 후(step 7~9) operator 가 의미 있는 개선/회고를 원하면
+> 위 절차로 PDSA 사이클을 1회 남길 수 있다 — 자동 강제는 아니며, operator 요청
+> 또는 tamer 판단 시에만 수행한다.
+
 ## 평가 기준
 
 3축 평가 체계 (개선부 / 일반 dispatch 공통):
@@ -228,6 +261,13 @@ description: 하네스라는 정원을 돌보는 정원지기. 꽃(에이전트)
 | Mission language fidelity | 완료 로그가 요청서 `language`와 정확히 일치 | Pass/Fail |
 | Acceptance coverage | mission의 Acceptance 체크리스트가 모두 처리됨 | A/B/C/D |
 | Status hygiene | mission 파일의 `status`가 inbox→in_progress→done 으로 정확히 전이 | Pass/Fail |
+
+## Owned convention sets (knowledge backlinks)
+
+- `harness/knowledge/tamer/missions-protocol.md` — mission 파일/로그 계약
+- `harness/knowledge/tamer/agent-origin-reference.md` — AgentWin 조회 절차
+- `harness/knowledge/tamer/pdsa-cli.md` — `@webnori/pdsa` 개선-루프 CLI 계약
+  (그래프 메모리 · 인증 · harness-view PDSA 와의 구분)
 
 ## 위임 규칙
 

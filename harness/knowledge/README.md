@@ -15,7 +15,8 @@ harness/knowledge/
 │   └── agentzerolite-architecture.md       # project map every agent anchors against
 ├── tamer/
 │   ├── missions-protocol.md                 # mission file/log contract
-│   └── agent-origin-reference.md            # AgentWin lookup procedure
+│   ├── agent-origin-reference.md            # AgentWin lookup procedure
+│   └── pdsa-cli.md                          # @webnori/pdsa improvement-loop CLI contract
 ├── code-coach/
 │   ├── llm-prompt-conventions.md            # prompts default to English (R-1..R-5)
 │   ├── wpf-xaml-resource-and-window-pitfalls.md   # 6 review-time XAML traps
