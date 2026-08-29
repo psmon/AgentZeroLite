@@ -92,11 +92,28 @@ public sealed class AgentStateMonitor
                     catch { continue; }
 
                     var lines = text.Replace("\r\n", "\n").Split('\n');
-                    var manifest = AgentManifestCatalog.ForAgent(tab.Title);
-                    var res = AgentStateDetector.Detect(manifest, new ScreenSnapshot(lines));
-
                     _states.TryGetValue(key, out var prev);
-                    var activity = res.StateChanged ? res.State : (prev?.Activity ?? AgentActivity.Unknown);
+
+                    // H4 authority gate: for a lifecycle-authority CLI whose hook
+                    // is installed, the hook is the single source of truth — screen
+                    // detection is suppressed and we keep the hook-reported state.
+                    // For every currently-shipping agent this resolves to screen
+                    // detection (the correct default); the branch is live plumbing
+                    // for when a lifecycle-authority CLI ships a hook installer.
+                    AgentActivity activity;
+                    string? rule;
+                    if (AgentIntegrationCatalog.UseScreenDetection(tab.Title, HookInstalled(tab.Title)))
+                    {
+                        var manifest = AgentManifestCatalog.ForAgent(tab.Title);
+                        var res = AgentStateDetector.Detect(manifest, new ScreenSnapshot(lines));
+                        activity = res.StateChanged ? res.State : (prev?.Activity ?? AgentActivity.Unknown);
+                        rule = res.MatchedRuleId;
+                    }
+                    else
+                    {
+                        activity = prev?.Activity ?? AgentActivity.Unknown;
+                        rule = prev?.Rule ?? "hook-authority";
+                    }
 
                     bool isActive = active is { } a && a.g == gi && a.t == ti;
                     bool seen;
@@ -105,7 +122,7 @@ public sealed class AgentStateMonitor
                         seen = false;                                             // newly done, unseen
                     else seen = prev?.Seen ?? (activity != AgentActivity.Done);
 
-                    _states[key] = new TabState(gi, ti, tab.Title, activity, seen, res.MatchedRuleId);
+                    _states[key] = new TabState(gi, ti, tab.Title, activity, seen, rule);
                 }
             }
 
@@ -127,5 +144,22 @@ public sealed class AgentStateMonitor
         {
             AppLogger.Log($"[AgentState] monitor tick failed: {ex.Message}");
         }
+    }
+
+    // H4 authority gate: cache of lifecycle-authority CLIs whose hook is
+    // installed (install/uninstall is rare, so we don't probe disk per tick).
+    // Empty today — no lifecycle-authority CLI ships a hook installer yet — so
+    // the gate resolves to screen detection for every shipping agent. When such
+    // an installer lands, populate this from the installer's discovery.
+    private readonly Dictionary<string, bool> _hookInstalledLifecycle = new(StringComparer.OrdinalIgnoreCase);
+
+    private bool HookInstalled(string? title)
+    {
+        var integ = AgentIntegrationCatalog.Lookup(title);
+        // Only lifecycle-authority CLIs are gated by hook presence; for
+        // session-identity agents screen detection always wins → flag irrelevant.
+        if (integ is null || integ.Authority != IntegrationAuthority.LifecycleAuthority)
+            return false;
+        return _hookInstalledLifecycle.TryGetValue(integ.Agent, out var v) && v;
     }
 }

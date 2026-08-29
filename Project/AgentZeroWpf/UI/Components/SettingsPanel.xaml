@@ -1983,6 +1983,60 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <!-- Budget Tab (orca cost layer — mission W9 follow-up) -->
+            <TabItem Header="&#x1F4B2; Budget" Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,0,0">
+
+                        <!-- Monthly budget -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#00FFA3" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="MONTHLY BUDGET" FontSize="11" FontWeight="Bold" Foreground="#00FFA3" FontFamily="Consolas"/>
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10" Foreground="#808080" LineHeight="16" Margin="0,0,0,6">
+                                    <Run>Estimated month-to-date spend from recorded token usage. Set a monthly cap (USD); 0 = no cap.</Run>
+                                </TextBlock>
+                                <DockPanel Margin="0,0,0,4">
+                                    <TextBlock DockPanel.Dock="Left" Text="Monthly cap ($):" Foreground="#C8C8D8" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <Button x:Name="btnBudgetSave" DockPanel.Dock="Right" Content="Save" Padding="14,5" FontFamily="Consolas" FontSize="11" FontWeight="Bold" Foreground="#00FFF0" Background="#14143A" BorderBrush="#2A2A5E" BorderThickness="1" Cursor="Hand" Click="OnBudgetSave" Margin="8,0,0,0"/>
+                                    <Button x:Name="btnBudgetRefresh" DockPanel.Dock="Right" Content="Refresh" Padding="14,5" FontFamily="Consolas" FontSize="11" Foreground="#C8C8D8" Background="#12122A" BorderBrush="#2A2A5E" BorderThickness="1" Cursor="Hand" Click="OnBudgetRefresh" Margin="8,0,0,0"/>
+                                    <TextBox x:Name="tbBudgetCap" Background="#12122A" Foreground="#E0E0E0" BorderBrush="#2A2A5E" BorderThickness="1" FontFamily="Consolas" FontSize="11" Padding="8,4" VerticalContentAlignment="Center" Width="120" HorizontalAlignment="Left"/>
+                                </DockPanel>
+                                <TextBlock x:Name="lblBudgetStatus" FontFamily="Consolas" FontSize="12" FontWeight="Bold" Foreground="#00FFA3" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Price table -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#FF2D95" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="PRICE TABLE (USD per 1M tokens)" FontSize="11" FontWeight="Bold" Foreground="#FF2D95" FontFamily="Consolas"/>
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10" Foreground="#808080" LineHeight="16" Margin="0,0,0,6">
+                                    <Run>Overrides are matched by lower-cased substring (first match wins), tried before the built-in defaults. Key examples: opus, sonnet, gpt-4o.</Run>
+                                </TextBlock>
+                                <DataGrid x:Name="dgPrices" AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="True" CanUserDeleteRows="True" Background="#12122A" Foreground="#E0E0E0" BorderBrush="#2A2A5E" BorderThickness="1" GridLinesVisibility="Horizontal" RowBackground="#12122A" AlternatingRowBackground="#161636" FontFamily="Consolas" FontSize="11" Height="180" Margin="0,0,0,4">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="*"/>
+                                        <DataGridTextColumn Header="Input" Binding="{Binding InputPerMTok}" Width="80"/>
+                                        <DataGridTextColumn Header="Output" Binding="{Binding OutputPerMTok}" Width="80"/>
+                                        <DataGridTextColumn Header="Cache+" Binding="{Binding CacheWritePerMTok}" Width="80"/>
+                                        <DataGridTextColumn Header="Cache-" Binding="{Binding CacheReadPerMTok}" Width="80"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10" Foreground="#556677" LineHeight="16">
+                                    <Run>Empty table = built-in defaults. Add a row to override a model family or price a new one; then Save.</Run>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
     </Grid>
 </UserControl>

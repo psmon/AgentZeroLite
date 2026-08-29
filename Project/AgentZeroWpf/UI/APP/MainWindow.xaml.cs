@@ -529,8 +529,11 @@ public partial class MainWindow : Window
 
             if (command == "terminal-send")
             {
-                int groupIdx = root.GetProperty("group_index").GetInt32();
-                int tabIdx = root.GetProperty("tab_index").GetInt32();
+                if (!TryResolveCliTarget(root, out int groupIdx, out int tabIdx, out var aliasErr))
+                {
+                    WriteAliasError(TerminalSendMmfName, TerminalSendMmfSize, aliasErr!);
+                    return;
+                }
                 string text = root.GetProperty("text").GetString() ?? "";
                 HandleTerminalSend(groupIdx, tabIdx, text);
                 return;
@@ -538,8 +541,12 @@ public partial class MainWindow : Window
 
             if (command == "terminal-key")
             {
-                int groupIdx = root.GetProperty("group_index").GetInt32();
-                int tabIdx = root.GetProperty("tab_index").GetInt32();
+                if (!TryResolveCliTarget(root, out int groupIdx, out int tabIdx, out var aliasErr))
+                {
+                    // terminal-key reuses the terminal-send response MMF (see HandleTerminalKey).
+                    WriteAliasError(TerminalSendMmfName, TerminalSendMmfSize, aliasErr!);
+                    return;
+                }
                 string key = root.GetProperty("key").GetString() ?? "";
                 HandleTerminalKey(groupIdx, tabIdx, key);
                 return;
@@ -547,10 +554,31 @@ public partial class MainWindow : Window
 
             if (command == "terminal-read")
             {
-                int groupIdx = root.GetProperty("group_index").GetInt32();
-                int tabIdx = root.GetProperty("tab_index").GetInt32();
+                if (!TryResolveCliTarget(root, out int groupIdx, out int tabIdx, out var aliasErr))
+                {
+                    WriteAliasError(TerminalReadMmfName, TerminalReadMmfSize, aliasErr!);
+                    return;
+                }
                 int lastN = root.TryGetProperty("last", out var lp) ? lp.GetInt32() : 0;
                 HandleTerminalRead(groupIdx, tabIdx, lastN);
+                return;
+            }
+
+            if (command == "terminal-alias")
+            {
+                string sub = root.TryGetProperty("sub", out var subp) ? subp.GetString() ?? "" : "";
+                HandleTerminalAlias(sub, root);
+                return;
+            }
+
+            if (command == "agent-resume-launch")
+            {
+                if (!TryResolveCliTarget(root, out int g, out int t, out var aliasErr))
+                {
+                    WriteAliasError(AgentResumeLaunchMmfName, AgentResumeLaunchMmfSize, aliasErr!);
+                    return;
+                }
+                HandleAgentResumeLaunch(g, t);
                 return;
             }
 
@@ -695,6 +723,178 @@ public partial class MainWindow : Window
         var cmd = Agent.Common.Agents.ClaudeSessionLocator.BuildResumeCommand(cwd) ?? "";
         var json = $"{{\"ok\":true,\"cwd\":\"{EscapeJson(cwd)}\",\"title\":\"{EscapeJson(title)}\",\"cmd\":\"{EscapeJson(cmd)}\"}}";
         IpcMemoryMappedResponseWriter.WriteJson(AgentResumeMmfName, AgentResumeMmfSize, json, "[IPC] agent-resume 응답 쓰기 오류");
+    }
+
+    // =========================================================================
+    //  Agent resume LAUNCH (herdr H3) — discover + actually inject the resume
+    //  command into the live terminal (vs agent-resume which only prints it).
+    // =========================================================================
+    private const string AgentResumeLaunchMmfName = "AgentZeroLite_AgentResumeLaunch_Response";
+    private const int AgentResumeLaunchMmfSize = 4096;
+
+    private void HandleAgentResumeLaunch(int g, int t)
+    {
+        string cwd = (g >= 0 && g < _cliGroups.Count) ? _cliGroups[g].DirectoryPath : "";
+        var cmd = Agent.Common.Agents.ClaudeSessionLocator.BuildResumeCommand(cwd);
+        string resultJson;
+        if (string.IsNullOrEmpty(cmd))
+        {
+            resultJson = $"{{\"ok\":false,\"error\":\"No prior Claude session found for this tab's workspace ({EscapeJson(cwd)}).\"}}";
+        }
+        else if (!CliTerminalIpcHelper.TryResolveSession(
+                     _cliGroups, g, t,
+                     $"Invalid group_index {g}. Use terminal-list.",
+                     $"Invalid tab_index {t} in group {g}. Use terminal-list.",
+                     $"Terminal [{g}:{t}] is not started. Activate the tab first.",
+                     out _, out _, out var session, out var errJson))
+        {
+            resultJson = errJson!;
+        }
+        else if (!session!.IsRunning)
+        {
+            resultJson = $"{{\"ok\":false,\"error\":\"Terminal [{g}:{t}] session is not running (PTY dead). Restart the tab before resuming.\"}}";
+        }
+        else
+        {
+            try
+            {
+                session.WriteAndSubmit(cmd!);
+                resultJson = $"{{\"ok\":true,\"group_index\":{g},\"tab_index\":{t},\"cmd\":\"{EscapeJson(cmd!)}\"}}";
+                AppLogger.Log($"[IPC] agent-resume-launch [{g}:{t}] | injected: {cmd}");
+            }
+            catch (Exception ex)
+            {
+                resultJson = $"{{\"ok\":false,\"error\":\"Write failed: {EscapeJson(ex.Message)}\"}}";
+            }
+        }
+        IpcMemoryMappedResponseWriter.WriteJson(AgentResumeLaunchMmfName, AgentResumeLaunchMmfSize, resultJson, "[IPC] agent-resume-launch 응답 쓰기 오류");
+    }
+
+    // =========================================================================
+    //  Terminal alias (herdr H5) — stable name → (group,tab) mapping so -cli
+    //  commands can target a terminal by alias instead of volatile indices.
+    // =========================================================================
+    private const string TerminalAliasMmfName = "AgentZeroLite_TerminalAlias_Response";
+    private const int TerminalAliasMmfSize = 16384;
+
+    /// <summary>Writes an alias-resolution error to a command's own response MMF.</summary>
+    private void WriteAliasError(string mmfName, int mmfSize, string error)
+        => IpcMemoryMappedResponseWriter.WriteJson(
+            mmfName, mmfSize, $"{{\"ok\":false,\"error\":\"{EscapeJson(error)}\"}}", "[IPC] alias resolve 오류");
+
+    /// <summary>
+    /// Resolves a terminal command's target: an optional <c>alias</c> wins over
+    /// <c>group_index</c>/<c>tab_index</c>. Aliases resolve against the live group
+    /// list by the stable (DisplayName, Title) pair.
+    /// </summary>
+    private bool TryResolveCliTarget(JsonElement root, out int groupIdx, out int tabIdx, out string? aliasError)
+    {
+        groupIdx = -1;
+        tabIdx = -1;
+        aliasError = null;
+
+        if (root.TryGetProperty("alias", out var ap) && ap.ValueKind == JsonValueKind.String)
+        {
+            string alias = ap.GetString() ?? "";
+            var target = Agent.Common.Agents.TerminalAliasRegistry.Load().Resolve(alias);
+            if (target is null)
+            {
+                aliasError = $"Alias '{alias}' is not defined. Assign it with: terminal-alias set <group> <tab> {alias}";
+                return false;
+            }
+            for (int gi = 0; gi < _cliGroups.Count; gi++)
+                for (int ti = 0; ti < _cliGroups[gi].Tabs.Count; ti++)
+                    if (_cliGroups[gi].DisplayName == target.GroupName && _cliGroups[gi].Tabs[ti].Title == target.Title)
+                    {
+                        groupIdx = gi;
+                        tabIdx = ti;
+                        return true;
+                    }
+            aliasError = $"Alias '{alias}' → \"{target.GroupName}/{target.Title}\" matches no live terminal.";
+            return false;
+        }
+
+        groupIdx = root.TryGetProperty("group_index", out var gp) ? gp.GetInt32() : -1;
+        tabIdx = root.TryGetProperty("tab_index", out var tp) ? tp.GetInt32() : -1;
+        return true;
+    }
+
+    private void HandleTerminalAlias(string sub, JsonElement root)
+    {
+        string resultJson;
+        try
+        {
+            var reg = Agent.Common.Agents.TerminalAliasRegistry.Load();
+            switch (sub)
+            {
+                case "set":
+                {
+                    int g = root.TryGetProperty("group_index", out var gp) ? gp.GetInt32() : -1;
+                    int t = root.TryGetProperty("tab_index", out var tp) ? tp.GetInt32() : -1;
+                    string name = root.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+                    if (g < 0 || g >= _cliGroups.Count || t < 0 || t >= _cliGroups[g].Tabs.Count)
+                    {
+                        resultJson = $"{{\"ok\":false,\"error\":\"Invalid [{g}:{t}]. Use terminal-list.\"}}";
+                        break;
+                    }
+                    string groupName = _cliGroups[g].DisplayName;
+                    string title = _cliGroups[g].Tabs[t].Title;
+                    if (!reg.Set(name, groupName, title))
+                    {
+                        resultJson = $"{{\"ok\":false,\"error\":\"Invalid alias '{EscapeJson(name)}' (letters/digits/-/_, 1–64 chars).\"}}";
+                        break;
+                    }
+                    reg.Save();
+                    resultJson = $"{{\"ok\":true,\"alias\":\"{EscapeJson(name)}\",\"group\":\"{EscapeJson(groupName)}\",\"title\":\"{EscapeJson(title)}\"}}";
+                    break;
+                }
+                case "rm":
+                {
+                    string name = root.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+                    bool removed = reg.Remove(name);
+                    if (removed) reg.Save();
+                    resultJson = removed
+                        ? $"{{\"ok\":true,\"alias\":\"{EscapeJson(name)}\"}}"
+                        : $"{{\"ok\":false,\"alias\":\"{EscapeJson(name)}\",\"error\":\"alias not found\"}}";
+                    break;
+                }
+                default: // "list" (and empty)
+                {
+                    var sb = new StringBuilder();
+                    sb.Append("{\"ok\":true,\"aliases\":[");
+                    bool first = true;
+                    foreach (var kv in reg.Entries)
+                    {
+                        if (!first) sb.Append(',');
+                        first = false;
+                        int rg = -1, rt = -1;
+                        for (int gi = 0; gi < _cliGroups.Count && rg < 0; gi++)
+                            for (int ti = 0; ti < _cliGroups[gi].Tabs.Count; ti++)
+                                if (_cliGroups[gi].DisplayName == kv.Value.GroupName && _cliGroups[gi].Tabs[ti].Title == kv.Value.Title)
+                                {
+                                    rg = gi;
+                                    rt = ti;
+                                    break;
+                                }
+                        sb.Append('{');
+                        sb.Append($"\"alias\":\"{EscapeJson(kv.Key)}\"");
+                        sb.Append($",\"group\":\"{EscapeJson(kv.Value.GroupName)}\"");
+                        sb.Append($",\"title\":\"{EscapeJson(kv.Value.Title)}\"");
+                        sb.Append($",\"group_index\":{rg},\"tab_index\":{rt}");
+                        sb.Append($",\"live\":{(rg >= 0 ? "true" : "false")}");
+                        sb.Append('}');
+                    }
+                    sb.Append("]}");
+                    resultJson = sb.ToString();
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            resultJson = $"{{\"ok\":false,\"error\":\"{EscapeJson(ex.Message)}\"}}";
+        }
+        IpcMemoryMappedResponseWriter.WriteJson(TerminalAliasMmfName, TerminalAliasMmfSize, resultJson, "[IPC] terminal-alias 응답 쓰기 오류");
     }
 
     // =========================================================================

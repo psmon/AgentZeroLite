@@ -24,6 +24,7 @@ public partial class SettingsPanel : UserControl
             InitializeDiarizationTab();
             InitializeMusicTab();
             InitializeVisionTab();
+            InitializeBudgetTab();
         };
     }
 

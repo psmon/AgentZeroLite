@@ -66,9 +66,33 @@ public static class TokenCostCalculator
         return p is null ? 0m : CostUsd(r, p);
     }
 
+    /// <summary>
+    /// Cost of one record using an explicit price table (e.g. user overrides
+    /// from budget settings, first-match-wins). 0 if the model is unknown.
+    /// </summary>
+    public static decimal CostUsd(TokenUsageRecord r, IReadOnlyList<(string Key, ModelPricing Pricing)> table)
+    {
+        var p = Lookup(r.Model, table);
+        return p is null ? 0m : CostUsd(r, p);
+    }
+
     /// <summary>Total estimated cost over many records (unknown models contribute 0).</summary>
     public static decimal TotalUsd(IEnumerable<TokenUsageRecord> records)
         => records.Sum(CostUsd);
+
+    /// <summary>Total estimated cost using an explicit price table.</summary>
+    public static decimal TotalUsd(IEnumerable<TokenUsageRecord> records, IReadOnlyList<(string Key, ModelPricing Pricing)> table)
+        => records.Sum(r => CostUsd(r, table));
+
+    /// <summary>
+    /// Total cost of records recorded at or after <paramref name="sinceUtc"/>,
+    /// using an explicit price table. The basis for a month-to-date budget read.
+    /// </summary>
+    public static decimal TotalUsdSince(
+        IEnumerable<TokenUsageRecord> records,
+        DateTime sinceUtc,
+        IReadOnlyList<(string Key, ModelPricing Pricing)> table)
+        => records.Where(r => r.RecordedAt >= sinceUtc).Sum(r => CostUsd(r, table));
 
     /// <summary>Cost grouped by model, most expensive first.</summary>
     public static IReadOnlyList<(string Model, decimal Usd, long Records)> ByModel(IEnumerable<TokenUsageRecord> records)
