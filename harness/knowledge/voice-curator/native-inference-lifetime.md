@@ -2,7 +2,7 @@
 
 **Owner**: voice-curator
 **Lifecycle**: convention — binding for any change to `SherpaSpeakerDiarizer`, `WebDevHost` note pipeline, or any new native-inference surface in the note path
-**Last updated**: 2026-08-19
+**Last updated**: 2026-08-29 (clarified the partial-vs-chunk drop-policy asymmetry; contracts unchanged)
 
 Two contracts that exist **only because** of the 2026-07-15 crash sequence
 (loopback concurrency crash → P0 gate patch → chunk-scoped re-implementation).
@@ -65,8 +65,14 @@ to a fully persistent instance.
   queued — partials are best-effort previews, and queuing behind a chunk
   STT would build a native-inference backlog.
 - Re-entrancy guards are orthogonal: `_noteChunkBusy` / `_notePartialBusy`
-  (Interlocked) prevent timer self-reentry; the gate prevents cross-surface
-  overlap. Don't conflate the two.
+  (Interlocked `CompareExchange`) prevent timer self-reentry; the gate
+  prevents cross-surface overlap. Don't conflate the two.
+- **Drop policy is asymmetric between the two guards.** When a chunk timer
+  finds the previous chunk still busy it *drains and drops* the buffer with an
+  audible log — `[WebDev:Note-Chunk] busy — … dropped N bytes` — trading one
+  chunk's transcript for backlog safety. The partial guard just returns
+  silently (no byte-count log): a dropped preview costs nothing, so don't go
+  looking for a "dropped" line on the partial path.
 
 ### Rule for new surfaces
 

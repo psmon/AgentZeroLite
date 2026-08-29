@@ -31,17 +31,33 @@
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
-    "tamer": 24,
+    "tamer": 26,
     "voice-curator": 5
   },
   "items": [
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-29-14-40-b3-knowledge-test-debt.md",
+      "date": "2026-08-29",
+      "time": "14:40",
+      "title": "b3 knowledge test debt",
+      "size": 3549
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-29-14-10-b1-reliability-adoption.md",
+      "date": "2026-08-29",
+      "time": "14:10",
+      "title": "b1 reliability adoption",
+      "size": 3593
+    },
     {
       "category": "tamer",
       "file": "harness/logs/tamer/2026-08-29-13-33-pdsa-cli-integration.md",
       "date": "2026-08-29",
       "time": "13:33",
       "title": "pdsa cli integration",
-      "size": 2819
+      "size": 2874
     },
     {
       "category": "pr-review",

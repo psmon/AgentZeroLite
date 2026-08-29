@@ -3,14 +3,24 @@
   "sort": "semver-desc",
   "items": [
     {
+      "file": "v1.12.1.md",
+      "title": "v1.12.1",
+      "heading": "B3 knowledge/test-debt adoption (agent-band docs + JS mini test runner)",
+      "path": "v1.12.1.md",
+      "size": 3834,
+      "modified": "2026-08-29",
+      "author": null,
+      "committed": null
+    },
+    {
       "file": "v1.12.0.md",
       "title": "v1.12.0",
       "heading": "PDSA CLI (`@webnori/pdsa`) integrated into the tamer garden",
       "path": "v1.12.0.md",
-      "size": 3580,
+      "size": 3650,
       "modified": "2026-08-29",
-      "author": null,
-      "committed": null
+      "author": "smpark-luna",
+      "committed": "2026-08-29"
     },
     {
       "file": "v1.11.0.md",
@@ -217,47 +227,47 @@
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 72.8
+      "percent": 71.9
     },
     {
       "name": "smpark-luna",
-      "commits": 46,
-      "percent": 27.2
+      "commits": 48,
+      "percent": 28.1
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 72.8
+      "percent": 71.9
     },
     {
       "name": "smpark-luna",
-      "commits": 46,
-      "percent": 27.2
+      "commits": 48,
+      "percent": 28.1
     }
   ],
   "contributorsRecent": [
     {
       "name": "smpark-luna",
-      "commits": 5,
+      "commits": 7,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 169,
-    "last7d": 0,
-    "last30d": 18
+    "totalAllTime": 171,
+    "last7d": 2,
+    "last30d": 20
   },
   "topChangedFiles": [
     {
       "path": "harness/harness.config.json",
-      "commits": 4
+      "commits": 5
     },
     {
       "path": "harness/engine/pr-review.md",
-      "commits": 2
+      "commits": 3
     },
     {
       "path": "harness/logs/pr-review/2026-08-21-11-05-pr12-p0-cleanup-merge-approval.md",

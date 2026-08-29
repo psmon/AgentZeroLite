@@ -2,8 +2,8 @@
 
 **Owner**: music-curator
 **Lifecycle**: convention — binding for any change to `Project/Plugins/agent-band/agent-band.js` `labelToPerformer()` / `labelToDance()` or to the classifier model that produces the labels
-**Last updated**: 2026-06-07 (v0.6.0 — dance migrated to a single master sheet + grid index; frame cycling restored)
-**Related**: [ast-audioset-model-serving.md](ast-audioset-model-serving.md) (the upstream model whose top-K we consume)
+**Last updated**: 2026-08-29 (v0.24 — added the 7 rock/EDM performers + genre fallbacks + the variant-before-base ordering contract that M0031 introduced but the doc had missed)
+**Related**: [ast-audioset-model-serving.md](ast-audioset-model-serving.md) (the upstream model whose top-K we consume) · [agent-band-youtube-stage.md](agent-band-youtube-stage.md) (the sibling YouTube-stage host-op contract)
 
 ## Why this doc exists
 
@@ -52,10 +52,40 @@ state → play (score ≥ 0.12) | idle (score ≥ 0.05)
 
 ## Tier 1 — specific instruments
 
-First-match-wins regex against `label.toLowerCase()`. Order matters
-where labels can co-occur (e.g. `\bcello\b` is tested before
-`\bviolin\b` would otherwise be — they're orthogonal here but the
-principle generalizes).
+First-match-wins regex against `label.toLowerCase()` in
+`labelToPerformer()`. **Order is a contract, not a convenience** — the
+electric/genre variants are matched *before* the base-instrument regex
+they would otherwise be swallowed by. Change the order and a "Bass
+guitar" label silently becomes an acoustic `guitar` again.
+
+### Ordering contract (why the rows are grouped this way)
+
+1. **Electric variants before their acoustic base.** `bass guitar` →
+   `elec-bass` and `electric guitar` / `tapping (guitar` → `elec-guitar`
+   must precede `\bguitar\b` → `guitar`. Likewise `electric piano` /
+   `electronic organ` / `hammond organ` → `keytar` precede
+   `\bpiano\b\|\borgan\b` → `piano`.
+2. **Percussion variants + genre pre-empt before `\bdrum\b`.** `drum
+   machine` / `beatbox` → `drum-machine`, and the genre pre-empt
+   `dubstep` / `drum and bass` → `edrum`, both precede `\bdrum\b` →
+   `drum` — otherwise "Drum and bass" would spawn an acoustic drummer.
+3. **The `synth` lookbehind.** `(?<!speech )synthesizer` deliberately
+   excludes AudioSet's "Speech synthesizer" (a TTS label) so narration
+   doesn't summon a synth performer.
+
+### Rock / EDM performers (M0031, matched first)
+
+| Sprite | regex | Matching AudioSet labels today |
+|---|---|---|
+| `elec-bass` | `bass guitar` | "Bass guitar" |
+| `elec-guitar` | `electric guitar\|tapping \(guitar` | "Electric guitar" / "Tapping (guitar technique)" |
+| `drum-machine` | `drum machine\|beatbox` | "Drum machine" / "Beatbox" |
+| `edrum` | `dubstep\|drum and bass` | "Dubstep" / "Drum and bass" (genre pre-empt — routes an electronic beat to the e-drummer before `\bdrum\b` grabs it) |
+| `synth` | `(?<!speech )synthesizer\|\bsampler\b\|theremin` | "Synthesizer" / "Sampler" / "Theremin" (NOT "Speech synthesizer") |
+| `keytar` | `electric piano\|electronic organ\|hammond organ` | "Electric piano" / "Electronic organ" / "Hammond organ" |
+| `dj-deck` | `scratch(ing)? \(performance\|turntable` | "Scratching (performance technique)" / "Turntable" |
+
+### Acoustic instruments
 
 Bundled-but-currently-unmatched sprites (viola / oboe / contrabass /
 tuba) have Tier 1 entries too. AudioSet at AST's `0.4593` build does
@@ -71,7 +101,7 @@ would keep stealing the spawn.
 | `violin` | `\bviolin\b\|\bfiddle\b` | "Violin, fiddle" | — |
 | `contrabass` | `\bcontrabass\b\|\bdouble bass\b` | (none — AudioSet has no Contrabass / Double bass label) | yes — any model emitting "Contrabass" or "Double bass" |
 | `harp` | `\bharp\b` AND NOT `harpsichord` | "Harp" (Harpsichord guarded out) | — |
-| `guitar` | `\bguitar\b` | "Guitar" / "Electric guitar" / "Acoustic guitar" / "Bass guitar" / "Steel guitar, slide guitar" / "Tapping (guitar technique)" | — |
+| `guitar` | `\bguitar\b` | "Guitar" / "Acoustic guitar" / "Steel guitar, slide guitar" (electric + bass variants are pre-empted above) | — |
 | `flute` | `\bflute\b` | "Flute" | — |
 | `clarinet` | `\bclarinet\b` | "Clarinet" | — |
 | `oboe` | `\boboe\b` | (none — AudioSet has no Oboe label) | yes — any model emitting "Oboe" |
@@ -79,8 +109,8 @@ would keep stealing the spawn.
 | `trumpet` | `\btrumpet\b` | "Trumpet" | — |
 | `trombone` | `\btrombone\b` | "Trombone" | — |
 | `tuba` | `\btuba\b` | (none — AudioSet has no Tuba label) | yes — any model emitting "Tuba" |
-| `piano` | `\bpiano\b` | "Piano" / "Electric piano" | — |
-| `drum` | `\bdrum\b\|cymbal\|tom-tom\|hi-hat\|tabla\|\bgong\b` | "Drum" / "Drum kit" / "Drum machine" / "Snare drum" / "Bass drum" / "Drum roll" / "Drum and bass" / "Gong" | — |
+| `piano` | `\bpiano\b\|\borgan\b` | "Piano" / "Organ" (electric piano / electronic organ are pre-empted to `keytar` above) | — |
+| `drum` | `\bdrum\b\|cymbal\|tom-tom\|hi-hat\|tabla\|\bgong\b` | "Drum" / "Drum kit" / "Snare drum" / "Bass drum" / "Drum roll" / "Gong" (drum machine → `drum-machine`, drum-and-bass → `edrum`) | — |
 
 ### Collapse rule
 
@@ -158,6 +188,26 @@ string instrument" at 0.18 while "Cello" sits at 0.07).
 > upgraded to one with proper viola/oboe/contrabass/tuba sub-classes,
 > the fallback gracefully steps aside in favour of the Tier 1 match.
 
+### Genre fallbacks (M0031) — route a *style* to a performer
+
+Tested after the instrument-category fallbacks. When the top-K carries
+a genre/style label but no instrument, these keep the rock/EDM
+performers reachable on music where AudioSet never emits a specific
+instrument (common for produced electronic / rock tracks).
+
+| Sprite | regex | Matching AudioSet labels |
+|---|---|---|
+| `dj-deck` | `house music\|techno\|electronic dance\|dance music\|\bdisco\b\|hip hop` | "House music" / "Techno" / "Electronic dance music" / "Dance music" / "Disco" / "Hip hop music" |
+| `synth` | `electronica\|electronic music\|ambient music\|trance music\|new-age music` | "Electronica" / "Electronic music" / "Ambient music" / "Trance music" / "New-age music" |
+| `elec-bass` | `\bfunk\b` | "Funk" |
+| `trumpet` | `\bska\b` | "Ska" |
+| `elec-guitar` | `\brock\b\|heavy metal\|grunge` | "Rock music" / "Heavy metal" / "Grunge" |
+
+> These overlap the dance troupe's genre routing (see "Genre → style
+> mapping" below) on purpose — the *same* "House music" label both spawns
+> a `dj-deck` band performer (row 1) and a `kpop` dancer (row 2). They are
+> independent registries; a genre can populate both rows at once.
+
 ## Currently unreachable sprites (forward-compat already wired)
 
 Bundled, **Tier 1 regex entries present** as of v0.3.0, but never
@@ -202,13 +252,18 @@ stages never overlap.
 - **Code**: `Project/Plugins/agent-band/agent-band.js` →
   `labelToPerformer(label)` (the regex tiers) and the score/persist
   constants at the top of the IIFE.
-- **Tests**: none yet — the regex tiers are pure functions and would
-  benefit from a small JS unit suite the next time the plugin folder
-  grows tooling (see follow-ups in M0025 mission log).
-- **Invariant for any future model swap**: keep this table updated in
-  lock-step with the regex. If you add a new sprite, add a row to both
-  the "Tier 1" table and the "unreachable sprites" graveyard once it
-  ships but before the model that activates it lands.
+- **Tests**: `tools/agent-band-tests/` — a zero-dependency `node --test`
+  suite (`labelToPerformer.test.mjs`) pins this table's mapping. The
+  regex lives inline in the plugin IIFE (not exported), so the test file
+  keeps a **hand-aligned reference copy** — the same mirror convention
+  the repo already uses for `parseVideoId` (JS) ↔ `ParseYouTubeId` (C#).
+  When you edit the regex in `agent-band.js`, update the reference copy
+  and this table together; the test then guards the mapping semantics.
+- **Invariant for any future model swap**: keep this table, the reference
+  copy in `tools/agent-band-tests/`, and the regex updated in lock-step.
+  If you add a new sprite, add a row to the "Tier 1" table (and the
+  "unreachable sprites" graveyard when it ships before the model that
+  activates it lands) and a case to the test suite.
 
 ## Dance troupe (v0.4.0) — row 2
 

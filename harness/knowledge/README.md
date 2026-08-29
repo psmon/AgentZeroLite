@@ -29,8 +29,18 @@ harness/knowledge/
 ├── test-runner/
 │   ├── unit-test-policy.md                  # explicit-trigger-only rule
 │   └── dotnet-test-execution.md             # serialization, host-cleanup
-└── test-sentinel/
-    └── voice-roundtrip-testing.md           # TTS↔STT methodology
+├── test-sentinel/
+│   └── voice-roundtrip-testing.md           # TTS↔STT methodology
+├── music-curator/
+│   ├── ast-audioset-model-serving.md        # AST model card + I/O contract
+│   ├── audio-capture-pipeline.md            # mic + WASAPI loopback paths
+│   ├── spectrum-sensitivity-conventions.md  # SpectrumBars normalization
+│   ├── agent-band-mapping.md                # AudioSet label → performer sprite
+│   └── agent-band-youtube-stage.md          # youtube.oembed / llm.classify host ops
+└── voice-curator/
+    ├── sherpa-onnx-integration.md           # model pair + integration contract
+    ├── speaker-diarization-pipeline.md      # capture→STT+diarize→merge→render
+    └── native-inference-lifetime.md         # chunk-scoped lifetime + _noteInferGate
 ```
 
 `build-doctor/` is reserved — currently has no agent-specific knowledge

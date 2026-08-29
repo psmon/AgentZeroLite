@@ -129,6 +129,20 @@ reviews. Treat them as binding for the file types they cover:
   avoid the `System.Drawing.Color` collision when `UseWindowsForms` is
   enabled).
 
+- **`harness/knowledge/music-curator/agent-band-mapping.md`** — the Agent
+  Band plugin's two-layer AudioSet-label → performer-sprite mapping: the
+  Tier 1 specific-instrument regex (incl. the M0031 rock/EDM performers and
+  the variant-before-base ordering contract), Tier 2 category + genre
+  fallbacks, gender-aware vocal fan-out, score-gate hysteresis, and the
+  dance-troupe genre routing. Binding when editing `labelToPerformer()`.
+
+- **`harness/knowledge/music-curator/agent-band-youtube-stage.md`** — the
+  YouTube stage host-op contract (`youtube.oembed` / `llm.classify`): the
+  SSRF guard that rebuilds the canonical URL server-side, the `llm-not-ready`
+  fallback, the `MatchCategory` category clamp against `YT_CATEGORIES`, the
+  keyword-fallback provenance, and the `parseVideoId` ↔ `ParseYouTubeId`
+  hand-aligned mirror.
+
 ## Evaluation rubric
 
 | Axis | Measure | Scale |
@@ -166,4 +180,12 @@ Project/AgentZeroWpf/Services/Music/
 Project/AgentZeroWpf/UI/Components/
 ├── SettingsPanel.xaml           ← Music tab XAML
 └── SettingsPanel.Music.cs       ← handlers, live inference loop
+
+Project/Plugins/agent-band/
+└── agent-band.js                ← label→performer regex + YouTube stage (parseVideoId, classifyVideo)
+
+Project/AgentZeroWpf/Services/Browser/
+└── WebDevHost.cs                ← YouTube stage host ops (youtube.oembed, llm.classify)
+
+tools/agent-band-tests/          ← zero-dep node --test suite for the plugin's pure JS helpers
 ```

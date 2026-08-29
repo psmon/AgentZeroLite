@@ -1,0 +1,10 @@
+{
+  "name": "agent-band-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Zero-dependency node --test suite for the Agent Band plugin's pure JS helpers (parseVideoId, labelToPerformer).",
+  "scripts": {
+    "test": "node --test"
+  }
+}
