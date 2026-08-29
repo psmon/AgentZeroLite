@@ -78,6 +78,7 @@ internal static class CliHandler
             "terminal-send" => TerminalSend(cliArgs.Skip(1).ToArray()),
             "terminal-key" => TerminalKey(cliArgs.Skip(1).ToArray()),
             "terminal-read" => TerminalRead(cliArgs.Skip(1).ToArray()),
+            "terminal-alias" => TerminalAlias(cliArgs.Skip(1).ToArray()),
             "remote-pin" => RemotePin(),
             "bot-chat" => BotChat(cliArgs.Skip(1).ToArray()),
             "agent-hook" => AgentHook(cliArgs.Skip(1).ToArray()),
@@ -90,6 +91,7 @@ internal static class CliHandler
             "agent-state" => AgentState(),
             "agent-resume-cmd" => AgentResumeCmd(cliArgs.Skip(1).ToArray()),
             "agent-resume" => AgentResume(cliArgs.Skip(1).ToArray()),
+            "agent-resume-launch" => AgentResumeLaunch(cliArgs.Skip(1).ToArray()),
             "skill-stub-install" => SkillStubInstall(),
             "skill-stub-uninstall" => SkillStubUninstall(),
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
@@ -511,32 +513,32 @@ internal static class CliHandler
         if (args.Length < 3)
         {
             Console.Error.WriteLine("Usage: terminal-send <group_index> <tab_index> <text...>");
+            Console.Error.WriteLine("   or: terminal-send --alias <name> <text...>");
             Console.Error.WriteLine("  Sends text + Enter to the specified terminal.");
-            Console.Error.WriteLine("  Use 'terminal-list' to discover group/tab indices.");
+            Console.Error.WriteLine("  Use 'terminal-list' for indices, 'terminal-alias' to name a terminal.");
             return 1;
         }
 
-        if (!int.TryParse(args[0], out int groupIdx))
+        if (!TryParseTarget(args, out var targetJson, out int consumed, out var targetErr))
         {
-            Console.Error.WriteLine($"Error: Invalid group_index '{args[0]}'. Must be an integer.");
-            return 1;
-        }
-        if (!int.TryParse(args[1], out int tabIdx))
-        {
-            Console.Error.WriteLine($"Error: Invalid tab_index '{args[1]}'. Must be an integer.");
+            Console.Error.WriteLine($"Error: {targetErr}");
             return 1;
         }
 
         // Join remaining args as the text to send
-        string text = string.Join(" ", args.Skip(2));
+        string text = string.Join(" ", args.Skip(consumed));
+        if (text.Length == 0)
+        {
+            Console.Error.WriteLine("Error: no text to send.");
+            return 1;
+        }
 
         IntPtr agentWnd = FindAgentZero();
         if (agentWnd == IntPtr.Zero) return 1;
 
         var sb = new StringBuilder();
         sb.Append("{\"command\":\"terminal-send\"");
-        sb.Append($",\"group_index\":{groupIdx}");
-        sb.Append($",\"tab_index\":{tabIdx}");
+        sb.Append(targetJson);
         sb.Append($",\"text\":\"{EscapeJson(text)}\"");
         sb.Append('}');
 
@@ -552,7 +554,7 @@ internal static class CliHandler
         bool ok = root.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
         if (ok)
         {
-            Console.WriteLine($"Sent to terminal [{groupIdx}:{tabIdx}]: {text}");
+            Console.WriteLine($"Sent to terminal {TargetLabel(root, targetJson)}: {text}");
         }
         else
         {
@@ -573,6 +575,7 @@ internal static class CliHandler
         if (args.Length < 3)
         {
             Console.Error.WriteLine("Usage: terminal-key <group_index> <tab_index> <key>");
+            Console.Error.WriteLine("   or: terminal-key --alias <name> <key>");
             Console.Error.WriteLine("  Sends a raw key sequence to the specified terminal.");
             Console.Error.WriteLine("  Supported keys:");
             Console.Error.WriteLine("    cr        - Carriage Return (\\r)");
@@ -589,26 +592,25 @@ internal static class CliHandler
             return 1;
         }
 
-        if (!int.TryParse(args[0], out int groupIdx))
+        if (!TryParseTarget(args, out var targetJson, out int consumed, out var targetErr))
         {
-            Console.Error.WriteLine($"Error: Invalid group_index '{args[0]}'.");
+            Console.Error.WriteLine($"Error: {targetErr}");
             return 1;
         }
-        if (!int.TryParse(args[1], out int tabIdx))
+        if (args.Length <= consumed)
         {
-            Console.Error.WriteLine($"Error: Invalid tab_index '{args[1]}'.");
+            Console.Error.WriteLine("Error: no key specified.");
             return 1;
         }
 
-        string keyName = args[2].ToLowerInvariant();
+        string keyName = args[consumed].ToLowerInvariant();
 
         IntPtr agentWnd = FindAgentZero();
         if (agentWnd == IntPtr.Zero) return 1;
 
         var sb = new StringBuilder();
         sb.Append("{\"command\":\"terminal-key\"");
-        sb.Append($",\"group_index\":{groupIdx}");
-        sb.Append($",\"tab_index\":{tabIdx}");
+        sb.Append(targetJson);
         sb.Append($",\"key\":\"{EscapeJson(keyName)}\"");
         sb.Append('}');
 
@@ -624,7 +626,7 @@ internal static class CliHandler
         bool ok = root.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
         if (ok)
         {
-            Console.WriteLine($"Key sent to terminal [{groupIdx}:{tabIdx}]: {keyName}");
+            Console.WriteLine($"Key sent to terminal {TargetLabel(root, targetJson)}: {keyName}");
         }
         else
         {
@@ -653,19 +655,14 @@ internal static class CliHandler
             return 1;
         }
 
-        if (!int.TryParse(args[0], out int groupIdx))
+        if (!TryParseTarget(args, out var targetJson, out int consumed, out var targetErr))
         {
-            Console.Error.WriteLine($"Error: Invalid group_index '{args[0]}'.");
-            return 1;
-        }
-        if (!int.TryParse(args[1], out int tabIdx))
-        {
-            Console.Error.WriteLine($"Error: Invalid tab_index '{args[1]}'.");
+            Console.Error.WriteLine($"Error: {targetErr}");
             return 1;
         }
 
         int lastN = 0; // 0 = all
-        for (int i = 2; i < args.Length - 1; i++)
+        for (int i = consumed; i < args.Length - 1; i++)
         {
             if (args[i].Equals("--last", StringComparison.OrdinalIgnoreCase)
                 && int.TryParse(args[i + 1], out var n))
@@ -680,8 +677,7 @@ internal static class CliHandler
 
         var sb = new StringBuilder();
         sb.Append("{\"command\":\"terminal-read\"");
-        sb.Append($",\"group_index\":{groupIdx}");
-        sb.Append($",\"tab_index\":{tabIdx}");
+        sb.Append(targetJson);
         sb.Append($",\"last\":{lastN}");
         sb.Append('}');
 
@@ -759,6 +755,170 @@ internal static class CliHandler
         return root.TryGetProperty("ok", out var ok) && ok.GetBoolean()
             ? root.GetProperty("text").GetString() ?? ""
             : null;
+    }
+
+    // =========================================================================
+    //  Shared target parsing (herdr H5) — a terminal command targets either
+    //  positional "<group> <tab>" or "--alias <name>". Emits the JSON fragment
+    //  the GUI resolves and reports how many leading args it consumed.
+    // =========================================================================
+    private static bool TryParseTarget(string[] args, out string targetJson, out int consumed, out string? err)
+    {
+        targetJson = "";
+        consumed = 0;
+        err = null;
+        if (args.Length >= 2 && args[0].Equals("--alias", StringComparison.OrdinalIgnoreCase))
+        {
+            targetJson = $",\"alias\":\"{EscapeJson(args[1])}\"";
+            consumed = 2;
+            return true;
+        }
+        if (args.Length >= 2 && int.TryParse(args[0], out int g) && int.TryParse(args[1], out int t))
+        {
+            targetJson = $",\"group_index\":{g},\"tab_index\":{t}";
+            consumed = 2;
+            return true;
+        }
+        err = "Expected '<group_index> <tab_index>' or '--alias <name>'. Use 'terminal-list' / 'terminal-alias list'.";
+        return false;
+    }
+
+    /// <summary>Human label for a resolved target — the GUI echoes indices on success even for an alias.</summary>
+    private static string TargetLabel(JsonElement root, string targetJson)
+    {
+        if (root.TryGetProperty("group_index", out var g) && root.TryGetProperty("tab_index", out var t))
+            return $"[{g.GetInt32()}:{t.GetInt32()}]";
+        return targetJson.Contains("\"alias\"", StringComparison.Ordinal) ? "(alias)" : "";
+    }
+
+    private static void PrintCliError(JsonElement root)
+    {
+        var e = root.TryGetProperty("error", out var ep) ? ep.GetString() : "unknown";
+        Console.Error.WriteLine($"Error: {e}");
+    }
+
+    // =========================================================================
+    //  terminal-alias <list | set <g> <t> <name> | rm <name>>  (herdr H5)
+    //      : manage stable name → terminal mappings. Needs the GUI (resolves
+    //      the terminal's stable (group,title) identity). Aliases persist to
+    //      %LocalAppData%\AgentZeroLite\terminal-aliases.json.
+    // =========================================================================
+    private const string TerminalAliasMmfName = "AgentZeroLite_TerminalAlias_Response";
+    private const int TerminalAliasMmfSize = 16384;
+
+    private static int TerminalAlias(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.Error.WriteLine("Usage: terminal-alias <list | set <group> <tab> <name> | rm <name>>");
+            Console.Error.WriteLine("  Names a terminal so other commands can target it with --alias <name>.");
+            return 1;
+        }
+        var sub = args[0].ToLowerInvariant();
+
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"terminal-alias\"");
+        sb.Append($",\"sub\":\"{EscapeJson(sub)}\"");
+        if (sub == "set")
+        {
+            if (args.Length < 4 || !int.TryParse(args[1], out int g) || !int.TryParse(args[2], out int t))
+            {
+                Console.Error.WriteLine("Usage: terminal-alias set <group_index> <tab_index> <name>");
+                return 1;
+            }
+            sb.Append($",\"group_index\":{g},\"tab_index\":{t},\"name\":\"{EscapeJson(args[3])}\"");
+        }
+        else if (sub == "rm")
+        {
+            if (args.Length < 2) { Console.Error.WriteLine("Usage: terminal-alias rm <name>"); return 1; }
+            sb.Append($",\"name\":\"{EscapeJson(args[1])}\"");
+        }
+        else if (sub != "list")
+        {
+            Console.Error.WriteLine($"Unknown subcommand '{sub}'. Use: list | set | rm.");
+            return 1;
+        }
+        sb.Append('}');
+
+        IntPtr agentWnd = FindAgentZero();
+        if (agentWnd == IntPtr.Zero) return 1;
+        if (!SendWpfCommand(agentWnd, sb.ToString())) return 1;
+        string? json = TryReadMmf(TerminalAliasMmfName, TerminalAliasMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        bool ok = root.TryGetProperty("ok", out var okP) && okP.GetBoolean();
+
+        if (sub == "list")
+        {
+            if (!ok) { PrintCliError(root); return 1; }
+            int n = 0;
+            if (root.TryGetProperty("aliases", out var arr) && arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var a in arr.EnumerateArray())
+                {
+                    n++;
+                    var name = a.GetProperty("alias").GetString();
+                    var group = a.GetProperty("group").GetString();
+                    var title = a.GetProperty("title").GetString();
+                    bool live = a.TryGetProperty("live", out var lp) && lp.GetBoolean();
+                    var gi = a.TryGetProperty("group_index", out var gip) ? gip.GetInt32() : -1;
+                    var ti = a.TryGetProperty("tab_index", out var tip) ? tip.GetInt32() : -1;
+                    var loc = live ? $"[{gi}:{ti}]" : "(not live)";
+                    Console.WriteLine($"  {name,-16} -> {group}/{title}  {loc}");
+                }
+            }
+            if (n == 0) Console.WriteLine("No aliases. Add one: terminal-alias set <group> <tab> <name>");
+            return 0;
+        }
+
+        if (ok)
+        {
+            if (sub == "set")
+                Console.WriteLine($"Alias '{root.GetProperty("alias").GetString()}' -> {root.GetProperty("group").GetString()}/{root.GetProperty("title").GetString()}");
+            else
+                Console.WriteLine($"Removed alias '{root.GetProperty("alias").GetString()}'.");
+            return 0;
+        }
+        PrintCliError(root);
+        return 1;
+    }
+
+    // =========================================================================
+    //  agent-resume-launch <group> <tab> | --alias <name>  (herdr H3)
+    //      : discover the tab's latest Claude conversation and INJECT the
+    //      resume command into the live terminal (vs agent-resume which prints).
+    // =========================================================================
+    private const string AgentResumeLaunchMmfName = "AgentZeroLite_AgentResumeLaunch_Response";
+    private const int AgentResumeLaunchMmfSize = 4096;
+
+    private static int AgentResumeLaunch(string[] args)
+    {
+        if (!TryParseTarget(args, out var targetJson, out _, out var terr))
+        {
+            Console.Error.WriteLine("Usage: agent-resume-launch <group> <tab>   or   agent-resume-launch --alias <name>");
+            if (terr != null) Console.Error.WriteLine($"  {terr}");
+            return 1;
+        }
+        IntPtr agentWnd = FindAgentZero();
+        if (agentWnd == IntPtr.Zero) return 1;
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"agent-resume-launch\"");
+        sb.Append(targetJson);
+        sb.Append('}');
+        if (!SendWpfCommand(agentWnd, sb.ToString())) return 1;
+        string? json = TryReadMmf(AgentResumeLaunchMmfName, AgentResumeLaunchMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (root.TryGetProperty("ok", out var okP) && okP.GetBoolean())
+        {
+            Console.WriteLine($"Resumed: {root.GetProperty("cmd").GetString()}");
+            return 0;
+        }
+        PrintCliError(root);
+        return 1;
     }
 
     // =========================================================================
