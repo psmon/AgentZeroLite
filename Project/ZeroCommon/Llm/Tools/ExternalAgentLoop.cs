@@ -159,16 +159,43 @@ public sealed class ExternalAgentLoop : IAgentLoop
                         break;
                     }
                 }
+                // Not a done-body we can auto-wrap. This is a JSON object we
+                // still can't route (missing/duplicate `tool`, malformed
+                // `args`, …). Offer the same self-correction feedback turn the
+                // no-envelope branch uses — the BuildFormatCorrectionInstruction
+                // doc covers exactly this case, and a REST model often fixes an
+                // unparseable envelope once told the exact shape. The budget is
+                // shared/per-instance so a persistently broken model still
+                // fails fast rather than looping.
+                else if (TryOfferFormatCorrection(
+                             $"model returned unparseable JSON at iteration {iter}: {ex.Message}",
+                             Truncate(rawJson, 200), out var badJsonInstruction))
+                {
+                    _messages.Add(LlmMessage.User(badJsonInstruction));
+                    continue;
+                }
                 else
                 {
-                    failure = $"model returned unparseable JSON at iteration {iter}: {ex.Message}; raw=\"{Truncate(rawJson, 200)}\"";
+                    failure = $"model returned unparseable JSON at iteration {iter} after {_formatCorrections} correction(s): {ex.Message}; raw=\"{Truncate(rawJson, 200)}\"";
                     break;
                 }
             }
 
             if (!AgentToolGrammar.KnownTools.Contains(call.Tool))
             {
-                failure = $"model called unknown tool '{call.Tool}' at iteration {iter}";
+                // A well-formed envelope naming a tool that doesn't exist.
+                // BuildFormatCorrectionInstruction lists the exact KnownTools,
+                // so a correction turn is precisely the right nudge — the model
+                // usually picks the right name on the retry. Shared per-instance
+                // budget keeps a chronically-wrong model failing fast.
+                if (TryOfferFormatCorrection(
+                        $"model called unknown tool '{call.Tool}' at iteration {iter}",
+                        Truncate(rawJson, 200), out var unknownToolInstruction))
+                {
+                    _messages.Add(LlmMessage.User(unknownToolInstruction));
+                    continue;
+                }
+                failure = $"model called unknown tool '{call.Tool}' at iteration {iter} after {_formatCorrections} correction(s)";
                 break;
             }
 
@@ -365,9 +392,10 @@ public sealed class ExternalAgentLoop : IAgentLoop
     /// <summary>
     /// Builds the self-correction feedback instruction injected (as a user
     /// message) when the model emits a turn we can't route — no JSON envelope
-    /// at all, or an unparseable JSON object. It names the exact envelope
-    /// shape so the next turn has a concrete target rather than an abstract
-    /// "you were wrong". Keeping it terse and imperative matches the
+    /// at all, an unparseable JSON object, or a well-formed envelope naming an
+    /// unknown tool. It names the exact envelope shape and the known tool set
+    /// so the next turn has a concrete target rather than an abstract "you were
+    /// wrong". Keeping it terse and imperative matches the
     /// system-prompt tool-calling voice (R-1..R-5, prompts default English).
     /// </summary>
     internal static string BuildFormatCorrectionInstruction(string? offendingPreview)

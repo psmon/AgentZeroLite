@@ -144,8 +144,9 @@ flowchart TD
 - Optional: PR number. Defaults to the PR for the current branch.
 - Optional: `Configuration` (Debug | Release) for build + e2e. Default Debug.
 - Optional: `skip_e2e` — for a docs-only PR, where a desktop session is
-  unavailable, or when issue #13 is still open and the probe cannot pass.
-  A skipped step is **reported as skipped**, never silently dropped.
+  unavailable, or when a probe regression (see "Known gate hazards") means the
+  smoke cannot pass. A skipped step is **reported as skipped**, never silently
+  dropped.
 
 ## Output
 
@@ -178,17 +179,26 @@ advisory reviewer that can close PRs stops being advisory.
 
 ## Known gate hazards
 
-Check these before reporting a gate red — each has an open issue, and
-attributing a known-broken gate to the PR under review is a false positive:
+List only **currently-open** infrastructure hazards here. A gate that is red
+because of one of these is a false positive against the PR — attributing a
+known-broken gate to the branch under review trains the operator to skim.
 
-| Gate | Hazard | Issue |
-|---|---|---|
-| e2e | `launch-self-smoke.ps1` cannot capture WinExe stdout — always fails at step 2 | #13 |
-| e2e | `os element-tree` hangs with no timeout | #13 |
-| `AgentTest` | Run totals vary 143–151; short runs report success without executing | #14 |
-| build | 10 × `NU1903` from one stale pin — expected, not new | #15 |
+**Currently open: none** (verified 2026-08-29).
 
-Keep this table current. An engine that cries wolf about its own
+The four hazards this engine was born watching are all resolved. They are kept
+below for history — so a reader of an older log knows they are closed — not to
+be reported as findings against a PR:
+
+| Gate | Hazard | Issue | Resolution |
+|---|---|---|---|
+| e2e | `launch-self-smoke.ps1` could not capture WinExe stdout — failed at step 2 | #13 (closed) | `Start-Process -NoNewWindow -Wait -PassThru -RedirectStandardOutput` (`Docs/scripts/launch-self-smoke.ps1`) |
+| e2e | `os element-tree` hung with no timeout | #13 (closed) | `--timeout-sec` (default 15, clamp 1–300) in `OsControl/OsCliCommands.cs` |
+| `AgentTest` | Run totals varied 143–151; short runs reported success without executing | #14 (closed) | issue closed |
+| build | 10 × `NU1903` from one stale pin — expected, not new | #15 (closed) | `System.Security.Cryptography.Xml` 10.0.7 → 10.0.11 (`ZeroCommon.csproj`) |
+
+When a new infrastructure hazard appears, file an issue, add it to a
+"Currently open" list above, and move it into the resolved table (or delete
+the row) when the issue closes. An engine that cries wolf about its own
 infrastructure trains the operator to skim its output.
 
 ## Evaluation rubric (engine-level)

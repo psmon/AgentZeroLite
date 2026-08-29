@@ -158,23 +158,79 @@ public sealed class ExternalAgentLoopTests
     }
 
     [Fact]
-    public async Task Loop_falls_through_when_inner_payload_lacks_message_field()
+    public async Task Loop_self_corrects_unparseable_json_then_done()
     {
-        // No `message` field → not unambiguously a done body → no repair.
-        // The loop must surface the original parse failure.
+        // Turn 0: a JSON object with no `tool` field and no `message` → not a
+        // done body, so the once-per-session done-repair is refused. Before the
+        // fix the loop hard-broke with "missing 'tool' field"; now it must fall
+        // through to a format-correction turn (the same one the no-envelope
+        // branch uses) rather than give up.
+        // Turn 1: a valid done envelope → clean termination.
         var provider = new ScriptedProvider(new[]
         {
             "{\"text\":\"not a done\"}",
+            "{\"tool\":\"done\",\"args\":{\"message\":\"fixed it\"}}",
         });
         var host = new MockAgentToolbelt();
-        var opts = new AgentLoopOptions { MaxIterations = 2 };
+        var opts = new AgentLoopOptions { MaxIterations = 4 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("hi");
+
+        Assert.True(run.TerminatedCleanly, $"Loop should self-correct. FailureReason: {run.FailureReason}");
+        Assert.Equal("fixed it", run.FinalMessage);
+        // Recovery came from the format-correction turn, NOT the done-envelope
+        // repair (which is refused without a `message` field).
+        Assert.False(loop.EnvelopeRepairUsed);
+        Assert.Equal(1, loop.FormatCorrectionsUsed);
+    }
+
+    [Fact]
+    public async Task Loop_self_corrects_unknown_tool_then_done()
+    {
+        // Turn 0: a well-formed envelope naming a tool that doesn't exist.
+        // Before the fix this hard-broke; now the loop injects a correction
+        // turn (which lists the known tools) and continues.
+        // Turn 1: a valid done envelope → clean termination.
+        var provider = new ScriptedProvider(new[]
+        {
+            "{\"tool\":\"frobnicate\",\"args\":{}}",
+            "{\"tool\":\"done\",\"args\":{\"message\":\"ok\"}}",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 4 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("hi");
+
+        Assert.True(run.TerminatedCleanly, $"Loop should self-correct. FailureReason: {run.FailureReason}");
+        Assert.Equal("ok", run.FinalMessage);
+        Assert.Equal(1, loop.FormatCorrectionsUsed);
+    }
+
+    [Fact]
+    public async Task Loop_fails_fast_when_unknown_tool_repeated_beyond_correction_cap()
+    {
+        // Every turn names a nonexistent tool. The shared per-instance
+        // correction budget (2) must bound the retries and then fail with a
+        // clear "unknown tool" reason instead of looping to the iteration cap.
+        var provider = new ScriptedProvider(new[]
+        {
+            "{\"tool\":\"nope1\",\"args\":{}}",
+            "{\"tool\":\"nope2\",\"args\":{}}",
+            "{\"tool\":\"nope3\",\"args\":{}}",
+            "{\"tool\":\"nope4\",\"args\":{}}",
+        });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 10, MaxFormatCorrections = 2 };
         await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
 
         var run = await loop.RunAsync("hi");
 
         Assert.False(run.TerminatedCleanly);
-        Assert.Contains("missing 'tool' field", run.FailureReason);
-        Assert.False(loop.EnvelopeRepairUsed);
+        Assert.NotNull(run.FailureReason);
+        Assert.Contains("unknown tool", run.FailureReason);
+        Assert.Equal(2, loop.FormatCorrectionsUsed);
     }
 
     // ── RCA #3 (2026-05-25) — format self-correction feedback turn ──────
