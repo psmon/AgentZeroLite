@@ -917,6 +917,49 @@ the **memory of those attempts** so the same mistake doesn't recur.
 
 ---
 
+## 🔁 Loop Engineering — a procedure the AI *can't* skip
+
+There is a failure mode specific to harness engineering. When you drive an
+agent's loop **by instructions alone** — "first do A, then B, only then C" — the
+model obeys while the whole procedure fits in its working context. But an agent's
+context gets **compressed** over a long run, and compression is lossy: the step
+it silently drops is often the *load-bearing* one. This is worst exactly where it
+hurts most — a **flow that must follow a procedure** (a gate before a release, a
+verify before a commit), enforced only by prose the model is trusted to remember.
+
+The fix is to stop trusting prose for sequencing. **Engineer the loop as a
+graph.** The order and the gates live in the graph's edges — owned by the
+runtime, not by the prompt — while the LLM does the creative work *inside* each
+node. The model can't skip Study-before-Act because there is no edge that lets
+it; the graph is the part that doesn't forget.
+
+The loop this project engineers is **PDSA** (Deming's *Plan → Do → Study → Act*
+improvement cycle):
+
+- **Plan** — the LLM commits to a *verifiable expected outcome* (a metric).
+- **Do** — the work is carried out.
+- **Study** — the LLM judges the result against that expectation (met / partial / unmet).
+- **Act** — learnings are recorded; a reinforcement cycle is auto-linked when needed.
+
+Each cycle accumulates into a **per-project graph memory** — long-term memory for
+the agent, so the loop improves the *process*, not just the task. The loop itself
+is built with the **Akka Streams graph DSL** (sibling project
+[`akka-graph-loop`](https://github.com/psmon/akka-graph-loop)) and shipped as a
+single Native-AOT CLI, `@webnori/pdsa`.
+
+**AgentZero exposes this to your agent.** Install `npm i -g @webnori/pdsa`, and a
+hosted agent can drive a graph-enforced PDSA loop from its own terminal
+(`pdsa plan …` → `pdsa do …` → `pdsa study …` → `pdsa act`). The harness wires it
+in — contract, auth, and the graph-memory model — at
+[`harness/knowledge/tamer/pdsa-cli.md`](harness/knowledge/tamer/pdsa-cli.md).
+
+The whole thing is open source: fork it and tune the graph to engineer **your
+own** custom AI loop. The theory, the context-compression failure it addresses,
+and how the Akka graph enforces the procedure are written up in
+**[Docs/loop-engineering.md](Docs/loop-engineering.md)**.
+
+---
+
 ## Settings
 
 A short tabbed pane (full-window overlay since v0.4 — same airspace
