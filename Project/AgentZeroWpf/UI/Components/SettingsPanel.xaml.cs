@@ -25,7 +25,44 @@ public partial class SettingsPanel : UserControl
             InitializeMusicTab();
             InitializeVisionTab();
             InitializeBudgetTab();
+            InitializeTerminalTab();
         };
+    }
+
+    // ── Terminal backend selector (modern-terminal spike) ──
+    private bool _terminalTabInit;
+
+    private void InitializeTerminalTab()
+    {
+        var backend = Agent.Common.Services.TerminalSettingsStore.Load().Backend;
+        foreach (var obj in cbTerminalBackend.Items)
+        {
+            if (obj is ComboBoxItem cbi && (cbi.Tag as string) == backend.ToString())
+            {
+                cbTerminalBackend.SelectedItem = cbi;
+                break;
+            }
+        }
+        _terminalTabInit = true;
+    }
+
+    private void OnTerminalBackendChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_terminalTabInit) return; // ignore the programmatic selection during init
+        if (cbTerminalBackend.SelectedItem is not ComboBoxItem cbi) return;
+        if (!Enum.TryParse<Agent.Common.Services.TerminalBackend>(cbi.Tag as string, out var backend)) return;
+
+        var s = Agent.Common.Services.TerminalSettingsStore.Load();
+        s.Backend = backend;
+        Agent.Common.Services.TerminalSettingsStore.Save(s);
+
+        if (lblTerminalBackendHint is not null)
+        {
+            lblTerminalBackendHint.Text = backend == Agent.Common.Services.TerminalBackend.WebViewXterm
+                ? "Saved. New tabs will use xterm.js / WebView2 (no HwndHost airspace)."
+                : "Saved. New tabs will use the Windows Terminal control.";
+        }
+        AppLogger.Log($"[Settings] Terminal backend set to {backend} (applies to new tabs)");
     }
 
     public void ShowOnboardingTab()

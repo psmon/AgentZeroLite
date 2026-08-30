@@ -372,6 +372,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" BorderBrush="#3E3E42" BorderThickness="1" CornerRadius="2"
@@ -412,6 +413,25 @@
                                 BorderBrush="#3E3E42" BorderThickness="1"
                                 Cursor="Hand" Click="OnDeleteCliDef" IsEnabled="False"/>
                     </StackPanel>
+
+                    <!-- Terminal backend selector (modern-terminal spike) -->
+                    <Border Grid.Row="2" Margin="0,12,0,0" Padding="10" CornerRadius="2"
+                            BorderBrush="#3E3E42" BorderThickness="1" Background="#1E1E1E">
+                        <StackPanel>
+                            <TextBlock Text="&#x1F5A5; Terminal backend"
+                                       Foreground="#D4D4D4" FontFamily="Consolas" FontSize="12" FontWeight="Bold"/>
+                            <ComboBox x:Name="cbTerminalBackend" Style="{StaticResource DarkComboBox}"
+                                      Margin="0,6,0,0" Width="420" HorizontalAlignment="Left"
+                                      SelectionChanged="OnTerminalBackendChanged">
+                                <ComboBoxItem Content="EasyConPty — Windows Terminal control (default)" Tag="EasyConPty"/>
+                                <ComboBoxItem Content="WebViewXterm — xterm.js in WebView2 (experimental)" Tag="WebViewXterm"/>
+                            </ComboBox>
+                            <TextBlock x:Name="lblTerminalBackendHint"
+                                       Text="Applies to newly opened terminal tabs."
+                                       Foreground="#808080" FontFamily="Consolas" FontSize="10"
+                                       Margin="0,6,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </TabItem>
 

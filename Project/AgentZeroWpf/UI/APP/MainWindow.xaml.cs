@@ -1721,7 +1721,10 @@ public partial class MainWindow : Window
     /// LastBoundSessionId/LastBoundHwnd so repeat Loaded events are idempotent.
     /// Also wires the channel-health alert so wedge events surface a banner.
     /// </summary>
-    private void BindSessionToActors(ConsoleTabInfo tab, EasyWindowsTerminalControl.EasyTerminalControl terminal, string groupName)
+    // terminalVisual is the hosting WPF element used only for the per-tab HWND
+    // lookup — EasyTerminalControl (EasyConPty) or XtermTerminalControl
+    // (WebViewXterm). Both derive from Visual, so this stays backend-agnostic.
+    private void BindSessionToActors(ConsoleTabInfo tab, System.Windows.Media.Visual? terminalVisual, string groupName)
     {
         if (!ActorSystemManager.IsInitialized || tab.Session is null) return;
 
@@ -1738,7 +1741,8 @@ public partial class MainWindow : Window
 
         try
         {
-            if (System.Windows.PresentationSource.FromVisual(terminal) is System.Windows.Interop.HwndSource src
+            if (terminalVisual is not null
+                && System.Windows.PresentationSource.FromVisual(terminalVisual) is System.Windows.Interop.HwndSource src
                 && src.Handle != tab.LastBoundHwnd)
             {
                 ActorSystemManager.Stage.Tell(
@@ -1922,7 +1926,7 @@ public partial class MainWindow : Window
         // 2) Dispose the old session — closes its write-loop channel, frees timers.
         //    The underlying ConPTYTerm reference is owned by terminal, not the
         //    session, so disposing the session does NOT kill the PTY itself.
-        try { tab.Session?.Dispose(); }
+        try { (tab.Session as IDisposable)?.Dispose(); }
         catch (Exception ex) { AppLogger.Log($"[CLI] Restart: session dispose threw {ex.GetType().Name}: {ex.Message}"); }
         tab.Session = null;
 
@@ -2268,6 +2272,12 @@ public partial class MainWindow : Window
         // Close all tabs in this group
         foreach (var tab in group.Tabs)
         {
+            if (tab.XtermTerminal is not null)
+            {
+                try { tab.XtermTerminal.Shutdown(); } catch { }
+                tab.TerminalHost.Children.Remove(tab.XtermTerminal);
+                tab.XtermTerminal = null;
+            }
             if (tab.Terminal is null) continue;
             try { tab.Terminal.ConPTYTerm?.StopExternalTermOnly(); } catch { }
             tab.TerminalHost.Children.Remove(tab.Terminal);
@@ -2573,6 +2583,16 @@ public partial class MainWindow : Window
             ? $"cmd /c \"{injectPath}&&pushd \"{workDir}\"&&{rawCmd}\""
             : $"cmd /c \"{injectPath}&&{rawCmd}\"";
 
+        // ── Terminal backend selection (modern-terminal spike) ──
+        // WebViewXterm is opt-in via terminal-settings.json; default stays the
+        // battle-tested EasyConPty (HwndHost) path below.
+        if (Agent.Common.Services.TerminalSettingsStore.Load().Backend
+            == Agent.Common.Services.TerminalBackend.WebViewXterm)
+        {
+            InitializeWebViewTerminal(tab, cmdLine, workDir, _cliGroups[_activeGroupIndex].DisplayName);
+            return;
+        }
+
         var terminal = new EasyWindowsTerminalControl.EasyTerminalControl();
         terminal.StartupCommandLine = cmdLine;
         terminal.FontFamilyWhenSettingTheme = new System.Windows.Media.FontFamily("Consolas");
@@ -2743,6 +2763,43 @@ public partial class MainWindow : Window
 
         tab.Terminal = terminal;
         AppLogger.Log($"[CLI] ConPTY 터미널 생성 (lazy): {cmdLine}, dir={workDir}");
+    }
+
+    /// <summary>
+    /// WebViewXterm backend counterpart to <see cref="InitializeTerminal"/>'s
+    /// EasyConPty path (modern-terminal spike). Hosts an
+    /// <see cref="AgentZeroWpf.UI.Components.XtermTerminalControl"/> (WebView2 +
+    /// xterm.js) driven by a managed ConPTY host, then runs the SAME
+    /// <see cref="BindSessionToActors"/> path so every consumer — CLI IPC,
+    /// handshake/DONE, approval parser, health — works unchanged. Because the
+    /// control is a normal WPF element (no HwndHost), approval toasts / wedge
+    /// banners render above it.
+    /// </summary>
+    private void InitializeWebViewTerminal(ConsoleTabInfo tab, string cmdLine, string workDir, string groupName)
+    {
+        var control = new AgentZeroWpf.UI.Components.XtermTerminalControl
+        {
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+            VerticalAlignment = System.Windows.VerticalAlignment.Stretch,
+        };
+        Grid.SetRow(control, 1);
+        tab.TerminalHost.Children.Add(control);
+        tab.XtermTerminal = control;
+
+        control.Loaded += (_, _) =>
+        {
+            if (tab.IsTerminalStarted) return;
+            var cwd = !string.IsNullOrEmpty(workDir) && System.IO.Directory.Exists(workDir) ? workDir : null;
+            var host = control.StartPty(cmdLine, cwd);
+            tab.IsTerminalStarted = true;
+
+            var sessionId = $"{groupName}/{tab.Title}";
+            tab.Session = new AgentZeroWpf.Services.WebViewXtermTerminalSession(host, sessionId);
+            BindSessionToActors(tab, control, groupName);
+            AppLogger.Log($"[Xterm] WebView terminal started | label={sessionId} cmd={cmdLine}");
+        };
+
+        AppLogger.Log($"[Xterm] WebView 터미널 생성 (lazy): {cmdLine}, dir={workDir}");
     }
 
     // --- AvalonDock DockingManager integration ---
@@ -3290,8 +3347,14 @@ public partial class MainWindow : Window
         }
 
         // Cleanup session and terminal
-        tab.Session?.Dispose();
+        (tab.Session as IDisposable)?.Dispose();
         tab.Session = null;
+        if (tab.XtermTerminal is not null)
+        {
+            try { tab.XtermTerminal.Shutdown(); } catch { }
+            tab.TerminalHost.Children.Remove(tab.XtermTerminal);
+            tab.XtermTerminal = null;
+        }
         if (tab.Terminal is not null)
         {
             try { tab.Terminal.ConPTYTerm?.StopExternalTermOnly(); } catch { }
@@ -3436,8 +3499,15 @@ public partial class MainWindow : Window
         }
 
         // Cleanup session and terminal
-        tab.Session?.Dispose();
+        (tab.Session as IDisposable)?.Dispose();
         tab.Session = null;
+        if (tab.XtermTerminal is not null)
+        {
+            try { tab.XtermTerminal.Shutdown(); } catch { }
+            if (tab.XtermTerminal.Parent is Panel xp) xp.Children.Remove(tab.XtermTerminal);
+            else tab.TerminalHost.Children.Remove(tab.XtermTerminal);
+            tab.XtermTerminal = null;
+        }
         if (tab.Terminal is not null)
         {
             try { tab.Terminal.ConPTYTerm?.StopExternalTermOnly(); } catch { }

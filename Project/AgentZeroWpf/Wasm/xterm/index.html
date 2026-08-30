@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <link rel="stylesheet" href="vendor/xterm.css">
+  <style>
+    html, body { margin: 0; height: 100%; background: #1e1e1e; overflow: hidden; }
+    #term { position: absolute; inset: 0; padding: 4px; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <div id="term"></div>
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="term.js"></script>
+</body>
+</html>

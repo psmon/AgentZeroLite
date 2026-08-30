@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Windows;
 using System.Windows.Interop;
+using Agent.Common.Services;
 using AgentZeroWpf.Services;
 
 namespace AgentZeroWpf.Module;
@@ -32,11 +33,11 @@ internal static class CliTerminalIpcHelper
                     sb.Append(',');
 
                 string hwndHex = "";
-                if (tab.Terminal is not null)
+                if (tab.TerminalVisual is not null)
                 {
                     try
                     {
-                        if (PresentationSource.FromVisual(tab.Terminal) is HwndSource src)
+                        if (PresentationSource.FromVisual(tab.TerminalVisual) is HwndSource src)
                             hwndHex = $"0x{src.Handle:X8}";
                     }
                     catch
@@ -71,7 +72,7 @@ internal static class CliTerminalIpcHelper
         string notStartedError,
         out CliGroupInfo? group,
         out ConsoleTabInfo? tab,
-        out ConPtyTerminalSession? session,
+        out ITerminalSession? session,
         out string? errorJson)
     {
         group = null;

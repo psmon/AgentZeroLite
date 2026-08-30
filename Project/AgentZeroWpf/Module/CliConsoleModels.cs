@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using Agent.Common.Services;
 using AgentZeroWpf.Services;
+using AgentZeroWpf.UI.Components;
 using AvalonDock.Layout;
 using EasyWindowsTerminalControl;
 
@@ -11,7 +14,14 @@ namespace AgentZeroWpf.Module;
 public sealed class ConsoleTabInfo : IConsoleTabInfo
 {
     public string Title { get; set; } = "";
+
+    // ── Terminal backend controls (exactly one is non-null per tab) ──
+    // EasyConPty backend → Terminal; WebViewXterm backend → XtermTerminal.
+    // TerminalVisual gives backend-agnostic access to the hosting Visual
+    // (used for the per-tab HWND lookup in terminal-list IPC).
     public EasyTerminalControl? Terminal { get; set; }
+    public XtermTerminalControl? XtermTerminal { get; set; }
+    public FrameworkElement? TerminalVisual => (FrameworkElement?)Terminal ?? XtermTerminal;
     public LayoutDocument Document { get; set; } = null!;
     public Grid TerminalHost { get; set; } = null!;
     public int CliDefinitionId { get; init; }
@@ -28,7 +38,7 @@ public sealed class ConsoleTabInfo : IConsoleTabInfo
     /// the current Windows user's DPAPI key.
     /// </summary>
     public string? EncryptedPasswordForLaunch { get; init; }
-    public ConPtyTerminalSession? Session { get; set; }
+    public ITerminalSession? Session { get; set; }
 
     /// <summary>
     /// Last time this session was touched (created, activated, or terminal init).
