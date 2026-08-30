@@ -178,6 +178,18 @@ $AZ = "Project\AgentZeroWpf\bin\Debug\net10.0-windows\AgentZeroLite.exe"
 
 > 가격은 편집 가능한 **기본값 기반 추정치**이며 실시간 시세가 아닙니다.
 
+### 💲 Budget 탭 (GUI)
+
+Settings → **💲 Budget**은 같은 텔레메트리를 예산 관점으로 보여줍니다:
+
+- **월 상한(USD)** — 지출 한도. `0`이면 상한 없음.
+- **가격표 편집** — `Key / Input / Output / Cache+ / Cache-`(1M tokens당 USD) 그리드.
+  소문자 부분일치·첫 매치 우선, 내장 기본값보다 먼저 적용. 빈 표 = 기본값.
+- **이달 누적 지출** — 이달 시작 이후 `TokenUsageRecords`를 유효 가격표로 계산. 상한
+  **≥80%**면 주황, **초과**면 빨강으로 표시.
+
+override는 `%LocalAppData%\AgentZeroLite\budget-settings.json`에 저장됩니다.
+
 ---
 
 ## 8. 내장 가이드 서빙 📖
@@ -258,8 +270,15 @@ WebDev / Scrap / Note). 마우스로 ActivityBar를 오가지 않고 키보드�
 & $AZ -cli agent-resume 5 0                     # 탭(그룹5 탭0)의 워크스페이스에서 자동 발견
 #  claude --resume 8151ecda-83b1-450d-...
 ```
-> 실행 중 터미널을 **자동 재시작하지 않습니다**(안전). `--resume`은 같은 대화를 복원하므로,
-> 준비되면(예: 에이전트 종료 후) 위 커맨드를 직접 실행하세요.
+> `agent-resume` / `agent-resume-cmd`는 커맨드를 **출력만** 합니다(안전). `--resume`은 같은
+> 대화를 복원하므로, 준비되면 직접 실행하세요.
+
+**또는 자동 주입** — `agent-resume-launch`는 같은 발견을 거쳐 resume 커맨드를 라이브
+터미널에 그대로 `WriteAndSubmit` 합니다:
+```powershell
+& $AZ -cli agent-resume-launch 5 0             # 탭 [5:0]에 주입
+& $AZ -cli agent-resume-launch --alias build   # …또는 alias로 지목
+```
 
 ---
 
@@ -276,13 +295,15 @@ WebDev / Scrap / Note). 마우스로 ActivityBar를 오가지 않고 키보드�
 | `terminal-wait <g> <t> --until <state>` | 특정 상태(working/blocked/idle/done)까지 대기 | ○ |
 | `agent-resume-cmd [cwd]` | 폴더의 최신 Claude 대화 resume 커맨드 출력 | ✕ |
 | `agent-resume <g> <t>` | 탭의 워크스페이스에서 세션 자동 발견 → resume 커맨드 | ○ |
+| `agent-resume-launch <g> <t>` | resume 커맨드를 라이브 터미널에 주입 (`--alias`도 가능) | ○ |
 | `help [topic]` | 가이드 서빙(agentzero/orchestrate) | ✕ |
 | `trust-workspace [경로]` | 폴더를 에이전트 CLI에 신뢰 등록 | ✕ |
 | `agent-hook-install` / `-uninstall` | 상태 훅 설치/제거 | ✕ |
 | `skill-stub-install` / `-uninstall` | 사용법 스텁 설치/제거 | ✕ |
 | `terminal-list` | 터미널 그룹/탭 목록 | ○ |
 | `terminal-read <g> <t> [--last N]` | 터미널 출력 읽기 | ○ |
-| `terminal-send <g> <t> "<텍스트>"` | 터미널에 입력 전송 | ○ |
+| `terminal-send <g> <t> "<텍스트>"` | 터미널에 입력 전송 (`--alias <name>`도 가능) | ○ |
+| `terminal-alias <list\|set <g> <t> <name>\|rm <name>>` | 터미널에 이름 부여 → send/key/read를 `--alias`로 지목 | ○ |
 | `terminal-wait <g> <t> [--idle-ms N]` | 터미널 유휴(완료)까지 대기 | ○ |
 
 ---

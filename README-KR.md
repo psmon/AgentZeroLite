@@ -617,11 +617,14 @@ peer-signal 트리거, ID 스킴을 string으로 전환 — 각 시도가 같은
 | `console`                           | 앱 디렉토리에서 PowerShell 새로 열기                            |
 | `log [--last N] [--clear]`          | CLI 액션 히스토리 (파일 기반)                                   |
 | `terminal-list`                     | 워크스페이스/탭 세션 전체 JSON 리스트                           |
-| `terminal-send <g> <t> "text"`      | 워크스페이스 `<g>`의 탭 `<t>`로 텍스트 전송                     |
-| `terminal-key <g> <t> <key>`        | 제어키 전송 (Ctrl+C, Enter, Tab, 화살표, …)                    |
-| `terminal-read <g> <t> [-n N]`      | 탭 스크롤백 마지막 N바이트 읽기                                 |
+| `terminal-send <g> <t> "text"`      | 탭 `<t>`로 텍스트 전송 (또는 `--alias <name>`)                  |
+| `terminal-key <g> <t> <key>`        | 제어키 전송 (Ctrl+C, Enter, Tab, 화살표, …) (또는 `--alias <name>`) |
+| `terminal-read <g> <t> [-n N]`      | 탭 스크롤백 마지막 N바이트 읽기 (또는 `--alias <name>`)         |
+| `terminal-alias <list\|set\|rm>`    | 터미널에 안정적 이름 부여 → `--alias`로 인덱스 대신 지목        |
+| `agent-resume-launch <g> <t>`       | 탭의 최신 세션을 찾아 `--resume` 명령을 라이브 터미널에 주입    |
 | `bot-chat [--from X] "text"`        | Bot 창에 외부 채팅 버블 표시                                    |
 | `os <verb> [args]`                  | OS 자동화: 윈도우 열거 / 스크린샷 / UIA / 마우스 / 키 입력      |
+| `cost`                              | 기록된 토큰 사용량 기반 USD 추정 비용                           |
 | `help`                              | 명령어 레퍼런스                                                 |
 
 편의용 PowerShell 래퍼가 `Project/AgentZeroWpf/AgentZeroLite.ps1`에 있습니다. 앱
@@ -680,15 +683,27 @@ tmp/os-cli/
 
 ## 설정
 
-두 개의 탭만 있습니다:
+전체 창 오버레이 방식의 탭 패널입니다(ConPTY 네이티브 창이 새어나오지 않도록
+WebDev와 동일한 airspace 처리):
 
 - **CLI Definitions** — AgentZero가 실행할 셸(`cmd`, `pwsh`, `claude …`, 커스텀)을
   등록합니다. 내장 항목은 삭제 불가. 새로 추가하면 모든 워크스페이스의 `+` 메뉴에
   나타납니다.
+- **LLM** — 로컬 모델 선택(Gemma 4 / Nemotron) + 외부 백엔드(OpenAI 호환) 토글.
+- **Voice** — STT 프로바이더(WhisperLocal CPU/Vulkan, OpenAI Whisper 등) + 언어 +
+  GPU 디바이스 + VAD 민감도. voice-note가 그대로 상속받는 값입니다.
+- **🎵 Music** — AST AudioSet ONNX 분류기(마이크 / WASAPI 루프백 두 입력원). 347MB
+  모델 원클릭 [Download], 1.5초 슬라이딩 윈도우 실시간 추론 테스트 패널, ~30Hz로
+  리페인트되는 64-bar 로그주파수 dBFS 스펙트럼 포함. Music 설정을 저장하면 라이브
+  분류기가 자동으로 무효화·재로드되어 재시작 없이 새 모델 경로가 반영됩니다.
+- **WebDev** — 튜토리얼 / 플러그인 작성 가이드. 실제 샌드박스는 상단 지구본 아이콘.
 - **AgentZero CLI** — 원클릭으로 앱 디렉토리를 사용자 `PATH`에 등록합니다. 이후
   `AgentZeroLite.ps1` 및 `AgentZeroLite.exe -cli …`가 어느 셸에서든 동작합니다.
   **AI ↔ AI Talk 섹션**에는 Claude/Codex에게 이 CLI를 가르치는 원샷 지시문이
   복사 가능한 형태로 준비돼 있습니다.
+- **💲 Budget** — 기록된 토큰 텔레메트리 위의 비용/예산 레이어. **월 상한(USD)** 설정,
+  **모델별 가격표**(입력/출력/캐시쓰기/캐시읽기 per 1M tokens, 부분일치 override) 편집,
+  그리고 **이달 누적 지출** 표시(상한 임박 시 주황, 초과 시 빨강). 빈 가격표 = 내장 기본값.
 
 저장 위치: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db` (SQLite, 첫 실행 시
 EF Core가 자동 마이그레이션).
@@ -697,9 +712,9 @@ EF Core가 자동 마이그레이션).
 
 ## 상태
 
-**Alpha.** 12개 헤드리스 테스트는 그린. WPF 통합 테스트는 데스크톱 세션에서만
-실행되는 opt-in 항목입니다. `ZeroCommon` 내부 API는 v1.0까지 불안정한 것으로
-간주됩니다.
+**Alpha — 현재 릴리스 v0.20.x.** 헤드리스 스위트 그린(500+ 테스트). WPF 통합
+테스트는 데스크톱 세션에서만 실행되는 opt-in 항목입니다. `ZeroCommon` 내부 API는
+v1.0까지 불안정한 것으로 간주됩니다.
 
 ---
 

@@ -32,6 +32,16 @@ public static class AgentSkillGuides
                                               Block until a terminal goes idle
                                               (output stops changing) — use this
                                               instead of polling read in a loop.
+          terminal-alias set <g> <t> <name>   Give a terminal a stable name, then
+          terminal-send --alias <name> "..."  target it by --alias instead of the
+          terminal-read --alias <name>        volatile <grp> <tab> indices
+                                              (--alias works on send/key/read).
+                                              terminal-alias list | rm <name>.
+
+        Resume a crashed/closed agent conversation:
+          agent-resume <grp> <tab>            Print the 'claude --resume <id>' cmd.
+          agent-resume-launch <grp> <tab>     Inject that resume cmd straight into
+                                              the live terminal (--alias works too).
 
         Peer messaging (report back to the AgentBot coordinator):
           bot-chat "DONE(<msg>)" --from <yourName>

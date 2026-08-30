@@ -807,7 +807,10 @@ footer a:hover{color:var(--mint)}
       <tr><td>terminal-send &lt;g&gt; &lt;t&gt; "text"</td><td class="ko">탭 <code>&lt;t&gt;</code>로 텍스트 전송</td><td class="en">Send text to tab <code>&lt;t&gt;</code> in workspace <code>&lt;g&gt;</code></td></tr>
       <tr><td>terminal-key &lt;g&gt; &lt;t&gt; &lt;key&gt;</td><td class="ko">제어키 전송 (Ctrl+C, Enter, 화살표 …)</td><td class="en">Send a control key (Ctrl+C, Enter, arrows …)</td></tr>
       <tr><td>terminal-read &lt;g&gt; &lt;t&gt; --last N</td><td class="ko">스크롤백 마지막 N바이트 읽기</td><td class="en">Read the last N bytes from a tab</td></tr>
+      <tr><td>terminal-alias set &lt;g&gt; &lt;t&gt; &lt;name&gt;</td><td class="ko">탭에 이름 부여 → <code>--alias</code>로 지목 (send/key/read)</td><td class="en">Name a tab → target it via <code>--alias</code> on send/key/read</td></tr>
+      <tr><td>agent-resume-launch &lt;g&gt; &lt;t&gt;</td><td class="ko">최신 세션을 찾아 <code>--resume</code>를 라이브 터미널에 주입</td><td class="en">Find the latest session and inject <code>--resume</code> into the live terminal</td></tr>
       <tr><td>bot-chat "text" --from X</td><td class="ko">Bot 창에 외부 메시지 버블 표시</td><td class="en">Display an external chat bubble in the bot window</td></tr>
+      <tr><td>cost</td><td class="ko">기록된 토큰 사용량 기반 USD 추정</td><td class="en">Estimated USD from recorded token usage</td></tr>
       <tr><td>copy · log · help</td><td class="ko">클립보드 / 액션 히스토리 / 도움말</td><td class="en">Clipboard / action history / help</td></tr>
     </tbody>
   </table>

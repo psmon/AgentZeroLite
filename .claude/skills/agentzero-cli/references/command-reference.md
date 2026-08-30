@@ -32,10 +32,11 @@ All examples assume `$Exe` resolved via `find-cli.ps1` and invocation through
 | Command | Notes |
 |---------|-------|
 | `terminal-list` | Groups → tabs, each with `tab_index`, `title`, `active`, `running`, `session_id`, `hwnd`. Also dumps raw JSON. |
-| `terminal-send <G> <T> <text…>` | Types text **+ Enter** into the tab. |
-| `terminal-key <G> <T> <key>` | Raw key, no text. Keys: `cr lf crlf esc tab backspace del ctrlc ctrld up down left right hex:XX`. |
-| `terminal-read <G> <T> [--last N]` | Console output text; `--last N` = last N chars (default all). |
+| `terminal-send <G> <T> <text…>` | Types text **+ Enter** into the tab. Accepts `--alias <name>` in place of `<G> <T>`. |
+| `terminal-key <G> <T> <key>` | Raw key, no text. Keys: `cr lf crlf esc tab backspace del ctrlc ctrld up down left right hex:XX`. Accepts `--alias <name>`. |
+| `terminal-read <G> <T> [--last N]` | Console output text; `--last N` = last N chars (default all). Accepts `--alias <name>`. |
 | `terminal-wait <G> <T> [flags]` | Block until settled/state. See below. |
+| `terminal-alias <list\|set <G> <T> <name>\|rm <name>>` | Stable name → terminal. `set` names the tab; then any send/key/read can target it with `--alias <name>` instead of volatile indices. Aliases persist to `terminal-aliases.json`. |
 
 `terminal-wait` flags:
 - `--idle-ms N` (default 1500) — consider settled after output is unchanged this long.
@@ -51,7 +52,8 @@ Exit codes: `0` reached/idle · `2` timeout · `3` stalled.
 |---------|------|-------|
 | `agent-state` | yes | Per-tab detected state + "needs attention" rollup (blocked / done-unseen). |
 | `agent-resume <G> <T>` | yes | Prints `claude --resume <id>` for that tab's workspace. Does **not** auto-restart. |
-| `agent-resume-cmd [cwd]` | no | Same, for an arbitrary folder (default CWD). |
+| `agent-resume-launch <G> <T>` | yes | Same discovery, but **injects** the resume command into the live terminal (`WriteAndSubmit`) instead of only printing it. Accepts `--alias <name>`. |
+| `agent-resume-cmd [cwd]` | no | Same as agent-resume, for an arbitrary folder (default CWD). |
 
 ## Peer channel (IPC — GUI required)
 

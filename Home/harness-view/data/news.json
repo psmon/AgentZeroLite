@@ -1,79 +1,79 @@
 {
   "_description": "Recent Updates surface — bilingual EN/KO. Default audience: English. `headline`, `narrative`, `highlights[].label/text`, `prompts[].tag/text` use `{ en, ko }` shape. Scalars (updatedAt, tone) stay language-neutral.",
-  "updatedAt": "2026-07-05",
+  "updatedAt": "2026-08-30",
   "headline": {
-    "en": "M0028 cycle — the app gets its FIRST on-device vision model (Florence-2, pip-free ONNX), a Settings → Vision test tab, and an Agent Band girl-group mode that watches the MV: person-count sets the idol count, frame-diff motion drives the dance, and visible instruments summon vision-first",
-    "ko": "M0028 사이클 — 앱에 최초의 온디바이스 비전 모델(Florence-2, pip 없는 ONNX) 도입, Settings → Vision 테스트 탭 신설, 그리고 뮤비를 보는 에이전트 악단 걸그룹 모드: person 수로 아이돌 인원을 맞추고, 프레임 차분 움직임으로 댄스를 구동하며, 보이는 악기를 비전 우선으로 소환"
+    "en": "Ops & cost cycle — a Settings → 💲 Budget tab (monthly cap + editable price table + month-to-date spend), stable terminal aliases so `-cli` can target a tab by name, one-shot agent session resume that injects `--resume` into the live terminal, the YouTube playlist moved from localStorage to SQLite, and the music classifier now hot-reloads on a settings change",
+    "ko": "운영·비용 사이클 — Settings → 💲 Budget 탭(월 상한 + 편집 가능한 가격표 + 이달 누적 지출), `-cli`가 탭을 이름으로 지목하는 안정적 터미널 별칭, `--resume`를 라이브 터미널에 주입하는 원샷 세션 복원, 유튜브 목록의 localStorage→SQLite 이관, 그리고 설정 변경 시 자동 핫리로드되는 음악 분류기"
   },
   "narrative": {
-    "en": "AgentZero already ran several on-device models (Whisper STT, SuperTonic TTS, AST music, Sherpa diarization); this cycle adds the first VISION one. Florence-2-base runs on-device via ONNX Runtime, downloaded pip-free straight from HuggingFace (~1 GB across four ONNX graphs) into the same %LOCALAPPDATA%\\...\\models cache convention as every other model — no Python, no pip. A new Settings → Vision tab is the test harness: paste a YouTube link, the app plays it and captures frames on a timer via WebView2 CapturePreviewAsync, then overlays Florence-2 object-detection boxes on the last frame. Getting the video to play surfaced YouTube error 153 (\"동영상 플레이어 구성 오류\") — a bare /embed/ navigation gives WebView2 a null origin that YouTube rejects; fixed by serving a tiny IFrame Player API page from a real https origin (WebView2 virtual-host mapping), verified in headless Edge. The ONNX Runtime bump this required (1.20 → 1.23.2) was regression-checked against the existing AST/SuperTonic paths (275 tests green). Then Agent Band's girl-group mode was extended to USE the model (group mode only): the host captures the playing MV region and runs Florence-2 so (1) the person count sets the idol member count — smoothed to the recent 8-second maximum so camera cuts don't flap it, capped at 7, (2) a cheap pixel frame-diff on the crop drives the idle(singing) ↔ action(dance) sync with hysteresis, and (3) visible instruments are summoned vision-first with the audio AST list as fallback. Environment recognition feeds instruments only; the whole thing degrades to the prior audio-only behavior when the model isn't downloaded, the mode is solo, or no video plays. Along the way all 5 build warnings were cleared — dead fields removed, a legacy ConPTY RID warning scoped-suppressed, and a High-severity SQLitePCLRaw advisory (GHSA-2m69-gcr7-jv3q, whole 2.1.x line) fixed by moving the bundled SQLite native to 3.50.x. Shipped as agent-band v0.15.0.",
-    "ko": "AgentZero는 이미 여러 온디바이스 모델(Whisper STT, SuperTonic TTS, AST 음악, Sherpa 화자분리)을 돌렸지만, 이번 사이클은 첫 비전 모델을 추가한다. Florence-2-base가 ONNX Runtime으로 온디바이스 구동되며, HuggingFace에서 pip 없이 바로 다운로드(4개 ONNX 그래프 ~1 GB)되어 다른 모든 모델과 동일한 %LOCALAPPDATA%\\...\\models 캐시 규약에 저장된다 — Python도 pip도 없다. 신규 Settings → Vision 탭이 테스트 하네스다: 유튜브 링크를 붙이면 재생하면서 WebView2 CapturePreviewAsync로 주기적으로 프레임을 캡처하고, 마지막 프레임 위에 Florence-2 객체탐지 박스를 오버레이한다. 영상 재생 과정에서 유튜브 오류 153(\"동영상 플레이어 구성 오류\")이 드러났다 — 바 /embed/ 이동은 WebView2에 null origin을 줘 유튜브가 거부한다; 실제 https origin(WebView2 가상호스트 매핑)에서 IFrame Player API 페이지를 서빙해 해결했고 헤드리스 Edge로 검증했다. 이때 필요했던 ONNX Runtime 상향(1.20 → 1.23.2)은 기존 AST/SuperTonic 경로 회귀를 확인(275 테스트 통과)했다. 이어서 에이전트 악단 걸그룹 모드가 이 모델을 사용하도록 확장됐다(걸그룹 모드 한정): 호스트가 재생 중인 뮤비 영역을 캡처해 Florence-2를 돌려 (1) person 수로 아이돌 인원을 정하되 카메라 컷 출렁임 방지를 위해 최근 8초 최대치로 스무딩(최대 7), (2) 크롭에 대한 값싼 픽셀 프레임 차분으로 유휴(노래) ↔ 동작(댄스) 상태를 히스테리시스로 싱크, (3) 보이는 악기는 비전 우선으로 소환하고 오디오 AST 리스트는 폴백. 환경인식은 악기 감지에만 쓰이고, 모델 미설치·솔로·영상 없음일 땐 기존 오디오 전용 동작으로 자연스럽게 폴백한다. 도중에 빌드 워닝 5종을 전부 제거했다 — 죽은 필드 삭제, 레거시 ConPTY RID 경고 범위 한정 억제, 그리고 High 심각도 SQLitePCLRaw 취약점(GHSA-2m69-gcr7-jv3q, 2.1.x 전체)을 번들 SQLite 네이티브 3.50.x 상향으로 해결. 에이전트 악단 v0.15.0으로 출시."
+    "en": "This cycle adopted the highest-value pieces from two sibling projects (herdr, orca) and closed product-polish debt. From orca: a $ cost layer graduated into a real GUI — Settings → 💲 Budget lets you set a monthly USD cap, edit a per-model price table (input/output/cache-write/cache-read per 1M tokens, substring-matched, defaults when empty), and read a month-to-date spend computed from the recorded token telemetry that turns amber near the cap and red once over. From herdr: terminals got stable aliases — `terminal-alias set <g> <t> <name>` maps a name to a tab's stable identity, and `--alias <name>` now works on `terminal-send`/`-key`/`-read` so scripts stop breaking when tab indices shift; and `agent-resume-launch` discovers a tab's latest agent session and WriteAndSubmits `claude --resume <id>` straight into the live terminal (vs `agent-resume`, which only prints it). Under the hood, screen-vs-hook state authority is now consulted in the live monitor. Product polish: the Agent Band YouTube playlist migrated from browser localStorage to the app SQLite DB (a new YouTubePlaylistItem table, unique on video id, with a one-time localStorage import) so it shares the MP3 library's durability; and the live music classifier now invalidates and rebuilds itself when Music settings change, so a new model path takes effect without an app restart (and its ONNX session no longer leaks). All shipped behind 500+ green headless tests, and the READMEs / CLI help / this page were refreshed to match.",
+    "ko": "이번 사이클은 자매 프로젝트 두 곳(herdr, orca)에서 고가치 요소를 채택하고 제품 폴리시 부채를 닫았다. orca 쪽: $ 비용 레이어가 실제 GUI로 승격 — Settings → 💲 Budget에서 월 USD 상한 설정, 모델별 가격표 편집(입력/출력/캐시쓰기/캐시읽기 per 1M tokens, 부분일치, 비우면 기본값), 그리고 기록된 토큰 텔레메트리로 계산한 이달 누적 지출(상한 임박 시 주황, 초과 시 빨강)을 볼 수 있다. herdr 쪽: 터미널에 안정적 별칭이 생겨 `terminal-alias set <g> <t> <name>`이 이름을 탭의 안정 식별자에 매핑하고, `terminal-send`/`-key`/`-read`에서 `--alias <name>`가 동작해 탭 인덱스가 바뀌어도 스크립트가 깨지지 않는다; `agent-resume-launch`는 탭의 최신 세션을 찾아 `claude --resume <id>`를 라이브 터미널에 그대로 주입한다(출력만 하는 `agent-resume`와 대비). 내부적으로는 화면-vs-훅 상태 권위가 라이브 모니터에 반영된다. 제품 폴리시: 에이전트 악단의 유튜브 목록이 브라우저 localStorage에서 앱 SQLite DB로 이관됐고(video id 유니크의 YouTubePlaylistItem 테이블 + 1회 localStorage 임포트) MP3 라이브러리와 같은 영속성을 공유한다; 라이브 음악 분류기는 Music 설정이 바뀌면 스스로 무효화·재빌드되어 재시작 없이 새 모델 경로가 반영된다(ONNX 세션 누수도 해소). 전부 500+ 그린 헤드리스 테스트 뒤에 실렸고, README / CLI 도움말 / 이 페이지도 맞춰 갱신했다."
   },
   "highlights": [
     {
-      "label": { "en": "First on-device vision model", "ko": "최초 온디바이스 비전 모델" },
+      "label": { "en": "Settings → 💲 Budget tab", "ko": "Settings → 💲 Budget 탭" },
       "text": {
-        "en": "Florence-2-base object detection runs on-device via ONNX Runtime, downloaded pip-free from HuggingFace into the shared models cache — same no-Python pattern as Whisper / SuperTonic / AST",
-        "ko": "Florence-2-base 객체탐지가 ONNX Runtime으로 온디바이스 구동, HuggingFace에서 pip 없이 공유 models 캐시로 다운로드 — Whisper / SuperTonic / AST와 동일한 no-Python 패턴"
-      },
-      "tone": "purple"
-    },
-    {
-      "label": { "en": "Settings → Vision test tab", "ko": "Settings → Vision 테스트 탭" },
-      "text": {
-        "en": "Paste a YouTube link → the app plays it and captures frames via WebView2 CapturePreviewAsync → object-detection boxes overlay the last frame. YouTube error 153 fixed with an IFrame-Player-API page served from a real origin",
-        "ko": "유튜브 링크 붙이기 → 재생하며 WebView2 CapturePreviewAsync로 프레임 캡처 → 마지막 프레임에 객체탐지 박스 오버레이. 유튜브 오류 153은 실제 origin에서 IFrame Player API 페이지 서빙으로 해결"
-      },
-      "tone": "blue"
-    },
-    {
-      "label": { "en": "Person-count → idol count", "ko": "person 수 → 아이돌 인원" },
-      "text": {
-        "en": "Girl-group mode only: the host counts `person` boxes in the playing MV → sets the on-stage idol member count, smoothed to the recent 8-second maximum so camera cuts don't flap it (capped at 7)",
-        "ko": "걸그룹 모드 한정: 호스트가 재생 중 뮤비의 `person` 박스를 세어 → 무대 아이돌 인원 결정, 카메라 컷 출렁임 방지 위해 최근 8초 최대치로 스무딩(최대 7)"
+        "en": "Monthly cap (USD), an editable per-model price table (input/output/cache±, substring-matched, defaults when empty), and a month-to-date spend readout that turns amber ≥80% of cap and red once over",
+        "ko": "월 상한(USD), 편집 가능한 모델별 가격표(입력/출력/캐시±, 부분일치, 비우면 기본값), 그리고 상한 ≥80%면 주황·초과면 빨강으로 바뀌는 이달 누적 지출 표시"
       },
       "tone": "green"
     },
     {
-      "label": { "en": "Frame-diff motion → dance sync", "ko": "프레임 차분 → 댄스 싱크" },
+      "label": { "en": "Stable terminal aliases", "ko": "안정적 터미널 별칭" },
       "text": {
-        "en": "A cheap pixel frame-diff on the MV crop (~300ms) drives the idle(singing) ↔ action(dance) sprite flip with hysteresis — the whole group dances in time with the video's motion",
-        "ko": "뮤비 크롭에 대한 값싼 픽셀 프레임 차분(~300ms)이 유휴(노래) ↔ 동작(댄스) 스프라이트 전환을 히스테리시스로 구동 — 그룹 전체가 영상 움직임에 맞춰 댄스"
+        "en": "`terminal-alias set <g> <t> <name>` names a tab by its stable identity; `--alias <name>` then works on terminal-send/-key/-read so scripts don't break when tab indices shift",
+        "ko": "`terminal-alias set <g> <t> <name>`이 탭을 안정 식별자로 명명; 이후 terminal-send/-key/-read에서 `--alias <name>`가 동작해 탭 인덱스가 바뀌어도 스크립트가 안 깨짐"
+      },
+      "tone": "blue"
+    },
+    {
+      "label": { "en": "One-shot agent resume", "ko": "원샷 에이전트 복원" },
+      "text": {
+        "en": "`agent-resume-launch <g> <t>` (or `--alias`) finds a tab's latest agent session and injects `claude --resume <id>` into the live terminal — vs `agent-resume`, which only prints it",
+        "ko": "`agent-resume-launch <g> <t>`(또는 `--alias`)가 탭의 최신 세션을 찾아 `claude --resume <id>`를 라이브 터미널에 주입 — 출력만 하는 `agent-resume`와 대비"
+      },
+      "tone": "purple"
+    },
+    {
+      "label": { "en": "YouTube playlist → SQLite", "ko": "유튜브 목록 → SQLite" },
+      "text": {
+        "en": "The Agent Band YouTube playlist moved from browser localStorage to the app SQLite DB (unique on video id, one-time localStorage import) — same durability as the MP3 library",
+        "ko": "에이전트 악단 유튜브 목록이 localStorage에서 앱 SQLite DB로 이관(video id 유니크 + 1회 localStorage 임포트) — MP3 라이브러리와 동일한 영속성"
       },
       "tone": "amber"
     },
     {
-      "label": { "en": "Vision-first instruments + fallback", "ko": "비전 우선 악기 + 폴백" },
+      "label": { "en": "Music classifier hot-reload", "ko": "음악 분류기 핫리로드" },
       "text": {
-        "en": "Instruments visible in the MV are summoned vision-first (Florence-2), with the audio AST list as fallback when vision sees none. Degrades to audio-only when the model is missing, mode is solo, or no video plays",
-        "ko": "뮤비에 보이는 악기를 비전 우선(Florence-2)으로 소환, 비전이 못 잡으면 오디오 AST 폴백. 모델 미설치·솔로·영상 없음일 땐 오디오 전용으로 폴백"
+        "en": "Changing Music settings (or downloading a new model) now invalidates and rebuilds the live AST classifier, so a new model path takes effect without an app restart — and the ONNX session no longer leaks",
+        "ko": "Music 설정 변경(또는 새 모델 다운로드) 시 라이브 AST 분류기를 무효화·재빌드 → 재시작 없이 새 모델 경로 반영. ONNX 세션 누수도 해소"
       },
-      "tone": "purple"
+      "tone": "blue"
     }
   ],
   "prompts": [
     {
-      "tag": { "en": "Try the Vision tab", "ko": "Vision 탭 시연" },
+      "tag": { "en": "Watch your spend", "ko": "지출 확인" },
+      "tone": "green",
+      "text": {
+        "en": "Settings → 💲 Budget → set a monthly cap and hit Refresh. The readout shows month-to-date spend vs the cap; add a price-table row to override a model family, or leave it empty for built-in defaults",
+        "ko": "Settings → 💲 Budget → 월 상한 설정 후 Refresh. 이달 누적 지출 대비 상한이 표시됨. 가격표에 행을 추가해 특정 모델을 override하거나, 비워두면 내장 기본값 사용"
+      }
+    },
+    {
+      "tag": { "en": "Name your tabs", "ko": "탭에 이름 달기" },
       "tone": "blue",
       "text": {
-        "en": "Settings → Vision → Download (one-time, ~1 GB, no pip) → paste a YouTube link → START TEST — the video plays and detection boxes overlay the captured frame with a live object list",
-        "ko": "Settings → Vision → Download(1회, ~1 GB, pip 없음) → 유튜브 링크 붙이기 → START TEST — 영상이 재생되고 캡처 프레임에 탐지 박스 + 실시간 객체 목록 오버레이"
+        "en": "`AgentZeroLite.ps1 terminal-alias set 0 1 build` then `terminal-send --alias build \"dotnet build\"` — target a tab by name, not by a volatile index",
+        "ko": "`AgentZeroLite.ps1 terminal-alias set 0 1 build` 후 `terminal-send --alias build \"dotnet build\"` — 휘발성 인덱스가 아니라 이름으로 탭을 지목"
       }
     },
     {
-      "tag": { "en": "Girl-group vision", "ko": "걸그룹 비전" },
+      "tag": { "en": "Resume after a crash", "ko": "크래시 후 복원" },
       "tone": "purple",
       "text": {
-        "en": "Open Agent Band → Singer = Group → paste a K-pop MV → ▶ Start. The top hint bar shows 👁 member-count · idle/action · instrument-count live as Florence-2 watches the MV and the idols match it",
-        "ko": "에이전트 악단 → Singer = Group → K-pop 뮤비 붙이기 → ▶ Start. 상단 힌트바에 👁 인원 · 유휴/동작 · 악기 수가 실시간 표시되며 Florence-2가 뮤비를 보고 아이돌이 맞춰 움직임"
-      }
-    },
-    {
-      "tag": { "en": "Graceful fallback", "ko": "우아한 폴백" },
-      "tone": "amber",
-      "text": {
-        "en": "Skip the model download, or switch Singer = Solo — the band behaves exactly as before (audio-only). Vision is strictly additive to girl-group mode and never blocks the existing flow",
-        "ko": "모델 다운로드를 건너뛰거나 Singer = Solo로 바꾸면 — 악단은 예전 그대로(오디오 전용) 동작. 비전은 걸그룹 모드에만 더해지고 기존 흐름을 절대 막지 않음"
+        "en": "If an agent tab dropped its conversation, `AgentZeroLite.ps1 agent-resume-launch 0 1` finds its latest session and relaunches it with `--resume` right in that terminal",
+        "ko": "에이전트 탭이 대화를 잃었다면 `AgentZeroLite.ps1 agent-resume-launch 0 1`이 최신 세션을 찾아 그 터미널에서 `--resume`로 재기동"
       }
     }
   ]

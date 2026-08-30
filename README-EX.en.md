@@ -182,6 +182,20 @@ Estimates cost per model from recorded token usage.
 
 > Prices are **editable default estimates**, not a live feed.
 
+### 💲 Budget tab (GUI)
+
+Settings → **💲 Budget** turns the same telemetry into a budget view:
+
+- **Monthly cap (USD)** — set a spend ceiling; `0` = no cap.
+- **Editable price table** — a grid of `Key / Input / Output / Cache+ / Cache-`
+  (USD per 1M tokens). Matched by lower-cased substring, first match wins, tried
+  before the built-in defaults. Empty table = defaults.
+- **Month-to-date spend readout** — computed from `TokenUsageRecords` since the
+  start of the current month using your effective price table. It turns **amber**
+  at ≥80 % of the cap and **red** once over.
+
+Overrides persist to `%LocalAppData%\AgentZeroLite\budget-settings.json`.
+
 ---
 
 ## 8. Built-in Guide Serving 📖
@@ -265,8 +279,15 @@ rules (manifests) to classify state. Rules are **data you can tune** — drop
 & $AZ -cli agent-resume 5 0                     # auto-resolve from a tab's (group 5, tab 0) workspace
 #  claude --resume 8151ecda-83b1-450d-...
 ```
-> It does **not** auto-restart a live terminal (safety). `--resume` restores the same
-> conversation, so run the command yourself when ready (e.g. after the agent exits).
+> `agent-resume` / `agent-resume-cmd` only **print** the command (safety). Run it
+> yourself when ready — `--resume` restores the same conversation.
+
+**Or inject it automatically** — `agent-resume-launch` does the same discovery but
+`WriteAndSubmit`s the resume command straight into the live terminal:
+```powershell
+& $AZ -cli agent-resume-launch 5 0             # inject into tab [5:0]
+& $AZ -cli agent-resume-launch --alias build   # …or target it by alias
+```
 
 ---
 
@@ -283,13 +304,15 @@ rules (manifests) to classify state. Rules are **data you can tune** — drop
 | `terminal-wait <g> <t> --until <state>` | wait until a state (working/blocked/idle/done) | ○ |
 | `agent-resume-cmd [cwd]` | print resume command for a folder's latest Claude session | ✕ |
 | `agent-resume <g> <t>` | auto-discover a tab's workspace session → resume command | ○ |
+| `agent-resume-launch <g> <t>` | inject the resume command into the live terminal (also `--alias`) | ○ |
 | `help [topic]` | serve guides (agentzero/orchestrate) | ✕ |
 | `trust-workspace [path]` | trust a folder for agent CLIs | ✕ |
 | `agent-hook-install` / `-uninstall` | install/remove status hooks | ✕ |
 | `skill-stub-install` / `-uninstall` | install/remove the usage stub | ✕ |
 | `terminal-list` | list terminal groups/tabs | ○ |
 | `terminal-read <g> <t> [--last N]` | read terminal output | ○ |
-| `terminal-send <g> <t> "<text>"` | send input to a terminal | ○ |
+| `terminal-send <g> <t> "<text>"` | send input to a terminal (also `--alias <name>`) | ○ |
+| `terminal-alias <list\|set <g> <t> <name>\|rm <name>>` | name a terminal so send/key/read can target it by `--alias` | ○ |
 | `terminal-wait <g> <t> [--idle-ms N]` | wait until a terminal is idle (done) | ○ |
 
 ---

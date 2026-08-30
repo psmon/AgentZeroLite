@@ -280,11 +280,14 @@ scripts from a hung GUI; add `--no-wait` for fire-and-forget.
 | `console`                       | Open a fresh PowerShell in the app directory              |
 | `log [--last N] [--clear]`      | CLI action history (file-backed)                          |
 | `terminal-list`                 | JSON list of all workspace/tab sessions                   |
-| `terminal-send <g> <t> "text"`  | Send text to tab `<t>` in workspace `<g>`                 |
-| `terminal-key <g> <t> <key>`    | Send a control key (Ctrl+C, Enter, Tab, arrows, …)        |
-| `terminal-read <g> <t> [-n N]`  | Read the last N bytes from a tab's scrollback             |
+| `terminal-send <g> <t> "text"`  | Send text to tab `<t>` in workspace `<g>` (or `--alias <name>`) |
+| `terminal-key <g> <t> <key>`    | Send a control key (Ctrl+C, Enter, Tab, arrows, …) (or `--alias <name>`) |
+| `terminal-read <g> <t> [-n N]`  | Read the last N bytes from a tab's scrollback (or `--alias <name>`) |
+| `terminal-alias <list\|set\|rm>`| Name a terminal so commands can target it by `--alias` instead of indices |
+| `agent-resume-launch <g> <t>`   | Discover a tab's latest agent session and inject `--resume` into the live terminal |
 | `bot-chat [--from X] "text"`    | Display an external chat bubble in the bot window         |
 | `os <verb> [args]`              | OS-control: window enum, screenshot, UIA, mouse, keypress |
+| `cost`                          | Estimated USD spend from recorded token usage             |
 | `help`                          | Command reference                                         |
 
 A PowerShell wrapper is shipped at `Project/AgentZeroWpf/AgentZeroLite.ps1` for convenience
@@ -938,6 +941,11 @@ treatment as WebDev so ConPTY native windows can't bleed through):
   the top-level globe icon (see [WebDev section](#-webdev--in-app-sandbox--plugin-system)).
 - **AgentZero CLI** — one-click button to register the app directory in the user
   `PATH` so `AgentZeroLite.ps1` and `AgentZeroLite.exe -cli …` resolve from any shell.
+- **💲 Budget** — cost/budget layer over the recorded token telemetry. Set a
+  **monthly cap** (USD), edit the **per-model price table** (input / output /
+  cache-write / cache-read per 1M tokens; overrides matched by substring), and
+  watch a **month-to-date spend** readout that turns amber near the cap and red
+  once over it. Empty price table = built-in defaults.
 
 Persistence lives in `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db` (SQLite, migrated by
 EF Core on first run). User-installed WebDev plugins live next door under
@@ -947,8 +955,8 @@ EF Core on first run). User-installed WebDev plugins live next door under
 
 ## Status
 
-**Alpha — current release v0.4.x.** Headless suite green; the WPF integration
-suite is opt-in and requires a desktop session. API surface inside
+**Alpha — current release v0.20.x.** Headless suite green (500+ tests); the WPF
+integration suite is opt-in and requires a desktop session. API surface inside
 `ZeroCommon` is considered unstable until v1.0; the WebDev `window.zero.*`
 bridge is additive-only since v0.4 — new ops added, none removed.
 
