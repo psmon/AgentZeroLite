@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using Agent.Common.Actors;
 using Agent.Common.Llm.Tools;
+using Agent.Common.Services;
 using AgentZeroWpf.Module;
 using AgentZeroWpf.OsControl;
 
@@ -242,7 +243,7 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
         return $"Term-{group}-{tab}";
     }
 
-    private bool TryResolveOrError(int group, int tab, out ConPtyTerminalSession? session, out string? errorJson)
+    private bool TryResolveOrError(int group, int tab, out ITerminalSession? session, out string? errorJson)
     {
         var groups = _groupsProvider();
         return CliTerminalIpcHelper.TryResolveSession(

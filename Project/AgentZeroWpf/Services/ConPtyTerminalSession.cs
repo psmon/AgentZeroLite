@@ -266,31 +266,9 @@ public sealed class ConPtyTerminalSession : ITerminalSession, IDisposable
             return;
         }
 
-        ReadOnlySpan<char> seq = control switch
-        {
-            TerminalControl.Interrupt => "\x03",
-            TerminalControl.Escape => "\x1b",
-            TerminalControl.Enter => "\r",
-            TerminalControl.Tab => "\t",
-            // ESC[Z is the standard xterm-style reverse-tab sequence — what
-            // VT220+ terminals emit for Shift+Tab. Claude Code uses it to
-            // cycle modes (auto-accept ↔ plan ↔ default); readline binds it
-            // to menu-complete-backward.
-            TerminalControl.BackTab => "\x1b[Z",
-            TerminalControl.Backspace => "\x7f",
-            TerminalControl.Space => " ",
-            TerminalControl.Delete => "\x1b[3~",
-            TerminalControl.Home => "\x1b[H",
-            TerminalControl.End => "\x1b[F",
-            TerminalControl.PageUp => "\x1b[5~",
-            TerminalControl.PageDown => "\x1b[6~",
-            TerminalControl.DownArrow => "\x1b[B",
-            TerminalControl.UpArrow => "\x1b[A",
-            TerminalControl.LeftArrow => "\x1b[D",
-            TerminalControl.RightArrow => "\x1b[C",
-            TerminalControl.ClearScreen => "\x1b[2J\x1b[H",
-            _ => "",
-        };
+        // Shared VT table — see TerminalControlSequences so ConPTY and the
+        // WebView/xterm.js backend stay byte-identical.
+        ReadOnlySpan<char> seq = Agent.Common.Services.TerminalControlSequences.ToSequence(control);
         if (seq.Length == 0) return;
 
         try

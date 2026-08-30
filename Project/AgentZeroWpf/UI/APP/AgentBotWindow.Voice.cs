@@ -1101,7 +1101,7 @@ public partial class AgentBotWindow
         // Match the existing `TrySendDelegationHandshake` style — let the
         // compiler resolve the Session type via the CliGroupInfo →
         // ConsoleTabInfo chain so we don't need an extra `using`.
-        AgentZeroWpf.Services.ConPtyTerminalSession? session = null;
+        Agent.Common.Services.ITerminalSession? session = null;
         try
         {
             var groups = _getGroups?.Invoke();

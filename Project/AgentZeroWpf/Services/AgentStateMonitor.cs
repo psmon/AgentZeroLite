@@ -84,7 +84,9 @@ public sealed class AgentStateMonitor
                     var tab = g.Tabs[ti];
                     if (!tab.IsTerminalStarted || tab.Session is null) continue;
 
-                    string key = (tab.Session as ConPtyTerminalSession)?.InternalId ?? $"{gi}:{ti}";
+                    // InternalId is on ITerminalSession, so this is backend-agnostic
+                    // (tab.Session is non-null — guarded on the line above).
+                    string key = tab.Session.InternalId;
                     live.Add(key);
 
                     string text;
