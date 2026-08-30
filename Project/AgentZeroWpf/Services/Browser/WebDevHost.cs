@@ -1048,8 +1048,14 @@ public sealed partial class WebDevHost : IZeroBrowser, IDisposable
 
     public void Dispose()
     {
+        // Drop the static settings-changed subscription first so the event can't
+        // pin this host alive or fire against a half-disposed instance.
+        Agent.Common.Music.MusicSettingsStore.Changed -= OnMusicSettingsChanged;
         try { TearDownNoteCaptureLocked(); } catch { }
         try { TearDownMusicLocked(); } catch { }
+        // TearDownMusicLocked keeps _musicClassifier across Start/Stop; host
+        // Dispose is the deterministic place to free its native ONNX session.
+        try { var mc = _musicClassifier; _musicClassifier = null; mc?.DisposeAsync().AsTask().GetAwaiter().GetResult(); } catch { }
         try { DisposeVision(); } catch { }
         try { DisposeMp3(); } catch { }
         // P1 (2026-07-15) — release the cached note-side diarizer's native ONNX

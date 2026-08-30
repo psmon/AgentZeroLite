@@ -383,6 +383,29 @@ public sealed class WebDevBridge
                 return await _noteHost!.ClassifyAsync(title, channel, cats);
             }
 
+            // ─── Agent Band YouTube playlist (B4) — SQLite-backed persistence ─
+            case "youtube.list":
+                EnsureNoteHost();
+                return await _noteHost!.YtListAsync();
+            case "youtube.upsert":
+            {
+                EnsureNoteHost();
+                string S(string k) => args?.TryGetProperty(k, out var e) == true && e.ValueKind == JsonValueKind.String
+                    ? e.GetString() ?? "" : "";
+                return await _noteHost!.YtUpsertAsync(
+                    S("videoId"), S("title"), S("author"), S("thumbnail"), S("category"), S("by"), S("url"));
+            }
+            case "youtube.remove":
+            {
+                EnsureNoteHost();
+                var vid = args?.TryGetProperty("videoId", out var e) == true && e.ValueKind == JsonValueKind.String
+                    ? e.GetString() ?? "" : "";
+                return await _noteHost!.YtRemoveAsync(TryGetInt(args, "id") ?? 0, vid);
+            }
+            case "youtube.clear":
+                EnsureNoteHost();
+                return await _noteHost!.YtClearAsync();
+
             // ─── Agent Band (M0028) — on-device vision (Florence-2 OD) ───
             // The frame is captured HERE (the bridge owns the plugin's
             // CoreWebView2) because the plugin's cross-origin YouTube iframe

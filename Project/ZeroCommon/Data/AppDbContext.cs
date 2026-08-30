@@ -24,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<OrchestrationTask> OrchestrationTasks => Set<OrchestrationTask>();
     public DbSet<OrchestrationDispatch> OrchestrationDispatches => Set<OrchestrationDispatch>();
     public DbSet<Automation> Automations => Set<Automation>();
+    public DbSet<YouTubePlaylistItem> YouTubePlaylistItems => Set<YouTubePlaylistItem>();
 
     private static readonly string _dbDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -91,6 +92,11 @@ public class AppDbContext : DbContext
         // Mp3Track (M0029) — FilePath is the rescan upsert key.
         mb.Entity<Mp3Track>()
             .HasIndex(t => t.FilePath)
+            .IsUnique();
+
+        // YouTubePlaylistItem (B4 / music-curator #29) — VideoId is the upsert key.
+        mb.Entity<YouTubePlaylistItem>()
+            .HasIndex(t => t.VideoId)
             .IsUnique();
 
         // DiffComment (W3) — comments fetched per review session, newest first.

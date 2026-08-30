@@ -1979,25 +1979,45 @@
   // ── Persistence (localStorage) ──────────────────────────────────────
   // The played list is kept per WebView origin so it survives app
   // restarts — the user's history is there next time they open the band.
-  function savePlaylist() {
-    try { localStorage.setItem(YT_STORE_KEY, JSON.stringify(ytPlaylist.slice(0, YT_STORE_MAX))); }
-    catch (_) { /* storage full / disabled — non-fatal */ }
+  // B4 (music-curator #29): the playlist now persists in the host SQLite DB
+  // (youtube.* ops) instead of localStorage, unifying the persistence layer
+  // with the MP3 library. Host round-trips are non-fatal — the in-memory
+  // ytPlaylist stays optimistic if a call fails (same stance as the old store).
+  function normalizeYt(p) {
+    return {
+      videoId: p.videoId, title: p.title || '', author: p.author || '',
+      thumbnail: p.thumbnail || '', category: p.category || '기타',
+      url: p.url || `https://www.youtube.com/watch?v=${p.videoId}`, by: p.by || 'keyword',
+    };
   }
-  function loadStoredPlaylist() {
+  async function loadStoredPlaylist() {
+    // One-time migration: drain any legacy localStorage store into the host DB,
+    // then remove it so this runs exactly once per machine.
     try {
-      const arr = JSON.parse(localStorage.getItem(YT_STORE_KEY) || '[]');
-      if (Array.isArray(arr)) {
-        for (const p of arr) {
-          if (p && typeof p.videoId === 'string' && /^[A-Za-z0-9_-]{11}$/.test(p.videoId)) {
-            ytPlaylist.push({
-              videoId: p.videoId, title: p.title || '', author: p.author || '',
-              thumbnail: p.thumbnail || '', category: p.category || '기타',
-              url: p.url || `https://www.youtube.com/watch?v=${p.videoId}`, by: p.by || 'keyword',
-            });
+      const legacy = localStorage.getItem(YT_STORE_KEY);
+      if (legacy) {
+        const arr = JSON.parse(legacy);
+        if (Array.isArray(arr)) {
+          for (const p of arr) {
+            if (p && typeof p.videoId === 'string' && /^[A-Za-z0-9_-]{11}$/.test(p.videoId)) {
+              try { await hostInvoke('youtube.upsert', normalizeYt(p)); } catch (_) { /* keep going */ }
+            }
           }
         }
+        localStorage.removeItem(YT_STORE_KEY);
       }
-    } catch (_) { /* corrupt store — start fresh */ }
+    } catch (_) { /* corrupt legacy store — ignore and move on */ }
+
+    // Load the canonical list from the host DB (newest first).
+    try {
+      const r = await hostInvoke('youtube.list', {});
+      ytPlaylist.length = 0;
+      if (r && r.ok && Array.isArray(r.items)) {
+        for (const it of r.items) {
+          if (it && typeof it.videoId === 'string') ytPlaylist.push(normalizeYt(it));
+        }
+      }
+    } catch (_) { /* host unavailable — start empty */ }
   }
 
   // Show/hide the top region. #yt-top is visible when media is loaded OR
@@ -2252,10 +2272,14 @@
   }
 
   function upsertPlaylist(item) {
+    // Move re-pasted videos to the front so the in-memory order matches the
+    // host's AddedAtUtc-desc ordering after its upsert bumps the row.
     const i = ytPlaylist.findIndex(p => p.videoId === item.videoId);
-    if (i >= 0) ytPlaylist[i] = item; else ytPlaylist.unshift(item);
+    if (i >= 0) ytPlaylist.splice(i, 1);
+    ytPlaylist.unshift(item);
     if (ytPlaylist.length > YT_STORE_MAX) ytPlaylist.length = YT_STORE_MAX;
-    savePlaylist();
+    // Persist to the host DB (dedupes by videoId + prunes to the cap). Non-fatal.
+    try { hostInvoke('youtube.upsert', item); } catch (_) { /* keep optimistic UI */ }
     renderPlaylist();
     updateTopVisibility();   // refresh the toggle's count badge
   }
@@ -2305,11 +2329,13 @@
     }
   }
 
-  function bindYouTube() {
-    loadStoredPlaylist();                       // restore history from localStorage
+  async function bindYouTube() {
+    // Bind interaction synchronously so paste works immediately…
     if (ytEls.paste)  ytEls.paste.addEventListener('click', onPasteYoutube);
     if (ytEls.url)    ytEls.url.addEventListener('keydown', e => { if (e.key === 'Enter') onPasteYoutube(); });
     if (ytEls.toggle) ytEls.toggle.addEventListener('click', togglePlaylist);
+    // …then hydrate from the host DB (+ one-time localStorage migration).
+    await loadStoredPlaylist();
     playlistOpen = ytPlaylist.length > 0;       // auto-open when there's saved history
     renderPlaylist();
     updateTopVisibility();
