@@ -44,11 +44,25 @@ public static class MusicSettingsStore
         }
     }
 
+    /// <summary>
+    /// Raised whenever the persisted music settings change (Save) or the model
+    /// file is replaced (download). Cached consumers — notably the live
+    /// classifier in <c>WebDevHost</c> — subscribe to drop an instance pinned to
+    /// the old model path (M0025 follow-up #12). Static, so it reaches every
+    /// consumer without a direct reference; consumers MUST unsubscribe on
+    /// dispose or the delegate pins them alive.
+    /// </summary>
+    public static event Action? Changed;
+
+    /// <summary>Raise <see cref="Changed"/> — for callers that alter the model on disk without going through <see cref="Save"/> (e.g. a model download).</summary>
+    public static void NotifyChanged() => Changed?.Invoke();
+
     public static void Save(MusicSettings settings)
     {
         var dir = Path.GetDirectoryName(FilePath)!;
         Directory.CreateDirectory(dir);
         File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOpts));
+        Changed?.Invoke();
     }
 
     /// <summary>Resolve <see cref="MusicSettings.ModelPath"/>, falling back to <see cref="DefaultModelPath"/>.</summary>

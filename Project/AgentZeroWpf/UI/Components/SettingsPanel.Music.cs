@@ -338,6 +338,10 @@ public partial class SettingsPanel
         // the next Test re-loads.
         try { _musicClassifier?.DisposeAsync().AsTask().Wait(500); } catch { }
         _musicClassifier = null;
+        // The download replaces the model file on disk without going through
+        // MusicSettingsStore.Save, so signal the host's cached classifier too
+        // (M0025 #12) — otherwise the live Agent Band keeps the old session.
+        MusicSettingsStore.NotifyChanged();
         RefreshMusicModelStatus();
         AppLogger.Log($"[Music] Download dialog closed | modelPresent={System.IO.File.Exists(MusicSettingsStore.DefaultModelPath)}");
     }

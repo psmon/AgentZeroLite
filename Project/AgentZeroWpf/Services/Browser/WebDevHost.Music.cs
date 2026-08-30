@@ -46,6 +46,11 @@ public sealed partial class WebDevHost
     private LoopbackCaptureService? _musicLoopback;
     private VoiceCaptureService? _musicMic;
     private OnnxAstClassifier? _musicClassifier;
+    // Set when music settings change (Save/download). The inference loop drops
+    // and rebuilds the classifier at a safe point so a new model path takes
+    // effect without a process restart (M0025 follow-up #12). Volatile: written
+    // from the settings-changed callback thread, read on the inference thread.
+    private volatile bool _musicClassifierStale;
     private CancellationTokenSource? _musicCts;
     private Task? _musicLoopTask;
     private readonly SpectrumBars _musicSpectrum = new();
@@ -66,6 +71,13 @@ public sealed partial class WebDevHost
     public event Action<float[]>? MusicSpectrum;
     private long _lastSpectrumEmit;
     private const int SpectrumEmitThrottleMs = 33; // ~30 Hz
+
+    public WebDevHost()
+    {
+        // Invalidate the cached AST classifier when music settings change so a
+        // new model path takes effect without a process restart (M0025 #12).
+        MusicSettingsStore.Changed += OnMusicSettingsChanged;
+    }
 
     public bool IsMusicLive =>
         _musicLoopback is { IsCapturing: true }
@@ -240,6 +252,15 @@ public sealed partial class WebDevHost
         MusicAmplitude?.Invoke(rms);
     }
 
+    /// <summary>
+    /// Reacts to a music-settings change: flags the cached classifier stale so
+    /// the inference loop rebuilds it against the new model path. Cheap and
+    /// thread-safe (just a volatile write) — the actual dispose/rebuild happens
+    /// on the inference thread inside the single-flight gate. Subscribed in the
+    /// WebDevHost ctor, unsubscribed in Dispose.
+    /// </summary>
+    private void OnMusicSettingsChanged() => _musicClassifierStale = true;
+
     private async Task MusicInferenceLoopAsync(MusicSettings settings, CancellationToken ct)
     {
         try
@@ -262,10 +283,35 @@ public sealed partial class WebDevHost
                 {
                     try
                     {
+                        // Settings changed since the classifier was built — rebuild
+                        // it here (single-flight gate held, so no ClassifyAsync is
+                        // in flight) with freshly-loaded settings so the new model
+                        // path takes effect. Disposing the old session frees the
+                        // ~347 MB ORT arena that previously leaked across restarts.
+                        if (_musicClassifierStale)
+                        {
+                            _musicClassifierStale = false;
+                            var old = _musicClassifier;
+                            _musicClassifier = null;
+                            try { if (old is not null) await old.DisposeAsync().ConfigureAwait(false); } catch { }
+                            settings = MusicSettingsStore.Load();
+                            var fresh = new OnnxAstClassifier(settings);
+                            if (await fresh.EnsureReadyAsync(null, ct).ConfigureAwait(false))
+                            {
+                                _musicClassifier = fresh;
+                                AppLogger.Log("[WebDev:Music] classifier invalidated → reloaded with new settings");
+                            }
+                            else
+                            {
+                                try { await fresh.DisposeAsync().ConfigureAwait(false); } catch { }
+                                AppLogger.Log("[WebDev:Music] classifier reload failed after settings change — will retry on next change");
+                            }
+                        }
+
                         byte[] snapshot;
                         lock (_musicRollingPcm) { snapshot = _musicRollingPcm.ToArray(); }
 
-                        if (snapshot.Length >= SpectrumBars.SampleRate * 2)
+                        if (_musicClassifier is not null && snapshot.Length >= SpectrumBars.SampleRate * 2)
                         {
                             var result = await _musicClassifier
                                 .ClassifyAsync(snapshot, _musicLiveTopK, ct)
