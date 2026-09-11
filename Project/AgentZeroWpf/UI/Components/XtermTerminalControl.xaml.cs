@@ -37,6 +37,10 @@ public partial class XtermTerminalControl : UserControl
     /// <see cref="WebViewXtermTerminalSession"/> wraps this.</summary>
     public ManagedConPtyHost? PtyHost => _host;
 
+    /// <summary>Renderer-reported column count (xterm fit addon). Feeds the
+    /// host-side link detector's soft-wrap heuristic.</summary>
+    public int Columns => _cols;
+
     public XtermTerminalControl()
     {
         InitializeComponent();
@@ -131,6 +135,13 @@ public partial class XtermTerminalControl : UserControl
                 case "resize":
                     ApplyResizeFromMessage(root);
                     _host?.Resize(_cols, _rows);
+                    break;
+                case "link":
+                    // Ctrl+click on a URL inside xterm.js (web-links addon /
+                    // OSC 8). Open in the user's default browser — scheme is
+                    // validated by the opener, never trust the page blindly.
+                    if (root.TryGetProperty("url", out var urlEl))
+                        ExternalLinkOpener.TryOpen(urlEl.GetString(), "xterm-click");
                     break;
             }
         }

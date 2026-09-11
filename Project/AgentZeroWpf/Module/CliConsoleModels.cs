@@ -66,6 +66,20 @@ public sealed class ConsoleTabInfo : IConsoleTabInfo
     // Travels with the doc, so it appears inside the floating window
     // automatically (the floating window hosts Document.Content).
     public Border? RedockStrip { get; set; }
+
+    // ── Link strip (terminal hyperlink detection) ──
+    // Row 0 of TerminalHost is a StackPanel holding every top strip (redock,
+    // link) so they never overlap and consume 0 px when collapsed. Lives
+    // ABOVE the terminal cell rather than over it, so the EasyConPty HwndHost
+    // can't punch through it (airspace).
+    public StackPanel? StripHost { get; set; }
+    // Watches this tab's session output for URLs (OAuth / device-login
+    // links). Rebuilt whenever the session is replaced (restart).
+    public TerminalLinkDetector? LinkDetector { get; set; }
+    public Border? LinkStrip { get; set; }
+    public TextBlock? LinkStripText { get; set; }
+    public string? LinkStripUrl { get; set; }
+    public System.Windows.Threading.DispatcherTimer? LinkStripHideTimer { get; set; }
 }
 
 public sealed class CliGroupInfo : ICliGroupInfo

@@ -35,10 +35,6 @@ public sealed class AgentEventStream : IDisposable
     private const int RecentBufferMaxLen = 4000;
     private bool _disposed;
 
-    private static readonly Regex UrlRegex = new(
-        @"https?://[^\s""'<>\]\)]+|localhost:\d{1,5}[^\s""'<>\]\)]*",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
     public event Action<AgentEvent>? EventReceived;
 
     public AgentEventStream(ITerminalSession session)
@@ -90,6 +86,7 @@ public sealed class AgentEventStream : IDisposable
         {
             AppLogger.Log("[EventStream] Approval fallback — skipping, likely false positive");
             _recentBuffer = "";
+            _urlScanOffset = 0;
             return;
         }
 
@@ -113,23 +110,24 @@ public sealed class AgentEventStream : IDisposable
         if (safeEnd < 0) safeEnd = _recentBuffer.LastIndexOf(' ');
         if (safeEnd <= _urlScanOffset) return;
 
-        var region = _recentBuffer[_urlScanOffset..safeEnd];
+        // Include the boundary '\n' so TerminalLinkScanner can see that a URL
+        // ends a full-width row (soft-wrap) and hold it until the next row lands.
+        var region = _recentBuffer[_urlScanOffset..(safeEnd + 1)];
+        var nextOffset = safeEnd + 1;
 
-        foreach (Match m in UrlRegex.Matches(region))
+        foreach (var link in TerminalLinkScanner.Scan(region, columns: null, final: false))
         {
-            var url = m.Value.TrimEnd('.', ',', ';', ':', '!', '?', ')', '\u2026');
-
-            // Skip truncated URLs (ending with ellipsis)
-            if (url.EndsWith("\u2026") || url.EndsWith("...")) continue;
-
-            // localhost without scheme → prepend http://
-            if (url.StartsWith("localhost", StringComparison.OrdinalIgnoreCase))
-                url = "http://" + url;
-
-            EventReceived?.Invoke(new UrlDetected(url, DateTimeOffset.UtcNow));
+            if (link.MayContinue)
+            {
+                // Wrapped URL whose continuation row hasn't arrived — rescan
+                // from its start on the next frame instead of emitting a stub.
+                nextOffset = Math.Min(nextOffset, _urlScanOffset + link.Start);
+                break;
+            }
+            EventReceived?.Invoke(new UrlDetected(link.Url, DateTimeOffset.UtcNow));
         }
 
-        _urlScanOffset = safeEnd;
+        _urlScanOffset = nextOffset;
     }
 
     public void Dispose()

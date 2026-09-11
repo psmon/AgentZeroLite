@@ -1737,6 +1737,7 @@ public partial class MainWindow : Window
             tab.LastBoundSessionId = tab.Session.SessionId;
             AppLogger.Log($"[Akka] Terminal actor bound: {groupName}/{tab.Title} session={tab.Session.SessionId}");
             WireHealthAlert(tab);
+            WireLinkDetector(tab);
         }
 
         try
@@ -1934,6 +1935,7 @@ public partial class MainWindow : Window
         tab.LastBoundSessionId = null;
         tab.LastBoundHwnd = 0;
         tab.HealthWired = false;
+        DisposeLinkDetector(tab);
 
         // 4) Hide banner immediately — UX feedback that the request was accepted.
         HideWedgeBanner(tab);
@@ -2454,8 +2456,13 @@ public partial class MainWindow : Window
         // Build the REDOCK strip — sits in row 0, collapsed until the tab floats.
         // Travels with doc.Content into floating windows automatically.
         newTab.RedockStrip = BuildRedockStrip(newTab);
-        Grid.SetRow(newTab.RedockStrip, 0);
-        termHost.Children.Add(newTab.RedockStrip);
+        // Row 0 hosts a vertical stack of strips (REDOCK, link detection) so
+        // they never overlap each other; each is Collapsed when idle (0 px).
+        var stripHost = new StackPanel { Orientation = System.Windows.Controls.Orientation.Vertical };
+        stripHost.Children.Add(newTab.RedockStrip);
+        newTab.StripHost = stripHost;
+        Grid.SetRow(stripHost, 0);
+        termHost.Children.Add(stripHost);
 
         _consoleTabs.Add(newTab);
         AppLogger.Log($"[CLI-Init-DIAG] ConsoleTabInfo created | title=\"{title}\" tabHash=#{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(newTab):X8} idx={idx}");
@@ -3347,6 +3354,7 @@ public partial class MainWindow : Window
         }
 
         // Cleanup session and terminal
+        DisposeLinkDetector(tab);
         (tab.Session as IDisposable)?.Dispose();
         tab.Session = null;
         if (tab.XtermTerminal is not null)
@@ -3499,6 +3507,7 @@ public partial class MainWindow : Window
         }
 
         // Cleanup session and terminal
+        DisposeLinkDetector(tab);
         (tab.Session as IDisposable)?.Dispose();
         tab.Session = null;
         if (tab.XtermTerminal is not null)

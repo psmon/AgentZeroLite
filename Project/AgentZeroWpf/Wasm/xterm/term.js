@@ -22,6 +22,25 @@
   var fit = new window.FitAddon.FitAddon();
   term.loadAddon(fit);
 
+  // Hyperlinks: Ctrl+click (or Cmd+click) on a URL asks the host to open it
+  // in the user's default browser. The host validates the scheme (http/https
+  // only) before shelling out. Plain click stays a focus/selection click so
+  // OAuth screens don't pop a browser on every stray click.
+  //   JS → host : { type: 'link', url }
+  function openLink(ev, uri) {
+    if (ev && !(ev.ctrlKey || ev.metaKey)) return;
+    post({ type: 'link', url: uri });
+  }
+  try {
+    // Bare URLs in output (OAuth / device-login links). The addon walks
+    // wrapped rows, so a URL broken across several lines is one link.
+    if (window.WebLinksAddon) {
+      term.loadAddon(new window.WebLinksAddon.WebLinksAddon(openLink));
+    }
+    // OSC 8 explicit hyperlinks (gh, cargo, modern CLIs).
+    term.options.linkHandler = { activate: openLink, allowNonHttpProtocols: false };
+  } catch (e) {}
+
   var host = document.getElementById('term');
   term.open(host);
   try { fit.fit(); } catch (e) {}
