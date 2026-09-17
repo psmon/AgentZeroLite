@@ -12,17 +12,17 @@ namespace AgentZeroWpf.UI.APP;
 /// <summary>
 /// Terminal hyperlink detection → "open in browser" strip.
 ///
-/// Why a strip and not clickable text: the default EasyConPty backend is the
-/// WPF <c>Microsoft.Terminal.Wpf.TerminalControl</c>, which (unlike Windows
-/// Terminal proper) has no hyperlink support at all — no OSC 8, no Ctrl+click.
-/// OAuth / device-login flows (claude, gh, az, gcloud) print a URL and wait, so
-/// we watch every tab's session output host-side with
-/// <see cref="TerminalLinkDetector"/> (works for BOTH backends, joins
-/// soft-wrapped URLs) and surface the latest link in a strip above the
-/// terminal. Above, not over: the HwndHost would punch through an overlay.
-/// The WebView xterm backend additionally gets Ctrl+click via its web-links
-/// addon (see <c>Wasm/xterm/term.js</c>) — both paths end in
+/// Why a strip as well as clickable text: the terminal renders OSC 8 and bare
+/// URLs as Ctrl+click links through xterm.js's web-links addon, but OAuth /
+/// device-login flows (claude, gh, az, gcloud) print a URL and then wait, and the
+/// link is easy to miss in a busy scrollback. So every tab's session output is also
+/// watched host-side by <see cref="TerminalLinkDetector"/> (which joins
+/// soft-wrapped URLs) and the latest link is surfaced in a strip. Both paths end in
 /// <see cref="ExternalLinkOpener"/>.
+///
+/// <para>The strip used to sit <i>above</i> the terminal rather than over it,
+/// because the HwndHost-based control it replaced would punch through any overlay.
+/// That constraint is gone.</para>
 /// </summary>
 public partial class MainWindow
 {

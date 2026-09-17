@@ -1,5 +1,4 @@
 using AgentZeroWpf.Services;
-using EasyWindowsTerminalControl;
 
 namespace AgentZeroWpf.Module;
 
@@ -15,45 +14,18 @@ internal static class CliSessionAccessHelper
         return $"{group!.DisplayName} / {tab!.Title}";
     }
 
+    /// <summary>
+    /// The active tab's session, or null when it has none yet.
+    ///
+    /// <para>This used to create the session on demand: the EasyConPty control
+    /// produced its PTY asynchronously, so a tab could exist with no session behind
+    /// it and every caller had to be able to conjure one. The xterm backend creates
+    /// the session in the same breath as the pseudo-console, so "no session" now
+    /// means exactly "not started yet" and there is nothing to conjure.</para>
+    /// </summary>
     public static ITerminalSession? GetActiveSession(
-        IReadOnlyList<CliGroupInfo> groups,
-        int activeGroupIndex,
-        Action<ConsoleTabInfo, EasyTerminalControl?, string> ensureSession)
-    {
-        if (!TryGetActiveTab(groups, activeGroupIndex, out var group, out var tab))
-            return null;
-
-        if (tab!.Session is null)
-            ensureSession(tab, tab.Terminal, group!.DisplayName);
-
-        return tab.Session;
-    }
-
-    public static void EnsureSession(ConsoleTabInfo tab, EasyTerminalControl? terminal, string groupName)
-    {
-        if (tab.Session is not null)
-            return;
-
-        if (terminal?.ConPTYTerm is null)
-        {
-            AppLogger.Log($"[CLI] Session skip: terminal/ConPTYTerm null for {groupName}/{tab.Title}");
-            return;
-        }
-
-        if (terminal.ConPTYTerm.ConsoleOutputLog is null)
-        {
-            var ptyHashPending = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
-            AppLogger.Log($"[CLI] Session pending: output log not ready yet | label={groupName}/{tab.Title} pty_ref=0x{ptyHashPending:X8}");
-            return;
-        }
-
-        var sessionId = $"{groupName}/{tab.Title}";
-        var session = new ConPtyTerminalSession(terminal.ConPTYTerm, sessionId);
-        tab.Session = session;
-        var ptyHash = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
-        var outputLen = terminal.ConPTYTerm.ConsoleOutputLog?.Length ?? -1;
-        AppLogger.Log($"[CLI] Session created (lazy) | label={sessionId} id={session.InternalId} pty_ref=0x{ptyHash:X8} output_len={outputLen}");
-    }
+        IReadOnlyList<CliGroupInfo> groups, int activeGroupIndex)
+        => TryGetActiveTab(groups, activeGroupIndex, out _, out var tab) ? tab!.Session : null;
 
     private static bool TryGetActiveTab(
         IReadOnlyList<CliGroupInfo> groups,

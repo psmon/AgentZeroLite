@@ -7,7 +7,6 @@ using Agent.Common.Services;
 using AgentZeroWpf.Services;
 using AgentZeroWpf.UI.Components;
 using AvalonDock.Layout;
-using EasyWindowsTerminalControl;
 
 namespace AgentZeroWpf.Module;
 
@@ -15,13 +14,11 @@ public sealed class ConsoleTabInfo : IConsoleTabInfo
 {
     public string Title { get; set; } = "";
 
-    // ── Terminal backend controls (exactly one is non-null per tab) ──
-    // EasyConPty backend → Terminal; WebViewXterm backend → XtermTerminal.
-    // TerminalVisual gives backend-agnostic access to the hosting Visual
-    // (used for the per-tab HWND lookup in terminal-list IPC).
-    public EasyTerminalControl? Terminal { get; set; }
     public XtermTerminalControl? XtermTerminal { get; set; }
-    public FrameworkElement? TerminalVisual => (FrameworkElement?)Terminal ?? XtermTerminal;
+
+    /// <summary>The Visual hosting this tab's terminal — used for the per-tab HWND
+    /// lookup in terminal-list IPC.</summary>
+    public FrameworkElement? TerminalVisual => XtermTerminal;
     public LayoutDocument Document { get; set; } = null!;
     public Grid TerminalHost { get; set; } = null!;
     public int CliDefinitionId { get; init; }
@@ -39,6 +36,13 @@ public sealed class ConsoleTabInfo : IConsoleTabInfo
     /// </summary>
     public string? EncryptedPasswordForLaunch { get; init; }
     public ITerminalSession? Session { get; set; }
+
+    // What this tab was launched with. Kept so the terminal can be recreated in
+    // place — wedge recovery and the context-menu restart both need to build the
+    // same child again, and the EasyConPty control used to own that (RestartTerm)
+    // where now nothing else does.
+    public string? LaunchCommandLine { get; set; }
+    public string? LaunchWorkingDir { get; set; }
 
     /// <summary>
     /// Last time this session was touched (created, activated, or terminal init).

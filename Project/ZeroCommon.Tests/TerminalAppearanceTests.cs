@@ -18,19 +18,8 @@ public class TerminalAppearanceTests
         Assert.StartsWith("JetBrains Mono", s.EffectiveFontFamily);
         Assert.Equal(14, s.EffectiveFontSize);
         Assert.Equal(TerminalThemeCatalog.DefaultName, s.ThemeName);
-        Assert.Equal(TerminalBackend.WebViewXterm, s.EffectiveBackend);
     }
 
-    /// <summary>One terminal: a settings file naming the old backend still loads,
-    /// and still gets the one that exists.</summary>
-    [Theory]
-    [InlineData(TerminalBackend.EasyConPty)]
-    [InlineData(TerminalBackend.WebViewXterm)]
-    public void EffectiveBackend_IsAlwaysTheOneBackend(TerminalBackend stored)
-    {
-        Assert.Equal(TerminalBackend.WebViewXterm,
-            new TerminalSettings { Backend = stored }.EffectiveBackend);
-    }
 
     // ── font ──
 

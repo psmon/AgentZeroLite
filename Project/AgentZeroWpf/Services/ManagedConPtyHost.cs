@@ -12,10 +12,10 @@ namespace AgentZeroWpf.Services;
 /// (decoded to UTF-16 text, ANSI/VT preserved) plus a stdin write channel and a
 /// resize call.
 ///
-/// This is the low layer of the <c>WebViewXterm</c> terminal backend — the piece
-/// that <c>EasyWindowsTerminalControl</c>'s <c>TermPTY</c> hid inside a closed
-/// NuGet. Because it is pure Win32 P/Invoke it lives WPF-side (ZeroCommon must
-/// stay Win32-free), alongside <see cref="ConPtyTerminalSession"/>.
+/// The low layer of the terminal: the piece that used to be hidden inside a closed
+/// third-party NuGet, now ours. Pure Win32 P/Invoke against kernel32 (CreatePseudoConsole
+/// has been there since Windows 10 1809), so the app ships no native terminal DLLs at
+/// all. It lives WPF-side because ZeroCommon must stay Win32-free.
 ///
 /// Ownership: <see cref="WebViewXtermTerminalSession"/> feeds <see cref="Output"/>
 /// into two sinks — the xterm.js renderer AND an accumulated console log that
@@ -97,16 +97,35 @@ public sealed class ManagedConPtyHost : IDisposable
             startupInfo.StartupInfo.cb = Marshal.SizeOf<Native.STARTUPINFOEX>();
             startupInfo.lpAttributeList = _attrList;
 
+            // The child's environment is built, not inherited. Passing IntPtr.Zero
+            // here hands it whatever launched the GUI — which is how NO_COLOR=1 from
+            // an IDE terminal ended up switching colour off in every tab. See
+            // TerminalEnvironment for what is dropped and why; CREATE_UNICODE_ENVIRONMENT
+            // is required because the block below is UTF-16.
+            var envBlock = Agent.Common.Services.TerminalEnvironment.ToBlock(
+                Agent.Common.Services.TerminalEnvironment.Build());
+            var envPtr = Marshal.StringToHGlobalUni(envBlock);
+
             // CreateProcess mutates lpCommandLine — hand it a private mutable buffer.
             var cmdBuffer = new StringBuilder(commandLine);
-            bool ok = Native.CreateProcess(
-                null, cmdBuffer, IntPtr.Zero, IntPtr.Zero,
-                bInheritHandles: false,
-                dwCreationFlags: Native.EXTENDED_STARTUPINFO_PRESENT,
-                lpEnvironment: IntPtr.Zero,
-                lpCurrentDirectory: workingDir,
-                ref startupInfo,
-                out var procInfo);
+            bool ok;
+            Native.PROCESS_INFORMATION procInfo;
+            try
+            {
+                ok = Native.CreateProcess(
+                    null, cmdBuffer, IntPtr.Zero, IntPtr.Zero,
+                    bInheritHandles: false,
+                    dwCreationFlags: Native.EXTENDED_STARTUPINFO_PRESENT
+                                     | Native.CREATE_UNICODE_ENVIRONMENT,
+                    lpEnvironment: envPtr,
+                    lpCurrentDirectory: workingDir,
+                    ref startupInfo,
+                    out procInfo);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(envPtr);
+            }
             Diagnostics += $" | CreateProcess ok={ok} pid={procInfo.dwProcessId} lastErr={Marshal.GetLastWin32Error()}";
             if (!ok)
                 throw new InvalidOperationException($"CreateProcess failed: {Marshal.GetLastWin32Error()}");
@@ -238,6 +257,7 @@ public sealed class ManagedConPtyHost : IDisposable
     //    marshal more cleanly here than via source-generated LibraryImport) ──
     private static class Native
     {
+        public const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
         public const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
         public const int PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = 0x00020016;
 

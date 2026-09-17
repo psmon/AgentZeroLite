@@ -42,7 +42,7 @@ public sealed class FakeTerminalSession : ITerminalSession
     public void NoteInputAttempt(string source) => InputAttempts.Add(source);
     public TerminalHealthState HealthState { get; set; } = TerminalHealthState.Alive;
 
-    /// <summary>Append to the buffer and fire an output frame, as ConPtyTerminalSession does.</summary>
+    /// <summary>Append to the buffer and fire an output frame, as the real session does.</summary>
     public void RaiseOutput(string text)
     {
         _log.Append(text);
