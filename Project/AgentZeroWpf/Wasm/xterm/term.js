@@ -21,7 +21,9 @@
     fontFamily: 'JetBrains Mono, Cascadia Mono, Consolas, monospace',
     fontSize: 14,
     lineHeight: 1.0,
-    cursorBlink: true,
+    // Not forced on: DECSCUSR from the running program decides, so a TUI that
+    // asks for a steady cursor gets one. Overridable from TerminalSettings.
+    cursorBlink: false,
     allowProposedApi: true,
     // scrollback kept generous so screen-scrapers (approval parser, state
     // monitor) see enough history even though they read the host-side log.
@@ -39,6 +41,7 @@
       if (cfg.fontSize) term.options.fontSize = cfg.fontSize;
       if (cfg.lineHeight) term.options.lineHeight = cfg.lineHeight;
       if (cfg.theme) term.options.theme = cfg.theme;
+      if (typeof cfg.cursorBlink === 'boolean') term.options.cursorBlink = cfg.cursorBlink;
     } catch (e) {}
     afterFonts(function () { doFit(); reportFont(); });
   }

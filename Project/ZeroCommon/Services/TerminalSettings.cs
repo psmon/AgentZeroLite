@@ -70,6 +70,14 @@ public sealed class TerminalSettings
 
     /// <summary>The stored palette. Used verbatim when <see cref="ThemeName"/> is
     /// <c>Custom</c> or names a preset this build does not know.</summary>
+    /// <summary>
+    /// Force the cursor to blink regardless of what the program in the terminal
+    /// asks for. Off, so DECSCUSR wins: a TUI that draws its own cursor and requests
+    /// a steady one gets a steady one. Forcing this on made the cursor blink under
+    /// applications that had explicitly asked it not to.
+    /// </summary>
+    public bool CursorBlink { get; set; } = false;
+
     public TerminalTheme Theme { get; set; } = new();
 
     /// <summary>The palette actually applied.</summary>

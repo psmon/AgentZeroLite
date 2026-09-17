@@ -205,6 +205,7 @@ public partial class XtermTerminalControl : UserControl
                 fontFamily = s.EffectiveFontFamily,
                 fontSize = s.EffectiveFontSize,
                 lineHeight = s.EffectiveLineHeight,
+                cursorBlink = s.CursorBlink,
                 theme = new
                 {
                     background = t.Background,

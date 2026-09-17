@@ -3609,15 +3609,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // Float windows we've already detached from Owner. ConditionalWeakTable
-    // so closing a float window doesn't leak. Without this guard the
-    // OnLayoutRootUpdated handler unsets Owner every layout tick — and
-    // Owner changes themselves cause focus events that retrigger
-    // Layout.Updated, producing a focus ping-pong between the float and
-    // the main window's tab in the same pane.
-    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, object>
-        _processedFloatOwners = new();
-
     private void OnLayoutRootUpdated(object? sender, EventArgs e)
     {
         // Fix floating window Owner ONCE per window to prevent parent-blocking
@@ -3637,23 +3628,21 @@ public partial class MainWindow : Window
         {
             try
             {
-                // Fix floating windows: unset Owner exactly once per window.
-                var floats = dockManager.FloatingWindows?.ToArray();
-                if (floats is not null)
-                {
-                    foreach (var fw in floats)
-                    {
-                        if (fw is null) continue;
-                        if (_processedFloatOwners.TryGetValue(fw, out _)) continue;
-                        _processedFloatOwners.Add(fw, new object());
-                        if (fw.Owner is not null)
-                        {
-                            fw.Owner = null;
-                            fw.ShowInTaskbar = true;
-                            AppLogger.Log($"[Dock] Float owner unset | title=\"{fw.Title}\"");
-                        }
-                    }
-                }
+                // Floating windows are left exactly as AvalonDock made them.
+                //
+                // This used to unset Owner and turn ShowInTaskbar on, once per window,
+                // from here — which is to say in the middle of the float operation,
+                // while the layout was still settling. Both are disruptive in WPF:
+                // clearing Owner turns a window that was pinned above its parent into
+                // an ordinary top-level one that can fall behind the main window, and
+                // assigning ShowInTaskbar destroys and recreates the window's HWND,
+                // which loses activation and flashes. Detaching a terminal and watching
+                // it drop behind the app, or the foreground bouncing, was this.
+                //
+                // Keeping the owner is also the behaviour you want from a detached
+                // terminal: it stays above the window it came from. If taskbar
+                // presence is wanted it belongs at window creation, deliberately, not
+                // as a reaction to a layout update.
 
                 // Per-tab REDOCK strip lives inside the tab's content (row 0 of
                 // TerminalHost) and travels with the tab into floating windows.
