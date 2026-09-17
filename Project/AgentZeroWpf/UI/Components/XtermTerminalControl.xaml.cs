@@ -41,6 +41,18 @@ public partial class XtermTerminalControl : UserControl
     /// host-side link detector's soft-wrap heuristic.</summary>
     public int Columns => _cols;
 
+    /// <summary>
+    /// Where the renderer's viewport snapshots go. The session is created after
+    /// this control (see MainWindow.InitializeWebViewTerminal), so snapshots that
+    /// arrive before then are simply dropped - the session falls back to the tail
+    /// of the stream until the next one lands, 250 ms later at worst.
+    /// </summary>
+    public WebViewXtermTerminalSession? Session { get; set; }
+
+    /// <summary>Log the first snapshot only — after that they arrive every 250 ms
+    /// while output flows, and the interesting question is whether any arrive at all.</summary>
+    private bool _screenSeen;
+
     public XtermTerminalControl()
     {
         InitializeComponent();
@@ -135,6 +147,19 @@ public partial class XtermTerminalControl : UserControl
                 case "resize":
                     ApplyResizeFromMessage(root);
                     _host?.Resize(_cols, _rows);
+                    break;
+                case "screen":
+                    // The renderer is the terminal emulator, so it is the only thing
+                    // that knows what is on screen. See TerminalConsoleBuffer for why
+                    // that is not the same question as "what came out of the pipe".
+                    var screen = root.TryGetProperty("data", out var scr) ? scr.GetString() : null;
+                    Session?.SetScreenSnapshot(screen);
+                    if (!_screenSeen)
+                    {
+                        _screenSeen = true;
+                        AppLogger.Log($"[Xterm] first viewport snapshot | chars={screen?.Length ?? 0} " +
+                                      $"bound={(Session is null ? "no session yet" : "session")}");
+                    }
                     break;
                 case "link":
                     // Ctrl+click on a URL inside xterm.js (web-links addon /

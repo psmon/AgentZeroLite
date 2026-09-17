@@ -2821,7 +2821,11 @@ public partial class MainWindow : Window
             tab.IsTerminalStarted = true;
 
             var sessionId = $"{groupName}/{tab.Title}";
-            tab.Session = new AgentZeroWpf.Services.WebViewXtermTerminalSession(host, sessionId);
+            var session = new AgentZeroWpf.Services.WebViewXtermTerminalSession(host, sessionId);
+            tab.Session = session;
+            // The renderer's viewport snapshots land on the control; route them to
+            // the session so GetConsoleText() means "the screen" on this backend too.
+            control.Session = session;
             BindSessionToActors(tab, control, groupName);
             AppLogger.Log($"[Xterm] WebView terminal started | label={sessionId} cmd={cmdLine}");
         };

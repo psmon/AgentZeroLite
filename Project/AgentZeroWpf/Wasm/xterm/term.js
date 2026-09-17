@@ -4,9 +4,10 @@
 //   host → JS : { type: 'out', data }  write VT to the screen
 //               { type: 'clear' }       clear the viewport
 //               { type: 'focus' }       focus the terminal
-//   JS → host : { type: 'ready', cols, rows }   renderer initialised
-//               { type: 'in',    data }          user keystrokes / paste
-//               { type: 'resize', cols, rows }   viewport reflowed
+//   JS → host : { type: 'ready',  cols, rows }  renderer initialised
+//               { type: 'in',     data }        user keystrokes / paste
+//               { type: 'resize', cols, rows }  viewport reflowed
+//               { type: 'screen', data }        the visible viewport, debounced
 (function () {
   var term = new window.Terminal({
     fontFamily: 'Cascadia Mono, Consolas, monospace',
@@ -53,9 +54,35 @@
   // workaround needed).
   term.onData(function (d) { post({ type: 'in', data: d }); });
 
+  // The host keeps the raw VT stream but has no emulator, so it cannot answer
+  // "what is on the screen" - which is what the approval parser, the agent-state
+  // monitor and the bot's context all actually ask for. We are the emulator, so we
+  // tell it. Debounced because output arrives in bursts and only the settled screen
+  // is interesting; 250 ms is well inside the state monitor's poll interval.
+  var NL = String.fromCharCode(10);
+  var screenTimer = null;
+  function postScreen() {
+    screenTimer = null;
+    try {
+      var buf = term.buffer.active;
+      var rows = [];
+      for (var y = 0; y < term.rows; y++) {
+        var line = buf.getLine(buf.viewportY + y);
+        rows.push(line ? line.translateToString(true) : '');
+      }
+      while (rows.length && rows[rows.length - 1] === '') rows.pop();
+      post({ type: 'screen', data: rows.join(NL) });
+    } catch (e) {}
+  }
+  function scheduleScreen() {
+    if (screenTimer) return;                 // coalesce the burst, do not restart it
+    screenTimer = setTimeout(postScreen, 250);
+  }
+
   function doFit() {
     try { fit.fit(); } catch (e) {}
     post({ type: 'resize', cols: term.cols, rows: term.rows });
+    scheduleScreen();                        // a reflow changes what is visible
   }
   if (window.ResizeObserver) { new ResizeObserver(doFit).observe(host); }
   window.addEventListener('resize', doFit);
@@ -64,8 +91,8 @@
     wv.addEventListener('message', function (e) {
       var m = e.data;
       if (!m || !m.type) return;
-      if (m.type === 'out') { term.write(m.data); }
-      else if (m.type === 'clear') { term.clear(); }
+      if (m.type === 'out') { term.write(m.data, scheduleScreen); }
+      else if (m.type === 'clear') { term.clear(); scheduleScreen(); }
       else if (m.type === 'focus') { term.focus(); }
     });
   }

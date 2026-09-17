@@ -1,4 +1,3 @@
-using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using Agent.Common.Services;
@@ -10,13 +9,16 @@ namespace AgentZeroWpf.Services;
 /// by xterm.js in a WebView2. The modern-terminal-spike counterpart to
 /// <see cref="ConPtyTerminalSession"/>.
 ///
-/// It owns the accumulated console log (the host hands us the raw VT stream), so
-/// <see cref="OutputLength"/>/<see cref="ReadOutput"/>/<see cref="GetConsoleText"/>
-/// reproduce the shape the approval parser + AgentEventStream already consume —
-/// no changes needed in those consumers. Control-key, submit-timing, backpressure
-/// and health-state semantics mirror <see cref="ConPtyTerminalSession"/> exactly so
-/// both backends behave identically through the interface. VT sequences come from
-/// the shared <see cref="TerminalControlSequences"/> table.
+/// Output goes through <see cref="TerminalConsoleBuffer"/>, which draws the line
+/// this class originally blurred: the raw stream answers
+/// <see cref="OutputLength"/>/<see cref="ReadOutput"/>, and <see cref="GetConsoleText"/>
+/// answers "what is on the screen". Only the emulator knows the latter, and here the
+/// emulator is xterm.js in the renderer — so the renderer pushes a viewport snapshot
+/// (see <c>Wasm/xterm/term.js</c>) and this class serves the last one. Control-key,
+/// submit-timing, backpressure and health-state semantics mirror
+/// <see cref="ConPtyTerminalSession"/> exactly so both backends behave identically
+/// through the interface. VT sequences come from the shared
+/// <see cref="TerminalControlSequences"/> table.
 /// </summary>
 public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
 {
@@ -24,9 +26,8 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
     private readonly string _sessionId;
     private readonly string _internalId;
 
-    // Accumulated raw VT output (mirrors TermPTY.ConsoleOutputLog).
-    private readonly StringBuilder _consoleLog = new();
-    private readonly object _logSync = new();
+    // Raw VT stream + the renderer's last reported viewport.
+    private readonly TerminalConsoleBuffer _console = new();
 
     private readonly Channel<ReadOnlyMemory<char>> _writeChannel;
     private readonly Task _writeLoopTask;
@@ -61,35 +62,31 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
 
     public event Action<TerminalOutputFrame>? OutputReceived;
 
+    /// <summary>
+    /// The renderer's viewport, pushed here by <c>XtermTerminalControl</c> whenever
+    /// the screen settles. Before the first push <see cref="GetConsoleText"/> falls
+    /// back to the tail of the stream.
+    /// </summary>
+    public void SetScreenSnapshot(string? screen) => _console.SetScreenSnapshot(screen);
+
     public int OutputLength
     {
-        get { lock (_logSync) return _consoleLog.Length; }
+        get { return _console.Length; }
     }
 
-    public string ReadOutput(int start, int length)
-    {
-        lock (_logSync)
-        {
-            if (length <= 0 || start < 0 || start >= _consoleLog.Length) return "";
-            var safeLength = Math.Min(length, _consoleLog.Length - start);
-            return safeLength > 0 ? _consoleLog.ToString(start, safeLength) : "";
-        }
-    }
+    public string ReadOutput(int start, int length) => _console.Read(start, length);
 
-    public string GetConsoleText()
-    {
-        // The full accumulated VT transcript. Consumers (ApprovalParser,
-        // AgentStateMonitor) strip ANSI themselves. NOTE (spike parity): the
-        // ConPTY backend returns only the *visible screen*; here we return the
-        // whole history. A SerializeAddon-based visible-screen snapshot is a
-        // documented follow-up refinement.
-        lock (_logSync) return _consoleLog.ToString();
-    }
+    /// <summary>
+    /// What is on the screen — the renderer's viewport, same as the ConPTY backend's
+    /// <c>TermPTY.GetConsoleText(true)</c>. Consumers (ApprovalParser,
+    /// AgentStateMonitor) strip ANSI themselves.
+    /// </summary>
+    public string GetConsoleText() => _console.GetConsoleText();
 
     private void OnHostOutput(string chunk)
     {
         if (_disposed || string.IsNullOrEmpty(chunk)) return;
-        lock (_logSync) _consoleLog.Append(chunk);
+        _console.Append(chunk);
 
         // Per-subscriber isolation — one bad consumer can't starve the others
         // (mirrors ConPtyTerminalSession.CheckOutputChanged).
