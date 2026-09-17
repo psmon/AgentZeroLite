@@ -118,11 +118,50 @@ ASSOCIATE 를 보내려 하는데, 센트럴(호스트)의 TX notify 구독은 1
 - **Claude 스킬 활용도: 1/5** — 스킬 없이 직접 수행.
 - **하네스 성숙도: L3+ 유지** — 기기 레인이 실제로 작동함을 확인.
 
-## 다음 단계 제안
+## 후속 진행 (같은 세션, 01:37~01:41) — 둘 다 완료
 
-1. **형제 저장소 이슈로 이관** — AskBot 이 TX notify 구독 완료를 기다린 뒤 ASSOCIATE 를
-   보내도록. 현재는 링크-업 즉시 시도한다
-2. 플래시 사이클은 아직 미수행. 수행하면 호스트 재기동이 **와치 재부팅과 같은 재접속 경로**를
-   타므로 2026-09-18 재접속 수정분의 회귀 검증이 같이 된다
-3. knowledge §3-A 는 실측 검증 완료. §3-B(arduino-cli 경로)는 해당 보드가 미연결이라
-   여전히 문서 기반 — 다음 기회에 검증
+### 1. 플래시 사이클 → 재접속 회귀 **통과**
+
+`idf.py -p COM7 flash` (3.7 MB, hash verified, hard reset) 로 기기를 리부트시키고
+호스트를 올렸다 — 사용자가 원래 보고한 "기기 리부트 후 재접속" 그 시나리오다.
+
+```
+01:37:34.647 connecting to 288485905F92 (claude-hud, Public)
+01:37:36.441 connected: claude-hud [288485905F92] mtu=512
+01:37:36.445 said hello as chat-app     01:37:40.598 said hello as askbot
+```
+
+스캔 실패 0 · 드롭 0 · 세 앱 전부 복구. **MTU 는 재접속에서도 512** — 2026-09-18
+수정 당시 세웠던 "재부팅 후 MTU 강등" 가설은 **이 환경에서 재현되지 않는다**.
+(UTF-8 경계 수정 자체는 512에서도 유효 — 한글 3바이트는 509 청크 경계에서도 갈린다.)
+
+### 2. ASSOCIATE 레이스 — 형제 저장소에서 수정하고 실측 검증
+
+이관만 하지 않고 `psmon/Arduino` 에 직접 수정했다 (사용자 요청: 크로스 협업).
+
+원인은 `askbot_ble_stream.cpp` 의 `BleStream::Connect` 가 `bleConnected()` 만 기다린 것.
+**바로 위 주석은 이미 올바른 조건을 말하고 있었다** — *"connected **and subscribed**"* —
+코드가 그 절반만 구현한 상태였다. `bleNotify`/`bleSendLine` 은 이미 `s_txSubscribed` 를
+확인하고 있었고, 게이트가 없던 곳은 터널을 여는 쪽뿐이었다.
+
+수정 커밋: `psmon/Arduino@17050d0` — 4파일 (`hud_transport.hpp` 에 `bleSubscribed()`
+공개, `hud_ble.cpp` 에 1줄 구현, `askbot_ble_stream.cpp` 가 그걸 기다림, + 그쪽
+하네스 로그). **그 레포의 커밋 안 된 작업 9건은 건드리지 않았다.**
+
+같은 보드에 플래시 후 실측:
+
+| 지표 | 전 | 후 |
+|---|---|---|
+| central connected → associated | 5574 ms | **1547 ms** |
+| 실패한 ASSOCIATE | 접속당 1건 | **0건** |
+| 호스트측 connected → tunnel open | 3993 ms | **5 ms** |
+
+## 남은 제안
+
+1. knowledge §3-A(ESP-IDF)는 이제 빌드·플래시·모니터 전구간 실측 검증 완료.
+   §3-B(arduino-cli)는 해당 보드 미연결로 여전히 문서 기반
+2. 형제 저장소 제안으로 남김: `PROTOCOL.md` 에 "센트럴은 CCCD write 전까지
+   수신하지 않는다"를 계약으로 명시 — 지금은 암묵적이라 다른 송신 경로에서
+   같은 실수가 반복될 수 있다
+3. 이 결함은 **한쪽 로그만으로는 보이지 않았다.** device-smith Step 4(양쪽 동시 캐처)가
+   없었으면 호스트 로그의 "tunnel open, 4초 뒤"에서 멈췄을 것이다
