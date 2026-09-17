@@ -7,6 +7,16 @@ public class CliDefinition
     public string ExePath { get; set; } = "";
     public string? Arguments { get; set; }
     public bool IsBuiltIn { get; set; }
+
+    /// <summary>
+    /// Ask this CLI to stop animating. Some agent TUIs decorate their prompt — Codex
+    /// shimmers it on certain models — and on a terminal that repaints continuously
+    /// it is distracting. The flag differs per CLI and most have none, so
+    /// <see cref="Agent.Common.Module.ReducedMotionArguments"/> resolves it and adds
+    /// nothing when there is nothing to add: ticking this can never produce a tab
+    /// that refuses to start.
+    /// </summary>
+    public bool ReducedMotion { get; set; }
     public int SortOrder { get; set; }
 
     // ── Remote Shell (M0021) ──

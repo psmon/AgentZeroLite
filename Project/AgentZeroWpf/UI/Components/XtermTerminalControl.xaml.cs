@@ -77,7 +77,8 @@ public partial class XtermTerminalControl : UserControl
                 VirtualHost, assetsRoot, CoreWebView2HostResourceAccessKind.Allow);
 
             Web.CoreWebView2.WebMessageReceived += OnWebMessage;
-            Web.CoreWebView2.Navigate($"https://{VirtualHost}/index.html");
+            var webgl = TerminalSettingsStore.Load().UseWebGlRenderer ? "?webgl=1" : "";
+            Web.CoreWebView2.Navigate($"https://{VirtualHost}/index.html{webgl}");
         }
         catch (Exception ex)
         {
@@ -107,6 +108,22 @@ public partial class XtermTerminalControl : UserControl
         return _host;
     }
 
+    /// <summary>
+    /// Synchronized output (DEC 2026), held here because xterm.js does not implement
+    /// it. An Ink TUI wraps each repaint in it to say "do not show the middle of
+    /// this"; without it the clear, the home and the redraw each reach the screen
+    /// separately and the cursor is visibly somewhere new every time.
+    /// </summary>
+    private readonly Agent.Common.Services.SynchronizedOutputBuffer _sync = new();
+
+    /// <summary>
+    /// A frame that never closes must not freeze the terminal. Real terminals give
+    /// up after a beat; so does this.
+    /// </summary>
+    private bool _syncReported;
+    private System.Windows.Threading.DispatcherTimer? _syncTimeout;
+    private static readonly TimeSpan SyncFrameTimeout = TimeSpan.FromMilliseconds(150);
+
     // ConPTY output → xterm.js. Runs on the host read thread → marshal to UI
     // (CoreWebView2 is STA-bound). Buffer until the renderer is ready.
     private void OnHostOutput(string chunk)
@@ -114,16 +131,57 @@ public partial class XtermTerminalControl : UserControl
         if (string.IsNullOrEmpty(chunk)) return;
         Dispatcher.BeginInvoke(new Action(() =>
         {
+            // One frame in, one write out — the renderer then paints it once.
+            var ready = _sync.Append(chunk);
+            ArmSyncTimeout(_sync.IsBuffering);
+
+            // Logged once: does this program actually use synchronized output? "The
+            // cursor still wanders" has two very different answers depending.
+            if (!_syncReported && _sync.FramesCoalesced > 0)
+            {
+                _syncReported = true;
+                AppLogger.Log("[Xterm] synchronized output in use (DEC 2026) — frames are coalesced");
+            }
+            if (ready.Length == 0) return;
+
             lock (_pendingSync)
             {
                 if (!_webReady)
                 {
-                    _pendingOutput.Add(chunk);
+                    _pendingOutput.Add(ready);
                     return;
                 }
             }
-            PostToWeb("out", chunk);
+            PostToWeb("out", ready);
         }));
+    }
+
+    private void ArmSyncTimeout(bool buffering)
+    {
+        if (!buffering)
+        {
+            _syncTimeout?.Stop();
+            return;
+        }
+        if (_syncTimeout is null)
+        {
+            _syncTimeout = new System.Windows.Threading.DispatcherTimer { Interval = SyncFrameTimeout };
+            _syncTimeout.Tick += (_, _) =>
+            {
+                _syncTimeout!.Stop();
+                var held = _sync.Flush();
+                if (held.Length == 0) return;
+                AppLogger.Log($"[Xterm] synchronized frame did not close within " +
+                              $"{SyncFrameTimeout.TotalMilliseconds:0} ms; releasing {held.Length} chars");
+                lock (_pendingSync)
+                {
+                    if (!_webReady) { _pendingOutput.Add(held); return; }
+                }
+                PostToWeb("out", held);
+            };
+        }
+        _syncTimeout.Stop();
+        _syncTimeout.Start();
     }
 
     private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)

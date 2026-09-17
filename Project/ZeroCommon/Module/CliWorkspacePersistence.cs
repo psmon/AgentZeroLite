@@ -25,7 +25,8 @@ public sealed record CliDefinitionSnapshot(
     string? SshUser = null,
     string? SshAuthMethod = null,
     string? SshKeyPath = null,
-    string? EncryptedPassword = null);
+    string? EncryptedPassword = null,
+    bool ReducedMotion = false);
 
 public sealed record CliTabSnapshot(
     string Title,
@@ -37,7 +38,8 @@ public sealed record CliTabSnapshot(
     string? SshUser = null,
     string? SshAuthMethod = null,
     string? SshKeyPath = null,
-    string? EncryptedPassword = null);
+    string? EncryptedPassword = null,
+    bool ReducedMotion = false);
 
 public sealed record CliGroupSnapshot(
     string DirectoryPath,
@@ -155,7 +157,8 @@ public static class CliWorkspacePersistence
                         tab.CliDefinition.SshUser,
                         tab.CliDefinition.SshAuthMethod,
                         tab.CliDefinition.SshKeyPath,
-                        tab.CliDefinition.EncryptedPassword))
+                        tab.CliDefinition.EncryptedPassword,
+                        tab.CliDefinition.ReducedMotion))
                     .ToList(),
                 group.ActiveTabIndex))
             .ToList();
@@ -176,7 +179,8 @@ public static class CliWorkspacePersistence
                 definition.SshUser,
                 definition.SshAuthMethod,
                 definition.SshKeyPath,
-                definition.EncryptedPassword))
+                definition.EncryptedPassword,
+                definition.ReducedMotion))
             .ToList();
     }
 }

@@ -78,6 +78,15 @@ public sealed class TerminalSettings
     /// </summary>
     public bool CursorBlink { get; set; } = false;
 
+    /// <summary>
+    /// Which xterm.js renderer to use. DOM is the library default and costs nothing
+    /// extra; WebGL draws through a per-terminal texture atlas, which is faster for
+    /// heavy output but holds GPU and host memory for every open terminal. It is
+    /// off by default because it is a cost, not a fix — the cursor wandering under
+    /// Ink TUIs was synchronized output, not renderer throughput.
+    /// </summary>
+    public bool UseWebGlRenderer { get; set; } = false;
+
     public TerminalTheme Theme { get; set; } = new();
 
     /// <summary>The palette actually applied.</summary>

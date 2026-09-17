@@ -113,9 +113,11 @@
   // no hardware acceleration, a lost context, an old WebView2 — the addon throws or
   // fires onContextLoss, and the DOM renderer carries on. Either way the host is
   // told which one is live, so "is it the renderer?" is answerable from a log.
+  // Off unless TerminalSettings asks: WebGL keeps a texture atlas per terminal, so
+  // it is memory spent on every open tab, and it is not what fixed the cursor.
   var renderer = 'dom';
   try {
-    if (window.WebglAddon) {
+    if (window.__azUseWebgl && window.WebglAddon) {
       var webgl = new window.WebglAddon.WebglAddon();
       webgl.onContextLoss(function () {
         try { webgl.dispose(); } catch (e) {}

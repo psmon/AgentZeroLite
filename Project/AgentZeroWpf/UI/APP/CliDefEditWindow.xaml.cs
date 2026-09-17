@@ -35,6 +35,7 @@ public partial class CliDefEditWindow : Window
 
             // Remote section — populate from existing record.
             cbRemote.IsChecked = existing.IsRemote;
+            cbReducedMotion.IsChecked = existing.ReducedMotion;
             tbSshHost.Text = existing.SshHost ?? "";
             tbSshUser.Text = existing.SshUser ?? "";
             tbSshKeyPath.Text = existing.SshKeyPath ?? "";
@@ -248,6 +249,7 @@ public partial class CliDefEditWindow : Window
             SshAuthMethod = sshAuthMethod,
             SshKeyPath = sshKeyPath,
             EncryptedPassword = encryptedPassword,
+            ReducedMotion = cbReducedMotion.IsChecked == true,
         };
         DialogResult = true;
     }

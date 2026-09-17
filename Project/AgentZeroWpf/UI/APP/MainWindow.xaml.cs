@@ -1794,6 +1794,8 @@ public partial class MainWindow : Window
                         User: tab.SshUser,
                         AuthMode: Agent.Common.Module.SshCommandBuilder.ParseAuthMethod(tab.SshAuthMethod),
                         KeyPath: tab.SshKeyPath));
+                resolvedArgs = Agent.Common.Module.ReducedMotionArguments.Append(
+                    resolvedArgs, tab.ExePath, tab.ReducedMotion);
                 AddConsoleTab(
                     tab.Title,
                     tab.ExePath,
@@ -1848,6 +1850,8 @@ public partial class MainWindow : Window
                     User: def.SshUser,
                     AuthMode: Agent.Common.Module.SshCommandBuilder.ParseAuthMethod(def.SshAuthMethod),
                     KeyPath: def.SshKeyPath));
+            resolvedArgs = Agent.Common.Module.ReducedMotionArguments.Append(
+                resolvedArgs, def.ExePath, def.ReducedMotion);
             string? encryptedPw = def.IsRemote &&
                 string.Equals(def.SshAuthMethod, Agent.Common.Module.SshCommandBuilder.AuthMethodPassword, StringComparison.OrdinalIgnoreCase)
                 ? def.EncryptedPassword : null;

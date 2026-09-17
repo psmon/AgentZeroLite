@@ -247,6 +247,11 @@
                 BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                 Padding="10,8" Margin="0,4,0,8">
             <StackPanel>
+                <CheckBox x:Name="cbReducedMotion" Content="Disable TUI animations (reduced motion)"
+                          Foreground="{StaticResource TextPrimary}" FontFamily="Consolas" FontSize="12"
+                          Margin="0,0,0,8"
+                          ToolTip="Appends the CLI's reduced-motion flag at launch (Codex: -c tui.animations=false). Ignored for CLIs that have none."/>
+
                 <CheckBox x:Name="cbRemote" Content="Remote (SSH)"
                           Foreground="{StaticResource TextPrimary}" FontFamily="Consolas" FontSize="12"
                           FontWeight="Bold"
