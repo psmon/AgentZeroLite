@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="772" viewBox="0 0 1440 772">
+<rect x="0.0" y="0.0" width="1440.0" height="772.0" rx="0" fill="#0b0e14"/>
+<text x="40.0" y="52.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="30" fill="#ffffff" text-anchor="start" font-weight="700">AskBot</text>
+<text x="150.0" y="52.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="17" fill="#8a8f98" text-anchor="start" font-weight="400">an actor system you can talk to, on a 466x466 round AMOLED</text>
+<text x="40.0" y="78.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="13" fill="#8a8f98" text-anchor="start" font-weight="400">One PC host, one BLE link, three apps. Actors on the PC; the watch is a peer, not a terminal.</text>
+<rect x="40.0" y="104.0" width="1360.0" height="96.0" rx="12" fill="#12161f" stroke="#232733" stroke-width="1"/>
+<text x="66.0" y="130.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11" fill="#8a8f98" text-anchor="start" font-weight="700">PC</text>
+<rect x="60.0" y="140.0" width="250.0" height="44.0" rx="8" fill="#161b26" stroke="#232733" stroke-width="1"/>
+<text x="185.0" y="159.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11.5" fill="#ffffff" text-anchor="middle" font-weight="600">AkkaHost  (.NET 10 + Akka 1.6)</text>
+<text x="185.0" y="175.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="middle" font-weight="400">netclaw / claude  ·  SuperTonic TTS  ·  whisper STT</text>
+<text x="60.0" y="196.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9" fill="#3a4052" text-anchor="start" font-weight="400">Claude Code hooks -&gt; 127.0.0.1:8765</text>
+<line x1="320.0" y1="134.0" x2="470.0" y2="134.0" stroke="#a78bfa" stroke-width="1.6" stroke-dasharray="4 3"/>
+<text x="478.0" y="137.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#a78bfa" text-anchor="start" font-weight="600">0xAB  Akka PDUs</text>
+<text x="590.0" y="137.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">AskBot  —  a real remoting peer</text>
+<line x1="320.0" y1="156.0" x2="470.0" y2="156.0" stroke="#5ce1e6" stroke-width="1.6" stroke-dasharray="4 3"/>
+<text x="478.0" y="159.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#5ce1e6" text-anchor="start" font-weight="600">R/A lines + 0xA6</text>
+<text x="590.0" y="159.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">Chat  —  audio both ways</text>
+<line x1="320.0" y1="178.0" x2="470.0" y2="178.0" stroke="#3dd68c" stroke-width="1.6" stroke-dasharray="4 3"/>
+<text x="478.0" y="181.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#3dd68c" text-anchor="start" font-weight="600">S/E lines</text>
+<text x="590.0" y="181.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">Claude HUD  —  session telemetry</text>
+<text x="1000.0" y="130.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="middle" font-weight="400">BLE (one central)</text>
+<rect x="935.0" y="140.0" width="130.0" height="44.0" rx="8" fill="#161b26" stroke="#232733" stroke-width="1"/>
+<text x="1000.0" y="166.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#ffffff" text-anchor="middle" font-weight="600">ESP32-S3</text>
+<line x1="880.0" y1="162.0" x2="931.0" y2="162.0" stroke="#8a8f98" stroke-width="1.4"/>
+<text x="1105.0" y="148.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">no WiFi: the PDUs ride</text>
+<text x="1105.0" y="164.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">the BLE link the HUD</text>
+<text x="1105.0" y="180.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">already keeps up</text>
+<circle cx="180.0" cy="356.0" r="127.0" fill="#05070b" stroke="#2b3040" stroke-width="2"/>
+<circle cx="180.0" cy="356.0" r="120.0" fill="#000000"/>
+<text x="180.0" y="506.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="600">AskBot</text>
+<text x="180.0" y="526.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#8a8f98" text-anchor="middle" font-weight="400">hold to talk, the actor answers</text>
+<text x="180.0" y="257.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="middle" font-weight="400">ASUS-AI · netclaw</text>
+<rect x="118.7" y="264.8" width="75.2" height="14.4" rx="7.210300429184549" fill="#12161f"/>
+<text x="156.3" y="275.3" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="middle" font-weight="400">actor?</text>
+<rect x="198.0" y="264.8" width="43.3" height="14.4" rx="7.210300429184549" fill="#12161f"/>
+<text x="219.7" y="275.3" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="middle" font-weight="400">New chat</text>
+<rect x="91.4" y="283.4" width="177.2" height="93.7" rx="9" fill="#12161f"/>
+<text x="102.7" y="295.7" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#5ce1e6" text-anchor="start" font-weight="400">Are you really a peer?</text>
+<text x="102.7" y="311.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#ffffff" text-anchor="start" font-weight="400">Yes - this watch registers a</text>
+<text x="102.7" y="322.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#ffffff" text-anchor="start" font-weight="400">client actor and the host</text>
+<text x="102.7" y="333.9" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#ffffff" text-anchor="start" font-weight="400">answers it directly.</text>
+<text x="180.0" y="386.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#3dd68c" text-anchor="middle" font-weight="400">done · 1 chunk · 1266 ms</text>
+<rect x="128.5" y="392.6" width="103.0" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="128.5" y="392.6" width="0.0" height="3.4" rx="1.7" fill="#3dd68c"/>
+<circle cx="180.0" cy="422.4" r="22.7" fill="#4c8dff"/>
+<text x="180.0" y="428.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="600">◉</text>
+<circle cx="130.6" cy="422.4" r="13.4" fill="#12161f"/>
+<text x="130.6" y="426.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#ffffff" text-anchor="middle" font-weight="600">T</text>
+<circle cx="229.4" cy="422.4" r="13.4" fill="#12161f"/>
+<text x="229.4" y="426.3" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11" fill="#ffffff" text-anchor="middle" font-weight="600">■</text>
+<circle cx="105.8" cy="389.5" r="13.4" fill="#12161f"/>
+<text x="105.8" y="393.7" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#a78bfa" text-anchor="middle" font-weight="600">♪</text>
+<line x1="111.3" y1="257.6" x2="81.3" y2="257.6" stroke="#3a4052" stroke-width="1"/>
+<circle cx="74.3" cy="257.6" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="74.3" y="260.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<line x1="94.3" y1="272.1" x2="64.3" y2="272.1" stroke="#3a4052" stroke-width="1"/>
+<circle cx="57.3" cy="272.1" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="57.3" y="275.1" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<line x1="287.6" y1="303.0" x2="317.6" y2="303.0" stroke="#3a4052" stroke-width="1"/>
+<circle cx="324.6" cy="303.0" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="324.6" y="306.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">4</text>
+<line x1="296.1" y1="386.4" x2="326.1" y2="386.4" stroke="#3a4052" stroke-width="1"/>
+<circle cx="333.1" cy="386.4" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="333.1" y="389.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">5</text>
+<line x1="279.9" y1="422.4" x2="309.9" y2="422.4" stroke="#3a4052" stroke-width="1"/>
+<circle cx="316.9" cy="422.4" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="316.9" y="425.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">6</text>
+<line x1="64.8" y1="389.5" x2="34.8" y2="389.5" stroke="#3a4052" stroke-width="1"/>
+<circle cx="27.8" cy="389.5" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="27.8" y="392.5" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<circle cx="30.0" cy="548.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="30.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<text x="42.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">host</text>
+<text x="120.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">which PC and which chat CLI answered</text>
+<circle cx="30.0" cy="567.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="30.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<text x="42.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">preset</text>
+<text x="120.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">tap to cycle the canned questions</text>
+<circle cx="30.0" cy="586.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="30.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<text x="42.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">voice</text>
+<text x="120.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">speak the answer, or text only</text>
+<circle cx="30.0" cy="605.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="30.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">4</text>
+<text x="42.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">heard</text>
+<text x="120.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">the transcript whisper produced</text>
+<circle cx="30.0" cy="624.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="30.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">5</text>
+<text x="42.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">stage</text>
+<text x="120.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">think / receiving / done, with timing</text>
+<circle cx="30.0" cy="643.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="30.0" y="647.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">6</text>
+<text x="42.0" y="647.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">mic</text>
+<text x="120.0" y="647.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">hold to talk; T sends the preset, ■ cancels</text>
+<circle cx="540.0" cy="356.0" r="127.0" fill="#05070b" stroke="#2b3040" stroke-width="2"/>
+<circle cx="540.0" cy="356.0" r="120.0" fill="#000000"/>
+<text x="540.0" y="506.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="600">Chat</text>
+<text x="540.0" y="526.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#8a8f98" text-anchor="middle" font-weight="400">the older app, same actors now</text>
+<text x="540.0" y="257.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="middle" font-weight="400">ASUS-AI · netclaw · chat 2</text>
+<rect x="478.7" y="264.8" width="75.2" height="14.4" rx="7.210300429184549" fill="#2a2440"/>
+<text x="516.3" y="275.3" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#a78bfa" text-anchor="middle" font-weight="400">♪ Text + voice</text>
+<rect x="558.0" y="264.8" width="43.3" height="14.4" rx="7.210300429184549" fill="#12161f"/>
+<text x="579.7" y="275.3" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="middle" font-weight="400">New chat</text>
+<rect x="451.4" y="283.4" width="177.2" height="93.7" rx="9" fill="#12161f"/>
+<text x="462.7" y="295.7" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#5ce1e6" text-anchor="start" font-weight="400">What is the weather today?</text>
+<text x="462.7" y="311.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#ffffff" text-anchor="start" font-weight="400">Seoul is clear and mild today.</text>
+<text x="540.0" y="386.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#ff5c5c" text-anchor="middle" font-weight="400">listening 2.4s</text>
+<rect x="488.5" y="394.6" width="103.0" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="488.5" y="394.6" width="63.9" height="3.4" rx="1.7" fill="#3dd68c"/>
+<circle cx="540.0" cy="425.5" r="22.7" fill="#ff5c5c"/>
+<text x="540.0" y="431.1" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="600">◉</text>
+<circle cx="490.6" cy="425.5" r="13.4" fill="#12161f"/>
+<text x="490.6" y="429.7" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#ffffff" text-anchor="middle" font-weight="600">T</text>
+<circle cx="589.4" cy="425.5" r="13.4" fill="#12161f"/>
+<text x="589.4" y="429.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11" fill="#ffffff" text-anchor="middle" font-weight="600">■</text>
+<line x1="454.3" y1="272.1" x2="424.3" y2="272.1" stroke="#3a4052" stroke-width="1"/>
+<circle cx="417.3" cy="272.1" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="417.3" y="275.1" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<line x1="656.1" y1="386.4" x2="686.1" y2="386.4" stroke="#3a4052" stroke-width="1"/>
+<circle cx="693.1" cy="386.4" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="693.1" y="389.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<line x1="653.6" y1="394.6" x2="683.6" y2="394.6" stroke="#3a4052" stroke-width="1"/>
+<circle cx="690.6" cy="394.6" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="690.6" y="397.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<circle cx="390.0" cy="548.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="390.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<text x="402.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">answer mode</text>
+<text x="480.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">shown only when the host can speak</text>
+<circle cx="390.0" cy="567.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="390.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<text x="402.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">stage</text>
+<text x="480.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">recording, transcribing, then the answer</text>
+<circle cx="390.0" cy="586.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="390.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<text x="402.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">level</text>
+<text x="480.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">input level while the mic is held</text>
+<circle cx="390.0" cy="605.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="390.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">4</text>
+<text x="402.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">same engine</text>
+<text x="480.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">one ChatActor serves this and AskBot</text>
+<circle cx="390.0" cy="624.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="390.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">5</text>
+<text x="402.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">unchanged</text>
+<text x="480.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">its firmware never had to be touched</text>
+<circle cx="900.0" cy="356.0" r="127.0" fill="#05070b" stroke="#2b3040" stroke-width="2"/>
+<circle cx="900.0" cy="356.0" r="120.0" fill="#000000"/>
+<text x="900.0" y="506.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="600">Claude HUD</text>
+<text x="900.0" y="526.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#8a8f98" text-anchor="middle" font-weight="400">swipe: crew / sessions / usage / info</text>
+<text x="900.0" y="277.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="15" fill="#5ce1e6" text-anchor="middle" font-weight="700">USAGE</text>
+<text x="900.0" y="304.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="30" fill="#ffe066" text-anchor="middle" font-weight="700">$1.23</text>
+<text x="900.0" y="326.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11" fill="#8a8f98" text-anchor="middle" font-weight="400">3 sess</text>
+<text x="843.3" y="347.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#ffffff" text-anchor="start" font-weight="400">ctx 42%</text>
+<rect x="851.1" y="353.4" width="97.9" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="851.1" y="353.4" width="41.1" height="3.4" rx="1.7" fill="#3dd68c"/>
+<text x="843.3" y="376.1" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#ffffff" text-anchor="start" font-weight="400">5h  12%</text>
+<rect x="851.1" y="382.3" width="97.9" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="851.1" y="382.3" width="11.7" height="3.4" rx="1.7" fill="#3dd68c"/>
+<text x="843.3" y="404.9" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#ffffff" text-anchor="start" font-weight="400">7d  30%</text>
+<rect x="851.1" y="411.1" width="97.9" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="851.1" y="411.1" width="29.4" height="3.4" rx="1.7" fill="#f5a524"/>
+<text x="900.0" y="437.9" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9" fill="#3a4052" text-anchor="middle" font-weight="400">&lt; sessions      info &gt;</text>
+<line x1="1008.1" y1="304.0" x2="1038.1" y2="304.0" stroke="#3a4052" stroke-width="1"/>
+<circle cx="1045.1" cy="304.0" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1045.1" y="307.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<line x1="1020.0" y1="353.4" x2="1050.0" y2="353.4" stroke="#3a4052" stroke-width="1"/>
+<circle cx="1057.0" cy="353.4" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1057.0" y="356.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<line x1="1017.1" y1="382.3" x2="1047.1" y2="382.3" stroke="#3a4052" stroke-width="1"/>
+<circle cx="1054.1" cy="382.3" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1054.1" y="385.3" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<line x1="987.7" y1="437.9" x2="1017.7" y2="437.9" stroke="#3a4052" stroke-width="1"/>
+<circle cx="1024.7" cy="437.9" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1024.7" y="440.9" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">4</text>
+<circle cx="750.0" cy="548.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="750.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<text x="762.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">cost</text>
+<text x="840.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">this session's spend, from the statusLine</text>
+<circle cx="750.0" cy="567.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="750.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<text x="762.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">context</text>
+<text x="840.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">how full the window is</text>
+<circle cx="750.0" cy="586.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="750.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<text x="762.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">limits</text>
+<text x="840.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">5-hour and 7-day rate limits</text>
+<circle cx="750.0" cy="605.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="750.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">4</text>
+<text x="762.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">tiles</text>
+<text x="840.0" y="609.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">crew, sessions, usage, info - swipe across</text>
+<circle cx="750.0" cy="624.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="750.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">5</text>
+<text x="762.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">no change</text>
+<text x="840.0" y="628.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">hooks still post to :8765, now to AkkaHost</text>
+<circle cx="1260.0" cy="356.0" r="127.0" fill="#05070b" stroke="#2b3040" stroke-width="2"/>
+<circle cx="1260.0" cy="356.0" r="120.0" fill="#000000"/>
+<text x="1260.0" y="506.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="600">Settings</text>
+<text x="1260.0" y="526.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#8a8f98" text-anchor="middle" font-weight="400">device-wide, shared by both apps</text>
+<text x="1260.0" y="260.7" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="12" fill="#ffffff" text-anchor="middle" font-weight="600">Settings</text>
+<rect x="1190.5" y="276.2" width="139.1" height="20.6" rx="7" fill="#12161f"/>
+<text x="1195.6" y="291.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#ffffff" text-anchor="start" font-weight="400">Speaker volume</text>
+<rect x="1203.3" y="291.6" width="113.3" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="1203.3" y="291.6" width="79.3" height="3.4" rx="1.7" fill="#3dd68c"/>
+<rect x="1190.5" y="303.0" width="139.1" height="20.6" rx="7" fill="#12161f"/>
+<text x="1195.6" y="318.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#ffffff" text-anchor="start" font-weight="400">Mic gain</text>
+<rect x="1203.3" y="318.4" width="113.3" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="1203.3" y="318.4" width="56.7" height="3.4" rx="1.7" fill="#3dd68c"/>
+<rect x="1190.5" y="329.7" width="139.1" height="20.6" rx="7" fill="#12161f"/>
+<text x="1195.6" y="344.7" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#ffffff" text-anchor="start" font-weight="400">Brightness</text>
+<rect x="1203.3" y="345.2" width="113.3" height="3.4" rx="1.7" fill="#3a4052"/>
+<rect x="1203.3" y="345.2" width="90.6" height="3.4" rx="1.7" fill="#3dd68c"/>
+<rect x="1190.5" y="358.6" width="139.1" height="16.5" rx="7" fill="#12161f"/>
+<text x="1195.6" y="371.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="start" font-weight="400">Answer</text>
+<text x="1324.4" y="371.6" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#a78bfa" text-anchor="end" font-weight="400">text + voice</text>
+<rect x="1190.5" y="379.2" width="139.1" height="16.5" rx="7" fill="#12161f"/>
+<text x="1195.6" y="392.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="start" font-weight="400">Listen</text>
+<text x="1324.4" y="392.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#ffffff" text-anchor="end" font-weight="400">Korean</text>
+<rect x="1190.5" y="399.8" width="139.1" height="16.5" rx="7" fill="#12161f"/>
+<text x="1195.6" y="412.8" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="start" font-weight="400">Speak</text>
+<text x="1324.4" y="412.8" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#ffffff" text-anchor="end" font-weight="400">English</text>
+<rect x="1190.5" y="420.4" width="139.1" height="16.5" rx="7" fill="#12161f"/>
+<text x="1195.6" y="433.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#8a8f98" text-anchor="start" font-weight="400">Voice</text>
+<text x="1324.4" y="433.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9.5" fill="#5ce1e6" text-anchor="end" font-weight="400">M2</text>
+<text x="1260.0" y="447.2" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="9" fill="#3a4052" text-anchor="middle" font-weight="400">WiFi: off (no SSID)</text>
+<line x1="1162.9" y1="285.4" x2="1132.9" y2="285.4" stroke="#3a4052" stroke-width="1"/>
+<circle cx="1125.9" cy="285.4" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1125.9" y="288.4" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<line x1="1140.4" y1="365.8" x2="1110.4" y2="365.8" stroke="#3a4052" stroke-width="1"/>
+<circle cx="1103.4" cy="365.8" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1103.4" y="368.8" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<line x1="1151.4" y1="407.0" x2="1121.4" y2="407.0" stroke="#3a4052" stroke-width="1"/>
+<circle cx="1114.4" cy="407.0" r="7.0" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1114.4" y="410.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<circle cx="1110.0" cy="548.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1110.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">1</text>
+<text x="1122.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">audio</text>
+<text x="1200.0" y="552.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">volume and mic gain, one codec for both apps</text>
+<circle cx="1110.0" cy="567.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1110.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">2</text>
+<text x="1122.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">listen</text>
+<text x="1200.0" y="571.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">language hint for whisper - beats auto-detect</text>
+<circle cx="1110.0" cy="586.5" r="6.5" fill="#1b2130" stroke="#232733" stroke-width="1"/>
+<text x="1110.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="8.5" fill="#5ce1e6" text-anchor="middle" font-weight="700">3</text>
+<text x="1122.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#ffffff" text-anchor="start" font-weight="600">speak</text>
+<text x="1200.0" y="590.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10.5" fill="#8a8f98" text-anchor="start" font-weight="400">language and voice of the answer, set apart</text>
+<rect x="40.0" y="688.0" width="1360.0" height="62.0" rx="12" fill="#12161f" stroke="#232733" stroke-width="1"/>
+<text x="66.0" y="714.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11.5" fill="#ffffff" text-anchor="start" font-weight="700">Akka 1.6 under Native AOT</text>
+<text x="66.0" y="732.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">works, once HOCON's types are rooted</text>
+<text x="406.0" y="714.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11.5" fill="#ffffff" text-anchor="start" font-weight="700">10 voices x 31 languages</text>
+<text x="406.0" y="732.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">read from the model, verified by round trip</text>
+<text x="746.0" y="714.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11.5" fill="#ffffff" text-anchor="start" font-weight="700">whisper 4.1 s in 0.24 s</text>
+<text x="746.0" y="732.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">31 threads, language pinned, silence gated</text>
+<text x="1086.0" y="714.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="11.5" fill="#ffffff" text-anchor="start" font-weight="700">0 draw failures</text>
+<text x="1086.0" y="732.0" font-family="'Segoe UI','Malgun Gothic','Noto Sans KR',system-ui,sans-serif" font-size="10" fill="#8a8f98" text-anchor="start" font-weight="400">after WiFi stopped eating the LCD's DMA heap</text>
+</svg>

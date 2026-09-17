@@ -803,6 +803,14 @@ v1.0까지 불안정한 것으로 간주됩니다.
 
 ### ⌚ 형제 저장소 — 기기 쪽 절반
 
+<img src="Home/wearable/watch-apps.svg" width="100%"
+     alt="하나의 호스트가 하나의 BLE 링크로 먹이는 시계의 세 앱 — 실제 Akka 리모팅 피어인 AskBot, 음성을 양방향으로 나르는 Chat, 세션 텔레메트리를 보여주는 Claude HUD, 그리고 기기 전역 설정">
+
+<sub>형제 저장소에서 가져왔습니다. 그쪽에서 실제 LVGL 레이아웃을 읽어
+<code>tools/gen_hero_svg.py</code>가 생성하므로, 화면이 바뀌면 이 파일을 고치지 말고
+그쪽에서 다시 생성해 복사해 오세요. 그림 속 <em>AkkaHost</em>는 <code>ZeroWearable</code>이
+이식되어 나온 원본이며, 여기서는 <code>AgentZeroWearable.exe</code>로 배포됩니다.</sub>
+
 AgentZero Lite는 웨어러블과 대화하고, **이 저장소에는 PC 쪽만** 있습니다.
 펌웨어는 별도 프로젝트입니다.
 
