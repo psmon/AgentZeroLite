@@ -142,6 +142,14 @@
   // workaround needed).
   term.onData(function (d) { post({ type: 'in', data: d }); });
 
+  // Clicking the terminal has to select its tab. This page is a WebView2 child
+  // HWND, so the click never surfaces as a WPF event and AvalonDock cannot see
+  // it — which is why only the tab header used to change the active document.
+  // Capture phase, because xterm.js stops the event on its own textarea.
+  window.addEventListener('mousedown', function () {
+    post({ type: 'activate' });
+  }, true);
+
   // The host keeps the raw VT stream but has no emulator, so it cannot answer
   // "what is on the screen" - which is what the approval parser, the agent-state
   // monitor and the bot's context all actually ask for. We are the emulator, so we

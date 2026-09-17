@@ -2852,6 +2852,10 @@ public partial class MainWindow : Window
             VerticalAlignment = System.Windows.VerticalAlignment.Stretch,
         };
         Grid.SetRow(control, 1);
+        // A click inside the renderer selects this tab. Safe against the split
+        // focus loop that OnDockActiveContentChanged documents: this only ever
+        // fires from a real click, and the handler it wakes pushes no focus back.
+        control.TerminalClicked += (_, _) => ActivateDocumentFromContentClick(tab);
         tab.TerminalHost.Children.Add(control);
         tab.XtermTerminal = control;
         tab.LaunchCommandLine = cmdLine;
@@ -2875,6 +2879,21 @@ public partial class MainWindow : Window
         };
 
         AppLogger.Log($"[Xterm] WebView terminal created (lazy): {cmdLine}, dir={workDir}");
+    }
+
+    /// <summary>
+    /// Make the clicked terminal's tab the active one. Called from the renderer,
+    /// which is the only thing that sees a click on a WebView2-hosted terminal.
+    /// </summary>
+    private void ActivateDocumentFromContentClick(ConsoleTabInfo tab)
+    {
+        if (tab.Document is not { } doc) return;
+        if (doc.IsActive) return;                  // already there — do not churn the layout
+
+        // IsSelected brings it to the front of its own pane (it may be behind a
+        // sibling tab); IsActive is what the rest of the app reads as "current".
+        doc.IsSelected = true;
+        doc.IsActive = true;
     }
 
     // --- AvalonDock DockingManager integration ---
@@ -3281,16 +3300,25 @@ public partial class MainWindow : Window
         RestartWedgedTerminal(tab);
     }
 
-    private void OnDocTabFloat(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Detach one document into its own floating window. The pane's ▽ button and
+    /// the tab context menu's Float both come through here so there is one
+    /// behaviour to reason about — and one place the log line comes from.
+    /// </summary>
+    private void FloatDocument(AvalonDock.Layout.LayoutDocument doc)
     {
-        var doc = GetContextDocument(sender);
-        if (doc is null || doc.IsFloating) return;
         try
         {
+            if (doc.IsFloating) return;
             doc.Float();
             AppLogger.Log($"[Dock] Float | tab={doc.Title}");
         }
         catch (Exception ex) { AppLogger.LogError("[Dock] Float failed", ex); }
+    }
+
+    private void OnDocTabFloat(object sender, RoutedEventArgs e)
+    {
+        if (GetContextDocument(sender) is { } doc) FloatDocument(doc);
     }
 
     private void OnDocTabDock(object sender, RoutedEventArgs e)
@@ -3323,7 +3351,7 @@ public partial class MainWindow : Window
     {
         var label = new TextBlock
         {
-            Text = "↩  Floating window — click to dock back to main",
+            Text = "↩  Floating window — drag here to move, or dock it back",
             Foreground = new System.Windows.Media.SolidColorBrush(
                 System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF0)),
             FontFamily = new System.Windows.Media.FontFamily("Consolas"),
@@ -3359,7 +3387,7 @@ public partial class MainWindow : Window
         dock.Children.Add(redockBtn);
         dock.Children.Add(label);
 
-        return new Border
+        var strip = new Border
         {
             Background = new System.Windows.Media.SolidColorBrush(
                 System.Windows.Media.Color.FromRgb(0x0A, 0x1A, 0x24)),
@@ -3368,8 +3396,27 @@ public partial class MainWindow : Window
             BorderThickness = new Thickness(0, 0, 0, 1),
             Padding = new Thickness(4, 4, 4, 4),
             Visibility = Visibility.Collapsed,
+            Cursor = Cursors.SizeAll,
             Child = dock,
         };
+
+        // The floating window has no title bar (StripFloatingWindowChrome), so this
+        // strip is how it gets moved. It is the only WPF surface in a detached
+        // terminal: everything below is a WebView2 child HWND that keeps its own
+        // mouse input, so a drag started there never reaches WPF at all.
+        strip.MouseLeftButtonDown += (s, e) =>
+        {
+            if (e.ClickCount != 1) return;
+            // A click on DOCK BACK is already handled by the button and never
+            // reaches here, so this cannot swallow it.
+            if (s is DependencyObject d && Window.GetWindow(d) is { } w && w != this)
+            {
+                try { w.DragMove(); }
+                catch (InvalidOperationException) { /* button released mid-drag */ }
+            }
+        };
+
+        return strip;
     }
 
     // Redock a single tab back to the main document pane. Called from the
@@ -3520,6 +3567,48 @@ public partial class MainWindow : Window
     // Flip every tab's REDOCK strip visibility based on its current float state.
     // Called from OnLayoutRootUpdated — fires whenever AvalonDock mutates its
     // layout (button click, drag-drop float, redock via right-click menu).
+    /// <summary>Floating windows whose title bar has already been taken off.</summary>
+    private readonly HashSet<Window> _chromeStripped = new();
+
+    /// <summary>
+    /// Give a detached terminal the whole window: no OS title bar, so the
+    /// terminal starts at the top edge instead of under a strip of chrome that
+    /// repeats the tab title already shown below it.
+    ///
+    /// <para>Deliberately <see cref="WindowStyle.None"/> and not
+    /// <c>AllowsTransparency</c>. Transparency puts WPF onto a layered window,
+    /// and a layered window does not composite child HWNDs — which is exactly
+    /// what a WebView2 is. The terminal would simply not draw. Borderless
+    /// without transparency keeps the renderer and still removes the bar.</para>
+    ///
+    /// <para>What is lost with the bar is the way to move the window; the
+    /// floating tab's REDOCK strip is the drag handle instead (BuildRedockStrip).</para>
+    /// </summary>
+    private void StripFloatingWindowChrome()
+    {
+        var fws = dockManager.FloatingWindows?.ToArray();
+        if (fws is null) return;
+
+        foreach (var fw in fws)
+        {
+            if (!_chromeStripped.Add(fw)) continue;
+            try
+            {
+                // WindowStyle is applied in place by WPF. ShowInTaskbar and
+                // AllowsTransparency are the two that rebuild the HWND, and that
+                // rebuild is what used to make a detached terminal flash and fall
+                // behind the main window — so neither is touched here.
+                fw.WindowStyle = WindowStyle.None;
+                fw.Closed += (s, _) => { if (s is Window w) _chromeStripped.Remove(w); };
+                AppLogger.Log($"[Dock] floating window is now borderless | title=\"{fw.Title}\"");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("[Dock] could not remove the floating window title bar", ex);
+            }
+        }
+    }
+
     private void RefreshAllRedockStripVisibility()
     {
         foreach (var group in _cliGroups)
@@ -3729,6 +3818,15 @@ public partial class MainWindow : Window
                 // TerminalHost) and travels with the tab into floating windows.
                 // Show it only while the tab is floating.
                 RefreshAllRedockStripVisibility();
+                StripFloatingWindowChrome();
+
+                // Turn each pane's ▽ drop-down into a detach button. Panes are
+                // created and destroyed as tabs are split and closed, so this has
+                // to run after a layout change rather than once at startup; it
+                // skips buttons it has already converted.
+                var converted = UI.DocumentPaneChrome.ApplyDetachButton(dockManager, FloatDocument);
+                if (converted > 0)
+                    AppLogger.Log($"[Dock] pane drop-down repurposed as detach | buttons={converted}");
 
                 // Safety net: catch any FW that became empty via paths we
                 // didn't explicitly sweep (e.g. user closes last tab via X,

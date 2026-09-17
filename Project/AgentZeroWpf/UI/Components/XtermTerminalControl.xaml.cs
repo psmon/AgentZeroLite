@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -49,6 +49,14 @@ public partial class XtermTerminalControl : UserControl
     /// of the stream until the next one lands, 250 ms later at worst.
     /// </summary>
     public WebViewXtermTerminalSession? Session { get; set; }
+
+    /// <summary>
+    /// Raised when the user clicks inside the terminal. The renderer lives in a
+    /// WebView2 child HWND, so a click there produces no WPF input event and the
+    /// dock manager never learns that this tab is the one being used. The host
+    /// listens and activates the owning document.
+    /// </summary>
+    public event EventHandler? TerminalClicked;
 
     /// <summary>Log the first snapshot only — after that they arrive every 250 ms
     /// while output flows, and the interesting question is whether any arrive at all.</summary>
@@ -234,6 +242,9 @@ public partial class XtermTerminalControl : UserControl
                         $"[Xterm] font | family={(root.TryGetProperty("family", out var ff) ? ff.GetString() : "?")} " +
                         $"loaded={(root.TryGetProperty("loaded", out var fl) && fl.ValueKind == JsonValueKind.True)} " +
                         $"cellWidth={(root.TryGetProperty("cellWidth", out var cw) ? cw.ToString() : "?")}");
+                    break;
+                case "activate":
+                    TerminalClicked?.Invoke(this, EventArgs.Empty);
                     break;
                 case "link":
                     // Ctrl+click on a URL inside xterm.js (web-links addon /
