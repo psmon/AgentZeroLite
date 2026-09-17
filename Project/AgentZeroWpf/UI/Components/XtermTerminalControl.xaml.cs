@@ -194,12 +194,12 @@ public partial class XtermTerminalControl : UserControl
     /// stack rather than an installed family — the renderer is a browser, so the
     /// shipped JetBrains Mono and any fallback the user names both just work.
     /// </summary>
-    private void PostAppearance()
+    public void PostAppearance()
     {
         try
         {
             var s = TerminalSettingsStore.Load();
-            var t = s.Theme;
+            var t = s.EffectiveTheme;
             PostJsonToWeb(new
             {
                 type = "config",
@@ -231,7 +231,8 @@ public partial class XtermTerminalControl : UserControl
                 },
             });
             AppLogger.Log($"[Xterm] appearance | font=\"{s.EffectiveFontFamily}\" " +
-                          $"size={s.EffectiveFontSize} lineHeight={s.EffectiveLineHeight:0.##}");
+                          $"size={s.EffectiveFontSize} lineHeight={s.EffectiveLineHeight:0.##} " +
+                          $"theme={s.ThemeName} bg={t.Background}");
         }
         catch (Exception ex)
         {

@@ -29,40 +29,79 @@ public partial class SettingsPanel : UserControl
         };
     }
 
-    // ── Terminal backend selector (modern-terminal spike) ──
+    // ── Terminal appearance (font + theme) ──
+    // The backend selector that used to live here is gone: one terminal now.
     private bool _terminalTabInit;
 
     private void InitializeTerminalTab()
     {
-        var backend = Agent.Common.Services.TerminalSettingsStore.Load().Backend;
-        foreach (var obj in cbTerminalBackend.Items)
-        {
-            if (obj is ComboBoxItem cbi && (cbi.Tag as string) == backend.ToString())
-            {
-                cbTerminalBackend.SelectedItem = cbi;
-                break;
-            }
-        }
+        var s = Agent.Common.Services.TerminalSettingsStore.Load();
+
+        // Font stack: editable, because it is CSS and the whole point of a web
+        // renderer is that any stack the user types just works.
+        cbTerminalFont.Text = s.EffectiveFontFamily;
+
+        cbTerminalFontSize.Items.Clear();
+        for (var n = Agent.Common.Services.TerminalSettings.MinFontSize;
+             n <= Agent.Common.Services.TerminalSettings.MaxFontSize; n++)
+            cbTerminalFontSize.Items.Add(n);
+        cbTerminalFontSize.SelectedItem = s.EffectiveFontSize;
+
+        cbTerminalLineHeight.Items.Clear();
+        foreach (var lh in new[] { 1.0, 1.1, 1.2, 1.3, 1.5 })
+            cbTerminalLineHeight.Items.Add(lh);
+        cbTerminalLineHeight.SelectedItem =
+            cbTerminalLineHeight.Items.Cast<double>()
+                .OrderBy(x => Math.Abs(x - s.EffectiveLineHeight)).First();
+
+        cbTerminalTheme.Items.Clear();
+        foreach (var name in Agent.Common.Services.TerminalThemeCatalog.Names)
+            cbTerminalTheme.Items.Add(name);
+        cbTerminalTheme.SelectedItem =
+            cbTerminalTheme.Items.Cast<string>().FirstOrDefault(
+                n => string.Equals(n, s.ThemeName, StringComparison.OrdinalIgnoreCase))
+            ?? Agent.Common.Services.TerminalThemeCatalog.DefaultName;
+
         _terminalTabInit = true;
     }
 
-    private void OnTerminalBackendChanged(object sender, SelectionChangedEventArgs e)
+    /// <summary>Commit a stack typed straight into the editable combo.</summary>
+    private void OnTerminalFontTextCommitted(object sender, RoutedEventArgs e)
+        => SaveTerminalAppearance();
+
+    private void OnTerminalAppearanceChanged(object sender, SelectionChangedEventArgs e)
+        => SaveTerminalAppearance();
+
+    private void SaveTerminalAppearance()
     {
-        if (!_terminalTabInit) return; // ignore the programmatic selection during init
-        if (cbTerminalBackend.SelectedItem is not ComboBoxItem cbi) return;
-        if (!Enum.TryParse<Agent.Common.Services.TerminalBackend>(cbi.Tag as string, out var backend)) return;
+        if (!_terminalTabInit) return;   // ignore the programmatic selection during init
 
         var s = Agent.Common.Services.TerminalSettingsStore.Load();
-        s.Backend = backend;
+
+        var font = (cbTerminalFont.SelectedItem as ComboBoxItem)?.Content as string
+                   ?? cbTerminalFont.Text;
+        if (!string.IsNullOrWhiteSpace(font)) s.FontFamily = font.Trim();
+
+        if (cbTerminalFontSize.SelectedItem is int size) s.FontSize = size;
+        if (cbTerminalLineHeight.SelectedItem is double lh) s.LineHeight = lh;
+        if (cbTerminalTheme.SelectedItem is string theme) s.ThemeName = theme;
+
         Agent.Common.Services.TerminalSettingsStore.Save(s);
 
-        if (lblTerminalBackendHint is not null)
+        // Live, not on restart: the renderer takes appearance as a message, so
+        // every open tab can be repainted without touching its pseudo-console.
+        var applied = (Application.Current?.MainWindow as AgentZeroWpf.UI.APP.MainWindow)
+            ?.RefreshTerminalAppearance() ?? 0;
+
+        if (lblTerminalAppearanceHint is not null)
         {
-            lblTerminalBackendHint.Text = backend == Agent.Common.Services.TerminalBackend.WebViewXterm
-                ? "Saved. New tabs will use xterm.js / WebView2 (no HwndHost airspace)."
-                : "Saved. New tabs will use the Windows Terminal control.";
+            lblTerminalAppearanceHint.Text = applied > 0
+                ? $"Saved — applied to {applied} open terminal{(applied == 1 ? "" : "s")}."
+                : "Saved. New terminal tabs will use it.";
         }
-        AppLogger.Log($"[Settings] Terminal backend set to {backend} (applies to new tabs)");
+        AppLogger.Log($"[Settings] Terminal appearance | font=\"{s.EffectiveFontFamily}\" " +
+                      $"size={s.EffectiveFontSize} lineHeight={s.EffectiveLineHeight:0.##} " +
+                      $"theme={s.ThemeName} applied={applied}");
     }
 
     public void ShowOnboardingTab()

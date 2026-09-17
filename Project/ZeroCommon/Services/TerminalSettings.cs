@@ -4,11 +4,16 @@ using System.Text.Json.Serialization;
 namespace Agent.Common.Services;
 
 /// <summary>
-/// Which terminal backend a new terminal tab is created with. The choice is
-/// per-app (read at tab-creation time), not per-tab, so flipping it affects
-/// terminals opened afterwards. Default stays <see cref="EasyConPty"/> — the
-/// battle-tested HwndHost + Windows Terminal control — so the modern
-/// <see cref="WebViewXterm"/> path is strictly opt-in during the spike.
+/// Which terminal backend a new terminal tab is created with.
+///
+/// <para><see cref="WebViewXterm"/> is now the only one the app creates, and the
+/// selector is gone from Settings. <see cref="EasyConPty"/> remains in the enum so
+/// an existing settings file still deserializes, and is treated as WebViewXterm.
+/// Its upstream is a third-party republish of CI builds, it reaches WPF only
+/// through an HwndHost — no hyperlinks, no overlays, clicks swallowed before they
+/// reach WPF — and its native DLLs are copied from hard-coded NuGet paths that
+/// fail silently on a version bump. The xterm path needs none of that: WebView2 is
+/// already a hard dependency of this app for WebDev, Mermaid and capture.</para>
 /// </summary>
 public enum TerminalBackend
 {
@@ -61,8 +66,13 @@ public sealed class TerminalTheme
 /// <summary>Persisted terminal preferences (side-car JSON, mirrors VoiceSettingsStore).</summary>
 public sealed class TerminalSettings
 {
+    /// <summary>Kept so old settings files load. <see cref="EffectiveBackend"/> is
+    /// what the app acts on.</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public TerminalBackend Backend { get; set; } = TerminalBackend.EasyConPty;
+    public TerminalBackend Backend { get; set; } = TerminalBackend.WebViewXterm;
+
+    /// <summary>The backend actually used. One value, on purpose.</summary>
+    public TerminalBackend EffectiveBackend => TerminalBackend.WebViewXterm;
 
     /// <summary>
     /// A CSS font stack, applied by the WebViewXterm backend. Being a web renderer is
@@ -81,7 +91,20 @@ public sealed class TerminalSettings
     /// and what a terminal normally wants; a little more helps long sessions.</summary>
     public double LineHeight { get; set; } = 1.0;
 
+    /// <summary>
+    /// Which palette from <see cref="TerminalThemeCatalog"/>. The named presets are
+    /// resolved on read, so switching themes in Settings does not rewrite - or lose -
+    /// a palette someone hand-edited into <see cref="Theme"/>; selecting
+    /// <c>Custom</c> brings that one back.
+    /// </summary>
+    public string ThemeName { get; set; } = TerminalThemeCatalog.DefaultName;
+
+    /// <summary>The stored palette. Used verbatim when <see cref="ThemeName"/> is
+    /// <c>Custom</c> or names a preset this build does not know.</summary>
     public TerminalTheme Theme { get; set; } = new();
+
+    /// <summary>The palette actually applied.</summary>
+    public TerminalTheme EffectiveTheme => TerminalThemeCatalog.Get(ThemeName) ?? Theme;
 
     public const int MinFontSize = 8;
     public const int MaxFontSize = 32;

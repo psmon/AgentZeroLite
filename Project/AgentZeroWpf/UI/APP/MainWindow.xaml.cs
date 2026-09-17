@@ -2610,15 +2610,13 @@ public partial class MainWindow : Window
             ? $"cmd /c \"{injectPath}&&pushd \"{workDir}\"&&{rawCmd}\""
             : $"cmd /c \"{injectPath}&&{rawCmd}\"";
 
-        // ── Terminal backend selection (modern-terminal spike) ──
-        // WebViewXterm is opt-in via terminal-settings.json; default stays the
-        // battle-tested EasyConPty (HwndHost) path below.
-        if (Agent.Common.Services.TerminalSettingsStore.Load().Backend
-            == Agent.Common.Services.TerminalBackend.WebViewXterm)
-        {
-            InitializeWebViewTerminal(tab, cmdLine, workDir, _cliGroups[_activeGroupIndex].DisplayName);
-            return;
-        }
+        // One terminal: xterm.js in WebView2. The EasyConPty (HwndHost) path below is
+        // no longer reachable - see TerminalBackend for why the choice went away - and
+        // comes out with its packages in a follow-up. Nothing selects it.
+        InitializeWebViewTerminal(tab, cmdLine, workDir, _cliGroups[_activeGroupIndex].DisplayName);
+        return;
+
+#pragma warning disable CS0162   // unreachable: the EasyConPty path, pending removal
 
         var terminal = new EasyWindowsTerminalControl.EasyTerminalControl();
         terminal.StartupCommandLine = cmdLine;
@@ -2790,6 +2788,7 @@ public partial class MainWindow : Window
 
         tab.Terminal = terminal;
         AppLogger.Log($"[CLI] ConPTY 터미널 생성 (lazy): {cmdLine}, dir={workDir}");
+#pragma warning restore CS0162
     }
 
     /// <summary>
@@ -2802,6 +2801,31 @@ public partial class MainWindow : Window
     /// control is a normal WPF element (no HwndHost), approval toasts / wedge
     /// banners render above it.
     /// </summary>
+    /// <summary>
+    /// Re-send the appearance from TerminalSettings to every open terminal. The
+    /// renderer takes font and theme as a message, so a settings change lands on
+    /// live tabs without disturbing their pseudo-console - the thing the HwndHost
+    /// backend could never do.
+    /// </summary>
+    /// <returns>How many terminals were repainted.</returns>
+    public int RefreshTerminalAppearance()
+    {
+        var n = 0;
+        foreach (var group in _cliGroups)
+        {
+            foreach (var tab in group.Tabs)
+            {
+                if (tab.XtermTerminal is not { } term) continue;
+                try { term.PostAppearance(); n++; }
+                catch (Exception ex)
+                {
+                    AppLogger.Log($"[Xterm] appearance refresh failed | tab={tab.Title} {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+        }
+        return n;
+    }
+
     private void InitializeWebViewTerminal(ConsoleTabInfo tab, string cmdLine, string workDir, string groupName)
     {
         var control = new AgentZeroWpf.UI.Components.XtermTerminalControl

@@ -414,22 +414,68 @@
                                 Cursor="Hand" Click="OnDeleteCliDef" IsEnabled="False"/>
                     </StackPanel>
 
-                    <!-- Terminal backend selector (modern-terminal spike) -->
+                    <!-- Appearance. The backend selector that used to live here is
+                         gone: there is one terminal now (xterm.js in WebView2), and
+                         being a web renderer is what makes a font a string and a
+                         theme a dropdown instead of a rebuild. -->
                     <Border Grid.Row="2" Margin="0,12,0,0" Padding="10" CornerRadius="2"
                             BorderBrush="#3E3E42" BorderThickness="1" Background="#1E1E1E">
                         <StackPanel>
-                            <TextBlock Text="&#x1F5A5; Terminal backend"
+                            <TextBlock Text="&#x1F5A5; Terminal appearance"
                                        Foreground="#D4D4D4" FontFamily="Consolas" FontSize="12" FontWeight="Bold"/>
-                            <ComboBox x:Name="cbTerminalBackend" Style="{StaticResource DarkComboBox}"
-                                      Margin="0,6,0,0" Width="420" HorizontalAlignment="Left"
-                                      SelectionChanged="OnTerminalBackendChanged">
-                                <ComboBoxItem Content="EasyConPty — Windows Terminal control (default)" Tag="EasyConPty"/>
-                                <ComboBoxItem Content="WebViewXterm — xterm.js in WebView2 (experimental)" Tag="WebViewXterm"/>
-                            </ComboBox>
-                            <TextBlock x:Name="lblTerminalBackendHint"
-                                       Text="Applies to newly opened terminal tabs."
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Font" VerticalAlignment="Center"
+                                           Foreground="#9C9C9C" FontFamily="Consolas" FontSize="11" Margin="0,0,10,6"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="cbTerminalFont"
+                                          Style="{StaticResource DarkComboBox}" IsEditable="True"
+                                          Width="420" HorizontalAlignment="Left" Margin="0,0,0,6"
+                                          SelectionChanged="OnTerminalAppearanceChanged"
+                                          LostFocus="OnTerminalFontTextCommitted">
+                                    <ComboBoxItem Content="JetBrains Mono, Cascadia Mono, Consolas, monospace"/>
+                                    <ComboBoxItem Content="Cascadia Mono, Consolas, monospace"/>
+                                    <ComboBoxItem Content="Consolas, monospace"/>
+                                    <ComboBoxItem Content="D2Coding, JetBrains Mono, monospace"/>
+                                    <ComboBoxItem Content="monospace"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Size" VerticalAlignment="Center"
+                                           Foreground="#9C9C9C" FontFamily="Consolas" FontSize="11" Margin="0,0,10,6"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" x:Name="cbTerminalFontSize"
+                                          Style="{StaticResource DarkComboBox}"
+                                          Width="120" HorizontalAlignment="Left" Margin="0,0,0,6"
+                                          SelectionChanged="OnTerminalAppearanceChanged"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Line height" VerticalAlignment="Center"
+                                           Foreground="#9C9C9C" FontFamily="Consolas" FontSize="11" Margin="0,0,10,6"/>
+                                <ComboBox Grid.Row="2" Grid.Column="1" x:Name="cbTerminalLineHeight"
+                                          Style="{StaticResource DarkComboBox}"
+                                          Width="120" HorizontalAlignment="Left" Margin="0,0,0,6"
+                                          SelectionChanged="OnTerminalAppearanceChanged"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Theme" VerticalAlignment="Center"
+                                           Foreground="#9C9C9C" FontFamily="Consolas" FontSize="11" Margin="0,0,10,0"/>
+                                <ComboBox Grid.Row="3" Grid.Column="1" x:Name="cbTerminalTheme"
+                                          Style="{StaticResource DarkComboBox}"
+                                          Width="220" HorizontalAlignment="Left"
+                                          SelectionChanged="OnTerminalAppearanceChanged"/>
+                            </Grid>
+
+                            <TextBlock x:Name="lblTerminalAppearanceHint"
+                                       Text="Applies to open terminals immediately."
                                        Foreground="#808080" FontFamily="Consolas" FontSize="10"
-                                       Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                       Margin="0,8,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
                 </Grid>
