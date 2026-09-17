@@ -3074,8 +3074,7 @@ public partial class MainWindow : Window
             case Agent.Common.Services.WindowCommandIds.Dock:
                 if (tab?.Document is not { } dd) { error = "no terminal to dock"; return false; }
                 if (!dd.IsFloating) { error = "not floating"; return false; }
-                dd.Dock();
-                AppLogger.Log($"[Cmd] dock | tab={dd.Title}");
+                RedockDocument(dd);
                 return true;
 
             case Agent.Common.Services.WindowCommandIds.CloseTab:
@@ -3290,14 +3289,7 @@ public partial class MainWindow : Window
 
     private void OnDocTabDock(object sender, RoutedEventArgs e)
     {
-        var doc = GetContextDocument(sender);
-        if (doc is null || !doc.IsFloating) return;
-        try
-        {
-            doc.Dock();
-            AppLogger.Log($"[Dock] Dock | tab={doc.Title}");
-        }
-        catch (Exception ex) { AppLogger.LogError("[Dock] Dock failed", ex); }
+        if (GetContextDocument(sender) is { } doc) RedockDocument(doc);
     }
 
     // CONSOLE-strip toolbar handler: explicit detach entry point that replaces
@@ -3380,34 +3372,48 @@ public partial class MainWindow : Window
     // an orphaned pane — see M0002 post-mortem).
     private void RedockOneTab(ConsoleTabInfo tab)
     {
-        var doc = tab.Document;
-        if (doc is null || !doc.IsFloating) return;
+        if (tab.Document is { } doc) RedockDocument(doc);
+    }
+
+    /// <summary>
+    /// Put a floating document back where it came from.
+    ///
+    /// <para>There were two ways to do this and they disagreed: the strip inside the
+    /// floating window moved the document into whichever pane happened to be active,
+    /// while the context menu called AvalonDock's own Dock(). After a left/right
+    /// split "whichever pane happened to be active" is a coin toss, so a tab came
+    /// back somewhere arbitrary and the layout looked shuffled.</para>
+    ///
+    /// <para>The framework already remembers: LayoutContent.Dock() returns a document
+    /// to its PreviousContainer, which is precisely "where it was". It is tried
+    /// first, and the manual move is kept only for the case it cannot handle — the
+    /// pane it remembers is no longer in the layout, so there is genuinely nowhere
+    /// to go back to.</para>
+    /// </summary>
+    private void RedockDocument(AvalonDock.Layout.LayoutDocument doc)
+    {
+        if (!doc.IsFloating) return;
         try
         {
-            AppLogger.Log($"[Dock-DIAG] RedockOne ENTER | tab={doc.Title} " +
-                          $"docParent={doc.Parent?.GetType().Name ?? "<null>"} " +
-                          $"fwCount={dockManager.FloatingWindows?.Count() ?? -1} " +
-                          $"appWindows={Application.Current.Windows.Count}");
-
-            if (doc.Parent is AvalonDock.Layout.ILayoutContainer parent)
-                parent.RemoveChild(doc);
-            GetActiveDocumentPane().Children.Add(doc);
-            doc.IsActive = true;
-            doc.IsSelected = true;
-            AppLogger.Log($"[Dock-DIAG] RedockOne POST-MOVE | tab={doc.Title} " +
-                          $"docParent={doc.Parent?.GetType().Name ?? "<null>"} " +
-                          $"isFloating={doc.IsFloating} " +
-                          $"fwCount={dockManager.FloatingWindows?.Count() ?? -1}");
-
-            // Sweep right after the move — feels snappier than waiting for the
-            // OnLayoutRootUpdated safety-net pass.
-            CloseEmptyFloatingWindows("RedockOneTab");
-
-            AppLogger.Log($"[Dock-DIAG] RedockOne DONE | tab={doc.Title} " +
-                          $"fwCount={dockManager.FloatingWindows?.Count() ?? -1} " +
-                          $"appWindows={Application.Current.Windows.Count}");
+            doc.Dock();
         }
-        catch (Exception ex) { AppLogger.LogError("[Dock] RedockOne failed", ex); }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Dock] Dock() threw for '{doc.Title}': {ex.GetType().Name}: {ex.Message}");
+        }
+
+        if (doc.IsFloating)
+        {
+            // Its remembered pane is gone. Any pane is better than a window the
+            // user asked to close.
+            AppLogger.Log($"[Dock] '{doc.Title}' had no container to return to; using the active pane");
+            if (doc.Parent is AvalonDock.Layout.ILayoutContainer parent) parent.RemoveChild(doc);
+            GetActiveDocumentPane().Children.Add(doc);
+        }
+
+        doc.IsActive = true;
+        doc.IsSelected = true;
+        AppLogger.Log($"[Dock] redocked '{doc.Title}' | floats={dockManager.FloatingWindows?.Count() ?? -1}");
     }
 
     // Close any floating windows that have no LayoutDocument descendants.
