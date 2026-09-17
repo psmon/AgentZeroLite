@@ -1,4 +1,4 @@
-<UserControl x:Class="AgentZeroWpf.UI.Components.ScrapPagePanel"
+﻿<UserControl x:Class="AgentZeroWpf.UI.Components.ScrapPagePanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource EditorBg}">
@@ -223,7 +223,7 @@
                     <Button x:Name="btnScrollDir" Content="↓ DOWN"
                             Style="{DynamicResource FlatButton}" FontSize="10" FontWeight="Bold"
                             Foreground="{DynamicResource CyberCyanBrush}"
-                            ToolTip="수집 방향 — ↓ DOWN: 최신이 상단(문서/피드형), ↑ UP: 최신이 하단·위로 올라가며 수집(채팅형)"
+                            ToolTip="Capture direction — ↓ DOWN: newest at the top (documents, feeds); ↑ UP: newest at the bottom, scrolling upward (chat)"
                             Click="OnToggleScrollDirClick" Margin="0,0,10,0"/>
 
                     <TextBlock Text="RANGE" Foreground="{DynamicResource TextDim}"

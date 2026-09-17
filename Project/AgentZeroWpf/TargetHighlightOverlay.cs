@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -50,7 +50,7 @@ internal sealed class TargetHighlightOverlay : Window
 
     public void HideOverlay()
     {
-        AppLogger.Log("[Overlay] HideOverlay 호출");
+        AppLogger.Log("[Overlay] HideOverlay called");
         if (IsVisible) Hide();
     }
 }

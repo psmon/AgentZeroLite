@@ -1,4 +1,4 @@
-<UserControl x:Class="AgentZeroWpf.UI.Components.SettingsPanel"
+﻿<UserControl x:Class="AgentZeroWpf.UI.Components.SettingsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:components="clr-namespace:AgentZeroWpf.UI.Components"
@@ -326,7 +326,7 @@
                     BorderBrush="#5A2540"
                     Foreground="#FFB0C8" FontSize="11" FontWeight="Bold"
                     FontFamily="Consolas"
-                    Cursor="Hand" ToolTip="닫기 (일반 화면으로)"
+                    Cursor="Hand" ToolTip="Close (back to the normal view)"
                     Click="OnSettingsCloseClick">
                 <Button.Style>
                     <Style TargetType="Button">
@@ -531,17 +531,17 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                                     <TextBlock Text="&#x2139;" FontSize="14" Foreground="#00E5FF"
                                                VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="온디바이스 LLM 상태" FontSize="13" FontWeight="Bold"
+                                    <TextBlock Text="On-device LLM status" FontSize="13" FontWeight="Bold"
                                                Foreground="#00E5FF" FontFamily="Consolas"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
                                            Foreground="#C8D8E0" LineHeight="16">
-                                    <Run FontWeight="Bold" Foreground="#00FFAA">기본 LLM 테스트 완료</Run><Run> — Gemma 4 / Nemotron Nano 둘 다 Load + 멀티턴 채팅 + 함수콜 단위로는 정상 동작.</Run>
+                                    <Run FontWeight="Bold" Foreground="#00FFAA">Base LLM tested</Run><Run> — Gemma 4 and Nemotron Nano both load, hold a multi-turn chat and make function calls correctly.</Run>
                                     <LineBreak/>
-                                    <Run FontWeight="Bold" Foreground="#00FFAA">AIMODE 툴체인은 Gemma 전용</Run><Run> — 5-tool JSON envelope + GBNF 그래마가 Gemma 4 기준으로 표준화됨. </Run><Run FontWeight="Bold" Foreground="#FFB800">Nemotron 등 Llama-3.x 계열은 AIMODE 비호환</Run><Run> (TestBot 일반 채팅은 OK).</Run>
+                                    <Run FontWeight="Bold" Foreground="#00FFAA">The AIMODE toolchain is Gemma-only</Run><Run> — the 5-tool JSON envelope and the GBNF grammar are standardised on Gemma 4. </Run><Run FontWeight="Bold" Foreground="#FFB800">Llama-3.x models such as Nemotron are not AIMODE-compatible</Run><Run> (plain TestBot chat is fine).</Run>
                                     <LineBreak/>
-                                    <Run Foreground="#888899">CPU 백엔드 안정. Vulkan 백엔드는 일부 GPU/드라이버 조합에서 native crash가 보고됨 — Docs/gemma4-gpu-load-failures.md 참고.</Run>
+                                    <Run Foreground="#888899">The CPU backend is stable. The Vulkan backend has been reported to crash natively on some GPU/driver combinations — see Docs/gemma4-gpu-load-failures.md.</Run>
                                 </TextBlock>
                             </StackPanel>
                         </Border>

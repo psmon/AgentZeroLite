@@ -340,12 +340,12 @@ public partial class MainWindow : Window
         {
             var collapsed = IsBotDockCollapsed;
             btnBotCollapse.Content = collapsed ? "\uE70E" : "\uE70D";   // chevron up / down
-            btnBotCollapse.ToolTip = collapsed ? "패널 펼치기" : "패널 접기";
+            btnBotCollapse.ToolTip = collapsed ? "Expand panel" : "Collapse panel";
         }
         if (btnBotMaximize is not null)
         {
             btnBotMaximize.Content = _botDockMaximized ? "\uE923" : "\uE922";   // restore / maximize
-            btnBotMaximize.ToolTip = _botDockMaximized ? "패널 원래 크기로" : "패널 최대화";
+            btnBotMaximize.ToolTip = _botDockMaximized ? "Restore panel size" : "Maximize panel";
         }
         UpdateStatusBarBot();
     }
@@ -640,7 +640,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            AppLogger.Log($"[DB] 초기화 오류: {ex.Message}");
+            AppLogger.Log($"[DB] init failed: {ex.Message}");
         }
     }
 
@@ -675,7 +675,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            AppLogger.Log($"[DB] 저장 오류: {ex.Message}");
+            AppLogger.Log($"[DB] save failed: {ex.Message}");
         }
 
         _botWindow?.Close();
@@ -720,7 +720,7 @@ public partial class MainWindow : Window
             if (cds.dwData == (IntPtr)CYCOPYDATA_COMMAND && cds.cbData > 0)
             {
                 string json = Marshal.PtrToStringUTF8(cds.lpData, cds.cbData) ?? "";
-                AppLogger.Log($"[IPC] WM_COPYDATA 수신 | {json}");
+                AppLogger.Log($"[IPC] WM_COPYDATA received | {json}");
                 HandleCliCommand(json);
                 handled = true;
                 return (IntPtr)1;
@@ -856,11 +856,11 @@ public partial class MainWindow : Window
                 return;
             }
 
-            AppLogger.Log($"[IPC] 알 수 없는 명령: {command}");
+            AppLogger.Log($"[IPC] unknown command: {command}");
         }
         catch (Exception ex)
         {
-            AppLogger.Log($"[IPC] 명령 파싱 오류: {ex.Message}");
+            AppLogger.Log($"[IPC] command parse failed: {ex.Message}");
         }
     }
 
@@ -876,7 +876,7 @@ public partial class MainWindow : Window
         sb.Append(",\"groups\":");
         sb.Append(_cliGroups.Count);
         sb.Append('}');
-        IpcMemoryMappedResponseWriter.WriteJson(StatusMmfName, StatusMmfSize, sb.ToString(), "[IPC] Status 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(StatusMmfName, StatusMmfSize, sb.ToString(), "[IPC] Status response write failed");
     }
 
     private static string EscapeJson(string s)
@@ -935,12 +935,12 @@ public partial class MainWindow : Window
             {
                 IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
                     $"{{\"ok\":false,\"error\":\"workspace index {index} out of range (0..{_cliGroups.Count - 1})\"}}",
-                    "[IPC] layout 응답 쓰기 오류");
+                    "[IPC] layout response write failed");
                 return;
             }
             ActivateGroup(index);
             IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
-                $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}", "[IPC] layout 응답 쓰기 오류");
+                $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}", "[IPC] layout response write failed");
             AppLogger.Log($"[IPC] layout workspace {index} | {_cliGroups[index].DisplayName}");
             return;
         }
@@ -956,13 +956,13 @@ public partial class MainWindow : Window
                 || actTab < 0 || actTab >= _cliGroups[actGroup].Tabs.Count)
             {
                 IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
-                    $"{{\"ok\":false,\"error\":\"[{actGroup}:{actTab}] out of range\"}}", "[IPC] layout 응답 쓰기 오류");
+                    $"{{\"ok\":false,\"error\":\"[{actGroup}:{actTab}] out of range\"}}", "[IPC] layout response write failed");
                 return;
             }
             if (actGroup != _activeGroupIndex) ActivateGroup(actGroup);
             ActivateConsoleTab(actTab);
             IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
-                $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}", "[IPC] layout 응답 쓰기 오류");
+                $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}", "[IPC] layout response write failed");
             return;
         }
 
@@ -971,7 +971,7 @@ public partial class MainWindow : Window
             IpcMemoryMappedResponseWriter.WriteJson(
                 LayoutMmfName, LayoutMmfSize,
                 $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}",
-                "[IPC] layout dump 응답 쓰기 오류");
+                "[IPC] layout dump response write failed");
             return;
         }
 
@@ -991,14 +991,14 @@ public partial class MainWindow : Window
             : $"{{\"ok\":false,\"command\":\"{EscapeJson(verb)}\",\"error\":\"{EscapeJson(error)}\"}}";
 
         IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize, json,
-            "[IPC] layout 응답 쓰기 오류");
+            "[IPC] layout response write failed");
         AppLogger.Log($"[IPC] layout {verb} | ok={ok}{(ok ? "" : $" error={error}")}");
     }
 
     private void HandleTerminalList()
     {
         string json = CliTerminalIpcHelper.BuildTerminalListJson(_cliGroups, EscapeJson);
-        IpcMemoryMappedResponseWriter.WriteJson(TerminalListMmfName, TerminalListMmfSize, json, "[IPC] terminal-list 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(TerminalListMmfName, TerminalListMmfSize, json, "[IPC] terminal-list response write failed");
 
         // Detailed session inventory for diagnosis — always emitted regardless of build config.
         int totalTabs = 0;
@@ -1036,7 +1036,7 @@ public partial class MainWindow : Window
             ? _cliGroups[g].Tabs[t].Title : "";
         var cmd = Agent.Common.Agents.ClaudeSessionLocator.BuildResumeCommand(cwd) ?? "";
         var json = $"{{\"ok\":true,\"cwd\":\"{EscapeJson(cwd)}\",\"title\":\"{EscapeJson(title)}\",\"cmd\":\"{EscapeJson(cmd)}\"}}";
-        IpcMemoryMappedResponseWriter.WriteJson(AgentResumeMmfName, AgentResumeMmfSize, json, "[IPC] agent-resume 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(AgentResumeMmfName, AgentResumeMmfSize, json, "[IPC] agent-resume response write failed");
     }
 
     // =========================================================================
@@ -1081,7 +1081,7 @@ public partial class MainWindow : Window
                 resultJson = $"{{\"ok\":false,\"error\":\"Write failed: {EscapeJson(ex.Message)}\"}}";
             }
         }
-        IpcMemoryMappedResponseWriter.WriteJson(AgentResumeLaunchMmfName, AgentResumeLaunchMmfSize, resultJson, "[IPC] agent-resume-launch 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(AgentResumeLaunchMmfName, AgentResumeLaunchMmfSize, resultJson, "[IPC] agent-resume-launch response write failed");
     }
 
     // =========================================================================
@@ -1094,7 +1094,7 @@ public partial class MainWindow : Window
     /// <summary>Writes an alias-resolution error to a command's own response MMF.</summary>
     private void WriteAliasError(string mmfName, int mmfSize, string error)
         => IpcMemoryMappedResponseWriter.WriteJson(
-            mmfName, mmfSize, $"{{\"ok\":false,\"error\":\"{EscapeJson(error)}\"}}", "[IPC] alias resolve 오류");
+            mmfName, mmfSize, $"{{\"ok\":false,\"error\":\"{EscapeJson(error)}\"}}", "[IPC] alias resolve failed");
 
     /// <summary>
     /// Resolves a terminal command's target: an optional <c>alias</c> wins over
@@ -1208,7 +1208,7 @@ public partial class MainWindow : Window
         {
             resultJson = $"{{\"ok\":false,\"error\":\"{EscapeJson(ex.Message)}\"}}";
         }
-        IpcMemoryMappedResponseWriter.WriteJson(TerminalAliasMmfName, TerminalAliasMmfSize, resultJson, "[IPC] terminal-alias 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(TerminalAliasMmfName, TerminalAliasMmfSize, resultJson, "[IPC] terminal-alias response write failed");
     }
 
     // =========================================================================
@@ -1243,7 +1243,7 @@ public partial class MainWindow : Window
             sb.Append('}');
         }
         sb.Append("]}");
-        IpcMemoryMappedResponseWriter.WriteJson(AgentStateMmfName, AgentStateMmfSize, sb.ToString(), "[IPC] agent-state 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(AgentStateMmfName, AgentStateMmfSize, sb.ToString(), "[IPC] agent-state response write failed");
     }
 
     // =========================================================================
@@ -1282,7 +1282,7 @@ public partial class MainWindow : Window
         {
             json = $"{{\"ok\":false,\"error\":\"{EscapeJson(ex.Message)}\"}}";
         }
-        IpcMemoryMappedResponseWriter.WriteJson(RemotePinMmfName, RemotePinMmfSize, json, "[IPC] remote-pin 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(RemotePinMmfName, RemotePinMmfSize, json, "[IPC] remote-pin response write failed");
     }
 
     private const string TerminalSendMmfName = "AgentZeroLite_TerminalSend_Response";
@@ -1334,7 +1334,7 @@ public partial class MainWindow : Window
             }
         }
 
-        IpcMemoryMappedResponseWriter.WriteJson(TerminalSendMmfName, TerminalSendMmfSize, resultJson, "[IPC] terminal-send 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(TerminalSendMmfName, TerminalSendMmfSize, resultJson, "[IPC] terminal-send response write failed");
     }
 
     // =========================================================================
@@ -1416,7 +1416,7 @@ public partial class MainWindow : Window
             }
         }
 
-        IpcMemoryMappedResponseWriter.WriteJson(TerminalSendMmfName, TerminalSendMmfSize, resultJson, "[IPC] terminal-key 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(TerminalSendMmfName, TerminalSendMmfSize, resultJson, "[IPC] terminal-key response write failed");
     }
 
     private static string ParseHexKey(string hex)
@@ -1507,7 +1507,7 @@ public partial class MainWindow : Window
             }
         }
 
-        IpcMemoryMappedResponseWriter.WriteJson(TerminalReadMmfName, TerminalReadMmfSize, resultJson, "[IPC] terminal-read 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(TerminalReadMmfName, TerminalReadMmfSize, resultJson, "[IPC] terminal-read response write failed");
     }
 
     // =========================================================================
@@ -1557,7 +1557,7 @@ public partial class MainWindow : Window
                 var simpleMatch = DonePatternSimple.Match(message);
                 if (simpleMatch.Success)
                 {
-                    doneFrom = from; // bot-chat의 --from 파라미터 사용
+                    doneFrom = from; // use bot-chat's --from parameter
                     doneMsg = simpleMatch.Groups["msg"].Value.Trim();
                 }
             }
@@ -1596,7 +1596,7 @@ public partial class MainWindow : Window
             AppLogger.Log($"[IPC] bot-chat from={from}, len={message.Length}");
         }
 
-        IpcMemoryMappedResponseWriter.WriteJson(BotChatMmfName, BotChatMmfSize, resultJson, "[IPC] bot-chat 응답 쓰기 오류");
+        IpcMemoryMappedResponseWriter.WriteJson(BotChatMmfName, BotChatMmfSize, resultJson, "[IPC] bot-chat response write failed");
     }
 
     /// <summary>
@@ -1620,7 +1620,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            AppLogger.Log($"[IPC] agent-hook 라우팅 오류: {ex.Message}");
+            AppLogger.Log($"[IPC] agent-hook routing failed: {ex.Message}");
         }
     }
 
@@ -2053,7 +2053,7 @@ public partial class MainWindow : Window
                 AppLogger.Log($"[Akka] Terminal HWND: {groupName}/{tab.Title} → 0x{src.Handle:X}");
             }
         }
-        catch { /* 레이아웃 완료 전이면 HWND 미획득 — 다음 활성화 시 재시도 */ }
+        catch { /* no HWND yet if layout has not finished — retry on the next activation */ }
     }
 
 
@@ -2370,8 +2370,8 @@ public partial class MainWindow : Window
             e.Handled = true;
             var result = System.Windows.MessageBox.Show(
                 this,
-                $"워크스페이스 '{name}'을(를) 제거하시겠습니까?\n\n워크스페이스 내 모든 세션이 닫힙니다.",
-                "워크스페이스 제거",
+                $"Remove the workspace '{name}'?\n\nEvery session inside it will be closed.",
+                "Remove workspace",
                 System.Windows.MessageBoxButton.YesNo,
                 System.Windows.MessageBoxImage.Question,
                 System.Windows.MessageBoxResult.No);
@@ -2452,7 +2452,7 @@ public partial class MainWindow : Window
         else
             RefreshSessionList();
 
-        AppLogger.Log($"[CLI] 그룹 전환: {_cliGroups[index].DisplayName} ({_cliGroups[index].DirectoryPath}) sameGroup={sameGroup}");
+        AppLogger.Log($"[CLI] group switch: {_cliGroups[index].DisplayName} ({_cliGroups[index].DirectoryPath}) sameGroup={sameGroup}");
     }
 
     /// <summary>
@@ -2874,7 +2874,7 @@ public partial class MainWindow : Window
             AppLogger.Log($"[Xterm] WebView terminal started | label={sessionId} cmd={cmdLine}");
         };
 
-        AppLogger.Log($"[Xterm] WebView 터미널 생성 (lazy): {cmdLine}, dir={workDir}");
+        AppLogger.Log($"[Xterm] WebView terminal created (lazy): {cmdLine}, dir={workDir}");
     }
 
     // --- AvalonDock DockingManager integration ---
@@ -3350,7 +3350,7 @@ public partial class MainWindow : Window
                 System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF0)),
             BorderThickness = new Thickness(1),
             Cursor = Cursors.Hand,
-            ToolTip = "이 탭을 메인 윈도우의 탭으로 복원",
+            ToolTip = "Dock this tab back into the main window",
         };
         redockBtn.Click += (_, _) => RedockOneTab(tab);
         DockPanel.SetDock(redockBtn, Dock.Right);
@@ -4483,17 +4483,17 @@ public partial class MainWindow : Window
             var fallback = isActive
                 ? (System.Windows.Media.Brush)FindResource("CyberCyanBrush")
                 : (System.Windows.Media.Brush)FindResource("CyberPurpleBrush");
-            return (fallback, "", isActive ? "활성 · 실행 중" : "실행 중");
+            return (fallback, "", isActive ? "active · running" : "running");
         }
 
         return s.Activity switch
         {
-            Agent.Common.Agents.AgentActivity.Blocked => (B(0xE0, 0x6C, 0x75), "blocked", "차단됨 — 입력/승인 대기"),
-            Agent.Common.Agents.AgentActivity.Working => (B(0xE5, 0xC0, 0x7B), "working", "작업 중"),
-            Agent.Common.Agents.AgentActivity.Done when !s.Seen => (B(0x61, 0xAF, 0xEF), "done", "완료 — 아직 확인 안 함"),
-            Agent.Common.Agents.AgentActivity.Done => (B(0x98, 0xC3, 0x79), "done", "완료 (확인함)"),
-            Agent.Common.Agents.AgentActivity.Idle => (B(0x7F, 0x84, 0x8E), "idle", "대기 중"),
-            _ => ((System.Windows.Media.Brush)FindResource("CyberPurpleBrush"), "", "실행 중"),
+            Agent.Common.Agents.AgentActivity.Blocked => (B(0xE0, 0x6C, 0x75), "blocked", "blocked — waiting for input or approval"),
+            Agent.Common.Agents.AgentActivity.Working => (B(0xE5, 0xC0, 0x7B), "working", "working"),
+            Agent.Common.Agents.AgentActivity.Done when !s.Seen => (B(0x61, 0xAF, 0xEF), "done", "done — not seen yet"),
+            Agent.Common.Agents.AgentActivity.Done => (B(0x98, 0xC3, 0x79), "done", "done (seen)"),
+            Agent.Common.Agents.AgentActivity.Idle => (B(0x7F, 0x84, 0x8E), "idle", "idle"),
+            _ => ((System.Windows.Media.Brush)FindResource("CyberPurpleBrush"), "", "running"),
         };
     }
 
@@ -4536,7 +4536,7 @@ public partial class MainWindow : Window
                         ? new System.Windows.Media.SolidColorBrush(
                             System.Windows.Media.Color.FromArgb(0x33, 0x26, 0x4F, 0x78))
                         : System.Windows.Media.Brushes.Transparent,
-                    ToolTip = $"{groupLabel} / {tabLabel}  (클릭: 이 세션으로 이동)",
+                    ToolTip = $"{groupLabel} / {tabLabel}  (click to go to this session)",
                 };
 
                 var stack = new StackPanel { Orientation = Orientation.Vertical };
@@ -4646,13 +4646,13 @@ public partial class MainWindow : Window
                 // Right-click: navigate or close the session (cross-workspace safe)
                 var menu = new ContextMenu();
 
-                var miActivate = new MenuItem { Header = "이 세션으로 이동" };
+                var miActivate = new MenuItem { Header = "Go to this session" };
                 miActivate.Click += (_, _) => NavigateToSession(capturedGroup, capturedTab);
                 menu.Items.Add(miActivate);
 
                 menu.Items.Add(new Separator());
 
-                var miClose = new MenuItem { Header = "세션 닫기" };
+                var miClose = new MenuItem { Header = "Close session" };
                 miClose.Click += (_, _) => CloseSessionAcrossWorkspaces(capturedGroup, capturedTab);
                 menu.Items.Add(miClose);
 
@@ -4705,7 +4705,7 @@ public partial class MainWindow : Window
     {
         var win = new Window
         {
-            Title = "세션 이름 변경",
+            Title = "Rename session",
             Width = 360,
             SizeToContent = SizeToContent.Height,
             Owner = this,
@@ -4720,7 +4720,7 @@ public partial class MainWindow : Window
 
         var label = new TextBlock
         {
-            Text = "새 세션 이름",
+            Text = "New session name",
             FontFamily = new System.Windows.Media.FontFamily("Consolas"),
             FontSize = 11,
             Margin = new Thickness(0, 0, 0, 6),
@@ -4743,13 +4743,13 @@ public partial class MainWindow : Window
 
         var okBtn = new Button
         {
-            Content = "변경",
+            Content = "Rename",
             Style = (Style)FindResource("AccentButton"),
             Padding = new Thickness(14, 4, 14, 4),
         };
         var cancelBtn = new Button
         {
-            Content = "취소",
+            Content = "Cancel",
             Style = (Style)FindResource("FlatButton"),
             Padding = new Thickness(14, 4, 14, 4),
             Margin = new Thickness(6, 0, 0, 0),

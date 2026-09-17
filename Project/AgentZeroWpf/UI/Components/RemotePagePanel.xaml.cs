@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -114,7 +114,7 @@ public partial class RemotePagePanel : UserControl
     {
         if (_host is null) return;
 
-        txtStatus.Text = _host.IsRunning ? "실행 중" : "중지됨";
+        txtStatus.Text = _host.IsRunning ? "Running" : "Stopped";
         txtStatus.Foreground = _host.IsRunning
             ? (System.Windows.Media.Brush)FindResource("CyberMintBrush")
             : (System.Windows.Media.Brush)FindResource("TextDim");
@@ -137,8 +137,8 @@ public partial class RemotePagePanel : UserControl
             txtPin.Text = p.Pin;
             var remain = p.ExpiresAt - DateTimeOffset.UtcNow;
             txtPinExpiry.Text = remain > TimeSpan.Zero
-                ? $"{(int)remain.TotalMinutes}:{remain.Seconds:D2} 남음"
-                : "만료됨";
+                ? $"{(int)remain.TotalMinutes}:{remain.Seconds:D2} left"
+                : "expired";
         }
         else
         {
@@ -172,7 +172,7 @@ public partial class RemotePagePanel : UserControl
             var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
             var revoke = new Button
             {
-                Content = "해제",
+                Content = "Revoke",
                 Style = (Style)FindResource("FlatButton"),
                 FontSize = 11,
                 Tag = hash,

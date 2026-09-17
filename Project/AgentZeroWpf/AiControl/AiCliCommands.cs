@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -86,7 +86,7 @@ internal static class AiCliCommands
             Console.WriteLine();
             if (!string.IsNullOrEmpty(current))
                 Console.WriteLine($"  '*' = current voice ({current}).");
-            Console.WriteLine("  Pick one per call:   ai tts \"안녕하세요\" --voice F3 --speaker");
+            Console.WriteLine("  Pick one per call:   ai tts \"Hello there\" --voice F3 --speaker");
             if (isSupertonic)
                 Console.WriteLine("  Supertonic: M1–M5 = male, F1–F5 = female. Change the saved default in Settings → Voice.");
             return 0;

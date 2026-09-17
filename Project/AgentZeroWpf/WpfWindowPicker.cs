@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 
 namespace AgentZeroWpf;
@@ -35,7 +35,7 @@ internal sealed class WpfWindowPicker : IDisposable
         _isDragging = true;
         _element.CaptureMouse();
         Mouse.OverrideCursor = Cursors.Cross;
-        AppLogger.Log("[Picker] 드래그 시작");
+        AppLogger.Log("[Picker] drag started");
         e.Handled = true;
     }
 
@@ -95,12 +95,12 @@ internal sealed class WpfWindowPicker : IDisposable
         {
             LastPickPoint = pickPt;
             LastChildHwnd = childHwnd;
-            AppLogger.Log($"[Picker] 윈도우 선택 완료 | root=0x{selectedHwnd:X8}, child=0x{childHwnd:X8}, pickPt=({pickPt.X},{pickPt.Y})");
+            AppLogger.Log($"[Picker] window picked | root=0x{selectedHwnd:X8}, child=0x{childHwnd:X8}, pickPt=({pickPt.X},{pickPt.Y})");
             WindowSelected?.Invoke(selectedHwnd);
         }
         else
         {
-            AppLogger.Log("[Picker] 드래그 종료 — 선택된 윈도우 없음");
+            AppLogger.Log("[Picker] drag ended — no window picked");
         }
 
         _hoveredHwnd = IntPtr.Zero;

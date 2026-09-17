@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -130,11 +130,11 @@ public partial class MainWindow
         };
         DockPanel.SetDock(label, Dock.Left);
 
-        var closeBtn = MakeStripButton("✕", "링크 표시 닫기");
+        var closeBtn = MakeStripButton("✕", "Hide the link bar");
         closeBtn.Click += (_, _) => HideLinkStrip(tab);
         DockPanel.SetDock(closeBtn, Dock.Right);
 
-        var copyBtn = MakeStripButton("Copy", "URL을 클립보드에 복사");
+        var copyBtn = MakeStripButton("Copy", "Copy the URL to the clipboard");
         copyBtn.Click += (_, _) =>
         {
             if (tab.LinkStripUrl is not { } u) return;
@@ -142,7 +142,7 @@ public partial class MainWindow
         };
         DockPanel.SetDock(copyBtn, Dock.Right);
 
-        var openBtn = MakeStripButton("Open in Browser", "기본 브라우저로 이 링크 열기 (OAuth 로그인 등)");
+        var openBtn = MakeStripButton("Open in Browser", "Open this link in the default browser (OAuth sign-in, etc.)");
         openBtn.FontWeight = FontWeights.Bold;
         openBtn.Click += (_, _) => OpenLinkFromStrip(tab);
         DockPanel.SetDock(openBtn, Dock.Right);

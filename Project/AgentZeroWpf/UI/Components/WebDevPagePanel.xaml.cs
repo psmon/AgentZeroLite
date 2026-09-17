@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
@@ -280,7 +280,7 @@ public partial class WebDevPagePanel : UserControl
         bool isFloating = _floatingBySampleId.ContainsKey(s.Id);
         if (isFloating)
         {
-            btnDetach.Content = "⤡  복귀 (Dock back)";
+            btnDetach.Content = "⤡  Dock back";
             btnDetach.Background = (System.Windows.Media.SolidColorBrush)
                 new System.Windows.Media.BrushConverter().ConvertFromString("#FFA94D")!;
             btnDetach.ToolTip = "Bring this sample's WebView2 back into the main window (no reload).";

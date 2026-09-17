@@ -1,4 +1,4 @@
-<Window x:Class="AgentZeroWpf.UI.APP.CliDefEditWindow"
+﻿<Window x:Class="AgentZeroWpf.UI.APP.CliDefEditWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="CLI Definition" Width="480" Height="640"
@@ -335,7 +335,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Tips (텍스트 선택 가능) -->
+        <!-- Tips (selectable text) -->
         <Border Grid.Row="4" Grid.ColumnSpan="2" Background="{StaticResource BgToolbar}" BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="1" CornerRadius="0" Padding="10,8" Margin="0,4,0,0">
             <TextBox IsReadOnly="True" BorderThickness="0" Background="Transparent"

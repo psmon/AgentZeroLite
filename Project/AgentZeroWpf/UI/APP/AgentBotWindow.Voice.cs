@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using Akka.Actor;
@@ -465,7 +465,7 @@ public partial class AgentBotWindow
                 if (string.IsNullOrWhiteSpace(terminalText))
                 {
                     AppLogger.Log($"[BOT-Voice] ({sourceTag}) summarize — no active terminal text");
-                    AddSystemMessage("활성 터미널 출력이 비어 있어 요약할 내용이 없습니다.");
+                    AddSystemMessage("The active terminal has no output to summarise.");
                     return;
                 }
                 AppLogger.Log($"[BOT-Voice] ({sourceTag}) summarize-terminal | terminalChars={terminalText.Length}");
@@ -1154,7 +1154,7 @@ public partial class AgentBotWindow
         catch (Exception ex)
         {
             AppLogger.LogError("[AIMODE] delegation direct-relay — WriteAndSubmit threw", ex);
-            AddSystemMessage("❌ Claude 터미널 전송 실패 — 자세한 내용은 로그를 확인해 주세요.");
+            AddSystemMessage("❌ Could not send to the Claude terminal — see the log for details.");
             return false;
         }
     }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -111,7 +111,7 @@ public partial class ScrapPagePanel : UserControl
             Dispatcher.BeginInvoke(() => OnWindowHovered(hwnd));
             return;
         }
-        lblCaptureStatus.Text = $"호버: 0x{hwnd:X8}";
+        lblCaptureStatus.Text = $"hover: 0x{hwnd:X8}";
     }
 
     private void OnWindowSelected(IntPtr hwnd)
@@ -174,7 +174,7 @@ public partial class ScrapPagePanel : UserControl
 
         var info = WindowInfo.Capture(hwnd);
         txtWindowInfo.Text = info.ToString();
-        lblCaptureStatus.Text = $"선택됨: {info.ClassName} - {info.Title}";
+        lblCaptureStatus.Text = $"selected: {info.ClassName} - {info.Title}";
         AppLogger.Log($"[Scrap] SelectWindow | hwnd=0x{hwnd:X8}, class={info.ClassName}");
 
         var framework = DetectFramework(info);
@@ -210,7 +210,7 @@ public partial class ScrapPagePanel : UserControl
         if (_selectedHwnd == IntPtr.Zero)
         {
             MessageBox.Show(Window.GetWindow(this) ?? (Window)null!,
-                "먼저 대상 창을 선택하세요.",
+                "Pick a target window first.",
                 "AgentZero — Scrap",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -222,7 +222,7 @@ public partial class ScrapPagePanel : UserControl
             _captureCts.Cancel();
             _captureCts = null;
             btnCapture.Content = "▶  CAPTURE";
-            lblCaptureStatus.Text = "취소됨";
+            lblCaptureStatus.Text = "cancelled";
             return;
         }
 
@@ -238,7 +238,7 @@ public partial class ScrapPagePanel : UserControl
             for (int i = 3; i > 0; i--)
             {
                 _captureCts.Token.ThrowIfCancellationRequested();
-                lblCaptureStatus.Text = $"{i}초 후 캡처 시작...";
+                lblCaptureStatus.Text = $"capture starts in {i}s...";
                 await Task.Delay(1000, _captureCts.Token);
             }
 
@@ -248,10 +248,10 @@ public partial class ScrapPagePanel : UserControl
             txtCapturedText.Clear();
             scrap = new ScrapWriter(AppContext.BaseDirectory);
             _currentScrap = scrap;
-            AppLogger.Log($"[Scrap.UI] ScrapWriter 생성 + ChunkWritten 구독 | path={scrap.FilePath}");
+            AppLogger.Log($"[Scrap.UI] ScrapWriter created + subscribed to ChunkWritten | path={scrap.FilePath}");
             scrap.ChunkWritten += chunk => Dispatcher.BeginInvoke(() =>
             {
-                AppLogger.Log($"[Scrap.UI] ChunkWritten → AppendWithCap | +{chunk.Length}자 (txt before={txtCapturedText.Text.Length}자)");
+                AppLogger.Log($"[Scrap.UI] ChunkWritten → AppendWithCap | +{chunk.Length} chars (txt before={txtCapturedText.Text.Length} chars)");
                 AppendWithCap(chunk);
             });
 
@@ -263,7 +263,7 @@ public partial class ScrapPagePanel : UserControl
                 FilterEndDate: dpFilterEnd.SelectedDate,
                 Direction: _scrollDirection);
 
-            lblCaptureStatus.Text = "캡처 중...";
+            lblCaptureStatus.Text = "capturing...";
             string result = await _captureService.CaptureAsync(
                 _selectedHwnd, _captureCts.Token, progress, scrap, null,
                 scrollOpts, _lastPickPoint, _lastChildHwnd);
@@ -279,18 +279,18 @@ public partial class ScrapPagePanel : UserControl
             }
 
             lblCaptureStatus.Text = string.IsNullOrEmpty(result)
-                ? "텍스트 없음"
-                : $"완료 ({result.Length} 글자) → {scrapPath}";
+                ? "no text"
+                : $"done ({result.Length} chars) → {scrapPath}";
         }
         catch (OperationCanceledException)
         {
-            lblCaptureStatus.Text = "취소됨";
+            lblCaptureStatus.Text = "cancelled";
         }
         catch (Exception ex)
         {
-            lblCaptureStatus.Text = "오류";
+            lblCaptureStatus.Text = "error";
             MessageBox.Show(Window.GetWindow(this) ?? (Window)null!,
-                ex.Message, "캡처 오류",
+                ex.Message, "Capture error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -310,7 +310,7 @@ public partial class ScrapPagePanel : UserControl
         {
             int removeCount = txtCapturedText.Text.Length - MaxDisplayChars + MaxDisplayChars / 4;
             string remaining = txtCapturedText.Text.Substring(removeCount);
-            txtCapturedText.Text = "[...이전 내용은 파일 참조...]\r\n" + remaining;
+            txtCapturedText.Text = "[...earlier content is in the file...]\r\n" + remaining;
         }
         txtCapturedText.ScrollToEnd();
     }
@@ -337,7 +337,7 @@ public partial class ScrapPagePanel : UserControl
             btnScrollDir.Foreground = (System.Windows.Media.Brush)FindResource("CyberCyanBrush");
         }
 
-        AppLogger.Log($"[Scrap.UI] 수집 방향 전환 → {_scrollDirection}");
+        AppLogger.Log($"[Scrap.UI] capture direction switched → {_scrollDirection}");
     }
 
     private void OnClearClick(object sender, RoutedEventArgs e) => txtCapturedText.Clear();
@@ -347,7 +347,7 @@ public partial class ScrapPagePanel : UserControl
         if (!string.IsNullOrEmpty(txtCapturedText.Text))
         {
             Clipboard.SetText(txtCapturedText.Text);
-            lblCaptureStatus.Text = "클립보드에 복사됨";
+            lblCaptureStatus.Text = "copied to clipboard";
         }
     }
 
@@ -442,27 +442,27 @@ public partial class ScrapPagePanel : UserControl
         var lines = _fullTreeText.Split('\n');
         var matched = lines.Where(l => l.Contains(keyword, StringComparison.OrdinalIgnoreCase)).ToArray();
         txtElementTree.Text = string.Join("\n", matched);
-        lblTreeSearchResult.Text = $"{matched.Length}건";
-        AppLogger.Log($"[Scrap] 트리 검색: \"{keyword}\" → {matched.Length}건");
+        lblTreeSearchResult.Text = $"{matched.Length} hits";
+        AppLogger.Log($"[Scrap] tree search: \"{keyword}\" → {matched.Length} hits");
     }
 
     private async Task ScanElementTreeAsync(IntPtr hwnd)
     {
         txtElementTree.Clear();
-        lblElementTreeCount.Text = "(스캔 중...)";
+        lblElementTreeCount.Text = "(scanning...)";
 
         var result = await Task.Run(() => ElementTreeScanner.Scan(hwnd));
 
         if (result != null)
         {
             lblElementTreeCount.Text = $"({result.NodeCount} nodes)";
-            AppLogger.Log($"[Scrap] Element tree 스캔 완료 | {result.NodeCount} nodes");
+            AppLogger.Log($"[Scrap] element tree scan complete | {result.NodeCount} nodes");
             _fullTreeText = result.TreeText;
             txtElementTree.Text = _fullTreeText;
         }
         else
         {
-            lblElementTreeCount.Text = "(요소 없음)";
+            lblElementTreeCount.Text = "(no elements)";
             txtElementTree.Clear();
         }
     }

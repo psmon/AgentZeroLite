@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -839,7 +839,7 @@ public partial class AgentBotWindow : Window
         e.CancelCommand();
         _clipboardAttachment = text;
         _clipboardInsertPos = txtInput.CaretIndex;   // remember where the user intended to paste
-        txtClipboardTag.Text = $"[클립보드 {text.Length}자]";
+        txtClipboardTag.Text = $"[clipboard {text.Length} chars]";
         pnlClipboardTag.Visibility = Visibility.Visible;
     }
 
@@ -849,7 +849,7 @@ public partial class AgentBotWindow : Window
         var preview = _clipboardAttachment.Length > 300
             ? _clipboardAttachment[..300] + "..."
             : _clipboardAttachment;
-        AddSystemMessage($"📋 클립보드 미리보기:\n{preview}");
+        AddSystemMessage($"📋 Clipboard preview:\n{preview}");
     }
 
     private void OnClipboardTagRemove(object sender, RoutedEventArgs e)
@@ -945,14 +945,14 @@ public partial class AgentBotWindow : Window
             var before = rawInput[..pos];
             var after = rawInput[pos..];
             textToSend = before + _clipboardAttachment + after;
-            displayText = $"{before}📋[클립보드 {_clipboardAttachment!.Length}자]{after}";
-            AppLogger.Log($"[BOT-CLIP] rawInput='{rawInput}' ({rawInput.Length}자), clipPos={_clipboardInsertPos}, before='{before}', after='{after}', totalSend={textToSend.Length}자");
+            displayText = $"{before}📋[clipboard {_clipboardAttachment!.Length} chars]{after}";
+            AppLogger.Log($"[BOT-CLIP] rawInput='{rawInput}' ({rawInput.Length} chars), clipPos={_clipboardInsertPos}, before='{before}', after='{after}', totalSend={textToSend.Length} chars");
         }
         else if (hasClip)
         {
             textToSend = _clipboardAttachment!;
-            displayText = $"📋[클립보드 {_clipboardAttachment!.Length}자]";
-            AppLogger.Log($"[BOT-CLIP] rawInput=EMPTY, clipOnly={_clipboardAttachment!.Length}자");
+            displayText = $"📋[clipboard {_clipboardAttachment!.Length} chars]";
+            AppLogger.Log($"[BOT-CLIP] rawInput=EMPTY, clipOnly={_clipboardAttachment!.Length} chars");
         }
         else
         {
@@ -1016,7 +1016,7 @@ public partial class AgentBotWindow : Window
 
         var sessionLabel = _getSessionName?.Invoke() ?? "Terminal";
         AddUserMessage(displayText, sessionLabel);
-        AppLogger.Log($"[BOT-SEND] first50='{textToSend[..Math.Min(50, textToSend.Length)]}', total={textToSend.Length}자, chunked={textToSend.Length > ClipboardPasteThreshold}, session={session.SessionId}, running={session.IsRunning}");
+        AppLogger.Log($"[BOT-SEND] first50='{textToSend[..Math.Min(50, textToSend.Length)]}', total={textToSend.Length} chars, chunked={textToSend.Length > ClipboardPasteThreshold}, session={session.SessionId}, running={session.IsRunning}");
 
         // Multi-line detection: if text contains newlines, we need an extra Enter
         // because some shells treat pasted newlines as line separators within
@@ -1656,10 +1656,10 @@ public partial class AgentBotWindow : Window
             if (!onPath)
             {
                 AddSystemMessage(
-                    "AgentZeroLite CLI가 현재 터미널의 PATH에 없습니다.\n" +
-                    "  1) Settings → AgentZero CLI → Register PATH 를 눌러 경로를 등록하세요.\n" +
-                    "  2) AgentZero Lite를 재시작한 뒤 이 기능을 다시 실행하세요.\n" +
-                    "  (이유: 현재 터미널 세션이 이전 PATH를 캐싱하고 있어, 재시작 전에는 새로 등록된 CLI를 인식하지 못할 수 있습니다.)");
+                    "AgentZeroLite CLI is not on this terminal's PATH.\n" +
+                    "  1) Settings -> AgentZero CLI -> Register PATH to add it.\n" +
+                    "  2) Restart AgentZero Lite, then run this again.\n" +
+                    "  (Why: this terminal session cached the old PATH, so a newly registered CLI stays invisible until it restarts.)");
                 return;
             }
 
@@ -1671,8 +1671,8 @@ public partial class AgentBotWindow : Window
             txtInput.Focus();
 
             AddSystemMessage(
-                "AgentZeroCLI Helper 문구를 입력창에 넣었습니다. 활성 터미널의 AI에게 전송하면 " +
-                "그 세션 한정으로 AgentZeroLite CLI 사용법을 학습시킬 수 있습니다.");
+                "The AgentZeroCLI helper text is in the input box. Send it to the AI in the active terminal " +
+                "to teach it the AgentZeroLite CLI, for that session only.");
         }
         finally
         {

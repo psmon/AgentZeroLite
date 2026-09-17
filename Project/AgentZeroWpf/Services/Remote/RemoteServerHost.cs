@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -117,13 +117,13 @@ public sealed class RemoteServerHost
 
                 IsRunning = false;
                 LastError = reserve == ElevationResult.Cancelled
-                    ? $"권한 설정이 취소되었습니다. 수동 설정: netsh http add urlacl url=http://+:{settings.Port}/ user=\"{CurrentUser()}\""
-                    : $"URL ACL 예약에 실패했습니다. 수동 설정(관리자): netsh http add urlacl url=http://+:{settings.Port}/ user=\"{CurrentUser()}\"";
+                    ? $"The elevation prompt was cancelled. Set it manually: netsh http add urlacl url=http://+:{settings.Port}/ user=\"{CurrentUser()}\""
+                    : $"Could not reserve the URL ACL. Set it manually (as admin): netsh http add urlacl url=http://+:{settings.Port}/ user=\"{CurrentUser()}\"";
             }
             else
             {
                 IsRunning = false;
-                LastError = $"권한 거부: netsh http add urlacl url=http://+:{settings.Port}/ user=\"{CurrentUser()}\"";
+                LastError = $"Permission denied: netsh http add urlacl url=http://+:{settings.Port}/ user=\"{CurrentUser()}\"";
             }
         }
         catch (Exception ex)

@@ -1,4 +1,4 @@
-using System.Windows.Automation;
+﻿using System.Windows.Automation;
 
 namespace AgentZeroWpf;
 
@@ -28,32 +28,32 @@ internal sealed class ChromiumTextCapture
         ScrapWriter? scrap = null, Func<bool>? askContinue = null, ScrollOptions? scroll = null,
         NativeMethods.POINT? pickPoint = null)
     {
-        AppLogger.Log($"[Chromium] TryCaptureAsync 시작 | hwnd=0x{hwnd:X8}, title=\"{windowTitle}\"");
+        AppLogger.Log($"[Chromium] TryCaptureAsync start | hwnd=0x{hwnd:X8}, title=\"{windowTitle}\"");
 
-        progress?.Report("Chromium 감지 → Enhanced UIA 시도 중...");
-        AppLogger.Log("[Enhanced UIA] 시작");
+        progress?.Report("Chromium detected — trying Enhanced UIA...");
+        AppLogger.Log("[Enhanced UIA] start");
         try
         {
             var s = scroll ?? new ScrollOptions();
             string? uiaResult = await Task.Run(() => TryEnhancedUiAutomation(hwnd, ct, progress, scrap, askContinue, s, pickPoint), ct);
             if (!string.IsNullOrWhiteSpace(uiaResult))
             {
-                AppLogger.Log($"[Enhanced UIA] 캡처 성공 | {uiaResult.Length}자");
-                progress?.Report("Enhanced UIA로 캡처 완료");
+                AppLogger.Log($"[Enhanced UIA] captured | {uiaResult.Length} chars");
+                progress?.Report("Captured with Enhanced UIA");
                 return uiaResult;
             }
-            AppLogger.Log("[Enhanced UIA] 결과 없음");
+            AppLogger.Log("[Enhanced UIA] no result");
         }
         catch (OperationCanceledException)
         {
-            AppLogger.Log("[Enhanced UIA] 취소됨");
+            AppLogger.Log("[Enhanced UIA] cancelled");
         }
         catch (Exception ex)
         {
-            AppLogger.LogError("[Enhanced UIA] 예외 발생", ex);
+            AppLogger.LogError("[Enhanced UIA] threw", ex);
         }
 
-        AppLogger.Log("[Chromium] Enhanced UIA 실패 → 기존 전략으로 폴스루");
+        AppLogger.Log("[Chromium] Enhanced UIA failed — falling through to the older strategy");
         return null;
     }
 
@@ -66,33 +66,33 @@ internal sealed class ChromiumTextCapture
     private static string? TryEnhancedUiAutomation(
         IntPtr hwnd, CancellationToken ct, IProgress<string>? progress, ScrapWriter? scrap, Func<bool>? askContinue, ScrollOptions scroll, NativeMethods.POINT? pickPoint)
     {
-        AppLogger.Log($"[Enhanced UIA] 시작 | hwnd=0x{hwnd:X8}");
+        AppLogger.Log($"[Enhanced UIA] start | hwnd=0x{hwnd:X8}");
 
         var root = AutomationElement.FromHandle(hwnd);
 
-        progress?.Report("Enhanced UIA: 콘텐츠 요소 검색 중...");
+        progress?.Report("Enhanced UIA: looking for content elements...");
         AutomationElement? document = null;
 
         foreach (var controlType in ContentControlTypes)
         {
-            AppLogger.Log($"[Enhanced UIA] FindFirst(ControlType.{controlType.ProgrammaticName}) 시도...");
+            AppLogger.Log($"[Enhanced UIA] FindFirst(ControlType.{controlType.ProgrammaticName}) ...");
             var condition = new PropertyCondition(
                 AutomationElement.ControlTypeProperty, controlType);
             document = root.FindFirst(TreeScope.Descendants, condition);
 
             if (document is not null)
             {
-                AppLogger.Log($"[Enhanced UIA] {controlType.ProgrammaticName} 발견!");
+                AppLogger.Log($"[Enhanced UIA] {controlType.ProgrammaticName} found!");
                 break;
             }
         }
 
         if (document is null)
         {
-            progress?.Report("Enhanced UIA: 접근성 트리 강제 구축 중...");
-            AppLogger.Log("[Enhanced UIA] FindAll(TrueCondition)으로 접근성 트리 강제 구축...");
+            progress?.Report("Enhanced UIA: forcing the accessibility tree to build...");
+            AppLogger.Log("[Enhanced UIA] forcing the accessibility tree with FindAll(TrueCondition)...");
             var allElements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
-            AppLogger.Log($"[Enhanced UIA] FindAll 결과: {allElements.Count}개 요소");
+            AppLogger.Log($"[Enhanced UIA] FindAll: {allElements.Count} elements");
             Thread.Sleep(500);
             ct.ThrowIfCancellationRequested();
 
@@ -103,7 +103,7 @@ internal sealed class ChromiumTextCapture
                 document = root.FindFirst(TreeScope.Descendants, condition);
                 if (document is not null)
                 {
-                    AppLogger.Log($"[Enhanced UIA] 재시도: {controlType.ProgrammaticName} 발견!");
+                    AppLogger.Log($"[Enhanced UIA] retry: {controlType.ProgrammaticName} found!");
                     break;
                 }
             }
@@ -120,7 +120,7 @@ internal sealed class ChromiumTextCapture
                 foreach (AutomationElement el in found)
                     allDocs.Add(el);
             }
-            AppLogger.Log($"[Enhanced UIA] 콘텐츠 요소 총 {allDocs.Count}개 발견");
+            AppLogger.Log($"[Enhanced UIA] {allDocs.Count} content elements found");
             foreach (var doc in allDocs)
             {
                 try
@@ -135,7 +135,7 @@ internal sealed class ChromiumTextCapture
 
         if (document is null)
         {
-            AppLogger.Log("[Enhanced UIA] 콘텐츠 요소를 찾을 수 없음 — 종료");
+            AppLogger.Log("[Enhanced UIA] no content element found — giving up");
             return null;
         }
 
@@ -148,7 +148,7 @@ internal sealed class ChromiumTextCapture
             foreach (AutomationElement el in found)
                 allContentElements.Add(el);
         }
-        AppLogger.Log($"[Enhanced UIA] 콘텐츠 요소 총 {allContentElements.Count}개");
+        AppLogger.Log($"[Enhanced UIA] {allContentElements.Count} content elements");
 
         string? bestResult = null;
 
@@ -156,7 +156,7 @@ internal sealed class ChromiumTextCapture
         {
             if (ct.IsCancellationRequested)
             {
-                AppLogger.Log($"[Enhanced UIA] 취소됨 — 부분 결과 반환 ({bestResult?.Length ?? 0}자)");
+                AppLogger.Log($"[Enhanced UIA] cancelled — returning a partial result ({bestResult?.Length ?? 0} chars)");
                 break;
             }
 
@@ -171,19 +171,19 @@ internal sealed class ChromiumTextCapture
 
             if (elemName.Contains("editor is not accessible", StringComparison.OrdinalIgnoreCase))
             {
-                AppLogger.Log("[Enhanced UIA] ⚠ VS Code 에디터 접근 불가 감지!");
-                AppLogger.Log("[Enhanced UIA] → VS Code에서 Shift+Alt+F1 또는 설정에서 editor.accessibilitySupport: on");
-                progress?.Report("⚠ VS Code 스크린 리더 모드 필요 (Shift+Alt+F1)");
+                AppLogger.Log("[Enhanced UIA] ⚠ the VS Code editor is not reachable!");
+                AppLogger.Log("[Enhanced UIA] → press Shift+Alt+F1 in VS Code, or set editor.accessibilitySupport: on");
+                progress?.Report("⚠ VS Code needs screen-reader mode (Shift+Alt+F1)");
                 continue;
             }
 
-            AppLogger.Log($"[Enhanced UIA] {elemType} 시도: \"{Truncate(elemName, 60)}\"");
-            progress?.Report($"Enhanced UIA: {elemType} 텍스트 추출 중...");
+            AppLogger.Log($"[Enhanced UIA] {elemType}: \"{Truncate(elemName, 60)}\"");
+            progress?.Report($"Enhanced UIA: {elemType} — extracting text...");
 
             string? textPatternResult = TryTextPatternOnElement(contentElem);
             if (!string.IsNullOrWhiteSpace(textPatternResult))
             {
-                AppLogger.Log($"[Enhanced UIA] TextPattern 결과 | {textPatternResult.Length}자");
+                AppLogger.Log($"[Enhanced UIA] TextPattern | {textPatternResult.Length} chars");
                 if (textPatternResult.Length > (bestResult?.Length ?? 0))
                 {
                     scrap?.WriteAll(textPatternResult);
@@ -194,7 +194,7 @@ internal sealed class ChromiumTextCapture
             string? deepResult = TryDeepCollect(contentElem, ct, progress, scrap, askContinue, scroll, pickPoint);
             if (!string.IsNullOrWhiteSpace(deepResult))
             {
-                AppLogger.Log($"[Enhanced UIA] DeepCollect 결과 | {deepResult.Length}자");
+                AppLogger.Log($"[Enhanced UIA] DeepCollect | {deepResult.Length} chars");
                 if (deepResult.Length > (bestResult?.Length ?? 0))
                     bestResult = deepResult;
             }
@@ -203,11 +203,11 @@ internal sealed class ChromiumTextCapture
         if (!string.IsNullOrWhiteSpace(bestResult))
         {
             bool cancelled = ct.IsCancellationRequested;
-            AppLogger.Log($"[Enhanced UIA] 최종 결과: {bestResult.Length}자{(cancelled ? " (취소로 부분 결과)" : "")}");
+            AppLogger.Log($"[Enhanced UIA] final: {bestResult.Length} chars{(cancelled ? " (partial, cancelled)" : "")}");
             return bestResult;
         }
 
-        AppLogger.Log("[Enhanced UIA] 모든 콘텐츠 요소에서 텍스트 추출 실패");
+        AppLogger.Log("[Enhanced UIA] could not extract text from any content element");
         return null;
     }
 
@@ -225,7 +225,7 @@ internal sealed class ChromiumTextCapture
         }
         catch (Exception ex)
         {
-            AppLogger.LogError("[Enhanced UIA] TextPattern 예외", ex);
+            AppLogger.LogError("[Enhanced UIA] TextPattern threw", ex);
         }
         return null;
     }
@@ -247,7 +247,7 @@ internal sealed class ChromiumTextCapture
         bool canMouseWheel = !bounds.IsEmpty && bounds.Width > 0 && bounds.Height > 0;
         if (!canMouseWheel)
         {
-            AppLogger.Log("[Enhanced UIA] DeepCollect: BoundingRectangle 없음, 스크롤 불가");
+            AppLogger.Log("[Enhanced UIA] DeepCollect: no BoundingRectangle, cannot scroll");
             var c = new HashSet<string>();
             var l = new List<string>();
             CollectElementText(element, c, l);
@@ -282,7 +282,7 @@ internal sealed class ChromiumTextCapture
         {
             scrollX = pickPoint.Value.X;
             scrollY = pickPoint.Value.Y;
-            AppLogger.Log($"[Enhanced UIA] DeepCollect 스크롤 위치: 픽포인트 ({scrollX},{scrollY})");
+            AppLogger.Log($"[Enhanced UIA] DeepCollect scroll point: ({scrollX},{scrollY})");
         }
         else
         {
@@ -295,7 +295,7 @@ internal sealed class ChromiumTextCapture
         CollectElementText(element, collected, lines);
         if (lines.Count > 0)
             scrap?.WriteLines(lines);
-        AppLogger.Log($"[Enhanced UIA] DeepCollect 초기 수집: {lines.Count}줄");
+        AppLogger.Log($"[Enhanced UIA] DeepCollect first pass: {lines.Count} lines");
 
         int maxScrollAttempts = scroll.MaxAttempts;
         const long noNewTextStopMs = 20_000;
@@ -306,13 +306,13 @@ internal sealed class ChromiumTextCapture
         {
             if (ct.IsCancellationRequested)
             {
-                AppLogger.Log($"[Enhanced UIA] DeepCollect: 취소됨 — 부분 결과 반환 ({lines.Count}줄)");
+                AppLogger.Log($"[Enhanced UIA] DeepCollect: cancelled — returning {lines.Count} lines");
                 break;
             }
 
             if (NativeMethods.GetForegroundWindow() != fgWindow)
             {
-                AppLogger.Log("[Enhanced UIA] DeepCollect: 포커스 상실 → 스크롤 종료");
+                AppLogger.Log("[Enhanced UIA] DeepCollect: lost focus — stopping the scroll");
                 break;
             }
 
@@ -332,17 +332,17 @@ internal sealed class ChromiumTextCapture
                 var newLines = lines.GetRange(linesBefore, lines.Count - linesBefore);
                 scrap?.WriteLines(newLines);
                 lastNewTextTick = Environment.TickCount64;
-                AppLogger.Log($"[Enhanced UIA] DeepCollect #{attempt}: +{newLines.Count}줄 (총 {lines.Count}줄)");
+                AppLogger.Log($"[Enhanced UIA] DeepCollect #{attempt}: +{newLines.Count} lines ({lines.Count} total)");
 
                 // 날짜 범위 필터: 시작일 이전 날짜 감지 → 스크롤 중지
                 if (scroll.FilterStartDate.HasValue && DateMatchHelper.ShouldStopScrolling(newLines, scroll.FilterStartDate.Value))
                 {
-                    AppLogger.Log($"[Filter] 시작일({scroll.FilterStartDate.Value:yyyy-MM-dd}) 이전 날짜 감지 → DeepCollect 스크롤 중지");
+                    AppLogger.Log($"[Filter] start date ({scroll.FilterStartDate.Value:yyyy-MM-dd}) reached an older date — stopping the DeepCollect scroll");
                     break;
                 }
 
                 if (attempt % 5 == 0)
-                    progress?.Report($"Enhanced UIA 스크롤 중... ({attempt}, {lines.Count}줄)");
+                    progress?.Report($"Enhanced UIA scrolling... ({attempt}, {lines.Count} lines)");
                 continue;
             }
 
@@ -350,12 +350,12 @@ internal sealed class ChromiumTextCapture
             if (elapsed < noNewTextStopMs)
                 continue;
 
-            AppLogger.Log($"[Enhanced UIA] DeepCollect #{attempt}: {elapsed / 1000}초간 새 텍스트 없음 → 자동 종료");
-            progress?.Report($"스크롤 자동 종료 — {elapsed / 1000}초간 새 텍스트 없음");
+            AppLogger.Log($"[Enhanced UIA] DeepCollect #{attempt}: no new text for {elapsed / 1000}s — stopping");
+            progress?.Report($"Scroll stopped — no new text for {elapsed / 1000}s");
             break;
         }
 
-        AppLogger.Log($"[Enhanced UIA] DeepCollect 완료: {lines.Count}줄, {string.Join(Environment.NewLine, lines).Length}자");
+        AppLogger.Log($"[Enhanced UIA] DeepCollect done: {lines.Count} lines, {string.Join(Environment.NewLine, lines).Length} chars");
         return lines.Count > 0 ? string.Join(Environment.NewLine, lines) : null;
     }
 
@@ -386,7 +386,7 @@ internal sealed class ChromiumTextCapture
         }
         catch (Exception ex)
         {
-            AppLogger.LogError("[Enhanced UIA] CollectElementText 예외", ex);
+            AppLogger.LogError("[Enhanced UIA] CollectElementText threw", ex);
         }
     }
 

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Threading;
 using System.Windows.Automation;
 
@@ -30,7 +30,7 @@ internal static class ElementTreeScanner
         }
         catch (Exception ex)
         {
-            AppLogger.LogError("[Main] ScanElementTree 예외", ex);
+            AppLogger.LogError("[Main] ScanElementTree threw", ex);
             return null;
         }
     }

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -100,7 +100,7 @@ internal sealed class ConsoleHostWindow : Window
             Cursor = Cursors.Hand,
         };
         var ctx = new ContextMenu();
-        ctx.Items.Add(CreateMenuItem("기본콘솔 (cmd)", "cmd.exe"));
+        ctx.Items.Add(CreateMenuItem("Default console (cmd)", "cmd.exe"));
         ctx.Items.Add(CreateMenuItem("PowerShell 5", "powershell.exe"));
         ctx.Items.Add(CreateMenuItem("PowerShell 7 (pwsh)", "pwsh.exe"));
         addBtn.ContextMenu = ctx;
@@ -169,7 +169,7 @@ internal sealed class ConsoleHostWindow : Window
 
         // Windows 11: 기본 터미널이 Windows Terminal이므로 conhost.exe로 강제
         string conhost = Path.Combine(Environment.SystemDirectory, "conhost.exe");
-        AppLogger.Log($"[CLI] 콘솔 시작: conhost.exe {exe}, panel=0x{panel.Handle:X8}");
+        AppLogger.Log($"[CLI] console start: conhost.exe {exe}, panel=0x{panel.Handle:X8}");
 
         var psi = new ProcessStartInfo
         {
@@ -182,7 +182,7 @@ internal sealed class ConsoleHostWindow : Window
         try { proc = Process.Start(psi)!; }
         catch (Exception ex)
         {
-            AppLogger.Log($"[CLI] 콘솔 시작 실패: {exe} | {ex.Message}");
+            AppLogger.Log($"[CLI] console start failed: {exe} | {ex.Message}");
             _hostGrid.Children.Remove(host);
             return;
         }
@@ -219,7 +219,7 @@ internal sealed class ConsoleHostWindow : Window
                     if (child.MainWindowHandle != IntPtr.Zero)
                     {
                         hwnd = child.MainWindowHandle;
-                        AppLogger.Log($"[CLI] 자식 프로세스: 0x{hwnd:X8} (child PID={child.Id})");
+                        AppLogger.Log($"[CLI] child process: 0x{hwnd:X8} (child PID={child.Id})");
                         break;
                     }
                 }
@@ -230,7 +230,7 @@ internal sealed class ConsoleHostWindow : Window
 
         if (hwnd == IntPtr.Zero)
         {
-            AppLogger.Log($"[CLI] 콘솔 핸들 취득 실패: {exe} (PID={pid})");
+            AppLogger.Log($"[CLI] could not get the console handle: {exe} (PID={pid})");
             try { proc.Kill(); } catch { }
             _hostGrid.Children.Remove(host);
             return;
@@ -240,7 +240,7 @@ internal sealed class ConsoleHostWindow : Window
         NativeMethods.ShowWindow(hwnd, NativeMethods.SW_HIDE);
 
         int style = NativeMethods.GetWindowLong(hwnd, NativeMethods.GWL_STYLE);
-        AppLogger.Log($"[CLI] 원본 스타일: 0x{style:X8}");
+        AppLogger.Log($"[CLI] original style: 0x{style:X8}");
         style = NativeMethods.WS_CHILD | NativeMethods.WS_VISIBLE;
         NativeMethods.SetWindowLong(hwnd, NativeMethods.GWL_STYLE, style);
 
@@ -263,7 +263,7 @@ internal sealed class ConsoleHostWindow : Window
         _tabBar.Children.Add(tabBtn);
 
         _tabs.Add(new ConsoleTab(title, proc, hwnd, host, panel, tabBtn));
-        AppLogger.Log($"[CLI] 콘솔 추가: {title} (PID={proc.Id})");
+        AppLogger.Log($"[CLI] console added: {title} (PID={proc.Id})");
         ActivateTab(tabIndex);
     }
 

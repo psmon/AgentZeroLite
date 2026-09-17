@@ -1,4 +1,4 @@
-namespace Agent.Common.Actors;
+﻿namespace Agent.Common.Actors;
 
 /// <summary>
 /// Pure mapping from an external agent CLI's hook event (Claude Code hook
@@ -56,12 +56,12 @@ public static class AgentHookMapper
     {
         var baseText = phase switch
         {
-            AgentLoopPhase.Idle       => "세션 준비",
-            AgentLoopPhase.Thinking   => "생각 중",
-            AgentLoopPhase.Generating => "생성 중",
-            AgentLoopPhase.Acting     => "도구 실행",
-            AgentLoopPhase.Done       => "완료",
-            AgentLoopPhase.Error      => "오류",
+            AgentLoopPhase.Idle       => "session ready",
+            AgentLoopPhase.Thinking   => "thinking",
+            AgentLoopPhase.Generating => "generating",
+            AgentLoopPhase.Acting     => "running tools",
+            AgentLoopPhase.Done       => "done",
+            AgentLoopPhase.Error      => "error",
             _                         => hookEvent,
         };
         return string.IsNullOrWhiteSpace(detail) ? baseText : $"{baseText} — {detail}";

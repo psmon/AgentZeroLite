@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using AgentZeroWpf.Module;
@@ -160,7 +160,7 @@ public partial class SettingsPanel : UserControl
 
         string newPath = string.Join(';', parts);
         Environment.SetEnvironmentVariable("Path", newPath, EnvironmentVariableTarget.User);
-        AppLogger.Log($"[PATH] 등록 완료: {appDir}");
+        AppLogger.Log($"[PATH] registered: {appDir}");
         RefreshPathStatus();
     }
 

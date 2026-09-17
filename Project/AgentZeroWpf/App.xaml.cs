@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -42,7 +42,7 @@ public partial class App : Application
         if (!createdNew)
         {
             System.Windows.MessageBox.Show(
-                "AgentZero가 이미 실행 중입니다. 작업관리자에서 확인해주세요.",
+                "AgentZero is already running. Check Task Manager.",
                 "AgentZero",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

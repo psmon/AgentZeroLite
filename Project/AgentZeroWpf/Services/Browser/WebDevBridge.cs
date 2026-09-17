@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows.Threading;
@@ -451,7 +451,7 @@ public sealed class WebDevBridge
                 var current = Mp3SettingsStore.Load().ScanFolder;
                 var dlg = new Microsoft.Win32.OpenFolderDialog
                 {
-                    Title = "MP3 폴더 선택 — 하위 폴더까지 스캔합니다",
+                    Title = "Pick an MP3 folder — subfolders are scanned too",
                 };
                 if (!string.IsNullOrWhiteSpace(current) && Directory.Exists(current))
                     dlg.InitialDirectory = current;
