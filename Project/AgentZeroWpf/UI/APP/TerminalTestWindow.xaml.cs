@@ -11,7 +11,7 @@ public partial class TerminalTestWindow : Window
     {
         InitializeComponent();
 
-        TestTerm.Theme = new TerminalTheme
+        TestTerm.Theme = new Microsoft.Terminal.Wpf.TerminalTheme
         {
             DefaultBackground = EasyTerminalControl.ColorToVal(Color.FromRgb(0x0A, 0x0A, 0x12)),
             DefaultForeground = EasyTerminalControl.ColorToVal(Color.FromRgb(0xD4, 0xD4, 0xD4)),

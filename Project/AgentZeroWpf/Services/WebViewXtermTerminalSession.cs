@@ -123,6 +123,12 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
         try
         {
             _host.Write(text);
+            // The success line is half of the freeze triage: a tab with no "write ok"
+            // while its sibling logs them failed upstream of here; lines present with
+            // no echo means the failure is in the pipe. Same reasoning, and the same
+            // shape, as ConPtyTerminalSession.
+            AppLogger.Log($"[XtermSession] write ok | id={_internalId} label={_sessionId} " +
+                          $"bytes={text.Length} outLen={OutputLength}");
             NoteInputAttempt($"write bytes={text.Length}");
         }
         catch (Exception ex)
@@ -145,28 +151,57 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
 
     public async Task WriteAsync(ReadOnlyMemory<char> text, CancellationToken ct = default)
     {
-        if (_disposed || !_host.IsRunning) return;
+        // Rejections are logged rather than silent: a bot write that vanishes here
+        // and a bot write that vanished upstream look identical otherwise.
+        if (_disposed)
+        {
+            AppLogger.Log($"[XtermSession] WriteAsync rejected: disposed | id={_internalId} label={_sessionId} bytes={text.Length}");
+            return;
+        }
+        if (!_host.IsRunning)
+        {
+            AppLogger.Log($"[XtermSession] WriteAsync rejected: host not running | id={_internalId} label={_sessionId} bytes={text.Length}");
+            return;
+        }
 
         if (text.Length <= SmallThreshold)
         {
-            try { _host.Write(text.Span); }
+            try
+            {
+                _host.Write(text.Span);
+                AppLogger.Log($"[XtermSession] writeAsync small ok | id={_internalId} label={_sessionId} bytes={text.Length}");
+            }
             catch (Exception ex)
             {
                 AppLogger.Log($"[XtermSession] writeAsync small failed | id={_internalId} bytes={text.Length} error={ex.GetType().Name}: {ex.Message}");
             }
             return;
         }
+
+        AppLogger.Log($"[XtermSession] writeAsync queued | id={_internalId} label={_sessionId} bytes={text.Length}");
         await _writeChannel.Writer.WriteAsync(text, ct);
     }
 
     public void SendControl(TerminalControl control)
     {
-        if (_disposed || !_host.IsRunning) return;
+        // send_to_terminal and send_key are the two paths the bot uses, and its
+        // freeze symptom is "neither lands" - so both outcomes are recorded.
+        if (_disposed)
+        {
+            AppLogger.Log($"[XtermSession] SendControl rejected: disposed | id={_internalId} label={_sessionId} control={control}");
+            return;
+        }
+        if (!_host.IsRunning)
+        {
+            AppLogger.Log($"[XtermSession] SendControl rejected: host not running | id={_internalId} label={_sessionId} control={control}");
+            return;
+        }
         var seq = TerminalControlSequences.ToSequence(control);
         if (seq.Length == 0) return;
         try
         {
             _host.Write(seq.AsSpan());
+            AppLogger.Log($"[XtermSession] control ok | id={_internalId} label={_sessionId} control={control}");
             if (control != TerminalControl.ClearScreen)
                 NoteInputAttempt($"control={control}");
         }
@@ -183,6 +218,7 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
         {
             await foreach (var text in _writeChannel.Reader.ReadAllAsync(ct))
             {
+                AppLogger.Log($"[XtermSession] writeLoop start | id={_internalId} label={_sessionId} totalBytes={text.Length}");
                 var ok = true;
                 for (var i = 0; i < text.Length; i += ChunkSize)
                 {
@@ -199,7 +235,18 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
                 }
                 if (!ok) continue;
                 await Task.Delay(FinalDelayMs, ct);
-                try { _host.Write("\r".AsSpan()); } catch { }
+                try
+                {
+                    _host.Write("\r".AsSpan());
+                    AppLogger.Log($"[XtermSession] writeLoop end ok | id={_internalId} label={_sessionId} totalBytes={text.Length}");
+                }
+                catch (Exception ex)
+                {
+                    // A swallowed failure here means a large payload landed with no submit -
+                    // the text is on screen and nothing happens, which is the hardest shape
+                    // of this bug to diagnose from the outside.
+                    AppLogger.Log($"[XtermSession] writeLoop final CR failed | id={_internalId} error={ex.GetType().Name}: {ex.Message}");
+                }
             }
         }
         catch (OperationCanceledException) { }

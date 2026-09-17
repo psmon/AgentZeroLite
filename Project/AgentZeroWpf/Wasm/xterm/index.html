@@ -2,10 +2,31 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <!-- font-src 'self': the faces below are served from vendor/fonts/ over the
+       term.local virtual host. Still no network — 'self' here is the local
+       folder mapping, and default-src stays 'none'. -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+        content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';">
   <link rel="stylesheet" href="vendor/xterm.css">
   <style>
+    /* JetBrains Mono, shipped with the app (OFL 1.1 — see vendor/fonts/OFL.txt).
+       Three faces because that is what xterm.js asks for; it synthesises nothing
+       else, so the rest of the family would be dead weight in every download. */
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('vendor/fonts/JetBrainsMono-Regular.ttf') format('truetype');
+      font-weight: 400; font-style: normal; font-display: block;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('vendor/fonts/JetBrainsMono-Bold.ttf') format('truetype');
+      font-weight: 700; font-style: normal; font-display: block;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('vendor/fonts/JetBrainsMono-Italic.ttf') format('truetype');
+      font-weight: 400; font-style: italic; font-display: block;
+    }
     html, body { margin: 0; height: 100%; background: #1e1e1e; overflow: hidden; }
     #term { position: absolute; inset: 0; padding: 4px; box-sizing: border-box; }
   </style>

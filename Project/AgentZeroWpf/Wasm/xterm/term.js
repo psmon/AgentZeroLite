@@ -4,14 +4,23 @@
 //   host → JS : { type: 'out', data }  write VT to the screen
 //               { type: 'clear' }       clear the viewport
 //               { type: 'focus' }       focus the terminal
+//               { type: 'config', fontFamily, fontSize, lineHeight, theme }
+//                                       appearance, owned by TerminalSettings in C#
 //   JS → host : { type: 'ready',  cols, rows }  renderer initialised
 //               { type: 'in',     data }        user keystrokes / paste
 //               { type: 'resize', cols, rows }  viewport reflowed
 //               { type: 'screen', data }        the visible viewport, debounced
+//               { type: 'fontstatus', family, loaded, cellWidth }
+//                                       did the configured face actually load
 (function () {
+  // Appearance is the host's to decide (TerminalSettings), but it arrives as a
+  // message and the renderer must be usable before it does. These are the same
+  // values the C# defaults carry, so the first frame never flashes a different
+  // look on its way to the configured one.
   var term = new window.Terminal({
-    fontFamily: 'Cascadia Mono, Consolas, monospace',
+    fontFamily: 'JetBrains Mono, Cascadia Mono, Consolas, monospace',
     fontSize: 14,
+    lineHeight: 1.0,
     cursorBlink: true,
     allowProposedApi: true,
     // scrollback kept generous so screen-scrapers (approval parser, state
@@ -19,6 +28,51 @@
     scrollback: 5000,
     theme: { background: '#1e1e1e', foreground: '#d4d4d4' }
   });
+
+  // Cell size is measured from the font, so a face that arrives after the first
+  // measurement leaves every column in the wrong place. Applying config and
+  // re-fitting is cheap; doing it twice is cheaper than getting it wrong once.
+  function applyConfig(cfg) {
+    if (!cfg) return;
+    try {
+      if (cfg.fontFamily) term.options.fontFamily = cfg.fontFamily;
+      if (cfg.fontSize) term.options.fontSize = cfg.fontSize;
+      if (cfg.lineHeight) term.options.lineHeight = cfg.lineHeight;
+      if (cfg.theme) term.options.theme = cfg.theme;
+    } catch (e) {}
+    afterFonts(function () { doFit(); reportFont(); });
+  }
+
+  // A web font that fails to load is silent: the stack falls through and the
+  // terminal keeps working in the fallback, looking almost right. Ask the
+  // renderer whether the first family in the stack is really there, and report
+  // the measured cell width so a mis-measured grid is visible too.
+  function reportFont() {
+    try {
+      var first = String(term.options.fontFamily || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
+      var spec = term.options.fontSize + 'px "' + first + '"';
+      post({
+        type: 'fontstatus',
+        family: first,
+        loaded: !!(document.fonts && document.fonts.check(spec)),
+        cellWidth: (term._core && term._core._renderService && term._core._renderService.dimensions
+          && term._core._renderService.dimensions.css
+          && term._core._renderService.dimensions.css.cell
+          ? Math.round(term._core._renderService.dimensions.css.cell.width * 100) / 100
+          : 0)
+      });
+    } catch (e) {}
+  }
+
+  // document.fonts.ready resolves once the @font-face files in index.html are in.
+  // Without this the first fit measures the fallback and the grid is off until
+  // something else forces a reflow.
+  function afterFonts(fn) {
+    try {
+      if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fn); return; }
+    } catch (e) {}
+    fn();
+  }
 
   var fit = new window.FitAddon.FitAddon();
   term.loadAddon(fit);
@@ -45,6 +99,7 @@
   var host = document.getElementById('term');
   term.open(host);
   try { fit.fit(); } catch (e) {}
+  afterFonts(function () { doFit(); });
 
   var wv = window.chrome && window.chrome.webview;
   function post(o) { if (wv) { try { wv.postMessage(o); } catch (e) {} } }
@@ -94,6 +149,7 @@
       if (m.type === 'out') { term.write(m.data, scheduleScreen); }
       else if (m.type === 'clear') { term.clear(); scheduleScreen(); }
       else if (m.type === 'focus') { term.focus(); }
+      else if (m.type === 'config') { applyConfig(m); }
     });
   }
 

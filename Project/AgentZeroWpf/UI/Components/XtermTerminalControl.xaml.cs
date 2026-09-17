@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using Agent.Common.Services;
 using AgentZeroWpf.Services;
 using Microsoft.Web.WebView2.Core;
 
@@ -138,6 +139,7 @@ public partial class XtermTerminalControl : UserControl
             {
                 case "ready":
                     ApplyResizeFromMessage(root);
+                    PostAppearance();      // before the flush, so buffered output lands already styled
                     FlushPending();
                     break;
                 case "in":
@@ -161,6 +163,15 @@ public partial class XtermTerminalControl : UserControl
                                       $"bound={(Session is null ? "no session yet" : "session")}");
                     }
                     break;
+                case "fontstatus":
+                    // Reported once per config apply. "loaded=false" means the stack
+                    // fell through to a fallback - the terminal still works, it just
+                    // is not the font that was asked for.
+                    AppLogger.Log(
+                        $"[Xterm] font | family={(root.TryGetProperty("family", out var ff) ? ff.GetString() : "?")} " +
+                        $"loaded={(root.TryGetProperty("loaded", out var fl) && fl.ValueKind == JsonValueKind.True)} " +
+                        $"cellWidth={(root.TryGetProperty("cellWidth", out var cw) ? cw.ToString() : "?")}");
+                    break;
                 case "link":
                     // Ctrl+click on a URL inside xterm.js (web-links addon /
                     // OSC 8). Open in the user's default browser — scheme is
@@ -173,6 +184,58 @@ public partial class XtermTerminalControl : UserControl
         catch (Exception ex)
         {
             AppLogger.Log($"[Xterm] web message parse failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Hands the renderer the appearance from <see cref="TerminalSettings"/>. The
+    /// EasyConPty backend built a <c>Microsoft.Terminal.Wpf.TerminalTheme</c> in C#;
+    /// this is the same idea over the message channel, which is why the font is a CSS
+    /// stack rather than an installed family — the renderer is a browser, so the
+    /// shipped JetBrains Mono and any fallback the user names both just work.
+    /// </summary>
+    private void PostAppearance()
+    {
+        try
+        {
+            var s = TerminalSettingsStore.Load();
+            var t = s.Theme;
+            PostJsonToWeb(new
+            {
+                type = "config",
+                fontFamily = s.EffectiveFontFamily,
+                fontSize = s.EffectiveFontSize,
+                lineHeight = s.EffectiveLineHeight,
+                theme = new
+                {
+                    background = t.Background,
+                    foreground = t.Foreground,
+                    cursor = t.Cursor,
+                    selectionBackground = t.SelectionBackground,
+                    black = t.Black,
+                    red = t.Red,
+                    green = t.Green,
+                    yellow = t.Yellow,
+                    blue = t.Blue,
+                    magenta = t.Magenta,
+                    cyan = t.Cyan,
+                    white = t.White,
+                    brightBlack = t.BrightBlack,
+                    brightRed = t.BrightRed,
+                    brightGreen = t.BrightGreen,
+                    brightYellow = t.BrightYellow,
+                    brightBlue = t.BrightBlue,
+                    brightMagenta = t.BrightMagenta,
+                    brightCyan = t.BrightCyan,
+                    brightWhite = t.BrightWhite,
+                },
+            });
+            AppLogger.Log($"[Xterm] appearance | font=\"{s.EffectiveFontFamily}\" " +
+                          $"size={s.EffectiveFontSize} lineHeight={s.EffectiveLineHeight:0.##}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Xterm] appearance failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -197,6 +260,20 @@ public partial class XtermTerminalControl : UserControl
             PostToWeb("out", chunk);
         // Match the pseudo-console to the renderer's fitted size.
         _host?.Resize(_cols, _rows);
+    }
+
+    /// <summary>Post an arbitrary message object; <see cref="PostToWeb"/> is the
+    /// two-field shorthand for the hot path.</summary>
+    private void PostJsonToWeb(object message)
+    {
+        try
+        {
+            Web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Xterm] PostWebMessage failed: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     private void PostToWeb(string type, string data)
