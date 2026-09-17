@@ -1994,30 +1994,12 @@ public partial class MainWindow : Window
 
     private void OnSidebarSettingsClick(object sender, RoutedEventArgs e)
     {
-        // Toggle. Settings is now a full overlay (Grid.Column 1, RowSpan 3,
-        // ColumnSpan 3) just like WebDev — the airspace fix applies to it
-        // for the same reason: ConPTY native HwndHost would otherwise punch
-        // through. EnterOverlayMode collapses CliPanel + BotDockArea so the
-        // underlying HWNDs get SW_HIDE'd, ExitOverlayMode (called from
-        // CloseSettings) restores them.
-        if (SettingsPanel.Visibility == Visibility.Visible)
-        {
-            DumpDockLayout("settings-close-before");
-            CloseSettings();
-            DumpDockLayout("settings-close-after");
-            return;
-        }
-
-        DumpDockLayout("settings-open-before");
-        CloseWebDev();
-        CloseScrap();
-        CloseHarnessView();
-        CloseNote();
-        CloseDiffReview();
-        CloseWearable();
-        EnterOverlayMode();
-        SettingsPanel.Visibility = Visibility.Visible;
-        DumpDockLayout("settings-open-after");
+        // SETTINGS-LAYOUT-DIAG — the dock layout is dumped either side of the
+        // round-trip; the "Document jumps to the left pane" bug lived here.
+        var opening = ActivePage != AppPage.Settings;
+        DumpDockLayout(opening ? "settings-open-before" : "settings-close-before");
+        TogglePage(AppPage.Settings);
+        DumpDockLayout(opening ? "settings-open-after" : "settings-close-after");
     }
 
     /// <summary>
@@ -2341,11 +2323,7 @@ public partial class MainWindow : Window
         SaveCliGroups();
     }
 
-    private void SwitchToCliPanel()
-    {
-        CloseWebDev();
-        CloseSettings();
-    }
+    private void SwitchToCliPanel() => ShowPage(AppPage.None);
 
     private NoteWindow? _noteWindow;
     private string? _noteEmbeddedDir;
@@ -2382,35 +2360,22 @@ public partial class MainWindow : Window
             _noteEmbeddedDir = dirPath;
         }
 
-        CloseWebDev();
-        CloseSettings();
-        CloseScrap();
-        CloseHarnessView();
-        CloseDiffReview();
-        CloseWearable();
-        EnterOverlayMode();
-        NotePage.Visibility = Visibility.Visible;
+        ShowPage(AppPage.Note);
     }
 
     private void OnActivityNoteClick(object sender, RoutedEventArgs e)
     {
-        if (NotePage.Visibility == Visibility.Visible)
+        if (ActivePage == AppPage.Note)
         {
-            CloseNote();
+            ShowPage(AppPage.None);
             return;
         }
-        OpenNoteTab();
+        OpenNoteTab();   // builds/reparents the note surface, then shows the page
     }
 
     private void CloseNote()
     {
-        if (NotePage.Visibility != Visibility.Visible) return;
-        NotePage.Visibility = Visibility.Collapsed;
-        if (WebDevPage.Visibility != Visibility.Visible &&
-            SettingsPanel.Visibility != Visibility.Visible &&
-            ScrapPage.Visibility != Visibility.Visible &&
-            HarnessViewPage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.Note) ShowPage(AppPage.None);
     }
 
 
@@ -3705,16 +3670,11 @@ public partial class MainWindow : Window
 
     private void OnActivityBotClick(object sender, RoutedEventArgs e)
     {
-        // Bot icon must take over from any active overlay (WebDev / Settings /
-        // Scrap / HarnessView / Note). All overlays collapse CliPanel +
-        // BotDockArea, and a bot toggle would otherwise be invisible because
-        // the overlay still covers the entire right area.
-        CloseWebDev();
-        CloseScrap();
-        CloseSettings();
-        CloseHarnessView();
-        CloseNote();
-        CloseDiffReview();
+        // The bot icon takes over from whatever page is up: every page collapses
+        // CliPanel + BotDockArea, so a bot toggle underneath one would be invisible.
+        // "Whatever page" is the point - this used to list them by hand and had
+        // forgotten Remote and Wearable.
+        ShowPage(AppPage.None);
         OnSidebarBotClick(sender, e);
     }
 
@@ -3735,20 +3695,7 @@ public partial class MainWindow : Window
             _floatingScrapWindow.Activate();
             return;
         }
-
-        if (ScrapPage.Visibility == Visibility.Visible)
-        {
-            CloseScrap();
-            return;
-        }
-        CloseWebDev();
-        CloseSettings();
-        CloseHarnessView();
-        CloseNote();
-        CloseDiffReview();
-        CloseWearable();
-        EnterOverlayMode();
-        ScrapPage.Visibility = Visibility.Visible;
+        TogglePage(AppPage.Scrap);
     }
 
     // ====================================================================
@@ -3757,29 +3704,12 @@ public partial class MainWindow : Window
 
     private void OnActivityHarnessClick(object sender, RoutedEventArgs e)
     {
-        if (HarnessViewPage.Visibility == Visibility.Visible)
-        {
-            CloseHarnessView();
-            return;
-        }
-        CloseWebDev();
-        CloseSettings();
-        CloseScrap();
-        CloseWearable();
-        EnterOverlayMode();
-        HarnessViewPage.Visibility = Visibility.Visible;
+        TogglePage(AppPage.Harness);
     }
 
     private void CloseHarnessView()
     {
-        if (HarnessViewPage.Visibility != Visibility.Visible) return;
-        HarnessViewPage.Visibility = Visibility.Collapsed;
-        if (WebDevPage.Visibility != Visibility.Visible &&
-            SettingsPanel.Visibility != Visibility.Visible &&
-            ScrapPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible &&
-            DiffReviewPage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.Harness) ShowPage(AppPage.None);
     }
 
     // ====================================================================
@@ -3789,31 +3719,14 @@ public partial class MainWindow : Window
 
     private void OnActivityDiffClick(object sender, RoutedEventArgs e)
     {
-        if (DiffReviewPage.Visibility == Visibility.Visible)
-        {
-            CloseDiffReview();
-            return;
-        }
-        CloseWebDev();
-        CloseSettings();
-        CloseScrap();
-        CloseHarnessView();
-        ConfigureDiffReviewPanel();
-        CloseWearable();
-        EnterOverlayMode();
-        DiffReviewPage.Visibility = Visibility.Visible;
+        // The panel is configured for the current workspace each time it opens.
+        if (ActivePage != AppPage.Diff) ConfigureDiffReviewPanel();
+        TogglePage(AppPage.Diff);
     }
 
     private void CloseDiffReview()
     {
-        if (DiffReviewPage.Visibility != Visibility.Visible) return;
-        DiffReviewPage.Visibility = Visibility.Collapsed;
-        if (WebDevPage.Visibility != Visibility.Visible &&
-            SettingsPanel.Visibility != Visibility.Visible &&
-            ScrapPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible &&
-            HarnessViewPage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.Diff) ShowPage(AppPage.None);
     }
 
     private bool _diffReviewConfigured;
@@ -3932,11 +3845,7 @@ public partial class MainWindow : Window
 
         // Show Scrap as the active overlay after re-dock so the operator sees
         // their work without having to click the ActivityBar icon again.
-        CloseWebDev();
-        CloseSettings();
-        CloseWearable();
-        EnterOverlayMode();
-        panel.Visibility = Visibility.Visible;
+        ShowPage(AppPage.Scrap);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -3959,6 +3868,103 @@ public partial class MainWindow : Window
     // CliPanel.Visibility serves as the "are we in overlay mode" flag.
     private Visibility? _botDockVisBeforeOverlay;
 
+    // ─────────────────────────────────────────────────────────────────────
+    //  Overlay pages — one visible at a time, decided here and nowhere else
+    // ─────────────────────────────────────────────────────────────────────
+    //
+    // Every page below is declared in the same Grid cell (Column 1, ColumnSpan 3,
+    // RowSpan 3), so when two are Visible the one declared last wins. That used to
+    // be the mechanism: each handler collapsed the pages it remembered, and
+    // declaration order covered the rest. With eight pages that is 56 hand-written
+    // references to keep in sync, and they were not: Remote was missing from six of
+    // the seven open handlers and DiffReview from most of the close checks, so
+    // opening Remote and then clicking WebDev left both Visible and Remote — later
+    // in the XAML — simply stayed on top. The menu looked stuck.
+    //
+    // So visibility is derived from one value instead. ShowPage collapses every page
+    // and shows at most one, which makes declaration order irrelevant: two pages are
+    // never Visible together, so nothing can cover anything.
+    //
+    // ActivePage is computed rather than stored. Anything that sets a page's
+    // Visibility directly - an old code path, a designer, a future panel - is
+    // corrected on the next transition rather than desyncing a field.
+
+    private enum AppPage { None, Settings, WebDev, Scrap, Harness, Diff, Remote, Wearable, Note }
+
+    private static readonly AppPage[] OverlayPages =
+    {
+        AppPage.Settings, AppPage.WebDev, AppPage.Scrap, AppPage.Harness,
+        AppPage.Diff, AppPage.Remote, AppPage.Wearable, AppPage.Note,
+    };
+
+    private FrameworkElement? PanelFor(AppPage page) => page switch
+    {
+        AppPage.Settings => SettingsPanel,
+        AppPage.WebDev   => WebDevPage,
+        AppPage.Scrap    => ScrapPage,
+        AppPage.Harness  => HarnessViewPage,
+        AppPage.Diff     => DiffReviewPage,
+        AppPage.Remote   => RemotePage,
+        AppPage.Wearable => WearablePage,
+        AppPage.Note     => NotePage,
+        _ => null,
+    };
+
+    /// <summary>Which page is on screen, read off the panels themselves.</summary>
+    private AppPage ActivePage
+    {
+        get
+        {
+            foreach (var page in OverlayPages)
+                if (PanelFor(page)?.Visibility == Visibility.Visible) return page;
+            return AppPage.None;
+        }
+    }
+
+    /// <summary>
+    /// Show exactly one page, or <see cref="AppPage.None"/> to return to the CLI.
+    /// The only place an overlay page's Visibility is assigned.
+    /// </summary>
+    private void ShowPage(AppPage page)
+    {
+        var leaving = ActivePage;
+        if (leaving == page) return;
+
+        // Enter overlay mode first so the CLI's HWNDs are already hidden by the
+        // time the page paints - see EnterOverlayMode for why that ordering exists.
+        if (page != AppPage.None) EnterOverlayMode();
+
+        foreach (var p in OverlayPages)
+        {
+            if (PanelFor(p) is not { } panel) continue;
+            var want = p == page ? Visibility.Visible : Visibility.Collapsed;
+            if (panel.Visibility != want) panel.Visibility = want;
+        }
+
+        if (leaving != AppPage.None) OnLeftPage(leaving);
+        if (page == AppPage.None) ExitOverlayMode();
+
+        AppLogger.Log($"[Page] {leaving} -> {page}");
+    }
+
+    /// <summary>Click the icon of the page you are on and you go back to the CLI.</summary>
+    private void TogglePage(AppPage page) => ShowPage(ActivePage == page ? AppPage.None : page);
+
+    /// <summary>Per-page teardown. Visibility is not this method's business.</summary>
+    private void OnLeftPage(AppPage page)
+    {
+        if (page != AppPage.Settings) return;
+
+        // A settings round-trip could delete or reorder CliGroup rows and leave
+        // _activeGroupIndex stale. Snap it back WITHOUT calling ActivateGroup —
+        // that would rebuild the document pane and clobber the split layout this
+        // round-trip is meant to preserve.
+        if (_cliGroups.Count == 0)
+            _activeGroupIndex = -1;
+        else if (_activeGroupIndex < 0 || _activeGroupIndex >= _cliGroups.Count)
+            _activeGroupIndex = Math.Clamp(_activeGroupIndex, 0, _cliGroups.Count - 1);
+    }
+
     /// <summary>Hide CLI + bot dock so a full overlay can take their place.</summary>
     private void EnterOverlayMode()
     {
@@ -3980,18 +3986,7 @@ public partial class MainWindow : Window
 
     private void OnActivityWebDevClick(object sender, RoutedEventArgs e)
     {
-        if (WebDevPage.Visibility == Visibility.Visible)
-        {
-            CloseWebDev();
-            return;
-        }
-        CloseSettings();
-        CloseScrap();
-        CloseHarnessView();
-        CloseDiffReview();
-        CloseWearable();
-        EnterOverlayMode();
-        WebDevPage.Visibility = Visibility.Visible;
+        TogglePage(AppPage.WebDev);
     }
 
     /// <summary>
@@ -4001,14 +3996,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void CloseWebDev()
     {
-        if (WebDevPage.Visibility != Visibility.Visible) return;
-        WebDevPage.Visibility = Visibility.Collapsed;
-        if (SettingsPanel.Visibility != Visibility.Visible &&
-            ScrapPage.Visibility != Visibility.Visible &&
-            HarnessViewPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible &&
-            WearablePage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.WebDev) ShowPage(AppPage.None);
     }
 
     /// <summary>
@@ -4017,23 +4005,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void CloseSettings()
     {
-        if (SettingsPanel.Visibility != Visibility.Visible) return;
-        SettingsPanel.Visibility = Visibility.Collapsed;
-        // Defensive (#3): a future settings extension could delete/reorder
-        // CliGroup rows and leave _activeGroupIndex stale. Snap it back into
-        // range here WITHOUT calling ActivateGroup — ActivateGroup would rebuild
-        // the document pane and clobber the split layout this settings
-        // round-trip is meant to preserve.
-        if (_cliGroups.Count == 0)
-            _activeGroupIndex = -1;
-        else if (_activeGroupIndex < 0 || _activeGroupIndex >= _cliGroups.Count)
-            _activeGroupIndex = Math.Clamp(_activeGroupIndex, 0, _cliGroups.Count - 1);
-        if (WebDevPage.Visibility != Visibility.Visible &&
-            ScrapPage.Visibility != Visibility.Visible &&
-            HarnessViewPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible &&
-            WearablePage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.Settings) ShowPage(AppPage.None);
     }
 
     /// <summary>
@@ -4042,14 +4014,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void CloseScrap()
     {
-        if (ScrapPage.Visibility != Visibility.Visible) return;
-        ScrapPage.Visibility = Visibility.Collapsed;
-        if (WebDevPage.Visibility != Visibility.Visible &&
-            SettingsPanel.Visibility != Visibility.Visible &&
-            HarnessViewPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible &&
-            WearablePage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.Scrap) ShowPage(AppPage.None);
     }
 
     /// <summary>
@@ -4058,19 +4023,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnActivityRemoteClick(object sender, RoutedEventArgs e)
     {
-        if (RemotePage.Visibility == Visibility.Visible)
-        {
-            CloseRemote();
-            return;
-        }
-        CloseSettings();
-        CloseWebDev();
-        CloseScrap();
-        CloseHarnessView();
-        CloseDiffReview();
-        CloseWearable();
-        EnterOverlayMode();
-        RemotePage.Visibility = Visibility.Visible;
+        TogglePage(AppPage.Remote);
     }
 
     /// <summary>
@@ -4080,15 +4033,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void CloseRemote()
     {
-        if (RemotePage.Visibility != Visibility.Visible) return;
-        RemotePage.Visibility = Visibility.Collapsed;
-        if (WebDevPage.Visibility != Visibility.Visible &&
-            SettingsPanel.Visibility != Visibility.Visible &&
-            ScrapPage.Visibility != Visibility.Visible &&
-            HarnessViewPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible &&
-            WearablePage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.Remote) ShowPage(AppPage.None);
     }
 
     /// <summary>
@@ -4097,19 +4042,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnActivityWearableClick(object sender, RoutedEventArgs e)
     {
-        if (WearablePage.Visibility == Visibility.Visible)
-        {
-            CloseWearable();
-            return;
-        }
-        CloseSettings();
-        CloseWebDev();
-        CloseScrap();
-        CloseHarnessView();
-        CloseDiffReview();
-        CloseRemote();
-        EnterOverlayMode();
-        WearablePage.Visibility = Visibility.Visible;
+        TogglePage(AppPage.Wearable);
     }
 
     /// <summary>
@@ -4118,15 +4051,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void CloseWearable()
     {
-        if (WearablePage.Visibility != Visibility.Visible) return;
-        WearablePage.Visibility = Visibility.Collapsed;
-        if (WebDevPage.Visibility != Visibility.Visible &&
-            SettingsPanel.Visibility != Visibility.Visible &&
-            ScrapPage.Visibility != Visibility.Visible &&
-            HarnessViewPage.Visibility != Visibility.Visible &&
-            RemotePage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible)
-            ExitOverlayMode();
+        if (ActivePage == AppPage.Wearable) ShowPage(AppPage.None);
     }
 
     // =========================================================================
