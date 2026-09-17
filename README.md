@@ -1052,14 +1052,13 @@ whole product.
 
 ### ⌚ Sibling Repo — the device half
 
-<img src="Home/wearable/watch-apps.svg" width="100%"
-     alt="The watch's three apps fed by one host over one BLE link: AskBot as a real Akka remoting peer, Chat carrying audio both ways, and the Claude HUD showing session telemetry, plus the device-wide Settings">
+![The watch's apps fed by one host over one BLE link: AskBot as a real Akka remoting peer, Chat carrying audio both ways, the Claude HUD showing session telemetry, and the device-wide Settings](Home/wearable/watch-apps.png)
 
-<sub>From the sibling repo, where it is generated from the real LVGL layouts by
-<code>tools/gen_hero_svg.py</code> — when a screen moves, regenerate it there and copy it
-across rather than editing this one. The host it names <em>AkkaHost</em> is the project
-<code>ZeroWearable</code> was ported from; here it ships as
-<code>AgentZeroWearable.exe</code>.</sub>
+<sub>From the sibling repo, where `watch-apps.svg` beside this PNG is generated from the real
+LVGL layouts by `tools/gen_hero_svg.py` — when a screen moves, regenerate it there, copy it
+across and re-render the PNG, rather than editing either copy here. The host it names
+*AkkaHost* is the project `ZeroWearable` was ported from; here it ships as
+`AgentZeroWearable.exe`.</sub>
 
 AgentZero Lite talks to a wearable, and **only the PC half lives here.** The firmware is a
 separate project:
