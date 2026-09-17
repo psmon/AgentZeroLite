@@ -2904,6 +2904,9 @@ public partial class MainWindow : Window
     {
         dockManager.Theme = new AvalonDock.Themes.Vs2013DarkTheme();
         dockManager.ActiveContentChanged += OnDockActiveContentChanged;
+        // Before the window is shown — the only moment AllowsTransparency can be
+        // set. See OnFloatingWindowCreated.
+        dockManager.LayoutFloatingWindowControlCreated += OnFloatingWindowCreated;
         dockManager.DocumentClosing += OnDockDocumentClosing;
         dockManager.Layout.Updated += OnLayoutRootUpdated;
 
@@ -3316,6 +3319,17 @@ public partial class MainWindow : Window
         catch (Exception ex) { AppLogger.LogError("[Dock] Float failed", ex); }
     }
 
+    /// <summary>
+    /// The pane button's one action: out of the window if it is in, back into it
+    /// if it is out. One button rather than two, because at any moment only one of
+    /// those is something you can do to that tab.
+    /// </summary>
+    private void ToggleDocumentFloat(AvalonDock.Layout.LayoutDocument doc)
+    {
+        if (doc.IsFloating) RedockDocument(doc);
+        else FloatDocument(doc);
+    }
+
     private void OnDocTabFloat(object sender, RoutedEventArgs e)
     {
         if (GetContextDocument(sender) is { } doc) FloatDocument(doc);
@@ -3571,6 +3585,49 @@ public partial class MainWindow : Window
     private readonly HashSet<Window> _chromeStripped = new();
 
     /// <summary>
+    /// A detached terminal gets the whole window: no OS title bar repeating the
+    /// tab title shown right below it.
+    ///
+    /// <para>Set here rather than after the fact because this is the last moment
+    /// the window has no HWND yet, which is what several window properties
+    /// require. AvalonDock shows a floating window as soon as it makes one, so by
+    /// the time it appears in <c>FloatingWindows</c> that moment has passed.</para>
+    ///
+    /// <para><c>WindowStyle.None</c> and deliberately not <c>AllowsTransparency</c>,
+    /// which is what would additionally buy rounded corners and a shadow. A
+    /// transparent WPF window is a layered window, and a layered window does not
+    /// composite child HWNDs. The terminal is one: <c>Microsoft.Web.WebView2.Wpf.WebView2</c>
+    /// derives from <c>HwndHost</c>, so the terminal would not draw at all.</para>
+    ///
+    /// <para>That limit belongs to this control, not to WebView2 — the SDK also
+    /// ships <c>WebView2CompositionControl</c>, which renders through a
+    /// Windows.UI.Composition visual inside the WPF tree and has no airspace.
+    /// Switching to it needs the WinRT projections (<c>Microsoft.Windows.SDK.NET</c>),
+    /// which means moving this project to a Windows-SDK target framework — and
+    /// that moves the build output path every doc, script and installer entry
+    /// quotes. Tried and reverted; the swap alone crashes every terminal with
+    /// FileNotFoundException on that assembly.</para>
+    /// </summary>
+    private void OnFloatingWindowCreated(
+        object? sender, AvalonDock.LayoutFloatingWindowControlCreatedEventArgs e)
+    {
+        var fw = e.LayoutFloatingWindowControl;
+        if (fw is null) return;
+
+        try
+        {
+            fw.WindowStyle = WindowStyle.None;
+            _chromeStripped.Add(fw);
+            fw.Closed += (s, _) => { if (s is Window w) _chromeStripped.Remove(w); };
+            AppLogger.Log("[Dock] floating window created borderless");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[Dock] could not make the floating window borderless", ex);
+        }
+    }
+
+    /// <summary>
     /// Give a detached terminal the whole window: no OS title bar, so the
     /// terminal starts at the top edge instead of under a strip of chrome that
     /// repeats the tab title already shown below it.
@@ -3820,13 +3877,18 @@ public partial class MainWindow : Window
                 RefreshAllRedockStripVisibility();
                 StripFloatingWindowChrome();
 
-                // Turn each pane's ▽ drop-down into a detach button. Panes are
-                // created and destroyed as tabs are split and closed, so this has
-                // to run after a layout change rather than once at startup; it
-                // skips buttons it has already converted.
-                var converted = UI.DocumentPaneChrome.ApplyDetachButton(dockManager, FloatDocument);
+                // Turn each pane's drop-down into a detach / rejoin button. Panes
+                // are created and destroyed as tabs are split, closed and torn off,
+                // so this runs after a layout change rather than once at startup.
+                // Floating windows are separate top-level Windows and are not under
+                // the dock manager's visual tree, so each is swept in its own right —
+                // that is where the button has to offer rejoin rather than detach.
+                var converted = UI.DocumentPaneChrome.Apply(dockManager, ToggleDocumentFloat);
+                foreach (var fw in dockManager.FloatingWindows
+                                   ?? Enumerable.Empty<AvalonDock.Controls.LayoutFloatingWindowControl>())
+                    converted += UI.DocumentPaneChrome.Apply(fw, ToggleDocumentFloat);
                 if (converted > 0)
-                    AppLogger.Log($"[Dock] pane drop-down repurposed as detach | buttons={converted}");
+                    AppLogger.Log($"[Dock] pane drop-down repurposed as detach/rejoin | buttons={converted}");
 
                 // Safety net: catch any FW that became empty via paths we
                 // didn't explicitly sweep (e.g. user closes last tab via X,

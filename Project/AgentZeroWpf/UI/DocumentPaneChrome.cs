@@ -17,11 +17,13 @@ namespace AgentZeroWpf.UI;
 /// all: you had to drag the tab header out of the window and hope the drag was
 /// read as a float rather than a re-order.</para>
 ///
-/// <para>So the button keeps its place and loses its menu: one click detaches the
-/// pane's current document into its own window. This is done by walking the
-/// visual tree rather than by retemplating <c>LayoutDocumentPaneControl</c>,
-/// because a retemplate means forking the whole VS2013 pane template — every
-/// tab strip, drop target and overflow behaviour in it — to change one button.</para>
+/// <para>So the button keeps its place and loses its menu: one click moves the
+/// pane's current document between docked and floating — detach when it is in
+/// the main window, rejoin when it is already out. Whichever it will do next is
+/// what its glyph and tooltip say. This is done by walking the visual tree
+/// rather than by retemplating <c>LayoutDocumentPaneControl</c>, because a
+/// retemplate means forking the whole VS2013 pane template — every tab strip,
+/// drop target and overflow behaviour in it — to change one button.</para>
 /// </summary>
 internal static class DocumentPaneChrome
 {
@@ -39,14 +41,15 @@ internal static class DocumentPaneChrome
 
     /// <summary>
     /// Find every pane drop-down under <paramref name="root"/> and turn it into a
-    /// detach button.
+    /// detach / rejoin button. Safe to call on every layout change: buttons it has
+    /// already converted only have their glyph refreshed.
     /// </summary>
-    /// <param name="detach">
-    /// Given the document the pane is currently showing. Not called when the pane
-    /// is empty or already floating.
+    /// <param name="toggleFloat">
+    /// Given the document the pane is showing — float it if it is docked, dock it
+    /// if it is floating.
     /// </param>
-    /// <returns>How many buttons were converted by this pass.</returns>
-    public static int ApplyDetachButton(DependencyObject? root, Action<LayoutDocument> detach)
+    /// <returns>How many buttons were converted by this pass (0 once settled).</returns>
+    public static int Apply(DependencyObject? root, Action<LayoutDocument> toggleFloat)
     {
         if (root is null) return 0;
 
@@ -54,34 +57,42 @@ internal static class DocumentPaneChrome
         foreach (var btn in Descendants<ToggleButton>(root))
         {
             if (btn.Name != ButtonName) continue;
-            if ((bool)btn.GetValue(PatchedProperty)) continue;
-            btn.SetValue(PatchedProperty, true);
 
-            // The tab-switch menu. AvalonDock's DropDownButton opens whatever is in
-            // this property on click, so clearing it is what removes the feature —
-            // the Click below then has the button to itself.
-            if (btn is AvalonDock.Controls.DropDownButton dd)
-                dd.DropDownContextMenu = null;
+            if (!(bool)btn.GetValue(PatchedProperty))
+            {
+                btn.SetValue(PatchedProperty, true);
 
-            btn.ToolTip = "Detach this tab into its own window";
+                // The tab-switch menu. AvalonDock's DropDownButton opens whatever is
+                // in this property on click, so clearing it is what removes the
+                // feature — the Click below then has the button to itself.
+                if (btn is AvalonDock.Controls.DropDownButton dd)
+                    dd.DropDownContextMenu = null;
+
+                btn.Click += (s, _) =>
+                {
+                    // A ToggleButton; without this it latches down after the click.
+                    if (s is ToggleButton t) t.IsChecked = false;
+                    if (DocumentOf(s as DependencyObject) is { } doc) toggleFloat(doc);
+                };
+                converted++;
+            }
+
+            // Refreshed every pass, not just on conversion: the same button is the
+            // detach button in the main window and the rejoin button once the pane
+            // it belongs to has been torn off into its own window.
+            var floating = DocumentOf(btn)?.IsFloating == true;
+            btn.ToolTip = floating
+                ? "Dock this tab back into the main window"
+                : "Detach this tab into its own window";
             btn.Content = new TextBlock
             {
-                Text = "⤢",
+                Text = floating ? "⤡" : "⤢",
                 FontSize = 11,
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                 VerticalAlignment = System.Windows.VerticalAlignment.Center,
                 Foreground = btn.TryFindResource("TextPrimary") as System.Windows.Media.Brush
                              ?? new SolidColorBrush(Color.FromRgb(0xD4, 0xD4, 0xD4)),
             };
-
-            btn.Click += (s, _) =>
-            {
-                // It is a ToggleButton; without this it latches down after the click.
-                if (s is ToggleButton t) t.IsChecked = false;
-                if (DocumentOf(s as DependencyObject) is { } doc && !doc.IsFloating)
-                    detach(doc);
-            };
-            converted++;
         }
         return converted;
     }
