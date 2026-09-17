@@ -394,30 +394,124 @@
             </Setter>
         </Style>
 
-        <!-- ===== ComboBox (Implicit) ===== -->
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="{StaticResource InputBg}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource InputBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Padding" Value="4,3"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style TargetType="ComboBoxItem">
+        <!-- ===== ComboBox (Implicit) =====
+             Pitfall 6 in harness/knowledge/code-coach/wpf-xaml-resource-and-window-pitfalls.md:
+             Background / Foreground setters alone do NOT darken a ComboBox. The default
+             template draws its ToggleButton chrome and its Popup from SystemColors, so on a
+             dark panel the closed box and the open list both render near-white — the control
+             is there but unreadable. The three parts below (item, toggle, box) override every
+             system-colour path, and they are the IMPLICIT style so a plain <ComboBox/> in any
+             panel hosted by this window is dark by default rather than by remembering. -->
+        <Style x:Key="DarkComboBoxItem" TargetType="ComboBoxItem">
             <Setter Property="Background" Value="{StaticResource PanelBg}"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Padding" Value="6,3"/>
-            <Style.Triggers>
-                <Trigger Property="IsHighlighted" Value="True">
-                    <Setter Property="Background" Value="{StaticResource ButtonHover}"/>
-                    <Setter Property="Foreground" Value="{StaticResource CyberCyanBrush}"/>
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource ButtonHover}"/>
+                                <Setter Property="Foreground" Value="{StaticResource CyberCyanBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectionBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+        <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DarkComboBoxItem}"/>
+
+        <Style x:Key="DarkComboBoxToggle" TargetType="ToggleButton">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="ClickMode" Value="Press"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{StaticResource InputBg}"
+                                BorderBrush="{StaticResource InputBorder}" BorderThickness="1"
+                                CornerRadius="3">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="22"/>
+                                </Grid.ColumnDefinitions>
+                                <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Data="M 0 0 L 4 4 L 8 0 Z" Fill="{StaticResource TextDim}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyberCyanBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyberCyanBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton" Style="{StaticResource DarkComboBoxToggle}"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                                      RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                              Margin="8,0,26,0"
+                                              VerticalAlignment="Center" HorizontalAlignment="Left"
+                                              TextElement.Foreground="{StaticResource TextPrimary}"/>
+                            <Popup x:Name="Popup" Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Border Background="{StaticResource PanelBg}"
+                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                        CornerRadius="3"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer>
+                                        <StackPanel IsItemsHost="True"
+                                                    KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ContentSite" Property="TextElement.Foreground"
+                                        Value="{StaticResource TextDim}"/>
+                                <Setter TargetName="ContentSite" Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource DarkComboBox}"/>
 
         <!-- ===== ToolTip (Implicit) ===== -->
         <Style TargetType="ToolTip">
@@ -637,6 +731,14 @@
                                 <Button x:Name="btnActivityRemote" Style="{StaticResource ActivityBarIcon}"
                                         Content="&#xE8CE;" ToolTip="Remote — 웹 원격 터미널 제어"
                                         Click="OnActivityRemoteClick"/>
+
+                                <!-- Wearable Icon (M0031) — the smartwatch host. Starts the
+                                     second process that owns the watch's BLE link and serves
+                                     AskBot + Chat + Claude HUD with AgentZero's own voice,
+                                     ear and agent. -->
+                                <Button x:Name="btnActivityWearable" Style="{StaticResource ActivityBarIcon}"
+                                        Content="&#xE702;" ToolTip="Wearable — smartwatch host"
+                                        Click="OnActivityWearableClick"/>
 
                             </StackPanel>
                         </DockPanel>
@@ -946,6 +1048,15 @@
                                                 Grid.Column="1" Grid.ColumnSpan="3"
                                                 Grid.Row="0" Grid.RowSpan="3"
                                                 Visibility="Collapsed"/>
+
+                    <!-- ===== Wearable Page (full overlay) — M0031 =====
+                         Smartwatch host admin surface (start/stop the child process, BLE
+                         device name, which brain answers, live host output). Same overlay
+                         pattern; toggled from OnActivityWearableClick. -->
+                    <components:WearablePagePanel x:Name="WearablePage"
+                                                  Grid.Column="1" Grid.ColumnSpan="3"
+                                                  Grid.Row="0" Grid.RowSpan="3"
+                                                  Visibility="Collapsed"/>
 
                     <!-- ===== Note Page (full overlay) — M0022-7 =====
                          Hosts the reparented NoteWindow Grid (file tree +

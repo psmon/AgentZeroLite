@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- WinRT (Windows.Devices.Bluetooth) for the BLE central. This is the ONLY reason
+         the wearable host is a separate exe: AgentZeroWpf stays on plain
+         net10.0-windows so its bin/…/net10.0-windows/AgentZeroLite.exe path — baked
+         into CLAUDE.md, the agentzero-cli skill, launch-self-smoke.ps1 and the
+         installer — does not move. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ZeroWearable</RootNamespace>
+    <AssemblyName>AgentZeroWearable</AssemblyName>
+    <Configurations>Debug;Release;AgentCLI</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <IsPackable>false</IsPackable>
+    <!-- NOT invariant: with globalization-invariant mode on, String.Normalize(FormKD)
+         leaves Hangul composed, every syllable maps to -1 in SuperTonic's unicode
+         indexer (it only carries the decomposed jamo) and Korean comes out as noise. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Classic remoting (akka.tcp://) — Artery is not wire-compatible with the protocol
+         the device's C++ client speaks. Pinned to the same 1.5.67 the rest of the
+         solution uses; PROTOCOL.md's framing/handshake is unchanged on this line. -->
+    <PackageReference Include="Akka.Remote" Version="1.5.67" />
+    <!-- Offline STT: whisper.cpp through Whisper.net. Uses the ggml models AgentZeroLite
+         already installed under ~/.ollama/models/agentzero/whisper — this host never
+         downloads anything. Same three-package shape (CPU + Vulkan) AgentZeroWpf uses,
+         so the loader can probe Vulkan → CPU from the Voice settings. -->
+    <PackageReference Include="Whisper.net" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SuperTonic TTS, the agent loop, the LLM providers and every settings store come
+         from here. Nothing model-shaped is reimplemented in this project. -->
+    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
+  </ItemGroup>
+
+</Project>

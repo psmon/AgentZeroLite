@@ -384,6 +384,16 @@ public partial class MainWindow : Window
         if (_remoteSettings.Enabled)
             _remoteHost.Start(_remoteSettings);
 
+        // Wearable (smartwatch host) — the panel and the child process share ONE
+        // WearableSettings instance, but the process re-reads the file at startup: the
+        // settings are the contract between the two processes, not this object.
+        _wearableSettings = Agent.Common.Wearable.WearableSettingsStore.Load();
+        _wearableHost = new Services.Wearable.WearableHostProcess();
+        WearablePage.Initialize(_wearableHost, _wearableSettings);
+        WearablePage.CloseRequested += CloseWearable;
+        if (_wearableSettings.Enabled)
+            _wearableHost.Start();
+
         // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
         PreviewKeyDown += (_, ke) =>
         {
@@ -464,6 +474,11 @@ public partial class MainWindow : Window
 
         // Stop the remote server so the listener + sockets release before process exit.
         try { _remoteHost?.Stop(); } catch { }
+
+        // Stop the wearable host so the BLE handles release before process exit — the
+        // watch only advertises while nothing is connected, so a leaked link makes the
+        // next run's scan come back empty.
+        try { _wearableHost?.Stop(); } catch { }
 
         // Stop all embedded terminal processes
         foreach (var group in _cliGroups)
@@ -1397,6 +1412,7 @@ public partial class MainWindow : Window
         Cmd("Diff Review", () => OnActivityDiffClick(this, new RoutedEventArgs()));
         Cmd("Bot (AgentCLI)", () => OnSidebarBotClick(this, new RoutedEventArgs()));
         Cmd("WebDev", () => OnActivityWebDevClick(this, new RoutedEventArgs()));
+        Cmd("Wearable", () => OnActivityWearableClick(this, new RoutedEventArgs()));
         Cmd("Scrap", () => OnActivityScrapClick(this, new RoutedEventArgs()));
         Cmd("Note", () => OnActivityNoteClick(this, new RoutedEventArgs()));
 
@@ -1998,6 +2014,7 @@ public partial class MainWindow : Window
         CloseHarnessView();
         CloseNote();
         CloseDiffReview();
+        CloseWearable();
         EnterOverlayMode();
         SettingsPanel.Visibility = Visibility.Visible;
         DumpDockLayout("settings-open-after");
@@ -2053,6 +2070,8 @@ public partial class MainWindow : Window
     private Services.AgentStateMonitor? _agentStateMonitor;
     private Services.Remote.RemoteServerHost? _remoteHost;
     private Agent.Common.Remote.RemoteSettings? _remoteSettings;
+    private Services.Wearable.WearableHostProcess? _wearableHost;
+    private Agent.Common.Wearable.WearableSettings? _wearableSettings;
     private int _prevAttention;
     private int _activeGroupIndex = -1;
 
@@ -2368,6 +2387,7 @@ public partial class MainWindow : Window
         CloseScrap();
         CloseHarnessView();
         CloseDiffReview();
+        CloseWearable();
         EnterOverlayMode();
         NotePage.Visibility = Visibility.Visible;
     }
@@ -3698,6 +3718,7 @@ public partial class MainWindow : Window
         CloseHarnessView();
         CloseNote();
         CloseDiffReview();
+        CloseWearable();
         EnterOverlayMode();
         ScrapPage.Visibility = Visibility.Visible;
     }
@@ -3716,6 +3737,7 @@ public partial class MainWindow : Window
         CloseWebDev();
         CloseSettings();
         CloseScrap();
+        CloseWearable();
         EnterOverlayMode();
         HarnessViewPage.Visibility = Visibility.Visible;
     }
@@ -3749,6 +3771,7 @@ public partial class MainWindow : Window
         CloseScrap();
         CloseHarnessView();
         ConfigureDiffReviewPanel();
+        CloseWearable();
         EnterOverlayMode();
         DiffReviewPage.Visibility = Visibility.Visible;
     }
@@ -3883,6 +3906,7 @@ public partial class MainWindow : Window
         // their work without having to click the ActivityBar icon again.
         CloseWebDev();
         CloseSettings();
+        CloseWearable();
         EnterOverlayMode();
         panel.Visibility = Visibility.Visible;
     }
@@ -3937,6 +3961,7 @@ public partial class MainWindow : Window
         CloseScrap();
         CloseHarnessView();
         CloseDiffReview();
+        CloseWearable();
         EnterOverlayMode();
         WebDevPage.Visibility = Visibility.Visible;
     }
@@ -3953,7 +3978,8 @@ public partial class MainWindow : Window
         if (SettingsPanel.Visibility != Visibility.Visible &&
             ScrapPage.Visibility != Visibility.Visible &&
             HarnessViewPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible)
+            NotePage.Visibility != Visibility.Visible &&
+            WearablePage.Visibility != Visibility.Visible)
             ExitOverlayMode();
     }
 
@@ -3977,7 +4003,8 @@ public partial class MainWindow : Window
         if (WebDevPage.Visibility != Visibility.Visible &&
             ScrapPage.Visibility != Visibility.Visible &&
             HarnessViewPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible)
+            NotePage.Visibility != Visibility.Visible &&
+            WearablePage.Visibility != Visibility.Visible)
             ExitOverlayMode();
     }
 
@@ -3992,7 +4019,8 @@ public partial class MainWindow : Window
         if (WebDevPage.Visibility != Visibility.Visible &&
             SettingsPanel.Visibility != Visibility.Visible &&
             HarnessViewPage.Visibility != Visibility.Visible &&
-            NotePage.Visibility != Visibility.Visible)
+            NotePage.Visibility != Visibility.Visible &&
+            WearablePage.Visibility != Visibility.Visible)
             ExitOverlayMode();
     }
 
@@ -4012,6 +4040,7 @@ public partial class MainWindow : Window
         CloseScrap();
         CloseHarnessView();
         CloseDiffReview();
+        CloseWearable();
         EnterOverlayMode();
         RemotePage.Visibility = Visibility.Visible;
     }
@@ -4029,6 +4058,45 @@ public partial class MainWindow : Window
             SettingsPanel.Visibility != Visibility.Visible &&
             ScrapPage.Visibility != Visibility.Visible &&
             HarnessViewPage.Visibility != Visibility.Visible &&
+            NotePage.Visibility != Visibility.Visible &&
+            WearablePage.Visibility != Visibility.Visible)
+            ExitOverlayMode();
+    }
+
+    /// <summary>
+    /// Toggle the Wearable overlay. Mirrors <see cref="OnActivityRemoteClick"/>: closes the
+    /// other overlays, enters overlay mode, and shows the smartwatch host panel.
+    /// </summary>
+    private void OnActivityWearableClick(object sender, RoutedEventArgs e)
+    {
+        if (WearablePage.Visibility == Visibility.Visible)
+        {
+            CloseWearable();
+            return;
+        }
+        CloseSettings();
+        CloseWebDev();
+        CloseScrap();
+        CloseHarnessView();
+        CloseDiffReview();
+        CloseRemote();
+        EnterOverlayMode();
+        WearablePage.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Tear down the Wearable overlay. Idempotent. Does NOT stop the host — the watch stays
+    /// served while the admin panel is closed, same rule as Remote.
+    /// </summary>
+    private void CloseWearable()
+    {
+        if (WearablePage.Visibility != Visibility.Visible) return;
+        WearablePage.Visibility = Visibility.Collapsed;
+        if (WebDevPage.Visibility != Visibility.Visible &&
+            SettingsPanel.Visibility != Visibility.Visible &&
+            ScrapPage.Visibility != Visibility.Visible &&
+            HarnessViewPage.Visibility != Visibility.Visible &&
+            RemotePage.Visibility != Visibility.Visible &&
             NotePage.Visibility != Visibility.Visible)
             ExitOverlayMode();
     }

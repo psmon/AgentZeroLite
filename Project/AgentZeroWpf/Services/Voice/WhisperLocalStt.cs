@@ -35,20 +35,22 @@ public sealed class WhisperLocalStt : ISpeechToText
     private static readonly GpuLoaderFallback<WhisperFactory> Fallback = new(
         log: msg => AppLogger.Log($"[Voice] Whisper {msg}"));
 
-    // minBytes guards against truncated/aborted downloads — anything smaller is
-    // treated as missing and re-fetched.
-    private static readonly Dictionary<string, (GgmlType type, string file, string sizeLabel, long minBytes)> Models = new()
+    // Paths and the "is this download complete" rule live in WhisperModelStore
+    // (ZeroCommon) so the wearable host resolves the same files without pulling
+    // Whisper.net into scope. What stays here is Whisper.net-specific: the GgmlType
+    // to fetch and the size label the download progress shows.
+    private static readonly Dictionary<string, (GgmlType type, string sizeLabel)> Downloads = new()
     {
-        ["tiny"]   = (GgmlType.Tiny,   "ggml-tiny.bin",   "~75 MB",   70_000_000),
-        ["small"]  = (GgmlType.Small,  "ggml-small.bin",  "~466 MB", 400_000_000),
-        ["medium"] = (GgmlType.Medium, "ggml-medium.bin", "~1.5 GB", 1_400_000_000),
+        ["tiny"]   = (GgmlType.Tiny,   "~75 MB"),
+        ["small"]  = (GgmlType.Small,  "~466 MB"),
+        ["medium"] = (GgmlType.Medium, "~1.5 GB"),
     };
 
     private readonly string _modelName;
 
     public WhisperLocalStt(string modelName = "small")
     {
-        _modelName = Models.ContainsKey(modelName) ? modelName : "small";
+        _modelName = Downloads.ContainsKey(modelName) ? modelName : "small";
     }
 
     public bool UseGpu { get; set; }
@@ -60,27 +62,13 @@ public sealed class WhisperLocalStt : ISpeechToText
     /// </summary>
     public int GpuDeviceIndex { get; set; } = -1;
 
-    public static IReadOnlyList<string> AvailableModels => ["tiny", "small", "medium"];
+    public static IReadOnlyList<string> AvailableModels => WhisperModelStore.DownloadableModels;
 
-    public static string GetModelDir()
-    {
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(userProfile, ".ollama", "models", "agentzero", "whisper");
-    }
+    public static string GetModelDir() => WhisperModelStore.ModelDirectory;
 
-    public static string GetModelPath(string modelName)
-    {
-        var (_, file, _, _) = Models.GetValueOrDefault(modelName, Models["small"]);
-        return Path.Combine(GetModelDir(), file);
-    }
+    public static string GetModelPath(string modelName) => WhisperModelStore.ModelPath(modelName);
 
-    public static bool IsModelDownloaded(string modelName)
-    {
-        var path = GetModelPath(modelName);
-        if (!File.Exists(path)) return false;
-        var (_, _, _, minBytes) = Models.GetValueOrDefault(modelName, Models["small"]);
-        return new FileInfo(path).Length >= minBytes;
-    }
+    public static bool IsModelDownloaded(string modelName) => WhisperModelStore.IsDownloaded(modelName);
 
     public async Task<bool> EnsureReadyAsync(IProgress<string>? progress = null, CancellationToken ct = default)
     {
@@ -95,7 +83,7 @@ public sealed class WhisperLocalStt : ISpeechToText
 
         if (File.Exists(path)) File.Delete(path);
 
-        var (ggmlType, _, sizeLabel, _) = Models[_modelName];
+        var (ggmlType, sizeLabel) = Downloads[_modelName];
         Directory.CreateDirectory(GetModelDir());
         progress?.Report($"Downloading Whisper {_modelName} model… ({sizeLabel})");
 

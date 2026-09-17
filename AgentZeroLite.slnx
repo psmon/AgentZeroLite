@@ -7,5 +7,6 @@
   </Configurations>
   <Project Path="Project/AgentTest/AgentTest.csproj" />
   <Project Path="Project/ZeroCommon/ZeroCommon.csproj" />
+  <Project Path="Project/ZeroWearable/ZeroWearable.csproj" />
   <Project Path="Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj" />
 </Solution>

@@ -1,0 +1,251 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.WearablePagePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource EditorBg}">
+    <!--
+        Wearable — the smartwatch host panel.
+        Starts / stops AgentZeroWearable.exe and streams its stdout verbatim.
+        No model pickers here on purpose: the voice comes from Settings → Voice and the
+        brain from Settings → LLM, and the host reads those same JSON files. This screen
+        is only about the link.
+
+        ComboBoxes carry no explicit Style: MainWindow's IMPLICIT ComboBox style is the
+        dark re-template (Pitfall 6 — plain Background/Foreground setters leave the closed
+        chrome and the popup drawn from SystemColors, i.e. near-white on this panel).
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- 0: Header -->
+            <RowDefinition Height="*"/>     <!-- 1: Banner + settings (scroll) -->
+            <RowDefinition Height="Auto"/>  <!-- 2: Host status + controls (always visible) -->
+            <RowDefinition Height="140"/>   <!-- 3: Host log -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource ToolbarBg}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" x:Name="btnClose" Content="✕"
+                        Style="{DynamicResource FlatButton}" FontSize="13"
+                        ToolTip="Close" Click="OnCloseClick"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets"
+                               Foreground="{DynamicResource CyberCyanBrush}"
+                               FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Wearable — smartwatch host" FontSize="14" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10">
+            <StackPanel MaxWidth="680" HorizontalAlignment="Left">
+
+                <!-- What this is -->
+                <Border Background="#16262B" BorderBrush="#2E6A7A" BorderThickness="1"
+                        Padding="12,8" Margin="0,0,0,10" CornerRadius="4">
+                    <TextBlock TextWrapping="Wrap" Foreground="#9FD6E3" FontSize="12">
+                        A <Run FontWeight="Bold">separate process</Run> (AgentZeroWearable.exe) holds the watch's single
+                        BLE link and serves all three of its apps at once: AskBot (Akka remoting) · Chat (line protocol) ·
+                        Claude HUD. The voice comes from <Run FontWeight="Bold">Settings → Voice</Run> (Supertonic), the ear
+                        from Whisper on that same tab, and the brain from <Run FontWeight="Bold">Settings → LLM</Run> —
+                        none of it is configured again here. The host never downloads anything: with a model missing it
+                        tells the watch so and answers in text only.
+                    </TextBlock>
+                </Border>
+
+                <!-- ── Link ── -->
+                <TextBlock Text="Link" FontWeight="Bold" Foreground="{DynamicResource CyberCyanBrush}"
+                           FontSize="12" Margin="0,6,0,6"/>
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <CheckBox Grid.Row="0" Grid.ColumnSpan="2" x:Name="chkEnabled"
+                              Content="Start the wearable host when AgentZero starts"
+                              Foreground="{DynamicResource TextPrimary}" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Watch BLE name"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtDevice" Width="220"
+                             HorizontalAlignment="Left" Style="{DynamicResource DarkTextBox}" Margin="0,4"
+                             ToolTip="The name the firmware advertises. It only advertises while nothing is connected, which is why the host keeps retrying."/>
+
+                    <CheckBox Grid.Row="2" Grid.ColumnSpan="2" x:Name="chkNoBle"
+                              Content="Disable BLE (Akka port only — exercise the whole path from a PC peer)"
+                              Foreground="{DynamicResource TextPrimary}" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Remoting port"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="txtPort" Width="120"
+                             HorizontalAlignment="Left" Style="{DynamicResource DarkTextBox}" Margin="0,4"
+                             ToolTip="Classic akka.tcp:// remoting port. The BLE tunnel relays into it."/>
+
+                    <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="chkHud"
+                              Content="Serve the Claude HUD endpoint (POST /status · /event → S/E lines to the watch)"
+                              Foreground="{DynamicResource TextPrimary}" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="HUD port"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="txtHudPort" Width="120"
+                             HorizontalAlignment="Left" Style="{DynamicResource DarkTextBox}" Margin="0,4"
+                             ToolTip="The port the already-installed Claude Code hooks post to (8765). Only one process can hold it — this host or claude_hud_amoled's ble_bridge.py, not both."/>
+                </Grid>
+
+                <!-- ── Brain ── -->
+                <TextBlock Text="Brain" FontWeight="Bold" Foreground="{DynamicResource CyberCyanBrush}"
+                           FontSize="12" Margin="0,10,0,6"/>
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Who answers"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="cboBrain" Width="330"
+                              HorizontalAlignment="Left" Margin="0,4"
+                              SelectionChanged="OnBrainChanged">
+                        <ComboBoxItem Content="AgentZero agent — External (Settings → LLM)"/>
+                        <ComboBoxItem Content="AgentZero agent — on-device GGUF"/>
+                        <ComboBoxItem Content="Agent CLI (claude / netclaw / echo)"/>
+                    </ComboBox>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="CLI"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Row="1" Grid.Column="1" x:Name="cboCli" Width="330"
+                              HorizontalAlignment="Left" Margin="0,4">
+                        <ComboBoxItem Content="echo (offline loopback — no LLM needed)"/>
+                        <ComboBoxItem Content="claude"/>
+                        <ComboBoxItem Content="netclaw"/>
+                    </ComboBox>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="File-tool root"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,4" LastChildFill="True">
+                        <Button DockPanel.Dock="Right" x:Name="btnPickRoot" Content="Browse…"
+                                Style="{DynamicResource FlatButton}" Padding="10,3" Margin="6,0,0,0"
+                                Click="OnPickRootClick"/>
+                        <TextBox x:Name="txtRoot" Style="{DynamicResource DarkTextBox}"
+                                 ToolTip="Leave empty to turn the file tools off entirely (default-deny). This is the only folder the watch can reach."/>
+                    </DockPanel>
+
+                    <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" FontSize="11"
+                               Foreground="{DynamicResource TextDim}" Margin="0,2,0,0"
+                               Text="The watch's agent gets file tools only — terminals, mouse, keyboard and screenshots are left unimplemented and answer &quot;not available&quot;. With no root set, the file tools are refused too."/>
+                </Grid>
+
+                <!-- ── On connect ── -->
+                <TextBlock Text="On connect" FontWeight="Bold" Foreground="{DynamicResource CyberCyanBrush}"
+                           FontSize="12" Margin="0,10,0,6"/>
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Speak first"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtAnnounce" Width="330"
+                             HorizontalAlignment="Left" Style="{DynamicResource DarkTextBox}" Margin="0,4"
+                             ToolTip="What the host says the moment the watch connects. Also the way to exercise the screen and the speaker without touching the device."/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Ask to record (ms)"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtTalkMs" Width="120"
+                             HorizontalAlignment="Left" Style="{DynamicResource DarkTextBox}" Margin="0,4"
+                             ToolTip="0 = off. Tells the watch to record for this long right after it connects — exercises the microphone path hands-free."/>
+                </Grid>
+
+                <Button x:Name="btnSaveApply" Content="Save &amp; apply"
+                        Style="{DynamicResource AccentButton}" Padding="14,5"
+                        HorizontalAlignment="Left" Click="OnSaveApplyClick"
+                        ToolTip="Writes the settings file, and restarts the host if it is running (the only safe way to move a BLE handle)."/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Host status + controls. Outside the ScrollViewer on purpose: on a short window
+             the settings list is what should scroll, not the button that starts the thing. -->
+        <Border Grid.Row="2" Background="{DynamicResource ToolbarBg}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0"
+                Padding="12,8">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Host:" Foreground="{DynamicResource TextDim}" Margin="0,0,6,0"/>
+                    <TextBlock x:Name="txtStatus" Text="stopped" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+                    <TextBlock Text="·" Foreground="{DynamicResource TextDim}" Margin="8,0"/>
+                    <TextBlock x:Name="txtModels" Text="" Foreground="{DynamicResource TextDim}"
+                               FontSize="11" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Executable:" Foreground="{DynamicResource TextDim}" Margin="0,0,6,0"
+                               FontSize="11" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtExePath" Text="—" IsReadOnly="True" BorderThickness="0"
+                             Background="Transparent" Foreground="{DynamicResource CyberMintBrush}"
+                             FontSize="11"/>
+                </StackPanel>
+                <TextBlock x:Name="txtError" Text="" Foreground="#F0A0A0" TextWrapping="Wrap"
+                           FontSize="11" Margin="0,0,0,4" Visibility="Collapsed"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="btnStart" Content="▶ Start" Style="{DynamicResource AccentButton}"
+                            Padding="14,5" Click="OnStartClick"/>
+                    <Button x:Name="btnStop" Content="■ Stop" Style="{DynamicResource FlatButton}"
+                            Padding="12,5" Margin="6,0,0,0" Click="OnStopClick"/>
+                    <Button x:Name="btnTestBrain" Content="🧠 Test brain" Style="{DynamicResource FlatButton}"
+                            Padding="12,5" Margin="6,0,0,0" Click="OnTestBrainClick"
+                            ToolTip="Runs the host once with --ask. Touches neither the radio nor the running host."/>
+                    <Button x:Name="btnTestHud" Content="📟 Test HUD" Style="{DynamicResource FlatButton}"
+                            Padding="12,5" Margin="6,0,0,0" Click="OnTestHudClick"
+                            ToolTip="Posts one status + one event to the HUD endpoint, exactly as the installed Claude Code hooks do. The host log then says whether it reached the watch."/>
+                    <Button x:Name="btnClearLog" Content="Clear log" Style="{DynamicResource FlatButton}"
+                            Padding="12,5" Margin="6,0,0,0" Click="OnClearLogClick"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Host stdout — the whole point of running it as a child process is that this is visible -->
+        <Border Grid.Row="3" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0"
+                Background="#0F1113">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Host output" FontSize="11" FontWeight="Bold"
+                           Foreground="{DynamicResource TextDim}" Margin="10,6,0,4"/>
+                <ScrollViewer Grid.Row="1" x:Name="logScroll" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto" Padding="10,0,10,8">
+                    <TextBox x:Name="txtLog" IsReadOnly="True" BorderThickness="0"
+                             Background="Transparent" Foreground="#B8C4C8"
+                             FontFamily="Consolas" FontSize="11"
+                             TextWrapping="NoWrap" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Disabled"
+                             HorizontalScrollBarVisibility="Disabled"/>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

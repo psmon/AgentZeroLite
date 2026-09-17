@@ -64,7 +64,52 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
+    <!-- The wearable host (M0031). ReferenceOutputAssembly=false + SkipGetTargetFrameworkProperties
+         because it targets net10.0-windows10.0.19041.0 (WinRT BLE) and a net10.0-windows project
+         cannot reference a higher platform version; we only want the build ORDER. Its output is
+         copied into wearable\ below and launched as a child process by WearableHostProcess —
+         keeping AgentZeroLite.exe's own TFM (and therefore its bin path, which CLAUDE.md, the
+         agentzero-cli skill and the installer all quote) unchanged. -->
+    <ProjectReference Include="..\ZeroWearable\ZeroWearable.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      Private="false" />
   </ItemGroup>
+
+  <!-- Ship the wearable host in its own folder: it carries Akka.Remote and its own copy of
+       the shared assemblies, and flattening those into the GUI's output would overwrite
+       them. WearableHostProcess.ResolveHostPath looks here first, then at the dev bin path. -->
+  <Target Name="CopyWearableHost" AfterTargets="Build">
+    <PropertyGroup>
+      <_WearableOut>$(MSBuildProjectDirectory)\..\ZeroWearable\bin\$(Configuration)\net10.0-windows10.0.19041.0\</_WearableOut>
+    </PropertyGroup>
+    <ItemGroup>
+      <_WearableFiles Include="$(_WearableOut)**\*" Exclude="$(_WearableOut)**\*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WearableFiles)"
+          DestinationFiles="@(_WearableFiles->'$(OutDir)wearable\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(_WearableFiles)' != ''" />
+    <Message Importance="normal" Text="Wearable host copied: @(_WearableFiles->Count()) file(s) -> $(OutDir)wearable\" />
+  </Target>
+
+  <!-- Release path. `dotnet publish` only carries items it knows about, so the Build-time
+       copy above never reaches ./publish; and since the GUI publishes self-contained, a
+       framework-dependent host would fail to start on a machine with no .NET 10 runtime.
+       So publish the host the same way the GUI was published (same RID, same
+       self-contained flag) straight into publish\wearable\. The installer's [Files] entry
+       recurses, so nothing there has to change; the cost is the host's own runtime in the
+       package. -->
+  <Target Name="PublishWearableHost" AfterTargets="Publish">
+    <PropertyGroup>
+      <_WearableRidArg Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</_WearableRidArg>
+      <_WearableSelfContainedArg Condition="'$(SelfContained)' == 'true'">--self-contained true</_WearableSelfContainedArg>
+      <_WearableSelfContainedArg Condition="'$(SelfContained)' != 'true'">--self-contained false</_WearableSelfContainedArg>
+      <_WearablePublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))wearable\</_WearablePublishDir>
+    </PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\ZeroWearable\ZeroWearable.csproj&quot; -c $(Configuration) $(_WearableRidArg) $(_WearableSelfContainedArg) -p:PublishSingleFile=false -o &quot;$(_WearablePublishDir)&quot;" />
+    <Message Importance="high" Text="Wearable host published -> $(_WearablePublishDir)" />
+  </Target>
 
   <ItemGroup>
     <None Update="AgentZeroLite.ps1">
