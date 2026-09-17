@@ -10,6 +10,7 @@
 //               { type: 'in',     data }        user keystrokes / paste
 //               { type: 'resize', cols, rows }  viewport reflowed
 //               { type: 'screen', data }        the visible viewport, debounced
+//               { type: 'renderer', name, reason }  which renderer is live
 //               { type: 'fontstatus', family, loaded, cellWidth }
 //                                       did the configured face actually load
 (function () {
@@ -101,6 +102,33 @@
 
   var host = document.getElementById('term');
   term.open(host);
+
+  // Renderer. xterm.js draws to the DOM by default, which is fine for a shell and
+  // struggles with a TUI that repaints the whole screen continuously — a starfield
+  // behind a prompt, say. Under that load the DOM renderer leaves the cursor at
+  // stale positions between frames, which reads as a cursor skittering around the
+  // screen. WebGL is the library's answer to exactly this, and what VS Code uses.
+  //
+  // Opened first, then the addon: it needs a live element. If WebGL is unavailable —
+  // no hardware acceleration, a lost context, an old WebView2 — the addon throws or
+  // fires onContextLoss, and the DOM renderer carries on. Either way the host is
+  // told which one is live, so "is it the renderer?" is answerable from a log.
+  var renderer = 'dom';
+  try {
+    if (window.WebglAddon) {
+      var webgl = new window.WebglAddon.WebglAddon();
+      webgl.onContextLoss(function () {
+        try { webgl.dispose(); } catch (e) {}
+        post({ type: 'renderer', name: 'dom', reason: 'webgl context lost' });
+      });
+      term.loadAddon(webgl);
+      renderer = 'webgl';
+    }
+  } catch (e) {
+    renderer = 'dom';
+  }
+  // Reported with 'ready' below: post() reads `wv`, which is not assigned until
+  // after this point, so anything sent here goes nowhere.
   try { fit.fit(); } catch (e) {}
   afterFonts(function () { doFit(); });
 
@@ -158,5 +186,6 @@
 
   // Signal readiness + initial size so the host can flush any buffered output
   // and size the pseudo-console to match.
+  post({ type: 'renderer', name: renderer });
   post({ type: 'ready', cols: term.cols, rows: term.rows });
 })();

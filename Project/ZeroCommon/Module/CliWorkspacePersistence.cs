@@ -42,7 +42,8 @@ public sealed record CliTabSnapshot(
 public sealed record CliGroupSnapshot(
     string DirectoryPath,
     string DisplayName,
-    IReadOnlyList<CliTabSnapshot> Tabs);
+    IReadOnlyList<CliTabSnapshot> Tabs,
+    int ActiveTabIndex = 0);
 
 public static class CliWorkspacePersistence
 {
@@ -110,6 +111,7 @@ public static class CliWorkspacePersistence
                 DirectoryPath = group.DirectoryPath,
                 DisplayName = group.DisplayName,
                 SortOrder = groupIndex,
+                ActiveTabIndex = group.ActiveTabIndex,
             };
 
             db.CliGroups.Add(dbGroup);
@@ -154,7 +156,8 @@ public static class CliWorkspacePersistence
                         tab.CliDefinition.SshAuthMethod,
                         tab.CliDefinition.SshKeyPath,
                         tab.CliDefinition.EncryptedPassword))
-                    .ToList()))
+                    .ToList(),
+                group.ActiveTabIndex))
             .ToList();
     }
 

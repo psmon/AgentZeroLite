@@ -81,28 +81,12 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
     /// </summary>
     public string GetConsoleText() => _console.GetConsoleText();
 
-    /// <summary>
-    /// Logged once per session: did any colour ever arrive from the child? An
-    /// all-monochrome terminal has two very different causes - the app decided not
-    /// to emit colour, or we lost it - and this separates them without guessing.
-    /// </summary>
-    private bool _sgrSeen;
-
     private void OnHostOutput(string chunk)
     {
         if (_disposed || string.IsNullOrEmpty(chunk)) return;
         _console.Append(chunk);
 
-        if (!_sgrSeen && chunk.Contains('\u001b'))
-        {
-            var i = chunk.IndexOf('\u001b');
-            if (i >= 0 && i + 1 < chunk.Length && chunk[i + 1] == '[')
-            {
-                _sgrSeen = true;
-                AppLogger.Log($"[XtermSession] first VT from child | id={_internalId} label={_sessionId} " +
-                              $"sample={Escape(chunk.Substring(i, Math.Min(24, chunk.Length - i)))}");
-            }
-        }
+        NoteCursorControls(chunk);
 
         // Per-subscriber isolation — one bad consumer can't starve the others
         // starve the others.
@@ -323,6 +307,29 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
             try { HealthChanged?.Invoke(TerminalHealthState.Alive); } catch { }
         }
     }
+
+    /// <summary>
+    /// Which cursor controls the program actually asks for. A terminal that blinks
+    /// when it should not has two very different causes - the renderer forcing it, or
+    /// the program requesting it - and this is the only way to tell them apart. Each
+    /// distinct sequence is logged once, and only a handful are kept.
+    /// </summary>
+    private readonly HashSet<string> _cursorControlsSeen = new(StringComparer.Ordinal);
+
+    private void NoteCursorControls(string chunk)
+    {
+        if (_cursorControlsSeen.Count > 12) return;
+        foreach (System.Text.RegularExpressions.Match m in CursorControl.Matches(chunk))
+        {
+            if (!_cursorControlsSeen.Add(m.Value)) continue;
+            AppLogger.Log($"[XtermSession] cursor control | label={_sessionId} seq={Escape(m.Value)}");
+        }
+    }
+
+    // DECTCEM show/hide (?25h/l), cursor-blink mode (?12h/l), DECSCUSR (CSI n SP q).
+    private static readonly System.Text.RegularExpressions.Regex CursorControl =
+        new("\\u001b\\[(?:\\?(?:25|12)[hl]|[0-9]* q)",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static string Escape(string s) => s.Replace("\u001b", "<ESC>");
 

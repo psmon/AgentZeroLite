@@ -163,6 +163,11 @@ public partial class XtermTerminalControl : UserControl
                                       $"bound={(Session is null ? "no session yet" : "session")}");
                     }
                     break;
+                case "renderer":
+                    AppLogger.Log(
+                        $"[Xterm] renderer={(root.TryGetProperty("name", out var rn) ? rn.GetString() : "?")}" +
+                        (root.TryGetProperty("reason", out var rr) ? $" ({rr.GetString()})" : ""));
+                    break;
                 case "fontstatus":
                     // Reported once per config apply. "loaded=false" means the stack
                     // fell through to a fallback - the terminal still works, it just

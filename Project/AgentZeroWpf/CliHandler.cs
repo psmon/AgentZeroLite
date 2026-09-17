@@ -584,8 +584,10 @@ internal static class CliHandler
         {
             Console.WriteLine("Usage: layout <verb> [<group_index> <tab_index>]");
             Console.WriteLine();
-            Console.WriteLine("  dump                 Print the dock layout as JSON (panes, documents, active tab,");
-            Console.WriteLine("                       bottom panel, and which exe is answering).");
+            Console.WriteLine("  dump                 Print the dock layout as JSON (panes, documents, per-tab");
+            Console.WriteLine("                       start state, bottom panel, and which exe is answering).");
+            Console.WriteLine("  workspace <index>    Switch to a workspace (indices from 'terminal-list').");
+            Console.WriteLine("  activate <g> <t>     Select a tab — this is what 'last selected' remembers.");
             Console.WriteLine();
             Console.WriteLine("Commands (omit indices to act on the active terminal):");
             foreach (var (id, desc) in Agent.Common.Services.WindowCommandIds.All)
@@ -603,8 +605,10 @@ internal static class CliHandler
 
         var verb = args[0].ToLowerInvariant();
         var full = FullCommandId(verb);
-        if (!string.Equals(verb, "dump", StringComparison.OrdinalIgnoreCase)
-            && !Agent.Common.Services.WindowCommandIds.IsKnown(full))
+        var isBuiltin = string.Equals(verb, "dump", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(verb, "workspace", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(verb, "activate", StringComparison.OrdinalIgnoreCase);
+        if (!isBuiltin && !Agent.Common.Services.WindowCommandIds.IsKnown(full))
         {
             Console.Error.WriteLine($"Error: unknown layout verb '{verb}'. Try 'layout help'.");
             return 1;
@@ -615,9 +619,20 @@ internal static class CliHandler
 
         var sb = new StringBuilder();
         sb.Append("{\"command\":\"layout\"");
-        sb.Append($",\"verb\":\"{EscapeJson(string.Equals(verb, "dump", StringComparison.OrdinalIgnoreCase) ? "dump" : full)}\"");
-        if (args.Length >= 3 && int.TryParse(args[1], out var g) && int.TryParse(args[2], out var t))
+        sb.Append($",\"verb\":\"{EscapeJson(isBuiltin ? verb : full)}\"");
+        if (string.Equals(verb, "workspace", StringComparison.OrdinalIgnoreCase))
+        {
+            if (args.Length < 2 || !int.TryParse(args[1], out var wi))
+            {
+                Console.Error.WriteLine("Usage: layout workspace <index>   (see 'terminal-list' for indices)");
+                return 1;
+            }
+            sb.Append($",\"group\":{wi}");
+        }
+        else if (args.Length >= 3 && int.TryParse(args[1], out var g) && int.TryParse(args[2], out var t))
+        {
             sb.Append($",\"group\":{g},\"tab\":{t}");
+        }
         sb.Append('}');
 
         if (!SendWpfCommand(agentWnd, sb.ToString())) return 1;

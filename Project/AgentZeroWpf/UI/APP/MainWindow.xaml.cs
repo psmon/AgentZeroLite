@@ -926,6 +926,46 @@ public partial class MainWindow : Window
     {
         var verb = root.TryGetProperty("verb", out var v) ? v.GetString() ?? "" : "";
 
+        // Switching workspace is a window action like any other, and without it the
+        // "remembered terminals do not start" path cannot be driven from a script.
+        if (string.Equals(verb, "workspace", StringComparison.OrdinalIgnoreCase))
+        {
+            var index = root.TryGetProperty("group", out var wg) && wg.TryGetInt32(out var wi) ? wi : -1;
+            if (index < 0 || index >= _cliGroups.Count)
+            {
+                IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
+                    $"{{\"ok\":false,\"error\":\"workspace index {index} out of range (0..{_cliGroups.Count - 1})\"}}",
+                    "[IPC] layout 응답 쓰기 오류");
+                return;
+            }
+            ActivateGroup(index);
+            IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
+                $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}", "[IPC] layout 응답 쓰기 오류");
+            AppLogger.Log($"[IPC] layout workspace {index} | {_cliGroups[index].DisplayName}");
+            return;
+        }
+
+        // Selecting a tab is how the "last selected terminal" is remembered, so the
+        // rule that only that one starts on a workspace switch cannot be tested
+        // without it.
+        if (string.Equals(verb, "activate", StringComparison.OrdinalIgnoreCase))
+        {
+            var actGroup = root.TryGetProperty("group", out var ag) && ag.TryGetInt32(out var g2) ? g2 : -1;
+            var actTab = root.TryGetProperty("tab", out var at) && at.TryGetInt32(out var t2) ? t2 : -1;
+            if (actGroup < 0 || actGroup >= _cliGroups.Count
+                || actTab < 0 || actTab >= _cliGroups[actGroup].Tabs.Count)
+            {
+                IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
+                    $"{{\"ok\":false,\"error\":\"[{actGroup}:{actTab}] out of range\"}}", "[IPC] layout 응답 쓰기 오류");
+                return;
+            }
+            if (actGroup != _activeGroupIndex) ActivateGroup(actGroup);
+            ActivateConsoleTab(actTab);
+            IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize,
+                $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}", "[IPC] layout 응답 쓰기 오류");
+            return;
+        }
+
         if (string.Equals(verb, "dump", StringComparison.OrdinalIgnoreCase))
         {
             IpcMemoryMappedResponseWriter.WriteJson(
@@ -1739,6 +1779,7 @@ public partial class MainWindow : Window
             if (!System.IO.Directory.Exists(grp.DirectoryPath)) continue;
 
             AddCliGroup(grp.DirectoryPath, autoCreateTab: false);
+            var restoredGroup = _cliGroups[^1];
 
             foreach (var tab in grp.Tabs)
             {
@@ -1763,6 +1804,13 @@ public partial class MainWindow : Window
                         string.Equals(tab.SshAuthMethod, Agent.Common.Module.SshCommandBuilder.AuthMethodPassword, StringComparison.OrdinalIgnoreCase)
                         ? tab.EncryptedPassword : null);
             }
+
+            // Which tab this workspace was last on. Nothing starts here — the
+            // terminal is created when the workspace is actually visited, which is
+            // the whole point of starting them lazily. This just makes the visit
+            // land on the right one.
+            if (restoredGroup.Tabs.Count > 0)
+                restoredGroup.ActiveTabIndex = Math.Clamp(grp.ActiveTabIndex, 0, restoredGroup.Tabs.Count - 1);
         }
 
         // Activate the last active group and tab (only this one initializes the terminal)
@@ -3106,6 +3154,23 @@ public partial class MainWindow : Window
 
         sb.Append($",\"activeGroup\":{_activeGroupIndex}");
         sb.Append($",\"activeTab\":{_activeConsoleTab}");
+
+        // Per-tab state of the active workspace. A terminal that exists but never
+        // started looks identical to one that is running unless this is spelled out.
+        sb.Append(",\"tabs\":[");
+        var tabs = _consoleTabs;
+        for (var i = 0; i < tabs.Count; i++)
+        {
+            var t = tabs[i];
+            if (i > 0) sb.Append(',');
+            sb.Append($"{{\"index\":{i},\"title\":\"{EscapeJson(t.Title)}\"," +
+                      $"\"cliDefId\":{t.CliDefinitionId}," +
+                      $"\"initialized\":{(t.IsInitialized ? "true" : "false")}," +
+                      $"\"started\":{(t.IsTerminalStarted ? "true" : "false")}," +
+                      $"\"session\":\"{EscapeJson(t.Session?.SessionId ?? "")}\"," +
+                      $"\"running\":{(t.Session?.IsRunning == true ? "true" : "false")}}}");
+        }
+        sb.Append(']');
         sb.Append($",\"floatingWindows\":{dockManager.FloatingWindows?.Count() ?? 0}");
         sb.Append($",\"botDock\":{{\"open\":{(IsBotDockOpen ? "true" : "false")},\"collapsed\":{(IsBotDockCollapsed ? "true" : "false")},\"height\":{BotDockRow.Height.Value:0}}}");
         sb.Append(",\"root\":");
