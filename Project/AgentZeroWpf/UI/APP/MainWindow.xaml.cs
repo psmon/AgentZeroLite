@@ -29,6 +29,9 @@ public partial class MainWindow : Window
         PreviewKeyDown += OnGlobalKeyDown;
         SourceInitialized += OnSourceInitializedForMaximize;
         txtVersion.Text = AppVersionProvider.GetDisplayVersion();
+        // ShowPage is what normally moves the rail, and it short-circuits when the
+        // page is already current — so the opening state is set once, here.
+        SyncActivityBar(AppPage.None);
 
         // Mirror AppLogger entries into the embedded LOG tab
         AppLogger.EntryAdded += OnAppLogEntryForBottomTab;
@@ -163,6 +166,136 @@ public partial class MainWindow : Window
         }
     }
 
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Bottom panel layout
+    // ─────────────────────────────────────────────────────────────────────
+    //
+    // The dock row had two heights — 280 and 0 — set from four places, and the
+    // only control was the ActivityBar icon. So a panel you had resized snapped
+    // back to 280 the next time anything touched it, there was no way to get it
+    // out of the way without losing it, and nothing inside the panel could change
+    // its own size. Height lives here now, and the panel carries its own chrome.
+
+    /// <summary>Height to come back to. Updated when the splitter is dragged, so a
+    /// size the user chose is the size that returns.</summary>
+    private double _botDockNormalHeight = 280;
+    private bool _botDockMaximized;
+
+    private const double BotTabBarPx = 30;      // collapsed: the tab strip alone
+    private const double BotSplitterPx = 6;
+    private const double BotMaximizedTopPx = 90;  // sliver of terminal kept when maximized
+
+    private bool IsBotDockOpen => BotDockRow.Height.Value > 0;
+
+    private bool IsBotDockCollapsed => IsBotDockOpen && !_botDockMaximized
+                                       && BotDockRow.Height.Value <= BotTabBarPx + 0.5;
+
+    /// <summary>Show the panel at the height it was left at.</summary>
+    private void OpenBotDock()
+    {
+        _botDockMaximized = false;
+        TopRow.Height = new GridLength(1, GridUnitType.Star);
+        BotDockRow.Height = new GridLength(Math.Max(_botDockNormalHeight, BotTabBarPx), GridUnitType.Pixel);
+        BotSplitterRow.Height = new GridLength(BotSplitterPx, GridUnitType.Pixel);
+        RefreshBotDockChrome();
+    }
+
+    /// <summary>Take the panel away entirely. The ActivityBar bot icon and Ctrl+` bring
+    /// it back, at the height it had.</summary>
+    private void CloseBotDock()
+    {
+        RememberBotDockHeight();
+        _botDockMaximized = false;
+        TopRow.Height = new GridLength(1, GridUnitType.Star);
+        BotDockRow.Height = new GridLength(0);
+        BotSplitterRow.Height = new GridLength(0);
+        RefreshBotDockChrome();
+    }
+
+    /// <summary>Collapse to the tab strip — the panel is still there, just out of the
+    /// way, and the splitter above it still drags it back open.</summary>
+    private void SetBotDockCollapsed(bool collapsed)
+    {
+        if (collapsed)
+        {
+            RememberBotDockHeight();
+            _botDockMaximized = false;
+            TopRow.Height = new GridLength(1, GridUnitType.Star);
+            BotDockRow.Height = new GridLength(BotTabBarPx, GridUnitType.Pixel);
+            BotSplitterRow.Height = new GridLength(BotSplitterPx, GridUnitType.Pixel);
+            RefreshBotDockChrome();
+        }
+        else
+        {
+            OpenBotDock();
+        }
+    }
+
+    /// <summary>
+    /// Give the panel the window, keeping a sliver of terminal. Not the whole window:
+    /// losing sight of the terminal entirely is disorienting, and the sliver is also
+    /// the way back if the chrome is ever unreachable.
+    /// </summary>
+    private void ToggleBotDockMaximized()
+    {
+        if (_botDockMaximized)
+        {
+            OpenBotDock();
+            return;
+        }
+
+        RememberBotDockHeight();
+        _botDockMaximized = true;
+        TopRow.Height = new GridLength(BotMaximizedTopPx, GridUnitType.Pixel);
+        BotDockRow.Height = new GridLength(1, GridUnitType.Star);
+        BotSplitterRow.Height = new GridLength(BotSplitterPx, GridUnitType.Pixel);
+        RefreshBotDockChrome();
+    }
+
+    /// <summary>Only a real, non-collapsed pixel height is worth remembering.</summary>
+    private void RememberBotDockHeight()
+    {
+        if (_botDockMaximized) return;
+        if (BotDockRow.Height.GridUnitType != GridUnitType.Pixel) return;
+        var h = BotDockRow.Height.Value;
+        if (h > BotTabBarPx + 0.5) _botDockNormalHeight = h;
+    }
+
+    /// <summary>The splitter writes the row height directly, so that is where a
+    /// user-chosen size is picked up.</summary>
+    private void OnBotDockSplitterDragged(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        _botDockMaximized = false;
+        RememberBotDockHeight();
+        RefreshBotDockChrome();
+    }
+
+    /// <summary>Glyphs and tooltips follow the state, so the buttons say what they
+    /// will do rather than what they are.</summary>
+    private void RefreshBotDockChrome()
+    {
+        if (btnBotCollapse is not null)
+        {
+            var collapsed = IsBotDockCollapsed;
+            btnBotCollapse.Content = collapsed ? "\uE70E" : "\uE70D";   // chevron up / down
+            btnBotCollapse.ToolTip = collapsed ? "패널 펼치기" : "패널 접기";
+        }
+        if (btnBotMaximize is not null)
+        {
+            btnBotMaximize.Content = _botDockMaximized ? "\uE923" : "\uE922";   // restore / maximize
+            btnBotMaximize.ToolTip = _botDockMaximized ? "패널 원래 크기로" : "패널 최대화";
+        }
+        UpdateStatusBarBot();
+    }
+
+    private void OnBotCollapseClick(object sender, RoutedEventArgs e)
+        => SetBotDockCollapsed(!IsBotDockCollapsed);
+
+    private void OnBotMaximizeClick(object sender, RoutedEventArgs e) => ToggleBotDockMaximized();
+
+    private void OnBotCloseClick(object sender, RoutedEventArgs e) => CloseBotDock();
+
     /// <summary>
     /// Moves the bot's content from the floating window into the main window's
     /// <see cref="BotDockHost"/>. The bot window itself is hidden but not disposed
@@ -180,8 +313,7 @@ public partial class MainWindow : Window
         _botWindow.Hide();
 
         BotDockHost.Content = content;
-        BotDockRow.Height = new GridLength(280, GridUnitType.Pixel);
-        BotSplitterRow.Height = new GridLength(6, GridUnitType.Pixel);
+        OpenBotDock();
 
         _isBotEmbedded = true;
         statusLabel.Text = "BOT EMBEDDED";
@@ -202,8 +334,7 @@ public partial class MainWindow : Window
         _botWindow.AttachContent(content);
         _botWindow.SetEmbeddedMode(false);
 
-        BotDockRow.Height = new GridLength(0);
-        BotSplitterRow.Height = new GridLength(0);
+        CloseBotDock();
 
         // Center on first undock if the window has no prior position (0,0 defaults)
         if (_botWindow.Left == 0 && _botWindow.Top == 0)
@@ -253,9 +384,24 @@ public partial class MainWindow : Window
 
     private enum BottomTab { Bot, Output, Log, Note }
 
-    private void OnBottomTabBotClick(object sender, RoutedEventArgs e) => SwitchBottomTab(BottomTab.Bot);
-    private void OnBottomTabOutputClick(object sender, RoutedEventArgs e) => SwitchBottomTab(BottomTab.Output);
-    private void OnBottomTabLogClick(object sender, RoutedEventArgs e) => SwitchBottomTab(BottomTab.Log);
+    private void OnBottomTabBotClick(object sender, RoutedEventArgs e) => ClickBottomTab(BottomTab.Bot);
+    private void OnBottomTabOutputClick(object sender, RoutedEventArgs e) => ClickBottomTab(BottomTab.Output);
+    private void OnBottomTabLogClick(object sender, RoutedEventArgs e) => ClickBottomTab(BottomTab.Log);
+
+    /// <summary>
+    /// Clicking the tab you are already on collapses the panel; clicking it again
+    /// brings it back. The same affordance VS Code gives its panel, and the reason
+    /// the chrome buttons are not the only way to get the panel out of the way.
+    /// </summary>
+    private void ClickBottomTab(BottomTab tab)
+    {
+        if (_activeBottomTab == tab && IsBotDockOpen && _isBotEmbedded)
+        {
+            SetBotDockCollapsed(!IsBotDockCollapsed);
+            return;
+        }
+        SwitchBottomTab(tab);
+    }
     private void OnBottomTabNoteClick(object sender, RoutedEventArgs e) => OpenNoteTab();
 
     private void SwitchBottomTab(BottomTab tab)
@@ -271,15 +417,17 @@ public partial class MainWindow : Window
         StyleBottomTabButton(btnBottomTabOutput,  tab == BottomTab.Output);
         StyleBottomTabButton(btnBottomTabLog,     tab == BottomTab.Log);
         StyleBottomTabButton(btnBottomTabNote,    tab == BottomTab.Note);
+        _activeBottomTab = tab;
     }
+
+    private BottomTab _activeBottomTab = BottomTab.Bot;
 
     /// <summary>Ensure the embedded bottom panel row is expanded and visible.</summary>
     private void EnsureBottomPanelVisible()
     {
         if (!_isBotEmbedded) return;
-        if (BotDockRow.Height.Value > 0) return;
-        BotDockRow.Height = new GridLength(280, GridUnitType.Pixel);
-        BotSplitterRow.Height = new GridLength(6, GridUnitType.Pixel);
+        if (IsBotDockOpen && !IsBotDockCollapsed) return;
+        OpenBotDock();
     }
 
     private void StyleBottomTabButton(Button btn, bool selected)
@@ -1586,18 +1734,7 @@ public partial class MainWindow : Window
         // Embedded mode: toggle the dock row visibility instead of the window
         if (_botWindow is not null && _botWindow.IsLoaded && _isBotEmbedded)
         {
-            bool isVisible = BotDockRow.Height.Value > 0;
-            if (isVisible)
-            {
-                BotDockRow.Height = new GridLength(0);
-                BotSplitterRow.Height = new GridLength(0);
-            }
-            else
-            {
-                BotDockRow.Height = new GridLength(280, GridUnitType.Pixel);
-                BotSplitterRow.Height = new GridLength(6, GridUnitType.Pixel);
-            }
-            UpdateStatusBarBot();
+            if (IsBotDockOpen) CloseBotDock(); else OpenBotDock();
             return;
         }
 
@@ -2584,6 +2721,14 @@ public partial class MainWindow : Window
         ctxRestart.Click += OnDocTabRestart;
         ctx.Items.Add(ctxRestart);
 
+        var ctxSplitRight = new System.Windows.Controls.MenuItem { Header = "Split Right" };
+        ctxSplitRight.Click += OnDocTabSplitRight;
+        ctx.Items.Add(ctxSplitRight);
+
+        var ctxSplitDown = new System.Windows.Controls.MenuItem { Header = "Split Down" };
+        ctxSplitDown.Click += OnDocTabSplitDown;
+        ctx.Items.Add(ctxSplitDown);
+
         // Float / Dock — explicit detach + re-merge controls. Drag-drop in
         // AvalonDock is unreliable when the drop lands outside any valid
         // target (snap-back / orphaning), so these menu items give the user
@@ -2605,6 +2750,12 @@ public partial class MainWindow : Window
             if (doc is null) { ctxFloat.IsEnabled = ctxDock.IsEnabled = false; return; }
             ctxFloat.IsEnabled = !doc.IsFloating;
             ctxDock.IsEnabled = doc.IsFloating;
+
+            // A lone document in its pane has nothing to split away from.
+            var splittable = !doc.IsFloating
+                             && doc.Parent is AvalonDock.Layout.LayoutDocumentPane p
+                             && p.ChildrenCount > 1;
+            ctxSplitRight.IsEnabled = ctxSplitDown.IsEnabled = splittable;
         };
 
         ctx.Items.Add(new System.Windows.Controls.Separator());
@@ -2623,6 +2774,103 @@ public partial class MainWindow : Window
 
         dockManager.DocumentContextMenu = ctx;
     }
+
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Splitting documents
+    // ─────────────────────────────────────────────────────────────────────
+    //
+    // There was no split command at all: the only way to get two terminals side by
+    // side was to drag a tab and hope the drop landed on a valid target. The context
+    // menu's Float/Dock pair exists because that drag was unreliable — and it was
+    // unreliable because the terminal was a native HwndHost child, which paints over
+    // the WPF adorner AvalonDock draws to show you where the drop will go. You were
+    // aiming at a target you could not see.
+    //
+    // The terminal is a WPF element now, so the drag works. These commands stay
+    // anyway, for the same reason an editor offers both: aiming is optional.
+
+    /// <summary>
+    /// Move a document into a new pane beside or below its current one.
+    /// </summary>
+    /// <param name="orientation">
+    /// Horizontal puts the new pane to the right, Vertical puts it underneath —
+    /// AvalonDock orients a LayoutPanel's children along this axis.
+    /// </param>
+    private void SplitDocument(AvalonDock.Layout.LayoutDocument? doc, Orientation orientation)
+    {
+        if (doc is null) return;
+        if (doc.Parent is not AvalonDock.Layout.LayoutDocumentPane pane) return;
+
+        // A pane holding one document has nothing to split off — the result would be
+        // an empty pane next to a full one, which AvalonDock then prunes anyway.
+        if (pane.ChildrenCount < 2)
+        {
+            AppLogger.Log($"[Dock] split skipped: '{doc.Title}' is the only document in its pane");
+            return;
+        }
+
+        var target = NeighbourPaneFor(pane, orientation);
+        if (target is null) return;
+
+        pane.RemoveChild(doc);
+        target.Children.Add(doc);
+        doc.IsActive = true;
+        doc.IsSelected = true;
+
+        AppLogger.Log($"[Dock] split {orientation} | doc='{doc.Title}' -> new pane");
+    }
+
+    /// <summary>
+    /// The pane to move the document into: a fresh one next to <paramref name="pane"/>
+    /// along <paramref name="orientation"/>.
+    ///
+    /// <para>The containing group is reached through <c>ILayoutOrientableGroup</c>
+    /// rather than a concrete type, because AvalonDock puts a document pane inside a
+    /// <c>LayoutPanel</c> or a <c>LayoutDocumentPaneGroup</c> depending on how the
+    /// layout grew — matching on one of them works until the first time the user has
+    /// already split something.</para>
+    ///
+    /// <para>If that group already runs along the requested axis the new pane simply
+    /// joins it. If it runs the other way, the pane and its new neighbour are wrapped
+    /// in their own group, in place — which is how AvalonDock expresses a grid of
+    /// panes, and why splitting right and then down nests instead of fighting.</para>
+    /// </summary>
+    private AvalonDock.Layout.LayoutDocumentPane? NeighbourPaneFor(
+        AvalonDock.Layout.LayoutDocumentPane pane, Orientation orientation)
+    {
+        if (pane.Parent is not AvalonDock.Layout.ILayoutOrientableGroup group
+            || group is not AvalonDock.Layout.ILayoutGroup container)
+        {
+            AppLogger.Log($"[Dock] split aborted: pane parent is {pane.Parent?.GetType().Name ?? "null"}");
+            return null;
+        }
+
+        var index = container.IndexOfChild(pane);
+        if (index < 0) return null;
+
+        var fresh = new AvalonDock.Layout.LayoutDocumentPane();
+
+        if (group.Orientation == orientation || container.ChildrenCount == 1)
+        {
+            group.Orientation = orientation;
+            container.InsertChildAt(index + 1, fresh);
+            return fresh;
+        }
+
+        var wrapper = new AvalonDock.Layout.LayoutDocumentPaneGroup { Orientation = orientation };
+        container.RemoveChildAt(index);
+        wrapper.Children.Add(pane);
+        wrapper.Children.Add(fresh);
+        container.InsertChildAt(index, wrapper);
+        return fresh;
+    }
+
+    private void OnDocTabSplitRight(object sender, RoutedEventArgs e)
+        => SplitDocument(GetContextDocument(sender), Orientation.Horizontal);
+
+    private void OnDocTabSplitDown(object sender, RoutedEventArgs e)
+        => SplitDocument(GetContextDocument(sender), Orientation.Vertical);
 
     private ConsoleTabInfo? FindTabByDocument(AvalonDock.Layout.LayoutDocument doc)
         => _consoleTabs.FirstOrDefault(t => t.Document == doc);
@@ -3653,11 +3901,34 @@ public partial class MainWindow : Window
         if (leaving != AppPage.None) OnLeftPage(leaving);
         if (page == AppPage.None) ExitOverlayMode();
 
+        SyncActivityBar(page);
         AppLogger.Log($"[Page] {leaving} -> {page}");
     }
 
     /// <summary>Click the icon of the page you are on and you go back to the CLI.</summary>
     private void TogglePage(AppPage page) => ShowPage(ActivePage == page ? AppPage.None : page);
+
+    /// <summary>
+    /// The ActivityBar rail follows the page, for the same reason the pages follow
+    /// one value: it is a single selection, so it is set in one place from that
+    /// value rather than each button lighting its own and never putting it out.
+    /// </summary>
+    private void SyncActivityBar(AppPage page)
+    {
+        Mark(btnActivityBot,      page == AppPage.None);   // no page up = the CLI/bot surface
+        Mark(btnActivitySettings, page == AppPage.Settings);
+        Mark(btnActivityWebDev,   page == AppPage.WebDev);
+        Mark(btnActivityScrap,    page == AppPage.Scrap);
+        Mark(btnActivityNote,     page == AppPage.Note);
+        Mark(btnActivityDiff,     page == AppPage.Diff);
+        Mark(btnActivityRemote,   page == AppPage.Remote);
+        Mark(btnActivityWearable, page == AppPage.Wearable);
+
+        static void Mark(System.Windows.Controls.Button? b, bool selected)
+        {
+            if (b is not null) UI.ActivityBarState.SetIsSelected(b, selected);
+        }
+    }
 
     /// <summary>Per-page teardown. Visibility is not this method's business.</summary>
     private void OnLeftPage(AppPage page)
