@@ -1,4 +1,4 @@
-namespace Agent.Common.Data.Entities;
+﻿namespace Agent.Common.Data.Entities;
 
 public class CliGroup
 {
@@ -18,6 +18,15 @@ public class CliGroup
     /// app as a whole was on when it closed.</para>
     /// </summary>
     public int ActiveTabIndex { get; set; }
+
+    /// <summary>
+    /// How this workspace's tabs were split, as
+    /// <see cref="Agent.Common.Services.DockPaneLayout.ToJson"/> writes it. Null
+    /// while the workspace is unsplit, which is most of them — an unsplit layout
+    /// is not stored, so a new tab is never pinned into an arrangement nobody asked
+    /// for.
+    /// </summary>
+    public string? LayoutJson { get; set; }
 
     public ICollection<CliTab> Tabs { get; set; } = [];
 }

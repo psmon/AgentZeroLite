@@ -1,4 +1,4 @@
-using Agent.Common.Data;
+﻿using Agent.Common.Data;
 using Agent.Common.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -45,7 +45,8 @@ public sealed record CliGroupSnapshot(
     string DirectoryPath,
     string DisplayName,
     IReadOnlyList<CliTabSnapshot> Tabs,
-    int ActiveTabIndex = 0);
+    int ActiveTabIndex = 0,
+    string? DockLayoutJson = null);
 
 public static class CliWorkspacePersistence
 {
@@ -114,6 +115,7 @@ public static class CliWorkspacePersistence
                 DisplayName = group.DisplayName,
                 SortOrder = groupIndex,
                 ActiveTabIndex = group.ActiveTabIndex,
+                LayoutJson = group.DockLayoutJson,
             };
 
             db.CliGroups.Add(dbGroup);
@@ -160,7 +162,8 @@ public static class CliWorkspacePersistence
                         tab.CliDefinition.EncryptedPassword,
                         tab.CliDefinition.ReducedMotion))
                     .ToList(),
-                group.ActiveTabIndex))
+                group.ActiveTabIndex,
+                group.LayoutJson))
             .ToList();
     }
 

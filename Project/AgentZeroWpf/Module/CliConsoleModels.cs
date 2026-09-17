@@ -103,5 +103,8 @@ public sealed class CliGroupInfo : ICliGroupInfo
     /// </summary>
     public Agent.Common.Services.DockPaneNode? DockLayout { get; set; }
 
+    /// <summary>The same thing as stored — see <see cref="ICliGroupInfo.DockLayoutJson"/>.</summary>
+    string? ICliGroupInfo.DockLayoutJson => Agent.Common.Services.DockPaneLayout.ToJson(DockLayout);
+
     IReadOnlyList<IConsoleTabInfo> ICliGroupInfo.TabsView => Tabs;
 }

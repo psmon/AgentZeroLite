@@ -177,6 +177,60 @@ public class DockPaneLayoutTests
         Assert.Equal(DockPaneLayout.PaneCount(once), DockPaneLayout.PaneCount(twice));
     }
 
+    // ── storage ──
+
+    [Fact]
+    public void Json_RoundTripsAShape()
+    {
+        var saved = DockPaneNode.Group(false,
+            DockPaneNode.Pane(0),
+            DockPaneNode.Group(true, DockPaneNode.Pane(1, 2), DockPaneNode.Pane(3)));
+
+        var back = DockPaneLayout.FromJson(DockPaneLayout.ToJson(saved));
+
+        Assert.Equal(3, DockPaneLayout.PaneCount(back));
+        Assert.Equal([0, 1, 2, 3], DockPaneLayout.Tabs(back));
+        Assert.True(back!.Children![1].Vertical);
+        Assert.False(back.Vertical);
+    }
+
+    /// <summary>
+    /// An unsplit workspace stores nothing. Otherwise every workspace would carry a
+    /// one-pane layout that pins the next new tab into an arrangement nobody chose.
+    /// </summary>
+    [Fact]
+    public void Json_DoesNotStoreAnUnsplitLayout()
+    {
+        Assert.Null(DockPaneLayout.ToJson(DockPaneNode.Pane(0, 1, 2)));
+        Assert.Null(DockPaneLayout.ToJson(null));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not json")]
+    [InlineData("{\"Children\":[")]
+    public void Json_UnreadableStoredLayout_IsNoLayout(string? stored)
+    {
+        // The workspace then opens unsplit, which is what it did before any of
+        // this existed - never a crash on startup.
+        Assert.Null(DockPaneLayout.FromJson(stored));
+    }
+
+    /// <summary>The stored form is what gets reconciled, so it has to survive the trip.</summary>
+    [Fact]
+    public void Json_StoredLayout_StillNormalisesAfterReload()
+    {
+        var stored = DockPaneLayout.ToJson(
+            DockPaneNode.Group(false, DockPaneNode.Pane(0), DockPaneNode.Pane(1)));
+
+        var r = DockPaneLayout.Normalise(DockPaneLayout.FromJson(stored), All(3));
+
+        Assert.Equal(2, DockPaneLayout.PaneCount(r));
+        Assert.Equal([0, 2, 1], DockPaneLayout.Tabs(r));
+    }
+
     /// <summary>The remembered layout is not mutated — it is still the fallback next time.</summary>
     [Fact]
     public void Normalise_LeavesTheSavedLayoutAlone()

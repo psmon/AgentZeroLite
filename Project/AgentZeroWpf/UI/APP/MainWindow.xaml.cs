@@ -1764,6 +1764,13 @@ public partial class MainWindow : Window
 
     private void SaveCliGroups()
     {
+        // The workspace on screen has not been left, so its arrangement was never
+        // captured — ActivateGroup only records the one being switched away from.
+        // Without this the workspace you were actually using is the one that comes
+        // back unsplit.
+        if (_activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count)
+            _cliGroups[_activeGroupIndex].DockLayout = CaptureDocumentLayout();
+
         CliWorkspacePersistence.SaveCliGroups(_cliGroups);
     }
 
@@ -1813,12 +1820,25 @@ public partial class MainWindow : Window
             // land on the right one.
             if (restoredGroup.Tabs.Count > 0)
                 restoredGroup.ActiveTabIndex = Math.Clamp(grp.ActiveTabIndex, 0, restoredGroup.Tabs.Count - 1);
+
+            // And how they were split. Reconciled against the tabs that exist when
+            // the workspace is actually opened, so a stored layout from before a tab
+            // was added or removed is corrected rather than believed.
+            restoredGroup.DockLayout = Agent.Common.Services.DockPaneLayout.FromJson(grp.DockLayoutJson);
         }
 
         // Activate the last active group and tab (only this one initializes the terminal)
         if (_cliGroups.Count > 0)
         {
             int gIdx = Math.Clamp(lastGroupIdx, 0, _cliGroups.Count - 1);
+
+            // Adding each group above left _activeGroupIndex pointing at the last one
+            // added, so if that happens to be the group we are about to open,
+            // ActivateGroup sees sameGroup and skips the rebuild — and the workspace
+            // opens flat with its stored split unread. Nothing is really on screen
+            // yet, so say so and let the activation below do the full job.
+            _activeGroupIndex = -1;
+
             ActivateGroup(gIdx);
             var tabs = _cliGroups[gIdx].Tabs;
             if (tabs.Count > 0)

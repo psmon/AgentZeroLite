@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace Agent.Common.Services;
 
 /// <summary>
@@ -20,6 +23,9 @@ public sealed class DockPaneNode
     /// <summary>Stacked top-to-bottom rather than left-to-right. Groups only.</summary>
     public bool Vertical { get; set; }
 
+    /// <summary>Not stored — it is just "has tabs", and writing it would put a
+    /// field in the saved layout that nothing reads back.</summary>
+    [JsonIgnore]
     public bool IsPane => Tabs is not null;
 
     public static DockPaneNode Pane(params int[] tabs) => new() { Tabs = [.. tabs] };
@@ -135,4 +141,37 @@ public static class DockPaneLayout
         node is null ? 0
         : node.IsPane ? 1
         : (node.Children ?? []).Sum(PaneCount);
+
+    // ── storage ──
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    /// <summary>
+    /// The layout as one string, for the workspace row that stores it. A single
+    /// column rather than a table of panes: nothing queries the shape, it is read
+    /// and written whole, and a schema for it would have to be migrated every time
+    /// the dock grows a new kind of node.
+    /// </summary>
+    public static string? ToJson(DockPaneNode? node)
+    {
+        // An unsplit workspace has nothing worth remembering, and storing it would
+        // only pin new tabs into an arrangement the user never asked for.
+        if (node is null || PaneCount(node) < 2) return null;
+        return JsonSerializer.Serialize(node, JsonOptions);
+    }
+
+    /// <summary>
+    /// Read a stored layout back. Returns null for anything unreadable — a layout
+    /// written by an older build, or a row edited by hand. The workspace then
+    /// simply opens unsplit, which is the behaviour before any of this existed.
+    /// </summary>
+    public static DockPaneNode? FromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<DockPaneNode>(json, JsonOptions); }
+        catch (JsonException) { return null; }
+    }
 }
