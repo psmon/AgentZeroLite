@@ -20,7 +20,6 @@ namespace AgentZeroWpf.UI.APP;
 
 public partial class MainWindow : Window
 {
-    // ConPTY 터미널은 EasyWindowsTerminalControl이 관리
 
     public MainWindow()
     {
@@ -447,8 +446,8 @@ public partial class MainWindow : Window
         {
             Dispatcher.BeginInvoke(() =>
             {
-                if (ati >= 0 && ati < tabs.Count && tabs[ati].Terminal is { } t)
-                    FocusTerminal(t);
+                if (ati >= 0 && ati < tabs.Count && tabs[ati].XtermTerminal is { } t)
+                    t.FocusTerminal();
             }, System.Windows.Threading.DispatcherPriority.Loaded);
         }
     }
@@ -484,7 +483,7 @@ public partial class MainWindow : Window
         foreach (var group in _cliGroups)
             foreach (var tab in group.Tabs)
             {
-                try { tab.Terminal?.ConPTYTerm?.StopExternalTermOnly(); } catch { }
+                try { tab.XtermTerminal?.Shutdown(); } catch { }
             }
     }
 
@@ -710,13 +709,12 @@ public partial class MainWindow : Window
             {
                 var t = g.Tabs[ti];
                 totalTabs++;
-                var sess = t.Session as ConPtyTerminalSession;
+                var sess = t.Session;
                 string id = sess?.InternalId ?? "-";
-                string ptyRef = sess is not null ? $"0x{sess.PtyRefHash:X8}" : "-";
                 bool running = sess?.IsRunning ?? false;
                 int outLen = sess?.OutputLength ?? -1;
                 if (inv.Length > 0) inv.Append(" | ");
-                inv.Append($"[{gi}:{ti}] label=\"{g.DisplayName}/{t.Title}\" id={id} pty_ref={ptyRef} running={running} out_len={outLen}");
+                inv.Append($"[{gi}:{ti}] label=\"{g.DisplayName}/{t.Title}\" id={id} running={running} out_len={outLen}");
             }
         }
         AppLogger.Log($"[IPC] terminal-list | groups={_cliGroups.Count} tabs={totalTabs} bytes={json.Length}");
@@ -1008,18 +1006,16 @@ public partial class MainWindow : Window
         }
         else
         {
-            var cps = session as ConPtyTerminalSession;
             int outLenBefore = session!.OutputLength;
             string label = session.SessionId;
-            string id = cps?.InternalId ?? "-";
-            string ptyRef = cps is not null ? $"0x{cps.PtyRefHash:X8}" : "-";
+            string id = session.InternalId;
             bool running = session.IsRunning;
             string preview = text.Length <= 30 ? text : text[..30] + "…";
 
             if (!running)
             {
                 resultJson = $"{{\"ok\":false,\"error\":\"Terminal [{groupIdx}:{tabIdx}] session is not running (PTY dead). id={id}\"}}";
-                AppLogger.Log($"[IPC] terminal-send REJECTED [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} pty_ref={ptyRef} running=false");
+                AppLogger.Log($"[IPC] terminal-send REJECTED [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} running=false");
             }
             else
             {
@@ -1027,7 +1023,7 @@ public partial class MainWindow : Window
                 {
                     session.WriteAndSubmit(text);
                     resultJson = $"{{\"ok\":true,\"group_index\":{groupIdx},\"tab_index\":{tabIdx},\"sent_length\":{text.Length}}}";
-                    AppLogger.Log($"[IPC] terminal-send [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} pty_ref={ptyRef} running={running} len={text.Length} out_len_before={outLenBefore} preview=\"{preview}\"");
+                    AppLogger.Log($"[IPC] terminal-send [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} running={running} len={text.Length} out_len_before={outLenBefore} preview=\"{preview}\"");
                 }
                 catch (Exception ex)
                 {
@@ -1093,16 +1089,14 @@ public partial class MainWindow : Window
             }
             else
             {
-                var cps = session as ConPtyTerminalSession;
                 string label = session!.SessionId;
-                string id = cps?.InternalId ?? "-";
-                string ptyRef = cps is not null ? $"0x{cps.PtyRefHash:X8}" : "-";
+                string id = session.InternalId;
                 bool running = session.IsRunning;
 
                 if (!running)
                 {
                     resultJson = $"{{\"ok\":false,\"error\":\"Terminal [{groupIdx}:{tabIdx}] session is not running (PTY dead). id={id}\"}}";
-                    AppLogger.Log($"[IPC] terminal-key REJECTED [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} pty_ref={ptyRef} running=false key={key}");
+                    AppLogger.Log($"[IPC] terminal-key REJECTED [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} running=false key={key}");
                 }
                 else
                 {
@@ -1110,7 +1104,7 @@ public partial class MainWindow : Window
                     {
                         session.Write(seq.AsSpan());
                         resultJson = $"{{\"ok\":true,\"group_index\":{groupIdx},\"tab_index\":{tabIdx},\"key\":\"{EscapeJson(key)}\"}}";
-                        AppLogger.Log($"[IPC] terminal-key [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} pty_ref={ptyRef} running={running} key={key} seq_bytes={seq.Length}");
+                        AppLogger.Log($"[IPC] terminal-key [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} running={running} key={key} seq_bytes={seq.Length}");
                     }
                     catch (Exception ex)
                     {
@@ -1181,10 +1175,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            var cps = session as ConPtyTerminalSession;
             string label = session!.SessionId;
-            string id = cps?.InternalId ?? "-";
-            string ptyRef = cps is not null ? $"0x{cps.PtyRefHash:X8}" : "-";
+            string id = session.InternalId;
             bool running = session.IsRunning;
 
             try
@@ -1205,7 +1197,7 @@ public partial class MainWindow : Window
                 text = ApprovalParser.StripAnsiCodes(text);
                 resultJson = $"{{\"ok\":true,\"group_index\":{groupIdx},\"tab_index\":{tabIdx},\"length\":{text.Length},\"text\":\"{EscapeJson(text)}\"}}";
                 int totalOutLen = session.OutputLength;
-                AppLogger.Log($"[IPC] terminal-read [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} pty_ref={ptyRef} running={running} last_n={lastN} out_len={totalOutLen} returned={text.Length}");
+                AppLogger.Log($"[IPC] terminal-read [{groupIdx}:{tabIdx}] | label=\"{label}\" id={id} running={running} last_n={lastN} out_len={totalOutLen} returned={text.Length}");
             }
             catch (Exception ex)
             {
@@ -1718,7 +1710,7 @@ public partial class MainWindow : Window
         => CliSessionAccessHelper.GetActiveSessionName(_cliGroups, _activeGroupIndex);
 
     private ITerminalSession? GetActiveSession()
-        => CliSessionAccessHelper.GetActiveSession(_cliGroups, _activeGroupIndex, EnsureSession);
+        => CliSessionAccessHelper.GetActiveSession(_cliGroups, _activeGroupIndex);
 
     private string? GetActiveDirectoryPath()
         => _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count
@@ -1726,20 +1718,11 @@ public partial class MainWindow : Window
             : null;
 
     /// <summary>
-    /// Creates a ConPtyTerminalSession if the terminal is started but Session is missing.
-    /// Safe to call multiple times — only creates once.
-    /// </summary>
-    private static void EnsureSession(ConsoleTabInfo tab, EasyWindowsTerminalControl.EasyTerminalControl? terminal, string groupName)
-        => CliSessionAccessHelper.EnsureSession(tab, terminal, groupName);
-
-    /// <summary>
     /// Bind the session to the Akka actor system once it's available. Dedup via
     /// LastBoundSessionId/LastBoundHwnd so repeat Loaded events are idempotent.
     /// Also wires the channel-health alert so wedge events surface a banner.
     /// </summary>
-    // terminalVisual is the hosting WPF element used only for the per-tab HWND
-    // lookup — EasyTerminalControl (EasyConPty) or XtermTerminalControl
-    // (WebViewXterm). Both derive from Visual, so this stays backend-agnostic.
+    // terminalVisual is the hosting WPF element, used only for the per-tab HWND lookup.
     private void BindSessionToActors(ConsoleTabInfo tab, System.Windows.Media.Visual? terminalVisual, string groupName)
     {
         if (!ActorSystemManager.IsInitialized || tab.Session is null) return;
@@ -1771,54 +1754,6 @@ public partial class MainWindow : Window
         catch { /* 레이아웃 완료 전이면 HWND 미획득 — 다음 활성화 시 재시도 */ }
     }
 
-    /// <summary>
-    /// Poll EnsureSession every 100ms until the ConPTY output log is ready (session
-    /// becomes non-null) or 10s elapses. Fixes the timing race where RestartTerm()
-    /// returns before the pipe connects, leaving the tab with a null session and
-    /// silent input until the next Loaded event.
-    /// </summary>
-    private void StartSessionPendingRetry(ConsoleTabInfo tab, EasyWindowsTerminalControl.EasyTerminalControl terminal, string groupName)
-    {
-        const int MaxAttempts = 100;
-        var attempts = 0;
-        var timer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(100),
-        };
-        tab.SessionPendingRetry = timer;
-        timer.Tick += (_, _) =>
-        {
-            attempts++;
-
-            // Abort if the terminal was swapped out (tab closed/reopened) — the new
-            // Loaded handler owns retry for the replacement terminal.
-            if (!ReferenceEquals(tab.Terminal, terminal))
-            {
-                timer.Stop();
-                tab.SessionPendingRetry = null;
-                AppLogger.Log($"[CLI] Session retry aborted: terminal replaced | label={groupName}/{tab.Title} attempts={attempts}");
-                return;
-            }
-
-            EnsureSession(tab, terminal, groupName);
-            if (tab.Session is not null)
-            {
-                timer.Stop();
-                tab.SessionPendingRetry = null;
-                BindSessionToActors(tab, terminal, groupName);
-                AppLogger.Log($"[CLI] Session retry success | label={groupName}/{tab.Title} attempts={attempts}");
-                return;
-            }
-
-            if (attempts >= MaxAttempts)
-            {
-                timer.Stop();
-                tab.SessionPendingRetry = null;
-                AppLogger.Log($"[CLI] Session retry timed out | label={groupName}/{tab.Title} attempts={attempts} — tab will remain unbound until next activation");
-            }
-        };
-        timer.Start();
-    }
 
     // ──────────────────────────────────────────────────────────────────────
     //  Wedge recovery: banner + Restart Terminal
@@ -1828,7 +1763,7 @@ public partial class MainWindow : Window
     //  outLen never advances, neither AgentBot writes nor direct keyboard
     //  reach the foreground child. The third-party openconsole layer is the
     //  source; we cannot fix it from here. Instead we DETECT (HealthState
-    //  machine in ConPtyTerminalSession) and OFFER RECOVERY (this code).
+    //  machine in WebViewXtermTerminalSession) and OFFER RECOVERY (this code).
     // ──────────────────────────────────────────────────────────────────────
 
     private void WireHealthAlert(ConsoleTabInfo tab)
@@ -1917,14 +1852,12 @@ public partial class MainWindow : Window
     /// </summary>
     private void RestartWedgedTerminal(ConsoleTabInfo tab)
     {
-        var terminal = tab.Terminal;
-        if (terminal is null)
+        if (tab.LaunchCommandLine is not { } cmdLine)
         {
-            AppLogger.Log($"[CLI] Restart: terminal null | label={tab.Title}");
+            AppLogger.Log($"[CLI] Restart: nothing recorded to relaunch | label={tab.Title}");
             return;
         }
 
-        // Resolve the tab's group for logging + rebind.
         string? groupName = null;
         foreach (var g in _cliGroups)
             if (g.Tabs.Contains(tab)) { groupName = g.DisplayName; break; }
@@ -1934,54 +1867,39 @@ public partial class MainWindow : Window
             return;
         }
 
-        AppLogger.Log($"[CLI] Restart requested | label={groupName}/{tab.Title} prevSessionId={tab.LastBoundSessionId ?? "(none)"}");
+        AppLogger.Log($"[CLI] Restart requested | label={groupName}/{tab.Title} " +
+                      $"prevSessionId={tab.LastBoundSessionId ?? "(none)"}");
 
-        // 1) Cancel any pending retry timer so it doesn't race with the fresh start.
-        try { tab.SessionPendingRetry?.Stop(); } catch { }
-        tab.SessionPendingRetry = null;
+        // The EasyConPty control restarted itself in place (RestartTerm) and handed
+        // back a new PTY. There is no such call here: the control owns its
+        // pseudo-console, so recovery means replacing the control. Which is simpler —
+        // one teardown, then the ordinary creation path, with no second way to start
+        // a terminal to keep in step.
 
-        // 2) Dispose the old session — closes its write-loop channel, frees timers.
-        //    The underlying ConPTYTerm reference is owned by terminal, not the
-        //    session, so disposing the session does NOT kill the PTY itself.
+        // 1) Let go of the old session: closes its write-loop channel, frees timers.
         try { (tab.Session as IDisposable)?.Dispose(); }
         catch (Exception ex) { AppLogger.Log($"[CLI] Restart: session dispose threw {ex.GetType().Name}: {ex.Message}"); }
         tab.Session = null;
 
-        // 3) Reset rebind dedup + health-wire flag so the new session is treated as fresh.
+        // 2) And the old control, which kills the child process with it.
+        if (tab.XtermTerminal is { } old)
+        {
+            try { old.Shutdown(); } catch { }
+            try { tab.TerminalHost.Children.Remove(old); } catch { }
+            tab.XtermTerminal = null;
+        }
+
+        // 3) Reset the rebind dedup so the replacement is treated as a fresh start.
         tab.LastBoundSessionId = null;
         tab.LastBoundHwnd = 0;
         tab.HealthWired = false;
+        tab.IsTerminalStarted = false;
         DisposeLinkDetector(tab);
-
-        // 4) Hide banner immediately — UX feedback that the request was accepted.
         HideWedgeBanner(tab);
 
-        // 5) Force RestartTerm() — this is the actual recovery: a new PTY child
-        //    process is spawned, the terminal control re-binds its renderer, and
-        //    a fresh stdin pipe is opened.
-        tab.IsTerminalStarted = false;
-        try
-        {
-            terminal.RestartTerm();
-            tab.IsTerminalStarted = true;
-            var ptyHashAfter = terminal.ConPTYTerm is null
-                ? 0
-                : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
-            AppLogger.Log($"[CLI] RestartTerm() (recovery) | label={groupName}/{tab.Title} ptyHash=0x{ptyHashAfter:X8}");
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Log($"[CLI] Restart: RestartTerm threw {ex.GetType().Name}: {ex.Message}");
-            return;
-        }
-
-        // 6) Try to bind immediately; if the new PTY's ConsoleOutputLog is not
-        //    ready yet, fall back to the polling retry — same path that
-        //    handles fresh-start init races.
-        EnsureSession(tab, terminal, groupName);
-        BindSessionToActors(tab, terminal, groupName);
-        if (tab.Session is null && tab.SessionPendingRetry is null)
-            StartSessionPendingRetry(tab, terminal, groupName);
+        // 4) Same path a first-time start takes — session, actor binding and health
+        //    alert all come back through the control's Loaded handler.
+        InitializeWebViewTerminal(tab, cmdLine, tab.LaunchWorkingDir ?? "", groupName);
     }
 
 
@@ -2281,9 +2199,6 @@ public partial class MainWindow : Window
                 tab.TerminalHost.Children.Remove(tab.XtermTerminal);
                 tab.XtermTerminal = null;
             }
-            if (tab.Terminal is null) continue;
-            try { tab.Terminal.ConPTYTerm?.StopExternalTermOnly(); } catch { }
-            tab.TerminalHost.Children.Remove(tab.Terminal);
         }
 
         // Remove documents from AvalonDock if this is the active group
@@ -2435,7 +2350,7 @@ public partial class MainWindow : Window
             CliDefinitionId = cliDefinitionId,
             ExePath = exe, Arguments = arguments,
             EncryptedPasswordForLaunch = encryptedPasswordForLaunch,
-            Terminal = null, IsInitialized = false,
+            IsInitialized = false,
         };
 
         // Build the REDOCK strip — sits in row 0, collapsed until the tab floats.
@@ -2575,185 +2490,8 @@ public partial class MainWindow : Window
             ? $"cmd /c \"{injectPath}&&pushd \"{workDir}\"&&{rawCmd}\""
             : $"cmd /c \"{injectPath}&&{rawCmd}\"";
 
-        // One terminal: xterm.js in WebView2. The EasyConPty (HwndHost) path below is
-        // no longer reachable - see TerminalBackend for why the choice went away - and
-        // comes out with its packages in a follow-up. Nothing selects it.
         InitializeWebViewTerminal(tab, cmdLine, workDir, _cliGroups[_activeGroupIndex].DisplayName);
-        return;
 
-#pragma warning disable CS0162   // unreachable: the EasyConPty path, pending removal
-
-        var terminal = new EasyWindowsTerminalControl.EasyTerminalControl();
-        terminal.StartupCommandLine = cmdLine;
-        terminal.FontFamilyWhenSettingTheme = new System.Windows.Media.FontFamily("Consolas");
-        terminal.FontSizeWhenSettingTheme = 12;
-        // Win32InputMode=true sends raw INPUT_RECORDs via the win32-input-mode VT
-        // escape, which delivers every keystroke (including modifiers) to the PTY.
-        // Tradeoff: Korean IME jamo keystrokes produce virtual-keys outside the
-        // ConsoleKey enum (> 255); PSReadLine unwraps those INPUT_RECORDs and
-        // throws on the out-of-range VK, crashing PowerShell 7. Standard Windows
-        // Terminal keeps this OFF for shells and lets TermControl's TSF handle
-        // IME composition natively (final text arrives as UTF-8 VT). We follow
-        // the same default so Korean input works with pwsh/cmd/claude.
-        terminal.Win32InputMode = false;
-        terminal.LogConPTYOutput = true;
-        terminal.Theme = new Microsoft.Terminal.Wpf.TerminalTheme
-        {
-            DefaultBackground = EasyWindowsTerminalControl.EasyTerminalControl.ColorToVal(
-                System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E)),
-            DefaultForeground = EasyWindowsTerminalControl.EasyTerminalControl.ColorToVal(
-                System.Windows.Media.Color.FromRgb(0xD4, 0xD4, 0xD4)),
-            DefaultSelectionBackground = 0x264F78,
-            CursorStyle = Microsoft.Terminal.Wpf.CursorStyle.BlinkingBar,
-            ColorTable = new uint[]
-            {
-                0x1E1E1E, 0xC74E39, 0x608B4E, 0xDCDCAA,
-                0x569CD6, 0xC586C0, 0x4EC9B0, 0xD4D4D4,
-                0x808080, 0xF14C4C, 0xB5CEA8, 0xDCDCAA,
-                0x9CDCFE, 0xD670D6, 0x4EC9B0, 0xFFFFFF,
-            },
-        };
-        terminal.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
-        terminal.VerticalAlignment = System.Windows.VerticalAlignment.Stretch;
-
-        // Tab: intercept in PreviewKeyDown before WPF's HwndHost processes it.
-        // (HwndHost's built-in Tab handling disrupts terminal cursor/focus state.)
-        // With Win32InputMode=false, TermControl's native TSF handles Korean IME
-        // composition directly — no ImeProcessed blocking needed.
-        terminal.PreviewKeyDown += (_, e) =>
-        {
-            // PTY-FREEZE-DIAG: if the user reports "keyboard does nothing",
-            // the first question is whether WPF saw the key at all. A line
-            // here per keystroke proves the key reached the WPF tree; absence
-            // of these lines while the user types means focus is parked
-            // somewhere the terminal doesn't own.
-            AppLogger.Log($"[CLI-Input-DIAG] PreviewKeyDown | tab={tab.Title} key={e.Key} handled={e.Handled}");
-
-            if (e.Key == System.Windows.Input.Key.Tab)
-            {
-                // Differentiate Tab vs Shift+Tab. WPF reports both as
-                // `Key.Tab`; the modifier flag distinguishes them. We must
-                // intercept Tab here (HwndHost's built-in Tab traversal
-                // disrupts terminal focus/cursor state) but we have to emit
-                // the right ANSI sequence so the underlying CLI sees the
-                // intended keystroke. Claude Code uses Shift+Tab to cycle
-                // its modes; readline binds it to reverse-completion.
-                bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
-                var seq = shift ? "\x1b[Z" : "\t";
-                terminal.ConPTYTerm?.WriteToTerm(seq.AsSpan());
-                e.Handled = true;
-                if (shift)
-                    AppLogger.Log($"[CLI-Input-DIAG] BackTab→PTY | tab={tab.Title} seq=ESC[Z");
-            }
-
-            // PTY-FREEZE-DIAG: route this keystroke through the session's
-            // input-attempt probe. The session schedules an echo check + drives
-            // the shared HealthState machine — same path AgentBot Write uses,
-            // so HealthState reflects BOTH user typing and bot writes.
-            if (IsEchoCandidateKey(e.Key))
-                tab.Session?.NoteInputAttempt($"keyboard:{e.Key}");
-        };
-
-        terminal.GotFocus += (_, _) =>
-        {
-            // PTY-FREEZE-DIAG: snapshot PTY state on focus. If a tab "doesn't
-            // accept input" while focused, the next questions are: is the PTY
-            // ref still wired? is its output log alive? is the process running?
-            // Logging here makes those answers visible at the moment focus
-            // settled — useful when correlated with later KEY-NO-ECHO lines.
-            var pty = terminal.ConPTYTerm;
-            var ptyHash = pty is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(pty);
-            var outLogNull = pty?.ConsoleOutputLog is null;
-            var outLen = pty?.ConsoleOutputLog?.Length ?? -1;
-            AppLogger.Log($"[CLI-Input-DIAG] GotFocus  | tab={tab.Title} active={tab.Document?.IsActive == true} ptyHash=0x{ptyHash:X8} outLogNull={outLogNull} outLen={outLen}");
-
-            // Click-to-target: EasyTerminalControl is HwndHost-based, so a
-            // click on the console body is consumed by the native child and
-            // never reaches WPF as PreviewMouseDown. The only signal we get
-            // is the routed focus event when the win32 child takes keyboard
-            // focus.
-            //
-            // Design split (intentional, per UX feedback):
-            //  - Terminal body click → updates AgentBot's send target only
-            //    (group.ActiveTabIndex / actor SetActiveTerminal / bot window
-            //    label). The dock's active document stays where it is.
-            //  - Tab strip click → AvalonDock's normal path; flips IsActive,
-            //    OnDockActiveContentChanged updates state.
-            //
-            // Why not touch Document.IsActive here: the prior attempt
-            // (6143c60, reverted in f679a7a) caused dock-cascade ricochet
-            // freezes. Even with a reentrance guard the active-document
-            // change feels intrusive when the user just wanted to focus the
-            // pane to type. Keeping the heavier dock-flip on the explicit
-            // tab-strip click matches what users actually expect.
-            if (_targetingFromTerminalFocus) return;
-            var idx = _consoleTabs.IndexOf(tab);
-            if (idx < 0 || idx == _activeConsoleTab) return;
-            _targetingFromTerminalFocus = true;
-            try { MarkTabAsBotTarget(idx); }
-            catch (Exception ex) { AppLogger.Log($"[CLI-Input-DIAG] Click-target threw {ex.GetType().Name}: {ex.Message}"); }
-            finally
-            {
-                Dispatcher.BeginInvoke(
-                    new Action(() => _targetingFromTerminalFocus = false),
-                    System.Windows.Threading.DispatcherPriority.Background);
-            }
-        };
-        terminal.LostFocus += (_, _) =>
-            AppLogger.Log($"[CLI-Input-DIAG] LostFocus | tab={tab.Title} active={tab.Document?.IsActive == true}");
-
-        // Row 1 = terminal area (row 0 is the REDOCK strip).
-        Grid.SetRow(terminal, 1);
-        tab.TerminalHost.Children.Add(terminal);
-
-        // Capture group name now (before async Loaded) for session ID
-        var groupName = _cliGroups[_activeGroupIndex].DisplayName;
-
-        terminal.Loaded += (_, _) =>
-        {
-            // PTY-FREEZE-DIAG: WPF fires Loaded again whenever the control is
-            // reparented (tab activation, dock layout restore, etc). The
-            // existing `IsTerminalStarted` guard prevents double-RestartTerm,
-            // but the *frequency* of Loaded was previously invisible. If a
-            // freeze coincides with an unexpected re-fire, this log is the
-            // first signal.
-            var ptyHashOnLoad = terminal.ConPTYTerm is null
-                ? 0
-                : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
-            var tabHashOnLoad = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(tab);
-            var termHash = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal);
-            AppLogger.Log($"[CLI] Loaded fired | label={groupName}/{tab.Title} tabHash=#{tabHashOnLoad:X8} termHash=#{termHash:X8} hasConPTY={terminal.ConPTYTerm is not null} ptyHash=0x{ptyHashOnLoad:X8} isStarted={tab.IsTerminalStarted}");
-
-            if (terminal.ConPTYTerm is null) return;
-
-            if (!tab.IsTerminalStarted)
-            {
-                terminal.RestartTerm();
-                tab.IsTerminalStarted = true;
-                // PTY-FREEZE-DIAG: capture the post-RestartTerm state so we
-                // can correlate the cmdLine with the actual ConPTYTerm object
-                // reference. Two tabs that share a ptyHash here is the strong
-                // smoking gun for cross-tab pipe collision.
-                var ptyHashAfter = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(terminal.ConPTYTerm);
-                var outLen = terminal.ConPTYTerm.ConsoleOutputLog?.Length ?? -1;
-                AppLogger.Log($"[CLI] RestartTerm(): {cmdLine} | label={groupName}/{tab.Title} ptyHash=0x{ptyHashAfter:X8} outputLog={(outLen >= 0 ? outLen.ToString() : "null")}");
-            }
-
-            // Create session if missing (covers both first start and reparent/restore)
-            EnsureSession(tab, terminal, groupName);
-            BindSessionToActors(tab, terminal, groupName);
-
-            // If session still null, PTY output log hasn't initialized yet.
-            // Poll every 100ms until ready or 10s timeout, then bind to actors.
-            if (tab.Session is null && tab.SessionPendingRetry is null)
-            {
-                StartSessionPendingRetry(tab, terminal, groupName);
-            }
-        };
-
-        tab.Terminal = terminal;
-        AppLogger.Log($"[CLI] ConPTY 터미널 생성 (lazy): {cmdLine}, dir={workDir}");
-#pragma warning restore CS0162
     }
 
     /// <summary>
@@ -2801,6 +2539,8 @@ public partial class MainWindow : Window
         Grid.SetRow(control, 1);
         tab.TerminalHost.Children.Add(control);
         tab.XtermTerminal = control;
+        tab.LaunchCommandLine = cmdLine;
+        tab.LaunchWorkingDir = workDir;
 
         control.Loaded += (_, _) =>
         {
@@ -2825,13 +2565,6 @@ public partial class MainWindow : Window
     // --- AvalonDock DockingManager integration ---
 
     private bool _isDockSyncInProgress;
-
-    // Reentrance guard for the terminal-focus → bot-target update. The dock
-    // active state isn't touched anymore (so the 6143c60 ricochet is moot)
-    // but the actor SetActiveTerminal + bot window refresh path can still
-    // re-enter via Dispatcher chains. Released on a Background-priority
-    // dispatcher tick so any in-flight refresh settles first.
-    private bool _targetingFromTerminalFocus;
 
     private void InitializeDockManager()
     {
@@ -3264,9 +2997,9 @@ public partial class MainWindow : Window
         // intent), creating the "focus keeps jumping back to the new
         // window" UX bug. The user's actual click on the floating window
         // already focuses its terminal natively.
-        if (tab.Terminal is { } terminal && tab.Document?.IsFloating != true)
+        if (tab.XtermTerminal is { } terminal && tab.Document?.IsFloating != true)
         {
-            Dispatcher.BeginInvoke(() => FocusTerminal(terminal),
+            Dispatcher.BeginInvoke(() => terminal.FocusTerminal(),
                 System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
@@ -3376,11 +3109,6 @@ public partial class MainWindow : Window
             tab.TerminalHost.Children.Remove(tab.XtermTerminal);
             tab.XtermTerminal = null;
         }
-        if (tab.Terminal is not null)
-        {
-            try { tab.Terminal.ConPTYTerm?.StopExternalTermOnly(); } catch { }
-            tab.TerminalHost.Children.Remove(tab.Terminal);
-        }
 
         int index = _consoleTabs.IndexOf(tab);
         if (index < 0) return;
@@ -3432,9 +3160,9 @@ public partial class MainWindow : Window
             // Same float-skip rule as OnDockActiveContentChanged — don't yank
             // focus into a floating window when the user is interacting elsewhere.
             if (safeIdx >= 0 && safeIdx < _consoleTabs.Count
-                && _consoleTabs[safeIdx].Terminal is { } t
+                && _consoleTabs[safeIdx].XtermTerminal is { } t
                 && _consoleTabs[safeIdx].Document?.IsFloating != true)
-                FocusTerminal(t);
+                t.FocusTerminal();
             _botWindow?.RefreshSessionInfo();
             if (_botWindow is not null
                 && _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count)
@@ -3490,20 +3218,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void FocusTerminal(EasyWindowsTerminalControl.EasyTerminalControl terminal)
-    {
-        // Step 1: WPF Focus
-        terminal.Focus();
-        System.Windows.Input.Keyboard.Focus(terminal);
-
-        // Step 2: Win32 SetFocus — ConPTY is HWND-based, WPF Focus alone is not enough
-        try
-        {
-            if (System.Windows.PresentationSource.FromVisual(terminal) is System.Windows.Interop.HwndSource source)
-                NativeMethods.SetFocus(source.Handle);
-        }
-        catch { /* WPF Focus already set */ }
-    }
 
     private void CloseConsoleTab(int index)
     {
@@ -3529,11 +3243,6 @@ public partial class MainWindow : Window
             if (tab.XtermTerminal.Parent is Panel xp) xp.Children.Remove(tab.XtermTerminal);
             else tab.TerminalHost.Children.Remove(tab.XtermTerminal);
             tab.XtermTerminal = null;
-        }
-        if (tab.Terminal is not null)
-        {
-            try { tab.Terminal.ConPTYTerm?.StopExternalTermOnly(); } catch { }
-            if (tab.Terminal.Parent is Panel p) p.Children.Remove(tab.Terminal);
         }
 
         _consoleTabs.RemoveAt(index);

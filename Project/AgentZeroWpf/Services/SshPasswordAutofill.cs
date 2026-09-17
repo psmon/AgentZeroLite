@@ -14,7 +14,7 @@ namespace AgentZeroWpf.Services;
 /// (event-driven). Real-world testing showed the event silently never fires
 /// for some session lifetimes — output grew from 471 → 502 chars while
 /// <c>frames=0</c> in the autofill log for 111 s. Root cause unverified but
-/// likely a ThreadPool / subscription race inside <see cref="ConPtyTerminalSession"/>'s
+/// likely a ThreadPool / subscription race inside the terminal session's
 /// 50 ms poll timer. Rather than chase it, this version drops the event
 /// subscription entirely and uses simple WPF-thread polling: every 150 ms,
 /// read the PTY buffer, scan the new portion for <c>"assword:"</c>, deliver

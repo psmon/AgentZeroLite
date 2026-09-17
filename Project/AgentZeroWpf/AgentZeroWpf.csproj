@@ -24,8 +24,6 @@
   <ItemGroup>
     <PackageReference Include="Dirkster.AvalonDock" Version="4.72.1" />
     <PackageReference Include="Dirkster.AvalonDock.Themes.VS2013" Version="4.72.1" />
-    <PackageReference Include="EasyWindowsTerminalControl" Version="1.0.36" />
-    <PackageReference Include="CI.Microsoft.Terminal.Wpf" Version="1.22.250204002" />
     <PackageReference Include="Microsoft.Build" Version="17.14.28" />
     <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28" />
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
@@ -187,17 +185,5 @@
     <WriteLinesToFile File="$(VersionFile)" Lines="$(_NextVer)" Overwrite="true" />
     <Message Importance="high" Text="Version bumped: $(_CurVer) → $(_NextVer)" />
   </Target>
-
-  <!-- ConPTY + Terminal 네이티브 DLL을 출력 디렉토리에 항상 복사 -->
-  <ItemGroup>
-    <Content Include="$(NuGetPackageRoot)/ci.microsoft.windows.console.conpty/1.22.250314001/runtimes/win10-x64/native/conpty.dll">
-      <Link>conpty.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="$(NuGetPackageRoot)/ci.microsoft.terminal.wpf/1.22.250204002/runtimes/win-x64/native/Microsoft.Terminal.Control.dll">
-      <Link>Microsoft.Terminal.Control.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 
 </Project>

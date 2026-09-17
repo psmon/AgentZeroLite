@@ -55,7 +55,7 @@ public sealed class TerminalActor : ReceiveActor
                 return;
             }
 
-            // PTY-FREEZE-DIAG: when a tab is restarted, a *new* ConPtyTerminalSession
+            // PTY-FREEZE-DIAG: when a tab is restarted, a *new* terminal session
             // gets bound here while the previous one still exists in MainWindow's
             // `tab.Session` history. If write traffic is racing in flight when this
             // swap happens, it can land on either object. The log emits both

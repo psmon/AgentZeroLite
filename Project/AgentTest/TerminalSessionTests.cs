@@ -3,7 +3,7 @@ using AgentZeroWpf.Services;
 namespace AgentTest;
 
 /// <summary>
-/// Tests for ITerminalSession, ConPtyTerminalSession, and AgentEventStream.
+/// Tests for ITerminalSession and AgentEventStream.
 /// Uses a fake ITerminalSession for unit testing without ConPTY dependency.
 /// </summary>
 public class FakeTerminalSession : ITerminalSession
@@ -336,7 +336,7 @@ public class TerminalControlTests
     {
         // Shift+Tab — used by Claude Code to cycle accept-mode (default ↔
         // auto-accept ↔ plan). The actual ESC[Z byte sequence is encoded
-        // inside ConPtyTerminalSession.SendControl; this test verifies the
+        // inside the session's SendControl; this test verifies the
         // enum value flows through the ITerminalSession contract just like
         // any other TerminalControl, which is what AgentBotWindow + CLI
         // paths use to send the keystroke.

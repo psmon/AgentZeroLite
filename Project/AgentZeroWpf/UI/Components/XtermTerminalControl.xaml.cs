@@ -10,11 +10,11 @@ namespace AgentZeroWpf.UI.Components;
 
 /// <summary>
 /// A terminal tab rendered by xterm.js inside a WebView2, driven by a
-/// <see cref="ManagedConPtyHost"/>. The WebViewXterm backend's UI control —
-/// the counterpart to <c>EasyWindowsTerminalControl.EasyTerminalControl</c>.
+/// <see cref="ManagedConPtyHost"/>. The terminal's UI control.
 ///
-/// Unlike the HwndHost-based control, this is a normal WPF element with NO
-/// airspace: WPF overlays (approval toasts, wedge banners) render above it.
+/// A normal WPF element with no HwndHost airspace, so WPF overlays (approval
+/// toasts, wedge banners) render above it — which the native control it replaced
+/// could never do.
 ///
 /// Assets are served offline from <c>Wasm/xterm/</c> via a virtual host
 /// mapping (same pattern as WebDevBridge's mp3.local), so nothing touches the
@@ -188,10 +188,9 @@ public partial class XtermTerminalControl : UserControl
     }
 
     /// <summary>
-    /// Hands the renderer the appearance from <see cref="TerminalSettings"/>. The
-    /// EasyConPty backend built a <c>Microsoft.Terminal.Wpf.TerminalTheme</c> in C#;
-    /// this is the same idea over the message channel, which is why the font is a CSS
-    /// stack rather than an installed family — the renderer is a browser, so the
+    /// Hands the renderer the appearance from <see cref="TerminalSettings"/>.
+    /// Appearance is owned in C# and travels as a message, which is why the font is a
+    /// CSS stack rather than an installed family — the renderer is a browser, so the
     /// shipped JetBrains Mono and any fallback the user names both just work.
     /// </summary>
     public void PostAppearance()

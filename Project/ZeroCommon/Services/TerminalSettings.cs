@@ -1,39 +1,16 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Agent.Common.Services;
 
 /// <summary>
-/// Which terminal backend a new terminal tab is created with.
-///
-/// <para><see cref="WebViewXterm"/> is now the only one the app creates, and the
-/// selector is gone from Settings. <see cref="EasyConPty"/> remains in the enum so
-/// an existing settings file still deserializes, and is treated as WebViewXterm.
-/// Its upstream is a third-party republish of CI builds, it reaches WPF only
-/// through an HwndHost — no hyperlinks, no overlays, clicks swallowed before they
-/// reach WPF — and its native DLLs are copied from hard-coded NuGet paths that
-/// fail silently on a version bump. The xterm path needs none of that: WebView2 is
-/// already a hard dependency of this app for WebDev, Mermaid and capture.</para>
-/// </summary>
-public enum TerminalBackend
-{
-    /// EasyWindowsTerminalControl (HwndHost) → Microsoft.Terminal.Control.dll + conpty.dll.
-    EasyConPty,
-
-    /// xterm.js rendered in WebView2, fed by a managed ConPTY host. No HwndHost
-    /// airspace — WPF overlays render above the terminal.
-    WebViewXterm,
-}
-
-/// <summary>
-/// How the terminal looks. The EasyConPty backend took its colours from a
-/// <c>Microsoft.Terminal.Wpf.TerminalTheme</c> built in C#; the WebViewXterm one had
-/// them hard-coded in <c>term.js</c> with no ANSI palette at all. Putting the whole
-/// thing here means the appearance is owned in one place, is persisted, and no longer
-/// requires editing JavaScript to change a colour.
+/// How the terminal looks. The colours were once hard-coded in <c>term.js</c> —
+/// a background and a foreground, with no ANSI palette at all, so every coloured
+/// CLI rendered through xterm.js's own defaults. Owning the whole palette here
+/// means appearance is in one place, is persisted, and changing a colour is not a
+/// JavaScript edit.
 ///
 /// <para>Colours are <c>#rrggbb</c> strings because that is what xterm.js takes and
-/// what a person can read; the ConPTY path converts as it always did.</para>
+/// what a person can read.</para>
 /// </summary>
 public sealed class TerminalTheme
 {
@@ -66,14 +43,6 @@ public sealed class TerminalTheme
 /// <summary>Persisted terminal preferences (side-car JSON, mirrors VoiceSettingsStore).</summary>
 public sealed class TerminalSettings
 {
-    /// <summary>Kept so old settings files load. <see cref="EffectiveBackend"/> is
-    /// what the app acts on.</summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public TerminalBackend Backend { get; set; } = TerminalBackend.WebViewXterm;
-
-    /// <summary>The backend actually used. One value, on purpose.</summary>
-    public TerminalBackend EffectiveBackend => TerminalBackend.WebViewXterm;
-
     /// <summary>
     /// A CSS font stack, applied by the WebViewXterm backend. Being a web renderer is
     /// the point: the font is a string, fallbacks are free, and changing it needs no

@@ -145,8 +145,15 @@ ComboBox style is a full re-template (toggle + popup + item). That is Pitfall 6 
 ### Persistence
 EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude) are marked `IsBuiltIn = true` and must not be deletable from the UI.
 
-### Native DLLs
-`conpty.dll` and `Microsoft.Terminal.Control.dll` are pulled from the `CI.Microsoft.*` NuGet packages via hard-coded `$(NuGetPackageRoot)` paths in `AgentZeroWpf.csproj`. If you bump those packages, update the version segments in the two `<Content Include=...>` entries or the copy step will silently drop — the app runs but ConPTY tabs won't start.
+### Terminal
+One backend: **xterm.js in a WebView2**, driven by `ManagedConPtyHost` — our own pseudo-console over plain `kernel32` P/Invoke (`CreatePseudoConsole`, present since Windows 10 1809). The app therefore ships **no native terminal DLLs**; `conpty.dll`, `Microsoft.Terminal.Control.dll` and the `EasyWindowsTerminalControl` / `CI.Microsoft.*` packages are gone, and with them the hard-coded `$(NuGetPackageRoot)` copy step that failed silently on a version bump.
+
+Assets live in `Project/AgentZeroWpf/Wasm/xterm/` and are served offline through a `term.local` virtual-host mapping — CSP in `index.html` blocks the network. JetBrains Mono ships alongside them (`vendor/fonts/`, OFL 1.1 — the licence must travel with the files).
+
+Two things that are easy to get wrong here:
+
+- **`GetConsoleText()` means "what is on the screen", not "everything the pipe produced."** The approval parser, the agent-state monitor and the bot's context all ask it that question. Only the emulator knows the answer, and the emulator is xterm.js in the renderer, so the renderer pushes a viewport snapshot back (`term.js` → `TerminalConsoleBuffer`). Returning the transcript instead re-matches prompts answered long ago and grows the model's context without bound.
+- **The child's environment is built, not inherited** (`TerminalEnvironment`). Handing a terminal child whatever launched the GUI is how a `NO_COLOR=1` picked up from an IDE terminal switched colour off in every tab. Same reason `CLAUDE_CODE_*` markers are dropped: a tab the user opened is not a nested agent session.
 
 ### Mermaid/Pencil rendering
 `Assets/mermaid.min.js` is embedded as a logical resource (`LogicalName="mermaid.min.js"`) for offline Markdown preview; `MarkdownViewer` + `MermaidRenderer` + WebView2 handle the render. Pencil (`.pen`) files go through the `pencil` MCP server — those files are encrypted, never read them with `Read`/`Grep`.

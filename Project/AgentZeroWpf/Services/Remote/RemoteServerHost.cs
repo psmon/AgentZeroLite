@@ -495,13 +495,9 @@ public sealed class RemoteServerHost
             if (tab < 0 || tab >= g.Tabs.Count) return;
             var t = g.Tabs[tab];
 
-            // Sessions are created lazily when a tab is first focused in the GUI. A
-            // freshly-created terminal that the web is trying to attach to may not have
-            // one yet — create it on demand (same seam the GUI uses), so newly-made
-            // terminals are reachable rather than reported "not started".
-            if (t.Session is null)
-                CliSessionAccessHelper.EnsureSession(t, t.Terminal, g.DisplayName);
-
+            // A tab gets its session when its pseudo-console is created, so a null
+            // session here means the terminal genuinely has not started yet - there is
+            // no longer a lazily-created one to reach for.
             session = t.Session;
             ok = session is not null;
         });

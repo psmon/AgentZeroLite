@@ -6,8 +6,7 @@ namespace AgentZeroWpf.Services;
 
 /// <summary>
 /// <see cref="ITerminalSession"/> over a <see cref="ManagedConPtyHost"/>, rendered
-/// by xterm.js in a WebView2. The modern-terminal-spike counterpart to
-/// <see cref="ConPtyTerminalSession"/>.
+/// by xterm.js in a WebView2 — the terminal.
 ///
 /// Output goes through <see cref="TerminalConsoleBuffer"/>, which draws the line
 /// this class originally blurred: the raw stream answers
@@ -16,8 +15,7 @@ namespace AgentZeroWpf.Services;
 /// emulator is xterm.js in the renderer — so the renderer pushes a viewport snapshot
 /// (see <c>Wasm/xterm/term.js</c>) and this class serves the last one. Control-key,
 /// submit-timing, backpressure and health-state semantics mirror
-/// <see cref="ConPtyTerminalSession"/> exactly so both backends behave identically
-/// through the interface. VT sequences come from the shared
+/// the shape the rest of the app already expects. VT sequences come from the shared
 /// <see cref="TerminalControlSequences"/> table.
 /// </summary>
 public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
@@ -34,7 +32,7 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
     private readonly CancellationTokenSource _cts = new();
     private bool _disposed;
 
-    // Adaptive chunking — identical to ConPtyTerminalSession.
+    // Adaptive chunking.
     private const int SmallThreshold = 200;
     private const int ChunkSize = 200;
     private const int ChunkDelayMs = 50;
@@ -83,13 +81,31 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
     /// </summary>
     public string GetConsoleText() => _console.GetConsoleText();
 
+    /// <summary>
+    /// Logged once per session: did any colour ever arrive from the child? An
+    /// all-monochrome terminal has two very different causes - the app decided not
+    /// to emit colour, or we lost it - and this separates them without guessing.
+    /// </summary>
+    private bool _sgrSeen;
+
     private void OnHostOutput(string chunk)
     {
         if (_disposed || string.IsNullOrEmpty(chunk)) return;
         _console.Append(chunk);
 
+        if (!_sgrSeen && chunk.Contains('\u001b'))
+        {
+            var i = chunk.IndexOf('\u001b');
+            if (i >= 0 && i + 1 < chunk.Length && chunk[i + 1] == '[')
+            {
+                _sgrSeen = true;
+                AppLogger.Log($"[XtermSession] first VT from child | id={_internalId} label={_sessionId} " +
+                              $"sample={Escape(chunk.Substring(i, Math.Min(24, chunk.Length - i)))}");
+            }
+        }
+
         // Per-subscriber isolation — one bad consumer can't starve the others
-        // (mirrors ConPtyTerminalSession.CheckOutputChanged).
+        // starve the others.
         var handlers = OutputReceived;
         if (handlers is not null)
         {
@@ -106,7 +122,7 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
         OnOutputObserved();
     }
 
-    // ── Write paths (mirror ConPtyTerminalSession) ──
+    // ── Write paths ──
 
     public void Write(ReadOnlySpan<char> text)
     {
@@ -126,7 +142,7 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
             // The success line is half of the freeze triage: a tab with no "write ok"
             // while its sibling logs them failed upstream of here; lines present with
             // no echo means the failure is in the pipe. Same reasoning, and the same
-            // shape, as ConPtyTerminalSession.
+            // shape as every other diagnostic here.
             AppLogger.Log($"[XtermSession] write ok | id={_internalId} label={_sessionId} " +
                           $"bytes={text.Length} outLen={OutputLength}");
             NoteInputAttempt($"write bytes={text.Length}");
@@ -256,7 +272,7 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
         }
     }
 
-    // ── Health state machine (identical thresholds/timing to ConPtyTerminalSession) ──
+    // ── Health state machine ──
     private const int EchoCheckMs = 1000;
     private const int StaleThreshold = 3;
     private const int DeadThreshold = 5;
@@ -308,6 +324,8 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
         }
     }
 
+    private static string Escape(string s) => s.Replace("\u001b", "<ESC>");
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -317,7 +335,7 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, IDisposable
         _writeChannel.Writer.TryComplete();
         try { _writeLoopTask.Wait(TimeSpan.FromSeconds(1)); } catch { }
         _cts.Dispose();
-        // The ManagedConPtyHost is owned by the XtermTerminalControl (mirrors how
-        // ConPtyTerminalSession does NOT kill the TermPTY it wraps).
+        // The ManagedConPtyHost is owned by the XtermTerminalControl, which kills the
+        // child when the control goes; the session only stops reading.
     }
 }
