@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -3175,7 +3175,13 @@ public partial class MainWindow : Window
         }
         sb.Append(']');
         sb.Append($",\"floatingWindows\":{dockManager.FloatingWindows?.Count() ?? 0}");
-        sb.Append($",\"botDock\":{{\"open\":{(IsBotDockOpen ? "true" : "false")},\"collapsed\":{(IsBotDockCollapsed ? "true" : "false")},\"height\":{BotDockRow.Height.Value:0}}}");
+        // Height as rendered, not as declared: maximized makes the row a star, whose
+        // Value is 1 — reported raw that is indistinguishable from a one-pixel panel,
+        // and this dump is what the CLI self-tests read.
+        sb.Append($",\"botDock\":{{\"open\":{(IsBotDockOpen ? "true" : "false")}," +
+                  $"\"collapsed\":{(IsBotDockCollapsed ? "true" : "false")}," +
+                  $"\"maximized\":{(_botDockMaximized ? "true" : "false")}," +
+                  $"\"height\":{BotDockRow.ActualHeight:0}}}");
         sb.Append(",\"root\":");
         AppendLayoutNode(sb, dockManager.Layout?.RootPanel);
         sb.Append('}');
