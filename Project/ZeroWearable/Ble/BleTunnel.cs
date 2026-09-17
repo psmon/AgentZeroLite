@@ -28,6 +28,15 @@ public sealed class BleTunnel : IAsyncDisposable
     private Task? _pump;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    /// <summary>
+    /// Which socket is current. A pump that is unwinding closes the tunnel in its finally,
+    /// and after a device reboot that unwind can land <i>after</i> the next chunk has already
+    /// opened a fresh socket - which would tear down a tunnel that just came up and leave the
+    /// reconnected watch with no path to Akka. Each socket carries its generation and only
+    /// closes itself.
+    /// </summary>
+    private int _generation;
+
     public long ToAkka, ToDevice;
     public bool Open => _stream != null;
 
@@ -57,11 +66,14 @@ public sealed class BleTunnel : IAsyncDisposable
             var tcp = new TcpClient();
             await tcp.ConnectAsync(_host, _port);
             tcp.NoDelay = true;
+            var stream = tcp.GetStream();
+            var cts = new CancellationTokenSource();
+            var generation = ++_generation;
             _tcp = tcp;
-            _stream = tcp.GetStream();
-            _cts = new CancellationTokenSource();
-            _pump = Task.Run(() => PumpAkkaToDeviceAsync(_cts.Token));
-            _log("info", $"tunnel open to {_host}:{_port}");
+            _stream = stream;
+            _cts = cts;
+            _pump = Task.Run(() => PumpAkkaToDeviceAsync(generation, stream, cts.Token));
+            _log("info", $"tunnel open to {_host}:{_port} (generation {generation})");
         }
         catch (Exception ex)
         {
@@ -100,9 +112,8 @@ public sealed class BleTunnel : IAsyncDisposable
         }
     }
 
-    private async Task PumpAkkaToDeviceAsync(CancellationToken ct)
+    private async Task PumpAkkaToDeviceAsync(int generation, NetworkStream stream, CancellationToken ct)
     {
-        var stream = _stream!;
         var buffer = new byte[4096];
         try
         {
@@ -142,7 +153,7 @@ public sealed class BleTunnel : IAsyncDisposable
         }
         finally
         {
-            await StopAsync();
+            await StopAsync(generation);
         }
     }
 
@@ -150,13 +161,22 @@ public sealed class BleTunnel : IAsyncDisposable
     /// Drops the loopback socket. The device notices its stream died and re-associates,
     /// which is the same recovery path as a lost TCP connection.
     /// </summary>
-    public async Task StopAsync()
+    public Task StopAsync() => StopAsync(null);
+
+    /// <param name="generation">
+    /// When given, close only if that socket is still the current one. Null means "close
+    /// whatever is open" - what a BLE disconnect and Dispose want.
+    /// </param>
+    private async Task StopAsync(int? generation)
     {
         await _gate.WaitAsync();
         try
         {
+            if (generation is { } g && g != _generation) return;   // a newer socket already replaced it
             if (_stream == null && _tcp == null) return;
             _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
             _stream?.Dispose();
             _tcp?.Dispose();
             _stream = null;

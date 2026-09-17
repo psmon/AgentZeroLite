@@ -29,6 +29,8 @@ public sealed class BleChatProxy : UntypedActor
 
     /// <summary>Sent by the link when the device connects, so the host greets it first.</summary>
     public sealed record Greet;
+    /// <summary>Sent by the link when the device goes away; its state must not outlive it.</summary>
+    public sealed record Reset;
     /// <summary>One inbound line from the device, tag included.</summary>
     public sealed record Line(string Text);
     /// <summary>One inbound binary frame from the device (0xA5 microphone audio).</summary>
@@ -52,6 +54,12 @@ public sealed class BleChatProxy : UntypedActor
                 // The firmware answers an "H" line with its own hello, which is what makes it
                 // start a conversation. ChatActor produces the payload; we only retag it.
                 _chat.Tell("{\"t\":\"hello\",\"name\":\"chat-app\",\"fw\":\"ble\"}", Self);
+                break;
+
+            case Reset:
+                // Told from this actor so ChatActor sees the same sender - and therefore the
+                // same device key - that the chat app's own lines arrive under.
+                _chat.Tell(new ChatActor.DeviceGone(), Self);
                 break;
 
             case Line line:
