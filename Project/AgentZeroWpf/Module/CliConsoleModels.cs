@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -93,6 +93,15 @@ public sealed class CliGroupInfo : ICliGroupInfo
     public List<ConsoleTabInfo> Tabs { get; } = [];
     public Border SidebarButton { get; set; } = null!;
     public int ActiveTabIndex { get; set; } = -1;
+
+    /// <summary>
+    /// How this workspace's tabs were split when it was last left, so returning
+    /// to it puts them back rather than collapsing everything into one pane.
+    /// Null until the workspace has been left once. Reconciled with the tabs that
+    /// actually exist by <see cref="Agent.Common.Services.DockPaneLayout"/> before
+    /// it is replayed — it goes stale as soon as a tab is opened or closed.
+    /// </summary>
+    public Agent.Common.Services.DockPaneNode? DockLayout { get; set; }
 
     IReadOnlyList<IConsoleTabInfo> ICliGroupInfo.TabsView => Tabs;
 }

@@ -2427,6 +2427,13 @@ public partial class MainWindow : Window
         // highlight + active-tab refresh below still run on every call so
         // a re-click still keeps the active-tab state coherent.
         var sameGroup = _activeGroupIndex == index;
+
+        // Remember how the workspace being left was arranged, before its documents
+        // are taken out of the panes below. Nothing else records this, so without
+        // it a split is simply gone by the time the user comes back.
+        if (!sameGroup && _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count)
+            _cliGroups[_activeGroupIndex].DockLayout = CaptureDocumentLayout();
+
         _activeGroupIndex = index;
 
         // Update sidebar highlights
@@ -2456,32 +2463,174 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Gather this workspace's documents into one pane. Called on a real group
-    /// switch, where the document set is replaced wholesale — so collapsing a split
-    /// here is correct, not collateral.
+    /// Put this workspace's documents into the panes it was last arranged in.
+    /// Called on a real group switch, where the document set is replaced wholesale.
     ///
-    /// <para>It resolves the pane through <see cref="GetActiveDocumentPane"/> rather
-    /// than using <c>terminalDocPane</c> directly. After a split the documents live
-    /// in a pane that field does not name, and the field itself can be orphaned —
-    /// adding documents to an orphaned pane puts them outside the layout, i.e.
-    /// nowhere.</para>
+    /// <para>This used to gather every document into a single pane, which is why a
+    /// split survived until you visited another workspace and no further: the
+    /// arrangement was never recorded, so coming back had nothing to come back
+    /// to. The shape is captured on the way out
+    /// (<see cref="CaptureDocumentLayout"/>) and reconciled with the tabs that
+    /// exist now before being rebuilt — a workspace can gain and lose tabs while
+    /// it is not the one on screen.</para>
     /// </summary>
     private void RebuildDocumentPane()
     {
         _isDockSyncInProgress = true;
         try
         {
-            var pane = GetActiveDocumentPane();
-            pane.Children.Clear();
             var tabs = _consoleTabs;
-            for (int i = 0; i < tabs.Count; i++)
-            {
+            for (var i = 0; i < tabs.Count; i++)
                 tabs[i].Document.Title = $"{tabs[i].Title} {i + 1}";
-                pane.Children.Add(tabs[i].Document);
+
+            // A floating tab already has a window of its own; leave it there.
+            var placeable = Enumerable.Range(0, tabs.Count)
+                                      .Where(i => !tabs[i].Document.IsFloating)
+                                      .ToList();
+
+            var saved = _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count
+                ? _cliGroups[_activeGroupIndex].DockLayout
+                : null;
+            var layout = Agent.Common.Services.DockPaneLayout.Normalise(saved, placeable);
+
+            if (layout is null)
+            {
+                // No tabs to place. Keep a pane in the layout so the next tab added
+                // has somewhere to go.
+                var empty = GetActiveDocumentPane();
+                empty.Children.Clear();
+                terminalDocPane = empty;
+                return;
             }
-            terminalDocPane = pane;
+
+            // Detach first. A document added to a second pane while still held by
+            // the first ends up drawn by neither.
+            foreach (var tab in tabs)
+                if (tab.Document.Parent is AvalonDock.Layout.ILayoutContainer holder
+                    && !tab.Document.IsFloating)
+                    holder.RemoveChild(tab.Document);
+
+            var root = dockManager.Layout.RootPanel;
+            root.Children.Clear();
+
+            var built = BuildDocumentPane(layout, tabs);
+            if (built is AvalonDock.Layout.LayoutDocumentPaneGroup top && top.Children.Count > 1)
+            {
+                // Lift the top group's children onto the root panel instead of
+                // nesting inside it, so a restored split has the same shape as one
+                // the user just made with SplitDocument — one thing to reason about,
+                // and one thing for `-cli layout dump` to report.
+                root.Orientation = top.Orientation;
+                foreach (var child in top.Children.ToList())
+                {
+                    top.RemoveChild(child);
+                    root.Children.Add(child);
+                }
+            }
+            else
+            {
+                root.Children.Add(built);
+            }
+
+            terminalDocPane = FirstDocumentPane(root) ?? GetActiveDocumentPane();
+
+            var panes = Agent.Common.Services.DockPaneLayout.PaneCount(layout);
+            if (panes > 1)
+                AppLogger.Log($"[Dock] workspace split restored | panes={panes} tabs={tabs.Count}");
         }
         finally { _isDockSyncInProgress = false; }
+    }
+
+    /// <summary>
+    /// Read the current arrangement back out of the dock as tab indices, so it can
+    /// be replayed after the documents have been taken out of it.
+    /// </summary>
+    private Agent.Common.Services.DockPaneNode? CaptureDocumentLayout()
+    {
+        var index = new Dictionary<AvalonDock.Layout.LayoutContent, int>();
+        var tabs = _consoleTabs;
+        for (var i = 0; i < tabs.Count; i++) index[tabs[i].Document] = i;
+
+        return CaptureNode(dockManager.Layout?.RootPanel, index);
+    }
+
+    private static Agent.Common.Services.DockPaneNode? CaptureNode(
+        AvalonDock.Layout.ILayoutElement? element,
+        IReadOnlyDictionary<AvalonDock.Layout.LayoutContent, int> index)
+    {
+        switch (element)
+        {
+            case AvalonDock.Layout.LayoutDocumentPane pane:
+            {
+                var tabs = pane.Children
+                               .Where(index.ContainsKey)
+                               .Select(c => index[c])
+                               .ToList();
+                return tabs.Count == 0 ? null : new Agent.Common.Services.DockPaneNode { Tabs = tabs };
+            }
+
+            case AvalonDock.Layout.ILayoutOrientableGroup group
+                 when group is AvalonDock.Layout.ILayoutContainer container:
+            {
+                var children = container.Children
+                                        .Select(c => CaptureNode(c, index))
+                                        .OfType<Agent.Common.Services.DockPaneNode>()
+                                        .ToList();
+                return children.Count == 0
+                    ? null
+                    : new Agent.Common.Services.DockPaneNode
+                      {
+                          Vertical = group.Orientation == Orientation.Vertical,
+                          Children = children,
+                      };
+            }
+
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>
+    /// Build the dock's own panes from a reconciled layout. Documents go in before
+    /// the pane joins the tree — AvalonDock prunes empty document panes on the next
+    /// layout update, and one attached empty can be collected before its documents
+    /// arrive.
+    /// </summary>
+    private static AvalonDock.Layout.ILayoutDocumentPane BuildDocumentPane(
+        Agent.Common.Services.DockPaneNode node, List<ConsoleTabInfo> tabs)
+    {
+        if (node.IsPane)
+        {
+            var pane = new AvalonDock.Layout.LayoutDocumentPane();
+            foreach (var i in node.Tabs!)
+                if (i >= 0 && i < tabs.Count) pane.Children.Add(tabs[i].Document);
+            return pane;
+        }
+
+        var group = new AvalonDock.Layout.LayoutDocumentPaneGroup
+        {
+            Orientation = node.Vertical ? Orientation.Vertical : Orientation.Horizontal,
+        };
+        foreach (var child in node.Children!)
+            group.Children.Add(BuildDocumentPane(child, tabs));
+        return group;
+    }
+
+    /// <summary>The first document pane in a subtree, in layout order.</summary>
+    private static AvalonDock.Layout.LayoutDocumentPane? FirstDocumentPane(
+        AvalonDock.Layout.ILayoutElement? element)
+    {
+        switch (element)
+        {
+            case AvalonDock.Layout.LayoutDocumentPane pane:
+                return pane;
+            case AvalonDock.Layout.ILayoutContainer container:
+                foreach (var child in container.Children)
+                    if (FirstDocumentPane(child) is { } hit) return hit;
+                return null;
+            default:
+                return null;
+        }
     }
 
     private void RemoveCliGroup(int index)
