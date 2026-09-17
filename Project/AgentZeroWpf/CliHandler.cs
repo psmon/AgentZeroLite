@@ -75,6 +75,7 @@ internal static class CliHandler
             "console" => OpenConsole(),
             "log" => ShowLog(cliArgs.Skip(1).ToArray()),
             "terminal-list" => TerminalList(),
+            "layout" => Layout(cliArgs.Skip(1).ToArray()),
             "terminal-send" => TerminalSend(cliArgs.Skip(1).ToArray()),
             "terminal-key" => TerminalKey(cliArgs.Skip(1).ToArray()),
             "terminal-read" => TerminalRead(cliArgs.Skip(1).ToArray()),
@@ -564,6 +565,98 @@ internal static class CliHandler
         }
 
         return 0;
+    }
+
+    // =========================================================================
+    //  layout <dump|split-right|split-down|float|dock|close-tab|add|panel-*>
+    // =========================================================================
+    //
+    // Driving the window from a script is what makes the layout testable: act,
+    // read the dock back, and notice when it is flipping between two states
+    // instead of settling. The same command ids are what shortcuts bind to.
+
+    private const string LayoutMmfName = "AgentZeroLite_Layout_Response";
+    private const int LayoutMmfSize = 65536;
+
+    private static int Layout(string[] args)
+    {
+        if (args.Length == 0 || args[0] is "help" or "--help" or "-h")
+        {
+            Console.WriteLine("Usage: layout <verb> [<group_index> <tab_index>]");
+            Console.WriteLine();
+            Console.WriteLine("  dump                 Print the dock layout as JSON (panes, documents, active tab,");
+            Console.WriteLine("                       bottom panel, and which exe is answering).");
+            Console.WriteLine();
+            Console.WriteLine("Commands (omit indices to act on the active terminal):");
+            foreach (var (id, desc) in Agent.Common.Services.WindowCommandIds.All)
+                Console.WriteLine($"  {ShortVerb(id),-16} {desc}");
+            Console.WriteLine();
+            Console.WriteLine("Examples:");
+            Console.WriteLine("  layout dump");
+            Console.WriteLine("  layout split-right");
+            Console.WriteLine("  layout float 6 1");
+            Console.WriteLine();
+            Console.WriteLine("These are the same commands the keyboard shortcuts run (Settings -> Shortcuts,");
+            Console.WriteLine("off by default).");
+            return 0;
+        }
+
+        var verb = args[0].ToLowerInvariant();
+        var full = FullCommandId(verb);
+        if (!string.Equals(verb, "dump", StringComparison.OrdinalIgnoreCase)
+            && !Agent.Common.Services.WindowCommandIds.IsKnown(full))
+        {
+            Console.Error.WriteLine($"Error: unknown layout verb '{verb}'. Try 'layout help'.");
+            return 1;
+        }
+
+        IntPtr agentWnd = FindAgentZero();
+        if (agentWnd == IntPtr.Zero) return 1;
+
+        var sb = new StringBuilder();
+        sb.Append("{\"command\":\"layout\"");
+        sb.Append($",\"verb\":\"{EscapeJson(string.Equals(verb, "dump", StringComparison.OrdinalIgnoreCase) ? "dump" : full)}\"");
+        if (args.Length >= 3 && int.TryParse(args[1], out var g) && int.TryParse(args[2], out var t))
+            sb.Append($",\"group\":{g},\"tab\":{t}");
+        sb.Append('}');
+
+        if (!SendWpfCommand(agentWnd, sb.ToString())) return 1;
+
+        string? json = TryReadMmf(LayoutMmfName, LayoutMmfSize);
+        if (json == null) return _noWait ? 0 : 1;
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        bool ok = root.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
+
+        if (!ok)
+        {
+            var error = root.TryGetProperty("error", out var e) ? e.GetString() : "unknown";
+            Console.Error.WriteLine($"Error: {error}");
+            return 1;
+        }
+
+        if (root.TryGetProperty("layout", out var layout))
+            Console.WriteLine(JsonSerializer.Serialize(layout, new JsonSerializerOptions { WriteIndented = true }));
+        else
+            Console.WriteLine("ok");
+        return 0;
+    }
+
+    /// <summary>"split-right" → "layout.split-right", "add" → "terminal.add".</summary>
+    private static string FullCommandId(string verb)
+    {
+        foreach (var (id, _) in Agent.Common.Services.WindowCommandIds.All)
+            if (string.Equals(ShortVerb(id), verb, StringComparison.OrdinalIgnoreCase))
+                return id;
+        return verb;
+    }
+
+    /// <summary>The part after the dot — what a person types.</summary>
+    private static string ShortVerb(string commandId)
+    {
+        var dot = commandId.IndexOf('.');
+        return dot >= 0 ? commandId[(dot + 1)..] : commandId;
     }
 
     // =========================================================================

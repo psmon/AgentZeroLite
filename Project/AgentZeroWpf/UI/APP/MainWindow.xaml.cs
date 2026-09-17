@@ -32,6 +32,7 @@ public partial class MainWindow : Window
         // ShowPage is what normally moves the rail, and it short-circuits when the
         // page is already current — so the opening state is set once, here.
         SyncActivityBar(AppPage.None);
+        ReloadShortcuts();
 
         // Mirror AppLogger entries into the embedded LOG tab
         AppLogger.EntryAdded += OnAppLogEntryForBottomTab;
@@ -136,8 +137,68 @@ public partial class MainWindow : Window
     /// <item>Ctrl+Shift+\` → embed↔float transition</item>
     /// </list>
     /// </summary>
+    // ── Keyboard shortcuts for the window commands ──
+    //
+    // The same ids the CLI dispatches, bound to keys. Off until the user turns them
+    // on: the app shipped without shortcuts, so every combination currently belongs
+    // to whatever is running inside a terminal, and taking keys away from someone's
+    // CLI is not a default to inherit on upgrade.
+
+    private IReadOnlyList<(Agent.Common.Services.ShortcutGesture Gesture, string CommandId)> _shortcuts =
+        Array.Empty<(Agent.Common.Services.ShortcutGesture, string)>();
+    private bool _shortcutsEnabled;
+
+    /// <summary>Re-read the keymap. Called at startup and when Settings saves.</summary>
+    internal void ReloadShortcuts()
+    {
+        var s = Agent.Common.Services.ShortcutSettingsStore.Load();
+        _shortcutsEnabled = s.Enabled;
+        _shortcuts = s.ResolveBindings();
+
+        var conflicts = s.FindConflicts();
+        AppLogger.Log($"[Shortcut] enabled={_shortcutsEnabled} bound={_shortcuts.Count}" +
+                      (conflicts.Count > 0 ? $" ignored-duplicates={string.Join(",", conflicts)}" : ""));
+    }
+
+    /// <summary>
+    /// Match a keypress against the keymap. Returns true when a command ran, so the
+    /// caller can mark the event handled and keep the key out of the terminal.
+    /// </summary>
+    private bool TryRunShortcut(KeyEventArgs e)
+    {
+        if (!_shortcutsEnabled || _shortcuts.Count == 0) return false;
+
+        var mods = Agent.Common.Services.ShortcutModifiers.None;
+        var k = Keyboard.Modifiers;
+        if (k.HasFlag(ModifierKeys.Control)) mods |= Agent.Common.Services.ShortcutModifiers.Control;
+        if (k.HasFlag(ModifierKeys.Alt)) mods |= Agent.Common.Services.ShortcutModifiers.Alt;
+        if (k.HasFlag(ModifierKeys.Shift)) mods |= Agent.Common.Services.ShortcutModifiers.Shift;
+        if (k.HasFlag(ModifierKeys.Windows)) mods |= Agent.Common.Services.ShortcutModifiers.Windows;
+        if (mods == Agent.Common.Services.ShortcutModifiers.None) return false;
+
+        // Alt-combinations arrive as Key.System with the real key in SystemKey.
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var name = key.ToString();
+
+        foreach (var (gesture, commandId) in _shortcuts)
+        {
+            if (gesture.Modifiers != mods) continue;
+            if (!string.Equals(gesture.Key, name, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var ok = RunWindowCommand(commandId, null, out var error);
+            AppLogger.Log($"[Shortcut] {gesture} -> {commandId} ok={ok}{(ok ? "" : $" ({error})")}");
+            return true;   // handled either way: the keys were claimed, so they must
+                           // not also reach the terminal underneath.
+        }
+        return false;
+    }
+
     private void OnGlobalKeyDown(object sender, KeyEventArgs e)
     {
+        // The user's own keymap first — the built-ins below predate it, but a
+        // binding someone set deliberately should win over one they inherited.
+        if (TryRunShortcut(e)) { e.Handled = true; return; }
+
         var mods = Keyboard.Modifiers;
 
         // Ctrl+Shift + 1 / 2 / 3 → switch the bottom panel tab
@@ -689,6 +750,12 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (command == "layout")
+            {
+                HandleLayoutCommand(root);
+                return;
+            }
+
             if (command == "terminal-send")
             {
                 if (!TryResolveCliTarget(root, out int groupIdx, out int tabIdx, out var aliasErr))
@@ -841,6 +908,52 @@ public partial class MainWindow : Window
 
     private const string TerminalListMmfName = "AgentZeroLite_TerminalList_Response";
     private const int TerminalListMmfSize = 32768;
+
+    // =========================================================================
+    //  layout — drive and inspect the window from the CLI
+    // =========================================================================
+
+    private const string LayoutMmfName = "AgentZeroLite_Layout_Response";
+    private const int LayoutMmfSize = 65536;
+
+    /// <summary>
+    /// <c>layout dump</c> and the window commands. Everything routes through
+    /// <see cref="RunWindowCommand"/>, so the CLI and the keyboard cannot drift
+    /// apart — and a layout that is flipping between two states can be caught by
+    /// a script instead of a pair of eyes.
+    /// </summary>
+    private void HandleLayoutCommand(JsonElement root)
+    {
+        var verb = root.TryGetProperty("verb", out var v) ? v.GetString() ?? "" : "";
+
+        if (string.Equals(verb, "dump", StringComparison.OrdinalIgnoreCase))
+        {
+            IpcMemoryMappedResponseWriter.WriteJson(
+                LayoutMmfName, LayoutMmfSize,
+                $"{{\"ok\":true,\"layout\":{BuildLayoutJson()}}}",
+                "[IPC] layout dump 응답 쓰기 오류");
+            return;
+        }
+
+        // A tab may be named; otherwise the command acts on the active one.
+        ConsoleTabInfo? target = null;
+        if (root.TryGetProperty("group", out var gp) && gp.TryGetInt32(out var gi)
+            && root.TryGetProperty("tab", out var tp) && tp.TryGetInt32(out var ti)
+            && gi >= 0 && gi < _cliGroups.Count
+            && ti >= 0 && ti < _cliGroups[gi].Tabs.Count)
+        {
+            target = _cliGroups[gi].Tabs[ti];
+        }
+
+        var ok = RunWindowCommand(verb, target, out var error);
+        var json = ok
+            ? $"{{\"ok\":true,\"command\":\"{EscapeJson(verb)}\",\"layout\":{BuildLayoutJson()}}}"
+            : $"{{\"ok\":false,\"command\":\"{EscapeJson(verb)}\",\"error\":\"{EscapeJson(error)}\"}}";
+
+        IpcMemoryMappedResponseWriter.WriteJson(LayoutMmfName, LayoutMmfSize, json,
+            "[IPC] layout 응답 쓰기 오류");
+        AppLogger.Log($"[IPC] layout {verb} | ok={ok}{(ok ? "" : $" error={error}")}");
+    }
 
     private void HandleTerminalList()
     {
@@ -2290,18 +2403,31 @@ public partial class MainWindow : Window
         AppLogger.Log($"[CLI] 그룹 전환: {_cliGroups[index].DisplayName} ({_cliGroups[index].DirectoryPath}) sameGroup={sameGroup}");
     }
 
+    /// <summary>
+    /// Gather this workspace's documents into one pane. Called on a real group
+    /// switch, where the document set is replaced wholesale — so collapsing a split
+    /// here is correct, not collateral.
+    ///
+    /// <para>It resolves the pane through <see cref="GetActiveDocumentPane"/> rather
+    /// than using <c>terminalDocPane</c> directly. After a split the documents live
+    /// in a pane that field does not name, and the field itself can be orphaned —
+    /// adding documents to an orphaned pane puts them outside the layout, i.e.
+    /// nowhere.</para>
+    /// </summary>
     private void RebuildDocumentPane()
     {
         _isDockSyncInProgress = true;
         try
         {
-            terminalDocPane.Children.Clear();
+            var pane = GetActiveDocumentPane();
+            pane.Children.Clear();
             var tabs = _consoleTabs;
             for (int i = 0; i < tabs.Count; i++)
             {
                 tabs[i].Document.Title = $"{tabs[i].Title} {i + 1}";
-                terminalDocPane.Children.Add(tabs[i].Document);
+                pane.Children.Add(tabs[i].Document);
             }
+            terminalDocPane = pane;
         }
         finally { _isDockSyncInProgress = false; }
     }
@@ -2802,68 +2928,239 @@ public partial class MainWindow : Window
         if (doc is null) return;
         if (doc.Parent is not AvalonDock.Layout.LayoutDocumentPane pane) return;
 
-        // A pane holding one document has nothing to split off — the result would be
-        // an empty pane next to a full one, which AvalonDock then prunes anyway.
+        // A pane holding one document has nothing to split off.
         if (pane.ChildrenCount < 2)
         {
             AppLogger.Log($"[Dock] split skipped: '{doc.Title}' is the only document in its pane");
             return;
         }
 
-        var target = NeighbourPaneFor(pane, orientation);
-        if (target is null) return;
-
-        pane.RemoveChild(doc);
-        target.Children.Add(doc);
-        doc.IsActive = true;
-        doc.IsSelected = true;
-
-        AppLogger.Log($"[Dock] split {orientation} | doc='{doc.Title}' -> new pane");
-    }
-
-    /// <summary>
-    /// The pane to move the document into: a fresh one next to <paramref name="pane"/>
-    /// along <paramref name="orientation"/>.
-    ///
-    /// <para>The containing group is reached through <c>ILayoutOrientableGroup</c>
-    /// rather than a concrete type, because AvalonDock puts a document pane inside a
-    /// <c>LayoutPanel</c> or a <c>LayoutDocumentPaneGroup</c> depending on how the
-    /// layout grew — matching on one of them works until the first time the user has
-    /// already split something.</para>
-    ///
-    /// <para>If that group already runs along the requested axis the new pane simply
-    /// joins it. If it runs the other way, the pane and its new neighbour are wrapped
-    /// in their own group, in place — which is how AvalonDock expresses a grid of
-    /// panes, and why splitting right and then down nests instead of fighting.</para>
-    /// </summary>
-    private AvalonDock.Layout.LayoutDocumentPane? NeighbourPaneFor(
-        AvalonDock.Layout.LayoutDocumentPane pane, Orientation orientation)
-    {
+        // The containing group is reached through ILayoutOrientableGroup rather than a
+        // concrete type: AvalonDock puts a document pane inside a LayoutPanel or a
+        // LayoutDocumentPaneGroup depending on how the layout grew, and matching on one
+        // of them works right up until the user has already split something once.
         if (pane.Parent is not AvalonDock.Layout.ILayoutOrientableGroup group
             || group is not AvalonDock.Layout.ILayoutGroup container)
         {
             AppLogger.Log($"[Dock] split aborted: pane parent is {pane.Parent?.GetType().Name ?? "null"}");
-            return null;
+            return;
         }
 
         var index = container.IndexOfChild(pane);
-        if (index < 0) return null;
+        if (index < 0) return;
 
+        // Everything above is a check; from here the layout is mutated. The document
+        // moves into the new pane BEFORE that pane enters the tree, because AvalonDock
+        // prunes empty document panes on the next layout update — an empty one inserted
+        // first can be collected before the document arrives, which leaves the document
+        // in a pane nobody owns and the dock repainting itself trying to settle.
         var fresh = new AvalonDock.Layout.LayoutDocumentPane();
+        pane.RemoveChild(doc);
+        fresh.Children.Add(doc);
 
         if (group.Orientation == orientation || container.ChildrenCount == 1)
         {
             group.Orientation = orientation;
             container.InsertChildAt(index + 1, fresh);
-            return fresh;
+        }
+        else
+        {
+            // Cross-axis: wrap this pane and its new neighbour in their own group, in
+            // place, so the surrounding layout is untouched. This is how AvalonDock
+            // expresses a grid of panes, and why right-then-down nests rather than fights.
+            var wrapper = new AvalonDock.Layout.LayoutDocumentPaneGroup { Orientation = orientation };
+            container.RemoveChildAt(index);
+            wrapper.Children.Add(pane);
+            wrapper.Children.Add(fresh);
+            container.InsertChildAt(index, wrapper);
         }
 
-        var wrapper = new AvalonDock.Layout.LayoutDocumentPaneGroup { Orientation = orientation };
-        container.RemoveChildAt(index);
-        wrapper.Children.Add(pane);
-        wrapper.Children.Add(fresh);
-        container.InsertChildAt(index, wrapper);
-        return fresh;
+        doc.IsActive = true;
+        doc.IsSelected = true;
+
+        AppLogger.Log($"[Dock] split {orientation} | doc='{doc.Title}' index={index}");
+    }
+
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Window commands — one registry, reached from the CLI and the keyboard
+    // ─────────────────────────────────────────────────────────────────────
+    //
+    // Every layout action lives here and nowhere else. The CLI calls it so the app
+    // can be driven — and therefore tested — without a hand on the mouse, which is
+    // how a runaway layout gets caught: split from a script, read the layout back,
+    // see it thrashing, kill it. Shortcuts call the same list, so a command cannot
+    // exist for one and not the other.
+
+    /// <summary>
+    /// Run a command by id. Returns false with a reason when it could not.
+    /// </summary>
+    /// <param name="target">
+    /// Which tab to act on, or null for the active one. The CLI names a tab; the
+    /// keyboard means "the one I am looking at".
+    /// </param>
+    internal bool RunWindowCommand(string commandId, ConsoleTabInfo? target, out string error)
+    {
+        error = "";
+        var tab = target ?? ActiveConsoleTab;
+
+        switch (commandId.ToLowerInvariant())
+        {
+            case Agent.Common.Services.WindowCommandIds.SplitRight:
+                return TrySplit(tab, Orientation.Horizontal, out error);
+
+            case Agent.Common.Services.WindowCommandIds.SplitDown:
+                return TrySplit(tab, Orientation.Vertical, out error);
+
+            case Agent.Common.Services.WindowCommandIds.Float:
+                if (tab?.Document is not { } fd) { error = "no terminal to detach"; return false; }
+                if (fd.IsFloating) { error = "already floating"; return false; }
+                fd.Float();
+                AppLogger.Log($"[Cmd] float | tab={fd.Title}");
+                return true;
+
+            case Agent.Common.Services.WindowCommandIds.Dock:
+                if (tab?.Document is not { } dd) { error = "no terminal to dock"; return false; }
+                if (!dd.IsFloating) { error = "not floating"; return false; }
+                dd.Dock();
+                AppLogger.Log($"[Cmd] dock | tab={dd.Title}");
+                return true;
+
+            case Agent.Common.Services.WindowCommandIds.CloseTab:
+                if (tab?.Document is not { } cd) { error = "no terminal to close"; return false; }
+                cd.Close();
+                AppLogger.Log($"[Cmd] close-tab | tab={cd.Title}");
+                return true;
+
+            case Agent.Common.Services.WindowCommandIds.TerminalAdd:
+                if (_activeGroupIndex < 0 || _activeGroupIndex >= _cliGroups.Count)
+                {
+                    error = "no active workspace";
+                    return false;
+                }
+                AddConsoleTab("CMD", "cmd.exe", cliDefinitionId: 1);
+                AppLogger.Log($"[Cmd] terminal-add | group={_cliGroups[_activeGroupIndex].DisplayName}");
+                return true;
+
+            case Agent.Common.Services.WindowCommandIds.PanelToggle:
+                if (IsBotDockOpen) CloseBotDock(); else OpenBotDock();
+                return true;
+
+            case Agent.Common.Services.WindowCommandIds.PanelCollapse:
+                SetBotDockCollapsed(!IsBotDockCollapsed);
+                return true;
+
+            case Agent.Common.Services.WindowCommandIds.PanelMaximize:
+                ToggleBotDockMaximized();
+                return true;
+
+            default:
+                error = $"unknown command '{commandId}'";
+                return false;
+        }
+    }
+
+    private ConsoleTabInfo? ActiveConsoleTab =>
+        _activeConsoleTab >= 0 && _activeConsoleTab < _consoleTabs.Count
+            ? _consoleTabs[_activeConsoleTab]
+            : null;
+
+    private bool TrySplit(ConsoleTabInfo? tab, Orientation orientation, out string error)
+    {
+        error = "";
+        if (tab?.Document is not { } doc) { error = "no terminal to split"; return false; }
+        if (doc.IsFloating) { error = "cannot split a floating terminal"; return false; }
+        if (doc.Parent is not AvalonDock.Layout.LayoutDocumentPane pane || pane.ChildrenCount < 2)
+        {
+            error = "need at least two terminals in the pane to split";
+            return false;
+        }
+        SplitDocument(doc, orientation);
+        return true;
+    }
+
+    /// <summary>
+    /// A snapshot of the dock: which pane holds what, and which document is active.
+    /// This is the read half of driving the window from a script — without it a
+    /// caller can act but never check, and a layout flipping between two states
+    /// looks exactly like one that settled.
+    /// </summary>
+    internal string BuildLayoutJson()
+    {
+        var sb = new StringBuilder();
+        sb.Append('{');
+
+        // Which build is actually running. The CLI attaches to whatever window it
+        // finds, so an old installed copy would answer these commands and look fine.
+        var exe = Environment.ProcessPath ?? "";
+        sb.Append($"\"exe\":\"{EscapeJson(exe)}\"");
+        try
+        {
+            if (exe.Length > 0)
+                sb.Append($",\"built\":\"{System.IO.File.GetLastWriteTime(exe):yyyy-MM-dd HH:mm:ss}\"");
+        }
+        catch
+        {
+            // path unreadable; the exe field is still the useful half
+        }
+
+        sb.Append($",\"activeGroup\":{_activeGroupIndex}");
+        sb.Append($",\"activeTab\":{_activeConsoleTab}");
+        sb.Append($",\"floatingWindows\":{dockManager.FloatingWindows?.Count() ?? 0}");
+        sb.Append($",\"botDock\":{{\"open\":{(IsBotDockOpen ? "true" : "false")},\"collapsed\":{(IsBotDockCollapsed ? "true" : "false")},\"height\":{BotDockRow.Height.Value:0}}}");
+        sb.Append(",\"root\":");
+        AppendLayoutNode(sb, dockManager.Layout?.RootPanel);
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private void AppendLayoutNode(StringBuilder sb, AvalonDock.Layout.ILayoutElement? element)
+    {
+        switch (element)
+        {
+            case null:
+                sb.Append("null");
+                return;
+
+            case AvalonDock.Layout.LayoutDocumentPane pane:
+                sb.Append("{\"type\":\"pane\",\"documents\":[");
+                for (var i = 0; i < pane.Children.Count; i++)
+                {
+                    var child = pane.Children[i];
+                    if (i > 0) sb.Append(',');
+                    sb.Append($"{{\"title\":\"{EscapeJson(child.Title ?? "")}\",\"active\":{(child.IsActive ? "true" : "false")},\"selected\":{(child.IsSelected ? "true" : "false")},\"floating\":{(child.IsFloating ? "true" : "false")}}}");
+                }
+                sb.Append("]}");
+                return;
+
+            case AvalonDock.Layout.ILayoutOrientableGroup group when group is AvalonDock.Layout.ILayoutContainer oc:
+                sb.Append($"{{\"type\":\"{element.GetType().Name}\",\"orientation\":\"{group.Orientation}\",\"children\":[");
+                var first = true;
+                foreach (var child in oc.Children)
+                {
+                    if (!first) sb.Append(',');
+                    first = false;
+                    AppendLayoutNode(sb, child);
+                }
+                sb.Append("]}");
+                return;
+
+            case AvalonDock.Layout.ILayoutContainer container:
+                sb.Append($"{{\"type\":\"{element.GetType().Name}\",\"children\":[");
+                var more = false;
+                foreach (var child in container.Children)
+                {
+                    if (more) sb.Append(',');
+                    more = true;
+                    AppendLayoutNode(sb, child);
+                }
+                sb.Append("]}");
+                return;
+
+            default:
+                sb.Append($"{{\"type\":\"{element.GetType().Name}\"}}");
+                return;
+        }
     }
 
     private void OnDocTabSplitRight(object sender, RoutedEventArgs e)
@@ -3221,6 +3518,51 @@ public partial class MainWindow : Window
 
 
 
+    // ── Active-content thrash detector ──
+    //
+    // The dock trading focus between two panes twenty times a second is silent:
+    // nothing on this path logged, so the only evidence was the window visibly
+    // flickering, and the only diagnosis was adding logging after the fact. It is
+    // cheap to notice, so notice it — once per burst, not once per event, because
+    // a loop would otherwise drown the log it is trying to appear in.
+
+    private int _activeContentChanges;
+    private DateTime _activeContentWindowStart = DateTime.MinValue;
+    private bool _thrashReported;
+
+    /// <summary>Rate of legitimate tab switching, well above any human.</summary>
+    private const int ThrashPerSecond = 12;
+
+    private void NoteActiveContentChange()
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _activeContentWindowStart).TotalSeconds >= 1)
+        {
+            _activeContentWindowStart = now;
+            _activeContentChanges = 0;
+            _thrashReported = false;
+        }
+
+        if (++_activeContentChanges < ThrashPerSecond || _thrashReported) return;
+
+        _thrashReported = true;
+        AppLogger.Log($"[Dock] active content changed {_activeContentChanges}x in under a second — " +
+                      "something is fighting over focus. Layout: " + DescribePaneLayout());
+    }
+
+    /// <summary>One-line pane summary for the thrash report.</summary>
+    private string DescribePaneLayout()
+    {
+        var sb = new StringBuilder();
+        for (var i = 0; i < _consoleTabs.Count; i++)
+        {
+            var t = _consoleTabs[i];
+            if (i > 0) sb.Append(" | ");
+            sb.Append($"[{i}] {t.Title} active={t.Document?.IsActive} floating={t.Document?.IsFloating}");
+        }
+        return sb.Length == 0 ? "(no tabs)" : sb.ToString();
+    }
+
     private void OnDockActiveContentChanged(object? sender, EventArgs e)
     {
         if (_isDockSyncInProgress) return;
@@ -3230,6 +3572,7 @@ public partial class MainWindow : Window
 
         int index = _consoleTabs.IndexOf(tab);
         if (index < 0 || index == _activeConsoleTab) return;
+        NoteActiveContentChange();
 
         _activeConsoleTab = index;
 
@@ -3237,19 +3580,19 @@ public partial class MainWindow : Window
         if (!tab.IsInitialized)
             InitializeTerminal(tab);
 
-        // Focus — skip for floating documents. Windows already manages
-        // floating-window activation; calling our Win32 SetFocus path on a
-        // floated terminal yanks the foreground back to the floating window
-        // every time AvalonDock fires ActiveContentChanged for it (which
-        // can happen as a side-effect of layout changes, not just user
-        // intent), creating the "focus keeps jumping back to the new
-        // window" UX bug. The user's actual click on the floating window
-        // already focuses its terminal natively.
-        if (tab.XtermTerminal is { } terminal && tab.Document?.IsFloating != true)
-        {
-            Dispatcher.BeginInvoke(() => terminal.FocusTerminal(),
-                System.Windows.Threading.DispatcherPriority.Loaded);
-        }
+        // No focus push here, deliberately.
+        //
+        // This used to focus the newly active terminal, and that is a loop: the
+        // push moves focus, moving focus changes AvalonDock's ActiveContent, and
+        // the change brings us straight back. With one document visible it
+        // converged — focusing the document that was already active does nothing.
+        // A split makes both visible, focus genuinely moves each time, and the two
+        // panes trade places about every 20 ms until the app is unusable.
+        //
+        // Nothing is lost. ActiveContent changes for exactly two reasons: the user
+        // clicked, in which case focus is already where they put it; or we set
+        // IsActive ourselves, which happens under _isDockSyncInProgress so this
+        // handler returns above, and ActivateConsoleTab does its own focus push.
 
         // Update bot window
         _botWindow?.RefreshSessionInfo();
@@ -3277,21 +3620,23 @@ public partial class MainWindow : Window
 
     private void OnLayoutRootUpdated(object? sender, EventArgs e)
     {
-        // Ensure terminalDocPane stays in layout after splits/rearranges.
         // Fix floating window Owner ONCE per window to prevent parent-blocking
         // without retriggering the layout/focus loop.
+        //
+        // This used to re-add terminalDocPane to the root whenever it was orphaned,
+        // which is a loop waiting to happen: the orphan is empty, AvalonDock prunes
+        // empty document panes on the next layout update, that update brings us back
+        // here, and we add it again. The dock repaints continuously and focus never
+        // settles — which is exactly what splitting a pane triggered.
+        //
+        // Nothing needs the field repaired on a timer. GetActiveDocumentPane already
+        // resolves it on demand, in the one place that actually needs a pane to put a
+        // document in: active document's pane, else terminalDocPane if it is still in
+        // the layout, else any pane in the layout, else a fresh one.
         Dispatcher.BeginInvoke(() =>
         {
             try
             {
-                // Pane preservation: re-add if orphaned
-                if (terminalDocPane.Parent is null)
-                {
-                    var root = dockManager.Layout;
-                    root.RootPanel ??= new AvalonDock.Layout.LayoutPanel();
-                    root.RootPanel.Children.Add(terminalDocPane);
-                }
-
                 // Fix floating windows: unset Owner exactly once per window.
                 var floats = dockManager.FloatingWindows?.ToArray();
                 if (floats is not null)
@@ -3376,7 +3721,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ActivateConsoleTab(int index)
+    private void ActivateConsoleTab(int index,
+        [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+        [System.Runtime.CompilerServices.CallerLineNumber] int callerLine = 0)
     {
         if (index < 0 || index >= _consoleTabs.Count) return;
 
@@ -3407,10 +3754,16 @@ public partial class MainWindow : Window
         {
             // Same float-skip rule as OnDockActiveContentChanged — don't yank
             // focus into a floating window when the user is interacting elsewhere.
-            if (safeIdx >= 0 && safeIdx < _consoleTabs.Count
+            // Deferred, so the activation it belongs to may already have been
+            // superseded — pushing focus at a tab nobody asked for is how the
+            // other loop started.
+            if (safeIdx == _activeConsoleTab
+                && safeIdx >= 0 && safeIdx < _consoleTabs.Count
                 && _consoleTabs[safeIdx].XtermTerminal is { } t
                 && _consoleTabs[safeIdx].Document?.IsFloating != true)
+            {
                 t.FocusTerminal();
+            }
             _botWindow?.RefreshSessionInfo();
             if (_botWindow is not null
                 && _activeGroupIndex >= 0 && _activeGroupIndex < _cliGroups.Count)
