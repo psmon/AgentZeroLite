@@ -72,6 +72,14 @@ public sealed class ChatActor : UntypedActor
 
     private readonly Dictionary<string, Device> _devices = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The device behind the sender is gone - the BLE link dropped, or the peer terminated.
+    /// Its <see cref="Device"/> entry is forgotten rather than reused: a board that reboots
+    /// comes back numbering its requests from 1 again, with no memory of the capture it was
+    /// in the middle of, so the entry describes a device that no longer exists.
+    /// </summary>
+    public sealed record DeviceGone;
+
     // Local (never serialized) completion messages.
     private sealed record Answered(string Key, int RequestId, string Text, IActorRef Target);
     private sealed record Failed(string Key, int RequestId, string Error, IActorRef Target);
@@ -117,6 +125,10 @@ public sealed class ChatActor : UntypedActor
         {
             case string json:
                 HandleJson(json);
+                break;
+
+            case DeviceGone:
+                Forget(Sender.Path.Address.ToString());
                 break;
 
             case Answered answered:
@@ -466,6 +478,7 @@ public sealed class ChatActor : UntypedActor
         }
 
         device.Cancel?.Cancel();          // newest utterance wins, same rule as text
+        DropCapture(device);              // an utterance the device abandoned; free its buffer
         device.CaptureId = id;
         device.Capture = new MemoryStream(16000 * 2 * 8);   // 8 s before it grows
         device.CaptureFrames = 0;
@@ -611,6 +624,15 @@ public sealed class ChatActor : UntypedActor
     });
 
     private void Tell(IActorRef target, string json) => target.Tell(json, Self);
+
+    private void Forget(string key)
+    {
+        if (!_devices.Remove(key, out var device)) return;
+        device.Cancel?.Cancel();
+        DropCapture(device);
+        _log.Info("device {0} went away after conversation {1}; its state is dropped",
+            key, device.Conversation);
+    }
 
     private Device GetDevice(string key)
     {

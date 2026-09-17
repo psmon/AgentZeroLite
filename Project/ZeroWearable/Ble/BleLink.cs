@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
+using Agent.Common.Wearable;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Advertisement;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
@@ -36,12 +37,26 @@ public sealed class BleLink : IDisposable
     private GattDeviceService? _svc;
     private GattCharacteristic? _rx;
     private GattCharacteristic? _tx;
-    private readonly StringBuilder _lineBuf = new();
+
+    /// <summary>
+    /// Inbound line assembly. Lives in ZeroCommon because it is the part of this class with
+    /// no WinRT in it and the part that had a real bug: it used to be a StringBuilder fed
+    /// with <c>Encoding.UTF8.GetString(notification)</c>, which destroyed every multi-byte
+    /// character that straddled two notifications. See <see cref="LineAssembler"/>.
+    /// </summary>
+    private readonly LineAssembler _lines = new();
 
     public bool IsConnected { get; private set; }
     public string DeviceName { get; private set; } = "";
     public ulong Address { get; private set; }
     public string AddressHex => Address.ToString("X12");
+
+    /// <summary>
+    /// The address kind the last successful connect used. Kept with <see cref="Address"/>
+    /// past a disconnect so the reconnect loop can dial the device directly when it is not
+    /// advertising (see the scan-free retry in Program.KeepLinkUpAsync).
+    /// </summary>
+    public BluetoothAddressType AddressKind { get; private set; } = BluetoothAddressType.Public;
     public int MaxPdu => _session?.MaxPduSize ?? 23;
     public long Sent, Dropped, RxLines, RxFrames;
     public string LastError { get; private set; } = "";
@@ -171,10 +186,11 @@ public sealed class BleLink : IDisposable
             session = null;
             svc = null;   // owned by the fields now
             Address = address;
+            AddressKind = addressType;
             DeviceName = string.IsNullOrEmpty(_dev.Name) ? name ?? "" : _dev.Name;
             IsConnected = true;
             LastError = "";
-            lock (_lineBuf) _lineBuf.Clear();
+            lock (_lines) _lines.Reset();
             Info($"connected: {DeviceName} [{AddressHex}] mtu={MaxPdu}");
             Connected?.Invoke();
             return true;
@@ -192,7 +208,7 @@ public sealed class BleLink : IDisposable
             try
             {
                 svc?.Dispose();
-                session?.Dispose();
+                ReleaseSession(session);
                 dev?.Dispose();
             }
             catch
@@ -245,6 +261,35 @@ public sealed class BleLink : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Hands the link back to Windows before letting go of the session. Disposing alone is
+    /// documented to be enough and usually is, but a session left with
+    /// <see cref="GattSession.MaintainConnection"/> set keeps the OS re-establishing the link
+    /// on its own - and the watch advertises only while nothing is connected, so the next
+    /// scan then comes back empty for a device that is sitting right there. Clearing the flag
+    /// first costs nothing and removes the ambiguity.
+    /// </summary>
+    private static void ReleaseSession(GattSession? session)
+    {
+        if (session is null) return;
+        try
+        {
+            session.MaintainConnection = false;
+        }
+        catch
+        {
+            // the session is already gone; disposing below is still correct
+        }
+        try
+        {
+            session.Dispose();
+        }
+        catch
+        {
+            // already gone
+        }
+    }
+
     private void Fail(string msg)
     {
         LastError = msg;
@@ -273,7 +318,7 @@ public sealed class BleLink : IDisposable
             if (_tx != null) _tx.ValueChanged -= OnValueChanged;
             if (_dev != null) _dev.ConnectionStatusChanged -= OnConnectionStatusChanged;
             _svc?.Dispose();
-            _session?.Dispose();
+            ReleaseSession(_session);
             _dev?.Dispose();
         }
         catch
@@ -325,24 +370,19 @@ public sealed class BleLink : IDisposable
             return;
         }
 
-        string text;
-        lock (_lineBuf)
+        // The notification boundary falls wherever the MTU puts it, which for UTF-8 is
+        // regularly in the middle of a character: bytes in, whole lines out.
+        IReadOnlyList<string> lines;
+        lock (_lines)
         {
-            _lineBuf.Append(Encoding.UTF8.GetString(data));
-            if (_lineBuf.Length > 16384) _lineBuf.Clear();
-            text = _lineBuf.ToString();
+            var discarded = _lines.Discarded;
+            lines = _lines.Append(data);
+            if (_lines.Discarded != discarded)
+                Warn("a line ran past 16 KB without a newline; it was discarded");
         }
-        int nl;
-        while ((nl = text.IndexOf('\n')) >= 0)
+
+        foreach (var line in lines)
         {
-            var line = text[..nl].TrimEnd('\r');
-            text = text[(nl + 1)..];
-            lock (_lineBuf)
-            {
-                _lineBuf.Clear();
-                _lineBuf.Append(text);
-            }
-            if (line.Length == 0) continue;
             Interlocked.Increment(ref RxLines);
             try
             {

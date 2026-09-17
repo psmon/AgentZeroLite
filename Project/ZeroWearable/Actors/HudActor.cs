@@ -29,9 +29,20 @@ public sealed class HudActor : UntypedActor
     public sealed record Status(string Json);
     /// <summary>Claude Code hook payload, verbatim.</summary>
     public sealed record Event(string Json);
+    /// <summary>The watch just connected — see <see cref="Replay"/> for why that is our cue.</summary>
+    public sealed record LinkUp;
 
     public long Statuses, Events, Dropped;
     public string LastStatus = "";
+    private DateTime _lastStatusAtUtc = DateTime.MinValue;
+
+    /// <summary>
+    /// How old a status may be and still be worth showing on a watch that just connected.
+    /// A statusLine describes a live session; past this it is a claim about cost and context
+    /// that may no longer be true, and the HUD's own "waiting for sessions..." is the more
+    /// honest screen.
+    /// </summary>
+    private static readonly TimeSpan StatusTtl = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// statusLine fires on nearly every render, so logging each one at Info would bury the
@@ -46,8 +57,13 @@ public sealed class HudActor : UntypedActor
     {
         switch (message)
         {
+            case LinkUp:
+                Replay();
+                break;
+
             case Status status:
                 LastStatus = status.Json;
+                _lastStatusAtUtc = DateTime.UtcNow;
                 Statuses++;
                 // Every event line is logged; statusLine is sampled (see StatusLogEvery).
                 Send('S', status.Json, loud: Statuses == 1 || Statuses % StatusLogEvery == 0);
@@ -68,6 +84,38 @@ public sealed class HudActor : UntypedActor
                 Unhandled(message);
                 break;
         }
+    }
+
+    /// <summary>
+    /// Pushes the last status to a watch that has just connected.
+    ///
+    /// <para>Without this the watch sits on "waiting for sessions..." until Claude Code
+    /// happens to render a statusLine — and it renders on interaction, not on a timer. A host
+    /// restart or a watch reboot in the middle of a live session therefore leaves the HUD
+    /// blank for as long as nobody types, which reads exactly like a link that never came up.
+    /// Measured on 2026-09-18: link up at 00:33:01, first S line at 00:36:31, zero drops in
+    /// between.</para>
+    ///
+    /// <para>This does not conjure a session out of nothing: on a cold host start there is no
+    /// status yet and the watch's waiting screen is correct. What it fixes is the reconnect,
+    /// where we already know what the screen should say.</para>
+    /// </summary>
+    private void Replay()
+    {
+        if (LastStatus.Length == 0)
+        {
+            _log.Info("watch connected; no statusLine seen yet, so nothing to show it");
+            return;
+        }
+        var age = DateTime.UtcNow - _lastStatusAtUtc;
+        if (age > StatusTtl)
+        {
+            _log.Info("watch connected; last status is {0:F0} min old, too stale to replay",
+                age.TotalMinutes);
+            return;
+        }
+        _log.Info("watch connected; replaying the last status ({0:F0} s old)", age.TotalSeconds);
+        Send('S', LastStatus, loud: true);
     }
 
     /// <param name="loud">

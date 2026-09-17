@@ -44,6 +44,10 @@ public static class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+        // Before anything can fail: from here on stdout is also on disk. The panel still
+        // receives the identical bytes - see HostLog for why that matters.
+        var logPath = HostLog.Install(Arg(args, "--log"));
+
         var settingsPath = Arg(args, "--config") ?? WearableSettingsStore.DefaultFilePath;
         var settings = WearableSettingsStore.Load(settingsPath);
 
@@ -110,6 +114,8 @@ public static class Program
         var chat = system.ActorOf(Props.Create(() => new ChatActor(settings, voice, stt, brain)), "chat");
         stt.Preload();
 
+        Log("host", "info", $"--- run started {DateTime.Now:yyyy-MM-dd HH:mm:ss} ---");
+        if (logPath != null) Log("host", "info", $"log: {logPath}");
         Log("host", "info", $"up as akka.tcp://{settings.SystemName}@{advertise}:{settings.RemotingPort}");
         Log("host", "info", "  /user/ask    echo actor (protocol smoke test)");
         Log("host", "info", "  /user/chat   conversation actor, shared by AskBot, Chat and the proxy");
@@ -140,6 +146,11 @@ public static class Program
                 if (frame.Length > 0 && frame[0] == BleTags.MicFrame) proxy.Tell(new BleChatProxy.MicFrame(frame));
             };
             link.Connected += () => proxy.Tell(new BleChatProxy.Greet());
+            // The device that comes back after a reboot starts its request ids at 1 again and
+            // has forgotten whatever it was recording. Carrying the old entry forward would
+            // leave a capture buffer and a cancelled request keyed to a board that no longer
+            // exists, so the link dropping is the signal to forget it.
+            link.Disconnected += () => proxy.Tell(new BleChatProxy.Reset());
 
             if (settings.TalkOnConnectMs > 0)
             {
@@ -167,6 +178,11 @@ public static class Program
         if (settings.HudEnabled)
         {
             var hudActor = system.ActorOf(Props.Create(() => new HudActor(link)), "hud");
+            // The Chat app gets a greeting when the link comes up; the HUD used to get nothing,
+            // so a watch that reconnected mid-session showed "waiting for sessions..." until
+            // the next statusLine render - which Claude Code does on interaction, not on a
+            // timer. Tell it, and it repaints from what we already know.
+            if (link != null) link.Connected += () => hudActor.Tell(new HudActor.LinkUp());
             hud = new HudEndpoint(hudActor, settings.HudPort, (level, message) => Log("hud", level, message));
             if (!hud.Start())
             {
@@ -337,8 +353,25 @@ public static class Program
                 if (!link.IsConnected)
                 {
                     var hit = await link.FindByNameAsync(deviceName, 6, ct);
-                    if (hit != null) await link.ConnectAsync(hit.Address, hit.Name, hit.AddressType);
-                    else Log("ble", "info", $"no device named '{deviceName}' in range");
+                    if (hit != null)
+                    {
+                        await link.ConnectAsync(hit.Address, hit.Name, hit.AddressType, ct);
+                    }
+                    else if (link.Address != 0)
+                    {
+                        // Absent from a scan is not the same as out of range. The watch
+                        // advertises only while unconnected, and after it reboots Windows can
+                        // still be holding - or re-establishing - the old link, so a device
+                        // sitting on the desk shows up in no scan at all. We connected to it
+                        // once, so we know its address: dial it.
+                        Log("ble", "info", $"'{deviceName}' is not advertising; " +
+                                           $"trying {link.AddressHex} directly");
+                        await link.ConnectAsync(link.Address, deviceName, link.AddressKind, ct);
+                    }
+                    else
+                    {
+                        Log("ble", "info", $"no device named '{deviceName}' in range");
+                    }
                 }
             }
             catch (OperationCanceledException)
