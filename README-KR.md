@@ -196,10 +196,15 @@ Agent 어휘 표준 표 — `harness/knowledge/_shared/agent-architecture.md`.
 | **AgentZeroWpf**     | `Project/AgentZeroWpf/`       | WinExe (net10.0-windows, WPF) | `AgentZeroWpf.*`     |
 | **ZeroCommon**       | `Project/ZeroCommon/`         | ClassLib (net10.0, UI 없음)   | `Agent.Common.*`     |
 | **AgentTest**        | `Project/AgentTest/`          | xUnit (net10.0-windows)       | `AgentTest.*`        |
+| **ZeroWearable**     | `Project/ZeroWearable/`       | Exe (net10.0-windows10.0.19041) | `ZeroWearable.*`   |
 | **ZeroCommon.Tests** | `Project/ZeroCommon.Tests/`   | xUnit (net10.0, 헤드리스)     | `ZeroCommon.Tests.*` |
 
-참조 관계: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`. WPF / Win32
-의존성이 없는 코드는 전부 ZeroCommon에 있어야 합니다.
+참조 관계: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`, 그리고
+`ZeroWearable → ZeroCommon`. WPF / Win32 의존성이 없는 코드는 전부 ZeroCommon에
+있어야 합니다. **ZeroWearable은 의도적으로 별도 프로세스**입니다 — BLE 센트럴이
+WinRT라 Windows SDK 타겟 프레임워크가 필요하고, GUI를 거기로 옮길 수는 없기 때문입니다.
+시계의 단일 BLE 링크를 이 프로세스가 소유합니다 —
+[웨어러블 기기 문서](Docs/wearable-device.kr.md) 참고.
 
 ---
 
@@ -793,6 +798,23 @@ v1.0까지 불안정한 것으로 간주됩니다.
 | **AgentZeroAIMODE** | 온디바이스 모델 탑재 AI 채팅 모드 — 예: *Gemma 4* ↔ *Claude Code* 간 대화, 온디바이스 LLM 컨트롤러에 TASK 처리 위임 |
 | **AgentZeroVoice** | 음성 입출력 — STT 입력은 **출시됨** (Whisper.net + Vulkan, [음성 섹션](#-음성--손과-입을-동시에-쓰는-듀얼-멀티태스킹) 참조); TTS 출력 (Windows 11 Natural Voices) 은 단계적 진행 중 |
 | **AgentZeroOS** | OS 네이티브 자동화 지원 — 스크린샷 캡처 기반이 아닌 **OS 메타정보(UI Automation) 기반 화면 해석기**로 AI 제어, 매크로급 처리 속도 |
+
+---
+
+### ⌚ 형제 저장소 — 기기 쪽 절반
+
+AgentZero Lite는 웨어러블과 대화하고, **이 저장소에는 PC 쪽만** 있습니다.
+펌웨어는 별도 프로젝트입니다.
+
+| 저장소 | 무엇인가 |
+| --- | --- |
+| [**psmon/Arduino**](https://github.com/psmon/Arduino) | 기기 펌웨어 — 하나의 ESP32-S3 앱이 시계의 **Claude HUD** · **Chat** · **AskBot** 화면을 단일 BLE 링크로 동시에 서비스. 초기 보드 샘플도 함께 있으며, 펌웨어 리뷰용 자체 하네스(`device-resource-warden`, `ble-contract-sentinel`)를 가짐 |
+
+USB로 기기를 빌드·플래시·디버깅하는 방법 — 포트 판별, arduino-cli · ESP-IDF 두 경로,
+호스트와 기기 로그를 나란히 읽는 방법, 그리고 **아두이노 계열이 아닌** 보드를 들일 때의
+체크리스트는 README에서 분리해 별도 페이지로 두었습니다:
+
+➤ **[Docs/wearable-device.kr.md](Docs/wearable-device.kr.md)**
 
 ---
 

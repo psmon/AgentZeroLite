@@ -214,10 +214,14 @@ Canonical agent vocabulary table — `harness/knowledge/_shared/agent-architectu
 | **AgentZeroWpf**         | `Project/AgentZeroWpf/`     | WinExe (net10.0-windows, WPF)    | `AgentZeroWpf.*`     |
 | **ZeroCommon**           | `Project/ZeroCommon/`       | ClassLib (net10.0, UI-free)      | `Agent.Common.*`     |
 | **AgentTest**            | `Project/AgentTest/`        | xUnit (net10.0-windows)          | `AgentTest.*`        |
+| **ZeroWearable**         | `Project/ZeroWearable/`     | Exe (net10.0-windows10.0.19041)  | `ZeroWearable.*`     |
 | **ZeroCommon.Tests**     | `Project/ZeroCommon.Tests/` | xUnit (net10.0, headless)        | `ZeroCommon.Tests.*` |
 
-Reference graph: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`. Anything
-without WPF / Win32 dependencies belongs in ZeroCommon.
+Reference graph: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`, and
+`ZeroWearable → ZeroCommon`. Anything without WPF / Win32 dependencies belongs in
+ZeroCommon. **ZeroWearable** is a second process on purpose — its BLE central is WinRT and
+needs a Windows-SDK target framework, which the GUI must not move to. It owns the watch's
+single BLE link; see [Wearable device](Docs/wearable-device.md).
 
 ---
 
@@ -1043,6 +1047,23 @@ whole product.
 | **AgentZeroVoice** | Voice input / output — STT input is **shipping** (Whisper.net + Vulkan, see [Voice section](#-voice--dual-multitasking-hands--voice-in-parallel)); TTS output (Windows 11 Natural Voices) is staged |
 | **AgentZeroMusic** | Audio *understanding* — instrument classification + live spectrum from mic or WASAPI loopback (see [Music section](#-music--instrument-classification--live-spectrum)). MIT AST AudioSet ONNX shipping; MERT (music embeddings) + CLAP (text-conditioned) tracked as drop-in `IMusicClassifier` implementations |
 | **AgentZeroOS** | Native OS automation — AI control via an **OS metadata (UI Automation) screen parser** instead of screenshot capture, delivering macro-level responsiveness |
+
+---
+
+### ⌚ Sibling Repo — the device half
+
+AgentZero Lite talks to a wearable, and **only the PC half lives here.** The firmware is a
+separate project:
+
+| Repo | What it is |
+| --- | --- |
+| [**psmon/Arduino**](https://github.com/psmon/Arduino) | The device firmware — a single ESP32-S3 app serving the watch's **Claude HUD**, **Chat** and **AskBot** screens over one BLE link, plus the earlier board samples. Has its own harness for firmware review (`device-resource-warden`, `ble-contract-sentinel`) |
+
+Building, flashing and debugging a device over USB — port discovery, the arduino-cli and
+ESP-IDF paths, reading the host and device logs side by side, and the checklist for bringing
+in a **non-Arduino** board — is kept out of this README and written up on its own page:
+
+➤ **[Docs/wearable-device.md](Docs/wearable-device.md)**
 
 ---
 
