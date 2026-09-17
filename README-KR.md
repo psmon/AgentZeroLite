@@ -31,9 +31,10 @@ AgentZero Lite는 단순한 아이디어로 만들어진 Windows 데스크톱 �
 
 ## 주요 기능
 
-- **멀티탭 ConPTY 터미널** — 각 탭이 진짜 `conhost` 렌더러로 돌아갑니다(의사
-  PTY 흉내가 아님). `EasyWindowsTerminalControl` / `CI.Microsoft.Terminal.Wpf`
-  기반.
+- **멀티탭 ConPTY 터미널** — 탭마다 Windows 의 진짜 의사 콘솔이 하나씩(의사 PTY
+  흉내가 아님). `ManagedConPtyHost`(직접 호출하는 `CreatePseudoConsole`)가 몰고
+  WebView2 안의 xterm.js 가 그립니다. 그래서 테마·폰트를 고를 수 있고,
+  **네이티브 터미널 DLL 은 하나도 배포하지 않습니다.**
 - **워크스페이스** — 탭을 폴더 단위로 묶어 프로젝트마다 별도 CLI 세트를 유지합니다.
   워크스페이스 버튼 한 번으로 `cd` 컨텍스트와 새 Claude가 함께 뜹니다.
 - **AgentChatBot** (v0.9.1 부터 UI 라벨은 **AgentCLI**) — 도킹 가능한 채팅 패널.
@@ -729,8 +730,9 @@ tmp/os-cli/
 
 ## 설정
 
-전체 창 오버레이 방식의 탭 패널입니다(ConPTY 네이티브 창이 새어나오지 않도록
-WebDev와 동일한 airspace 처리):
+전체 창 오버레이 방식의 탭 패널입니다(터미널이 아직 WPF가 위에 그릴 수 없는 자식
+창이던 시절에 도입됐습니다. 지금 렌더러에는 airspace 가 없지만, 설정 화면에는 이
+형태가 맞아서 그대로 뒀습니다):
 
 - **CLI Definitions** — AgentZero가 실행할 셸(`cmd`, `pwsh`, `claude …`, 커스텀)을
   등록합니다. 내장 항목은 삭제 불가. 새로 추가하면 모든 워크스페이스의 `+` 메뉴에

@@ -263,9 +263,11 @@ footer a:hover{color:var(--mint)}
     <a class="btn" href="#live-demo"><span class="ko">▶ 웹에서 만져보기</span><span class="en">▶ Try the live demo</span></a>
     <a class="btn" href="#ai-talk"><span class="ko">🤝 AI ↔ AI 대화 보기</span><span class="en">🤝 See AI ↔ AI talk</span></a>
     <a class="btn" href="#voice"><span class="ko">🎙 음성으로 듀얼 멀티태스크</span><span class="en">🎙 Voice — dual multitask</span></a>
-    <a class="btn" href="#music"><span class="ko">🎵 Music — 악기 분류 <span style="color:var(--mint)">NEW</span></span><span class="en">🎵 Music — instrument ID <span style="color:var(--mint)">NEW</span></span></a>
+    <a class="btn" href="#music"><span class="ko">🎵 Music — 악기 분류</span><span class="en">🎵 Music — instrument ID</span></a>
     <a class="btn" href="#webdev"><span class="ko">🌐 WebDev + 플러그인</span><span class="en">🌐 WebDev + Plugins</span></a>
-    <a class="btn" href="#scrap"><span class="ko">🔎 Scrap — 윈도우 캡처 <span style="color:var(--mint)">NEW</span></span><span class="en">🔎 Scrap — window capture <span style="color:var(--mint)">NEW</span></span></a>
+    <a class="btn" href="#scrap"><span class="ko">🔎 Scrap — 윈도우 캡처</span><span class="en">🔎 Scrap — window capture</span></a>
+    <a class="btn" href="#wearable"><span class="ko">⌚ 스마트워치 <span style="color:var(--mint)">NEW</span></span><span class="en">⌚ Smartwatch <span style="color:var(--mint)">NEW</span></span></a>
+    <a class="btn" href="#terminal"><span class="ko">🖥 터미널 · 레이아웃 <span style="color:var(--mint)">NEW</span></span><span class="en">🖥 Terminal &amp; layout <span style="color:var(--mint)">NEW</span></span></a>
     <a class="btn" href="#install"><span class="ko">🛠 설치 옵션</span><span class="en">🛠 Install options</span></a>
     <a class="btn" href="https://github.com/psmon/AgentZeroLite" target="_blank" rel="noopener"><span class="ko">GitHub</span><span class="en">GitHub</span></a>
   </div>
@@ -315,8 +317,8 @@ footer a:hover{color:var(--mint)}
       <span class="tag">TERMINAL</span>
       <h4 class="ko">진짜 멀티탭 ConPTY</h4>
       <h4 class="en">Real multi-tab ConPTY</h4>
-      <p class="ko">각 탭이 Windows Terminal과 동일한 <code>conhost</code> 렌더러로 돌아갑니다. 흉내가 아닌 진짜 PTY.</p>
-      <p class="en">Every tab is a real <code>conhost</code> session — the same renderer Windows Terminal uses. Not a pseudo-PTY pretending.</p>
+      <p class="ko">탭마다 Windows 의 진짜 의사 콘솔(<code>CreatePseudoConsole</code>)이 하나씩 붙습니다 — 흉내가 아닙니다. 화면을 그리는 쪽은 <a href="#terminal" style="color:var(--cyan)">xterm.js</a> 라서, 테마·폰트를 고르고 WPF 오버레이를 그 위에 얹을 수 있습니다.</p>
+      <p class="en">Every tab gets a real Windows pseudo-console of its own (<code>CreatePseudoConsole</code>) — nothing is pretending. What draws it is <a href="#terminal" style="color:var(--cyan)">xterm.js</a>, which is why themes and fonts are selectable and WPF overlays can sit on top.</p>
     </div>
 
     <div class="card accent-cyan">
@@ -753,6 +755,152 @@ footer a:hover{color:var(--mint)}
   </p>
 </section>
 
+<!-- ═════════════════════ Wearable ═════════════════════ -->
+<section class="section" id="wearable">
+  <h2 class="ko">⌚ 스마트워치 — 손목 위의 액터 <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.24</span></h2>
+  <h2 class="en">⌚ Smartwatch — an actor on your wrist <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.24</span></h2>
+
+  <p class="ko" style="color:var(--text-soft);max-width:820px">
+    ActivityBar 의 <strong>Wearable</strong> 항목이 <code>AgentZeroWearable.exe</code> 를 띄우면, 하나의 BLE 링크로 시계의 <strong>세 앱을 동시에</strong> 서비스합니다 — <strong>AskBot</strong> 은 진짜 Akka 리모팅 피어(PDU 를 BLE 로 터널링), <strong>Chat</strong> 은 음성을 양방향으로, <strong>Claude HUD</strong> 는 <code>:8765</code> 로 들어온 Claude Code 훅의 세션 텔레메트리를 띄웁니다. 시계는 터미널이 아니라 <em>피어</em>입니다.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px">
+    The <strong>Wearable</strong> entry on the ActivityBar starts <code>AgentZeroWearable.exe</code>, which serves <strong>three watch apps at once</strong> over a single BLE link — <strong>AskBot</strong> as a real Akka remoting peer (PDUs tunnelled over BLE), <strong>Chat</strong> carrying audio both ways, and the <strong>Claude HUD</strong> showing session telemetry posted by Claude Code hooks to <code>:8765</code>. The watch is a <em>peer</em>, not a terminal.
+  </p>
+
+  <img src="wearable/watch-apps.png" alt="The watch apps fed by one host over one BLE link: AskBot, Chat, the Claude HUD and the device-wide Settings" loading="lazy" style="width:100%;border-radius:8px;border:1px solid var(--border-dim);margin-top:18px">
+
+  <div class="grid" style="margin-top:18px">
+    <div class="card accent-cyan">
+      <span class="tag">NO DOUBLE SETUP</span>
+      <h4 class="ko">모델은 두 번 설정하지 않습니다</h4>
+      <h4 class="en">Nothing model-shaped is configured twice</h4>
+      <p class="ko">호스트는 AgentZero 가 이미 설치한 번들을 그대로 읽습니다 — 목소리는 <strong>Settings → Voice</strong> 의 Supertonic, 귀는 같은 화면의 Whisper(Vulkan→CPU 프로브 포함), 두뇌는 <strong>Settings → LLM</strong> 의 <code>IAgentLoop</code>. 샘플이 들고 있던 466줄짜리 TTS 복사본은 버렸습니다.</p>
+      <p class="en">The host reads the bundles the app already installed — voice from <strong>Settings → Voice</strong> (Supertonic), ear from the same screen (Whisper, Vulkan→CPU probe included), brain from <strong>Settings → LLM</strong> (<code>IAgentLoop</code>). The sample's own 466-line TTS copy was dropped.</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">SECOND PROCESS</span>
+      <h4 class="ko">일부러 별도 프로세스</h4>
+      <h4 class="en">A second process on purpose</h4>
+      <p class="ko">BLE 센트럴이 WinRT 라 Windows SDK TFM 이 필요합니다. 메인 exe 를 그 쪽으로 옮기면 문서·스크립트·인스톨러가 인용하는 <strong>빌드 출력 경로가 통째로 바뀌므로</strong> 호스트만 분리했습니다. 잡 오브젝트가 호스트 수명을 GUI 에 묶어, 강제 종료 뒤 고아 프로세스가 BLE 와 <code>:8765</code> 를 붙든 채 남는 일을 막습니다.</p>
+      <p class="en">The BLE central is WinRT, which needs a Windows-SDK target framework. Moving the main exe there would move the build output path every doc, script and installer entry quotes — so only the host went. A Job Object ties its lifetime to the GUI, so a force-kill cannot leave an orphan holding the radio and <code>:8765</code>.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">RECONNECT</span>
+      <h4 class="ko">시계를 재부팅해도 살아남습니다</h4>
+      <h4 class="en">Survives a watch reboot</h4>
+      <p class="ko">기기를 리부팅하고 재접속하면 링크가 죽던 문제를 고쳤습니다. 원인은 두 가지 — 세션을 놓기 전에 <code>MaintainConnection</code> 을 지우지 않은 것, 그리고 <strong>BLE 알림 경계에서 잘린 UTF-8</strong>. 줄 조립을 바이트 단위로 바꿔 한 글자가 두 알림에 걸쳐도 깨지지 않습니다.</p>
+      <p class="en">Rebooting the device and reconnecting used to kill the link. Two causes — the session was disposed without clearing <code>MaintainConnection</code>, and <strong>UTF-8 cut at a BLE notification boundary</strong>. Line assembly is byte-level now, so a character split across two notifications survives.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">CROSS-REPO</span>
+      <h4 class="ko">펌웨어 쪽 버그도 함께 고쳤습니다</h4>
+      <h4 class="en">The firmware bug got fixed too</h4>
+      <p class="ko">호스트와 기기 시리얼 로그를 나란히 찍어 AskBot 의 <strong>ASSOCIATE 레이스</strong>를 찾았습니다 — <code>Connect</code> 가 구독 완료가 아니라 연결만 기다리고 있었고, 바로 위 주석은 줄곧 "connected <em>and subscribed</em>" 라고 적혀 있었습니다. 형제 저장소에 직접 고쳐 넣어 <strong>5574ms → 1547ms</strong>.</p>
+      <p class="en">Capturing the host and device serial logs side by side found AskBot's <strong>ASSOCIATE race</strong> — <code>Connect</code> waited for the link, not for the subscribe, while the comment right above it had always said "connected <em>and subscribed</em>". Fixed in the sibling repo itself: <strong>5574ms → 1547ms</strong>.</p>
+    </div>
+  </div>
+
+  <p class="ko" style="color:var(--text-dim);font-size:13px;max-width:820px;margin-top:14px">
+    펌웨어는 별도 저장소 <a href="https://github.com/psmon/Arduino" style="color:var(--cyan)">psmon/Arduino</a> 에 있습니다(위 그림도 그쪽에서 실제 LVGL 레이아웃으로 생성됩니다). USB 로 기기를 빌드·플래시·디버깅하는 법, 호스트와 기기 로그를 나란히 읽는 법, <strong>아두이노 계열이 아닌</strong> 보드를 들일 때의 체크리스트는 <a href="../Docs/wearable-device.kr.md" style="color:var(--cyan)">웨어러블 기기 문서</a>에 별도로 정리돼 있습니다.
+  </p>
+  <p class="en" style="color:var(--text-dim);font-size:13px;max-width:820px;margin-top:14px">
+    The firmware lives in its own repo, <a href="https://github.com/psmon/Arduino" style="color:var(--cyan)">psmon/Arduino</a> — which is also where the picture above is generated from the real LVGL layouts. Building, flashing and debugging a device over USB, reading the host and device logs side by side, and the checklist for bringing in a <strong>non-Arduino</strong> board are kept on their own page: <a href="../Docs/wearable-device.md" style="color:var(--cyan)">Wearable device</a>.
+  </p>
+</section>
+
+<!-- ═════════════════════ Terminal & layout ═════════════════════ -->
+<section class="section" id="terminal">
+  <h2 class="ko">🖥 터미널 · 레이아웃 — 백엔드 하나로 <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.24</span></h2>
+  <h2 class="en">🖥 Terminal &amp; layout — down to one backend <span style="color:var(--mint);font-size:14px;font-weight:400;margin-left:8px">NEW · v0.24</span></h2>
+
+  <p class="ko" style="color:var(--text-soft);max-width:820px">
+    터미널 백엔드가 <strong>하나</strong>로 정리됐습니다 — WebView2 안의 <strong>xterm.js</strong>, 그리고 그것을 먹이는 <code>ManagedConPtyHost</code>(Windows 10 1809 부터 있는 <code>CreatePseudoConsole</code> 를 kernel32 P/Invoke 로 직접 호출). 그 결과 앱은 <strong>네이티브 터미널 DLL 을 전혀 배포하지 않습니다.</strong> 이전 백엔드는 업스트림 지원이 끊겼고 WPF 에서 제어하기 어려운 수준이 됐습니다.
+  </p>
+  <p class="en" style="color:var(--text-soft);max-width:820px">
+    The terminal is down to <strong>one backend</strong> — <strong>xterm.js</strong> in a WebView2, driven by <code>ManagedConPtyHost</code>, our own pseudo-console over plain kernel32 P/Invoke (<code>CreatePseudoConsole</code>, present since Windows 10 1809). The app therefore ships <strong>no native terminal DLLs at all</strong>. The backend it replaced had lost upstream support and had become hard to control from WPF.
+  </p>
+
+  <div class="grid" style="margin-top:18px">
+    <div class="card accent-cyan">
+      <span class="tag">NO NATIVE DLLS</span>
+      <h4 class="ko">조용히 깨지던 복사 단계가 사라졌습니다</h4>
+      <h4 class="en">A copy step that failed silently is gone</h4>
+      <p class="ko"><code>conpty.dll</code> · <code>Microsoft.Terminal.Control.dll</code> 과 <code>CI.Microsoft.*</code> 패키지가 전부 빠졌고, 그와 함께 <code>$(NuGetPackageRoot)</code> 경로를 하드코딩한 복사 단계도 없어졌습니다. 패키지 버전을 올리면 그 단계가 <em>조용히</em> 실패해서, 앱은 뜨는데 터미널 탭만 안 열리곤 했습니다.</p>
+      <p class="en"><code>conpty.dll</code>, <code>Microsoft.Terminal.Control.dll</code> and the <code>CI.Microsoft.*</code> packages are gone, and with them the copy step with hard-coded <code>$(NuGetPackageRoot)</code> paths. Bump a package version and that step failed <em>silently</em> — the app started, the terminal tabs did not.</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">DEC 2026</span>
+      <h4 class="ko">커서가 화면을 돌아다니던 문제</h4>
+      <h4 class="en">The cursor that skittered around</h4>
+      <p class="ko">Ink 계열 TUI(Claude Code · Codex)는 화면을 지우고 커서를 홈으로 보낸 뒤 프레임 전체를 다시 그립니다. 그걸 <code>ESC[?2026h…l</code> 로 감싸 "중간을 보여주지 말라"고 말하는데 <strong>xterm.js 5.5.0 은 이 모드를 구현하지 않습니다.</strong> 그래서 <strong>호스트가</strong> 프레임을 모았다가 한 번에 넘깁니다 — 렌더러는 한 번만 그립니다.</p>
+      <p class="en">Ink-style TUIs (Claude Code, Codex) repaint by clearing, homing and redrawing the whole frame, wrapped in <code>ESC[?2026h…l</code> to say "don't show anyone the middle of this". <strong>xterm.js 5.5.0 does not implement that mode</strong>, so the <strong>host</strong> holds the frame back and hands it over as one write — the renderer paints once.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">THEME · FONT</span>
+      <h4 class="ko">테마 7종 + JetBrains Mono 동봉</h4>
+      <h4 class="en">7 themes + JetBrains Mono, shipped</h4>
+      <p class="ko">Dark+ · One Dark · Solarized Dark · Gruvbox Dark · Nord · Tokyo Night · Custom. 폰트는 JetBrains Mono 를 동봉하고(OFL 1.1, 라이선스 동행), 크기·행간까지 설정에서 고릅니다. 렌더러가 메시지로 받으므로 <strong>살아 있는 탭에 즉시 적용</strong> — 의사 콘솔은 건드리지 않습니다.</p>
+      <p class="en">Dark+, One Dark, Solarized Dark, Gruvbox Dark, Nord, Tokyo Night, Custom. JetBrains Mono ships with the app (OFL 1.1, licence travels with it), and size and line height are settings too. The renderer takes it as a message, so a change <strong>lands on live tabs</strong> without disturbing their pseudo-console.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">ENVIRONMENT</span>
+      <h4 class="ko">자식 환경은 상속이 아니라 조립</h4>
+      <h4 class="en">The child environment is built, not inherited</h4>
+      <p class="ko">GUI 를 띄운 쉘의 환경을 그대로 물려주면, IDE 터미널에서 딸려온 <code>NO_COLOR=1</code> 하나가 모든 탭의 색을 꺼버립니다. 이제 필요한 것만 조립합니다 — <code>COLORTERM=truecolor</code> 를 켜고, <code>CLAUDE_CODE_*</code> 같은 표식은 버립니다. 사용자가 연 탭은 <em>중첩된 에이전트 세션이 아니기</em> 때문입니다.</p>
+      <p class="en">Handing a terminal child whatever launched the GUI is how one <code>NO_COLOR=1</code> picked up from an IDE terminal switched colour off in every tab. The environment is assembled now — <code>COLORTERM=truecolor</code> on, <code>CLAUDE_CODE_*</code> markers dropped, because a tab the user opened <em>is not a nested agent session</em>.</p>
+    </div>
+  </div>
+
+  <div class="ascii" style="margin-top:18px">
+<span class="src">┌─ layout ─────────────────────────────────────────────┐</span>
+│ <span class="cmd">-cli layout dump</span>       <span class="src">→ 지금 화면 구조 JSON / shape as JSON</span>
+│ <span class="cmd">-cli layout split-right</span>  <span class="src">Panel(H:[codex 1] [CMD 2])</span>
+│ <span class="cmd">-cli layout float</span> · <span class="cmd">dock</span>  <span class="src">떼고 / 되돌리고  detach / rejoin</span>
+│ <span class="cmd">-cli layout workspace 6</span>  <span class="src">전환 — 분할까지 그대로 복원</span>
+<span class="src">└──────────────────────────────────────────────────────┘</span>
+  </div>
+
+  <div class="grid" style="margin-top:18px">
+    <div class="card accent-cyan">
+      <span class="tag">SPLIT · DETACH</span>
+      <h4 class="ko">편법이 아닌 정식 도킹</h4>
+      <h4 class="en">Real docking, not a workaround</h4>
+      <p class="ko">분할·분리·재도킹이 프레임워크의 공식 경로를 탑니다. 페인 머리의 작은 ▽ 버튼은 탭 목록을 여는(탭 클릭과 중복되던) 기능 대신 <strong>떼어내기</strong>가 됐고, 이미 떼어낸 창에서는 같은 버튼이 <strong>합류</strong>가 됩니다. 떼어낸 창은 타이틀바가 없고, 되돌리면 <strong>원래 있던 자리로</strong> 돌아갑니다.</p>
+      <p class="en">Splitting, detaching and re-docking go through the framework's own path. The small ▽ in the pane header — which used to open a tab list, duplicating what clicking a tab already does — is now <strong>detach</strong>, and in a window that is already detached the same button is <strong>rejoin</strong>. A detached terminal has no title bar, and docking it back returns it <strong>where it came from</strong>.</p>
+    </div>
+
+    <div class="card accent-magenta">
+      <span class="tag">MEMORY</span>
+      <h4 class="ko">워크스페이스가 분할을 기억합니다</h4>
+      <h4 class="en">A workspace remembers its split</h4>
+      <p class="ko">워크스페이스를 옮겼다 돌아오면 배치가 평탄해지던 문제를 고쳤습니다. 이제 나갈 때 배치를 저장하고 <strong>재시작 뒤에도</strong> 복원합니다. 저장된 배치는 그대로 재생하지 않고 <em>지금 있는 탭과 대조</em>합니다 — 자리를 비운 사이 탭이 닫혔거나 늘었을 수 있으니까요.</p>
+      <p class="en">Leaving a workspace and coming back used to flatten it. The arrangement is stored on the way out and restored — <strong>across a restart too</strong>. A stored layout is never replayed as-is: it is reconciled with the tabs that exist now, because a workspace can gain and lose tabs while it is not the one on screen.</p>
+    </div>
+
+    <div class="card accent-yellow">
+      <span class="tag">SELF-TEST</span>
+      <h4 class="ko">창을 CLI 로 몹니다</h4>
+      <h4 class="en">The window is driven from the CLI</h4>
+      <p class="ko">탭 추가·분할·분리·재도킹·패널 접기까지 <code>-cli layout …</code> 로 실행하고, <code>dump</code> 로 결과 구조를 받습니다. 마우스 없이 재현·검증할 수 있어서, 탭이 무한히 왔다 갔다 하는 루프도 즉시 잡고 끌 수 있습니다. 같은 명령에 <strong>단축키</strong>를 매핑할 수 있고 <strong>기본값은 꺼짐</strong>입니다.</p>
+      <p class="en">Add a tab, split, detach, re-dock, collapse the panel — all as <code>-cli layout …</code>, with <code>dump</code> returning the resulting shape. Reproducible without a mouse, which is how a runaway tab-switching loop gets caught and killed instead of fought. The same commands can be bound to <strong>keyboard shortcuts</strong>, <strong>off by default</strong>.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">TUI ANIMATION</span>
+      <h4 class="ko">입력창 애니메이션 끄기</h4>
+      <h4 class="en">Turn the prompt animation off</h4>
+      <p class="ko">일부 모델은 입력칸 뒤에 애니메이션을 그려서, 끊임없이 다시 칠하는 터미널에서는 방해가 됩니다. CLI 정의의 체크박스 하나로 해당 도구가 실제로 지원하는 스위치만 붙입니다 — <em>모르는 도구에는 아무것도 붙이지 않습니다.</em> 인식 못 하는 인자는 보통 실행 자체를 실패시키기 때문입니다.</p>
+      <p class="en">Some models draw an animation behind the prompt, which is distracting on a terminal that repaints continuously. A checkbox on the CLI definition appends the switch that tool actually documents — and <em>nothing at all</em> for a tool without one, because an argument a program does not recognise is usually fatal at launch.</p>
+    </div>
+  </div>
+</section>
+
 <!-- ═════════════════════ How it works ═════════════════════ -->
 <section class="section">
   <h2 class="ko">작동 방식 (짧게)</h2>
@@ -779,6 +927,13 @@ footer a:hover{color:var(--mint)}
       <h4 class="en">Stage → Workspace → Terminal</h4>
       <p class="ko">Akka.NET 액터 트리로 터미널 생명주기·라우팅·장애 격리를 관리합니다. 탭이 죽어도 다른 탭은 살아남습니다.</p>
       <p class="en">An Akka.NET actor tree manages lifecycle, routing and fault isolation. A crashing tab never takes the rest down.</p>
+    </div>
+    <div class="card">
+      <span class="tag">ENGINE</span>
+      <h4 class="ko">관리 코드 ConPTY + xterm.js</h4>
+      <h4 class="en">Managed ConPTY + xterm.js</h4>
+      <p class="ko">터미널은 WebView2 안의 xterm.js 하나뿐이고, 의사 콘솔은 <code>CreatePseudoConsole</code> 을 직접 부르는 우리 코드입니다. 네이티브 터미널 DLL 은 <strong>배포하지 않습니다</strong>.</p>
+      <p class="en">One terminal — xterm.js in a WebView2 — over a pseudo-console we drive ourselves with <code>CreatePseudoConsole</code>. <strong>No native terminal DLLs ship</strong> with the app.</p>
     </div>
     <div class="card accent-yellow">
       <span class="tag">ZERO AI</span>
@@ -811,6 +966,10 @@ footer a:hover{color:var(--mint)}
       <tr><td>agent-resume-launch &lt;g&gt; &lt;t&gt;</td><td class="ko">최신 세션을 찾아 <code>--resume</code>를 라이브 터미널에 주입</td><td class="en">Find the latest session and inject <code>--resume</code> into the live terminal</td></tr>
       <tr><td>bot-chat "text" --from X</td><td class="ko">Bot 창에 외부 메시지 버블 표시</td><td class="en">Display an external chat bubble in the bot window</td></tr>
       <tr><td>cost</td><td class="ko">기록된 토큰 사용량 기반 USD 추정</td><td class="en">Estimated USD from recorded token usage</td></tr>
+      <tr><td>layout dump</td><td class="ko">현재 분할/탭/패널 구조를 JSON 으로</td><td class="en">The current split / tab / panel shape as JSON</td></tr>
+      <tr><td>layout add · split-right · split-down</td><td class="ko">탭 추가 · 좌우/상하 분할</td><td class="en">Add a tab · split right / down</td></tr>
+      <tr><td>layout float · dock</td><td class="ko">활성 탭을 창으로 떼기 · 원래 자리로 되돌리기</td><td class="en">Detach the active tab · dock it back where it came from</td></tr>
+      <tr><td>layout workspace &lt;g&gt;</td><td class="ko">워크스페이스 전환 (분할 배치까지 복원)</td><td class="en">Switch workspace, split arrangement and all</td></tr>
       <tr><td>copy · log · help</td><td class="ko">클립보드 / 액션 히스토리 / 도움말</td><td class="en">Clipboard / action history / help</td></tr>
     </tbody>
   </table>

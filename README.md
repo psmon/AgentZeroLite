@@ -32,8 +32,10 @@ macros to whichever terminal is in focus — nothing more, nothing less.
 
 ## Features
 
-- **Multi-tab ConPTY terminals** — real `conhost` rendering per tab, not a pseudo-PTY
-  pretending. Powered by `EasyWindowsTerminalControl` / `CI.Microsoft.Terminal.Wpf`.
+- **Multi-tab ConPTY terminals** — a real Windows pseudo-console per tab, not a
+  pseudo-PTY pretending. Driven by `ManagedConPtyHost` (our own `CreatePseudoConsole`
+  P/Invoke) and drawn by xterm.js in a WebView2, so themes and fonts are selectable and
+  **no native terminal DLLs ship at all**.
 - **Workspaces** — group tabs by folder so each project keeps its own set of CLIs
   (one click = `cd` context and a fresh Claude).
 - **AgentChatBot** (labelled **AgentCLI** in the UI from v0.9.1) — a dockable chat
@@ -966,8 +968,9 @@ and how the Akka graph enforces the procedure are written up in
 
 ## Settings
 
-A short tabbed pane (full-window overlay since v0.4 — same airspace
-treatment as WebDev so ConPTY native windows can't bleed through):
+A short tabbed pane (full-window overlay since v0.4 — introduced when the terminal was
+still a child window that WPF could not draw over; the current renderer has no airspace,
+but the overlay stayed because it is the right shape for a settings screen):
 
 - **CLI Definitions** — register shells AgentZero can spawn (`cmd`, `pwsh`, `claude …`,
   custom entries). Built-ins cannot be deleted. New definitions appear in the `+` menu
