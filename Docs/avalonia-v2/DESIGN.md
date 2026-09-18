@@ -265,3 +265,21 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
 
 `Project/AgentZeroAvalonia.Tests`(xUnit, 헤드리스): `XtermMessages` 코덱 5, `LocalAssetServer` 해석·실서빙 2, PTY 백엔드 에코/종료 2 +
 이론 케이스. CI 두 잡 모두 실행한다. `Avalonia.Headless.XUnit`는 아직 필요 없어 넣지 않았다(M0036 SplitTree도 순수 모델).
+
+## 구현 기록 — M0036 분할창 (2026-09-19)
+
+- **모델** `Layout/WorkspaceLayout<T>`: `PaneNode`(탭 목록·활성 탭) / `SplitNode`(Vertical·자식). 규칙은 WPF `SplitDocument`와 같다 —
+  분할은 활성 탭을 바로 뒤의 새 페인으로 옮기고(혼자면 null → 호스트는 같은 정의의 새 터미널을 연다), 같은 방향의 부모는 흡수,
+  다른 방향이면 중첩 분할로 감싸고, 빈 페인은 부모를 접으며 같은 방향의 손자는 부모에 병합한다. `FromDock/ToDock`은
+  `DockPaneNode`(탭 인덱스)와 매핑하고 `DockPaneLayout.Normalise`로 모르는 탭은 첫 페인에 넣는다.
+- **뷰** `TerminalsView`: `LayoutRoot` Grid에 트리를 다시 그리고(페인 = 탭 스트립 + 콘텐츠 슬롯 Border, 분할 = Star/Auto 열·행 +
+  GridSplitter 4px), `SurfaceHost` Canvas가 모든 `XtermWebViewTerminalControl`을 보유한다. `LayoutUpdated`마다 각 페인 슬롯의
+  사각형을 `TranslatePoint`로 캔버스 좌표로 옮겨 활성 탭 컨트롤에 `Canvas.Left/Top/Width/Height`를 준다(변화 없으면 건너뜀).
+  비활성 탭은 `IsVisible=false`로 숨기고 PTY는 계속 돈다. 페인 포커스 이동은 슬롯 사각형으로 `Neighbour`를 고른다.
+- **단축키** `Layout/HotkeyTable`: id는 `WindowCommandIds` + 호스트 전용(next/prev-tab, move-tab-next-pane, close-pane,
+  focus-left/right/up/down, bot.toggle). 사용자 설정 → WPF 제안 표 → 호스트 기본값. 같은 표를 `config.hotkeys`로 렌더러에
+  보내고(`term.js`의 `attachCustomKeyEventHandler`) 창에서는 `KeyDown` 터널 핸들러가 `HotkeyTable.Match`로 본다.
+- **CLI** `layout status|split-right|split-down|close-tab|close-pane|add|next-tab|prev-tab|move-tab|focus-<dir>` — 요청은 WPF와
+  같은 `{"command":"layout","sub":...}`, 응답에 `panes`와 저장 JSON.
+- **영속**: `WorkspaceViewModel.DockLayoutJson = Layout.ToJson(Tabs)`; 변경은 500 ms 디바운스 후 `SaveCliGroups`, 종료 시 즉시.
+- 골든 행이 로컬 DB에 없어 `DockPaneLayout.ToJson` 산출로 고정(페인에도 `"Vertical":false`).

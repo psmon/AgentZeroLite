@@ -18,7 +18,7 @@
         <Style Selector="Button.tabtitle">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="12,5,6,5" />
+            <Setter Property="Padding" Value="12,4,6,4" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
         </Style>
@@ -40,69 +40,68 @@
         <Style Selector="Button.strip">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Padding" Value="8,3" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
         </Style>
         <Style Selector="Button.strip:pointerover">
             <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
         </Style>
+        <Style Selector="Border.pane">
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.pane.active">
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+        </Style>
+        <Style Selector="Border.panestrip">
+            <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        <Style Selector="GridSplitter">
+            <Setter Property="Background" Value="{DynamicResource BorderColor}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*">
 
-        <!-- Tab strip -->
-        <Border Grid.Row="0" Background="{DynamicResource CyberBgToolbar}"
+        <!-- Workspace bar -->
+        <Border Grid.Row="0" Background="{DynamicResource CyberBgPanel}"
                 BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="4,0">
+                    <Button Classes="strip" Content="⫿" ToolTip.Tip="Split right" Command="{Binding SplitRightCommand}" />
+                    <Button Classes="strip" Content="⫽" ToolTip.Tip="Split down" Command="{Binding SplitDownCommand}" />
                     <Button Classes="strip" Content="＋" ToolTip.Tip="New terminal (default CLI)"
                             Command="{Binding NewTerminalDefaultCommand}" />
-                    <Button x:Name="NewTerminalMenuButton" Classes="strip" Content="▾" ToolTip.Tip="New terminal…">
+                    <Button x:Name="NewTerminalMenuButton" Classes="strip" Content="▾" ToolTip.Tip="New terminal">
                         <Button.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight" />
                         </Button.Flyout>
                     </Button>
                 </StackPanel>
-                <TextBlock DockPanel.Dock="Left" Text="{Binding ActiveWorkspace.DisplayName}" FontSize="11"
+                <TextBlock Text="{Binding ActiveWorkspace.DisplayName}" FontSize="11" FontWeight="Bold"
                            Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" Margin="10,0,6,0" />
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding ActiveWorkspace.Tabs}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:TerminalTabViewModel">
-                                <Border Classes="tab" Classes.selected="{Binding IsActive}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Classes="tabtitle" Content="{Binding Title}" Command="{Binding ActivateCommand}"
-                                                ToolTip.Tip="{Binding HealthText}" />
-                                        <Button Classes="tabclose" Content="✕" Command="{Binding CloseCommand}" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
             </DockPanel>
         </Border>
 
-        <!-- Terminal surface: every tab's renderer lives here, one visible at a time
-             (M0036 turns this into the split-pane surface host). -->
-        <Panel Grid.Row="1" x:Name="Surface" Background="#1e1e1e" />
-
-        <!-- Empty state -->
-        <Border Grid.Row="1" IsVisible="{Binding !HasActiveTab}" Background="{DynamicResource CyberBgDeep}">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-                <TextBlock Text="AgentZero Lite — Avalonia host" FontSize="16" FontWeight="Bold"
-                           Foreground="{DynamicResource CyberCyanBrush}" HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding EmptyStateHint}" Foreground="{DynamicResource TextDim}"
-                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="460" />
-                <Button Content="Open a terminal here" HorizontalAlignment="Center"
-                        IsVisible="{Binding HasActiveWorkspace}" Command="{Binding NewTerminalDefaultCommand}" />
-            </StackPanel>
-        </Border>
+        <!-- Split tree (tab strips, pane frames, splitters) with the terminal surface host
+             on top: every tab's renderer lives on the canvas and is positioned over the
+             pane whose active tab it is. No renderer is ever re-parented. -->
+        <Panel Grid.Row="1">
+            <Grid x:Name="LayoutRoot" Background="{DynamicResource CyberBgDeep}" />
+            <Canvas x:Name="SurfaceHost" Background="{x:Null}" />
+            <Border IsVisible="{Binding !HasActiveTab}" Background="{DynamicResource CyberBgDeep}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                    <TextBlock Text="AgentZero Lite — Avalonia host" FontSize="16" FontWeight="Bold"
+                               Foreground="{DynamicResource CyberCyanBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding EmptyStateHint}" Foreground="{DynamicResource TextDim}"
+                               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="460" />
+                    <Button Content="Open a terminal here" HorizontalAlignment="Center"
+                            IsVisible="{Binding HasActiveWorkspace}" Command="{Binding NewTerminalDefaultCommand}" />
+                </StackPanel>
+            </Border>
+        </Panel>
     </Grid>
 </UserControl>

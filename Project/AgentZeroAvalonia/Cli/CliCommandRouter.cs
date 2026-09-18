@@ -5,6 +5,7 @@ using Agent.Common;
 using Agent.Common.Module;
 using Agent.Common.Platform;
 using Agent.Common.Services;
+using AgentZeroAvalonia.Layout;
 
 namespace AgentZeroAvalonia.Cli;
 
@@ -20,6 +21,12 @@ internal sealed class CliCommandRouter
 
     /// <summary>The live workspaces; set by the app once the view model exists.</summary>
     public Func<IReadOnlyList<ICliGroupInfo>>? Groups { get; set; }
+
+    /// <summary>Run a window command by id (the hotkey table's ids) — <c>-cli layout &lt;verb&gt;</c>.</summary>
+    public Action<string>? ExecuteWindowCommand { get; set; }
+
+    /// <summary>The active workspace's split layout as stored JSON (null while unsplit), plus its pane count.</summary>
+    public Func<(string? Json, int Panes, string? Workspace)>? LayoutStatus { get; set; }
 
     public CliCommandRouter(IClassicDesktopStyleApplicationLifetime desktop) => _desktop = desktop;
 
@@ -55,6 +62,9 @@ internal sealed class CliCommandRouter
 
                     case "terminal-read":
                         return Task.FromResult(TerminalRead(root));
+
+                    case "layout":
+                        return Task.FromResult(Layout(root));
 
                     default:
                         return Task.FromResult(CliIpcProtocol.ErrorJson($"unknown command '{command}' (not ported to the Avalonia host yet)"));
@@ -167,6 +177,42 @@ internal sealed class CliCommandRouter
             chars[i] = (char)b;
         }
         return new string(chars);
+    }
+
+    /// <summary>The WPF host's <c>-cli layout &lt;verb&gt;</c>: window commands by name, plus <c>status</c>.</summary>
+    private string Layout(JsonElement root)
+    {
+        var sub = (root.TryGetProperty("sub", out var sp) ? sp.GetString() ?? "" : "").ToLowerInvariant();
+        var id = sub switch
+        {
+            "split-right" => WindowCommandIds.SplitRight,
+            "split-down" => WindowCommandIds.SplitDown,
+            "close-tab" => WindowCommandIds.CloseTab,
+            "add" or "new-tab" => WindowCommandIds.TerminalAdd,
+            "close-pane" => HotkeyTable.ClosePane,
+            "next-tab" => HotkeyTable.NextTab,
+            "prev-tab" => HotkeyTable.PrevTab,
+            "move-tab" => HotkeyTable.MoveTabNextPane,
+            "focus-left" => HotkeyTable.FocusLeft,
+            "focus-right" => HotkeyTable.FocusRight,
+            "focus-up" => HotkeyTable.FocusUp,
+            "focus-down" => HotkeyTable.FocusDown,
+            "status" or "" => null,
+            _ => sub.Contains('.') ? sub : "?",
+        };
+        if (id == "?")
+            return CliIpcProtocol.ErrorJson($"Unknown layout verb '{sub}'. Use: status, split-right, split-down, close-tab, close-pane, add, next-tab, prev-tab, move-tab, focus-left|right|up|down");
+        if (id is not null)
+        {
+            if (ExecuteWindowCommand is null) return CliIpcProtocol.ErrorJson("layout commands are not wired");
+            ExecuteWindowCommand(id);
+        }
+        var (json, panes, ws) = LayoutStatus?.Invoke() ?? (null, 0, null);
+        var wsJson = ws is null ? "null" : "\"" + CliIpcProtocol.Escape(ws) + "\"";
+        return "{\"ok\":true,\"sub\":\"" + CliIpcProtocol.Escape(sub.Length == 0 ? "status" : sub) + "\""
+               + ",\"workspace\":" + wsJson
+               + ",\"panes\":" + panes
+               + ",\"layout\":" + (json ?? "null") + "}";
     }
 
     private string TerminalRead(JsonElement root)

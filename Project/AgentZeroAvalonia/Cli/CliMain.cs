@@ -67,6 +67,7 @@ internal static class CliMain
             "terminal-send" => TerminalVerbs.Send(client, rest),
             "terminal-key" => TerminalVerbs.Key(client, rest),
             "terminal-read" => TerminalVerbs.Read(client, rest),
+            "layout" => TerminalVerbs.Layout(client, rest),
             _ => Unknown(command),
         };
     }
@@ -163,6 +164,7 @@ internal static class CliMain
         Console.WriteLine("  terminal-send <g> <t> <text...>   Type text + Enter into a terminal");
         Console.WriteLine("  terminal-key <g> <t> <key>        Send a key (cr, esc, tab, ctrlc, up, ...)");
         Console.WriteLine("  terminal-read <g> <t> [--last N]  Read the screen text (or the last N chars)");
+        Console.WriteLine("  layout [status|split-right|split-down|close-tab|close-pane|add|next-tab|prev-tab|move-tab|focus-<dir>]");
         Console.WriteLine();
         Console.WriteLine("The GUI answers over a named pipe (AgentZeroLite.cli); it must be running.");
     }

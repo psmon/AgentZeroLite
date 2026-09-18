@@ -46,6 +46,13 @@ internal static class TerminalActorBinder
         tab.LastBoundSessionId = null;
     }
 
+    /// <summary>The terminal actor is named by the tab title; renaming the tab renames the actor.</summary>
+    public static void Rename(WorkspaceViewModel ws, TerminalTabViewModel tab, string newTitle)
+    {
+        if (!ActorSystemManager.IsInitialized || tab.LastBoundSessionId is null) return;
+        ActorSystemManager.Stage.Tell(new RenameTerminalInWorkspace(ws.DisplayName, tab.Title, newTitle), ActorRefs.NoSender);
+    }
+
     public static void SetActive(WorkspaceViewModel? ws, TerminalTabViewModel? tab)
     {
         if (!ActorSystemManager.IsInitialized) return;

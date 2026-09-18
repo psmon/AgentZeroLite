@@ -59,13 +59,19 @@ public partial class App : Application
             var vm = new MainWindowViewModel();
             vm.LoadState();
 
-            var router = new CliCommandRouter(desktop) { Groups = () => vm.Groups };
+            var router = new CliCommandRouter(desktop)
+            {
+                Groups = () => vm.Groups,
+                ExecuteWindowCommand = vm.HandleHotkey,
+                LayoutStatus = () => (vm.ActiveWorkspace?.DockLayoutJson, vm.ActiveWorkspace?.Layout.PaneCount ?? 0, vm.ActiveWorkspace?.DisplayName),
+            };
             _cliServer = CliServer.Start(router);
 
             desktop.MainWindow = new MainWindow { DataContext = vm };
 
             desktop.ShutdownRequested += (_, _) =>
             {
+                try { vm.FlushPersist(); } catch { }
                 try { _cliServer?.Dispose(); } catch { }
                 ActorSystemManager.Shutdown();
             };

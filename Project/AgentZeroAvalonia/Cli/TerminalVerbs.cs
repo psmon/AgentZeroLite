@@ -109,6 +109,24 @@ internal static class TerminalVerbs
         return 0;
     }
 
+    public static int Layout(CliClient client, string[] args)
+    {
+        var sub = args.Length > 0 ? args[0] : "status";
+        var reply = client.Send("{\"command\":\"layout\",\"sub\":\"" + CliIpcProtocol.Escape(sub) + "\"}");
+        if (reply is null) return client.NoWait ? 0 : 1;
+        var root = CliClient.Parse(reply);
+        if (!CliClient.Ok(root))
+        {
+            Console.Error.WriteLine($"Error: {CliClient.Str(root, "error", "unknown")}");
+            return 1;
+        }
+        var panes = root.TryGetProperty("panes", out var p) ? p.GetInt32() : 0;
+        Console.WriteLine($"layout {CliClient.Str(root, "sub")} | workspace={CliClient.Str(root, "workspace", "-")} panes={panes}");
+        Console.WriteLine("--- JSON ---");
+        Console.WriteLine(reply);
+        return 0;
+    }
+
     private static bool TryTarget(string[] args, string usage, out int g, out int t)
     {
         g = t = -1;

@@ -3,7 +3,9 @@ id: M0036
 title: Avalonia v2 ④ — 분할창·탭·워크스페이스 (SplitTree·단축키·DockPaneLayout 호환 저장)
 operator: psmon
 language: ko
-status: inbox
+status: done
+started: 2026-09-19T01:10:00+09:00
+finished: 2026-09-19T01:40:00+09:00
 priority: high
 created: 2026-09-18
 related: [M0035]
