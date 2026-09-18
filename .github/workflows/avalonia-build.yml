@@ -8,7 +8,7 @@ name: Avalonia host — build & self-test
 
 on:
   push:
-    branches: [feat/avalonia-v2]
+    branches: [main, feat/avalonia-v2]
     paths:
       - "Project/AgentZeroAvalonia/**"
       - "Project/ZeroCommon/**"
