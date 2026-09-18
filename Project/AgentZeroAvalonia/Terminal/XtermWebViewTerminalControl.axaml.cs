@@ -290,12 +290,13 @@ public partial class XtermWebViewTerminalControl : UserControl
                     FlushPending();
                     break;
                 case "in":
+                    // Straight to the PTY, as in the WPF host — and NOT counted as an input
+                    // attempt by the health tracker: xterm.js answers the program's terminal
+                    // queries (device attributes, cursor position) through this same channel,
+                    // five of them inside 80 ms when a TUI starts a frame, which read as
+                    // "typed five times, no echo" and flashed the Dead banner on every repaint.
                     var data = XtermMessages.Str(root, "data");
-                    if (!string.IsNullOrEmpty(data))
-                    {
-                        Session?.NoteInputAttempt("keyboard");
-                        _host?.Write(data.AsSpan());
-                    }
+                    if (!string.IsNullOrEmpty(data)) _host?.Write(data.AsSpan());
                     break;
                 case "resize":
                     ApplyResizeFromMessage(root);
