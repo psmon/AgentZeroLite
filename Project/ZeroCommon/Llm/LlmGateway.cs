@@ -25,7 +25,7 @@ public static class LlmGateway
         var s = LlmSettingsStore.Load();
         return s.ActiveBackend switch
         {
-            LlmActiveBackend.Local => LlmService.Llm is not null,
+            LlmActiveBackend.Local => OperatingSystem.IsWindows() && LlmService.Llm is not null,
             LlmActiveBackend.External => HasUsableExternal(s),
             _ => false,
         };

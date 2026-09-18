@@ -107,6 +107,12 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm
         {
             if (_nativeConfigured) return;
 
+            // Only the self-built win-x64 natives ship (runtimes/win-x64-{cpu,vulkan});
+            // on any other OS the app runs the External backend (M0033).
+            if (!OperatingSystem.IsWindows())
+                throw new PlatformNotSupportedException(
+                    "The bundled local LLM natives are Windows-only in this build — use the External backend (Settings → LLM).");
+
             var baseDir = AppContext.BaseDirectory;
             var subDir = backend switch
             {

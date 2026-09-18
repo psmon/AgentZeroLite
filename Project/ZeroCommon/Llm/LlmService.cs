@@ -21,6 +21,8 @@ public static class LlmService
     private static void SetNativeEnv(string name, string value)
     {
         Environment.SetEnvironmentVariable(name, value);
+        // The CRT cache only exists on Windows; on Unix .NET writes straight to environ.
+        if (!OperatingSystem.IsWindows()) return;
         try { _putenv_s(name, value); } catch { /* fall back silently */ }
     }
 

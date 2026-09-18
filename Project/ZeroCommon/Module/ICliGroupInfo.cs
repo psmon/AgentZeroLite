@@ -4,6 +4,13 @@ public interface IConsoleTabInfo
 {
     string Title { get; }
     int CliDefinitionId { get; }
+
+    /// <summary>The live session once the terminal has started, else null (M0033: lifted
+    /// into the contract so <see cref="TerminalCatalogJson"/> can answer <c>terminal-list</c>
+    /// for any host; the WPF tab already had both members).</summary>
+    Agent.Common.Services.ITerminalSession? Session { get; }
+
+    bool IsTerminalStarted { get; }
 }
 
 public interface ICliGroupInfo

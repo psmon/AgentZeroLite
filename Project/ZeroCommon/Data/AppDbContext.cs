@@ -32,10 +32,18 @@ public class AppDbContext : DbContext
 
     private static readonly string _dbPath = Path.Combine(_dbDir, "agentZeroLite.db");
 
+    public AppDbContext() { }
+
+    /// <summary>For tests and hosts that point the context at another file (M0033).</summary>
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
     protected override void OnConfiguring(DbContextOptionsBuilder options)
-        => options
+    {
+        if (options.IsConfigured) return;
+        options
             .UseSqlite($"Data Source={_dbPath}")
             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+    }
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -128,20 +136,51 @@ public class AppDbContext : DbContext
         EnsureDefaultCliDefinitions(db);
     }
 
-    private static void EnsureDefaultCliDefinitions(AppDbContext db)
+    /// <summary>
+    /// Runtime seeding, on top of the migration's <c>HasData</c> rows. Windows: the
+    /// "Claude" profile (unchanged since before M0033). Other OSes (M0033): the
+    /// migrated rows are all <c>.exe</c> shells the launcher hides there, so a
+    /// <c>zsh</c> / <c>bash</c> / "Claude" trio is added once, without a migration —
+    /// the same table serves both hosts.
+    /// </summary>
+    internal static void EnsureDefaultCliDefinitions(AppDbContext db, bool? isWindows = null)
     {
-        if (!db.CliDefinitions.Any(d => d.Name == "Claude"))
+        var windows = isWindows ?? OperatingSystem.IsWindows();
+        if (windows)
         {
-            var maxSort = db.CliDefinitions.Any() ? db.CliDefinitions.Max(d => d.SortOrder) : -1;
-            db.CliDefinitions.Add(new CliDefinition
+            if (!db.CliDefinitions.Any(d => d.Name == "Claude"))
+            {
+                var maxSort = db.CliDefinitions.Any() ? db.CliDefinitions.Max(d => d.SortOrder) : -1;
+                db.CliDefinitions.Add(new CliDefinition
+                {
+                    Name = "Claude",
+                    ExePath = "powershell.exe",
+                    Arguments = "-NoExit -Command claude",
+                    IsBuiltIn = true,
+                    SortOrder = maxSort + 1,
+                });
+                db.SaveChanges();
+            }
+            return;
+        }
+
+        var hasPosixShell = db.CliDefinitions.AsEnumerable()
+            .Any(d => !d.IsRemote && !string.IsNullOrEmpty(d.ExePath)
+                      && !d.ExePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+        if (hasPosixShell) return;
+
+        var sort = db.CliDefinitions.Any() ? db.CliDefinitions.Max(d => d.SortOrder) : -1;
+        db.CliDefinitions.AddRange(
+            new CliDefinition { Name = "zsh", ExePath = "/bin/zsh", Arguments = "-l", IsBuiltIn = true, SortOrder = ++sort },
+            new CliDefinition { Name = "bash", ExePath = "/bin/bash", Arguments = "-l", IsBuiltIn = true, SortOrder = ++sort },
+            new CliDefinition
             {
                 Name = "Claude",
-                ExePath = "powershell.exe",
-                Arguments = "-NoExit -Command claude",
+                ExePath = "/bin/zsh",
+                Arguments = "-l -c \"claude; exec zsh -l\"",
                 IsBuiltIn = true,
-                SortOrder = maxSort + 1,
+                SortOrder = ++sort,
             });
-            db.SaveChanges();
-        }
+        db.SaveChanges();
     }
 }

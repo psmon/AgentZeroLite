@@ -93,6 +93,42 @@ public static class TerminalEnvironment
         return env;
     }
 
+    /// <summary>
+    /// The POSIX reading of <see cref="Build"/> (M0033): names are case-sensitive
+    /// (<c>Path</c> and <c>PATH</c> are two variables), and a GUI app launched from the
+    /// Dock starts with almost nothing, so the terminal identity and a UTF-8 locale are
+    /// filled in when absent.
+    /// </summary>
+    public static Dictionary<string, string> BuildPosix(IDictionary? source = null)
+    {
+        var env = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (DictionaryEntry entry in source ?? Environment.GetEnvironmentVariables())
+        {
+            if (entry.Key is not string key || key.Length == 0) continue;
+            if (ShouldDrop(key)) continue;
+            env[key] = entry.Value as string ?? "";
+        }
+        env["COLORTERM"] = "truecolor";
+        env["TERM_PROGRAM"] = TermProgram;
+        env.TryAdd("TERM", "xterm-256color");
+        if (!env.ContainsKey("LANG") && !env.ContainsKey("LC_ALL"))
+            env["LANG"] = "en_US.UTF-8";
+        return env;
+    }
+
+    /// <summary>
+    /// Put <paramref name="dir"/> first on the PATH — what the WPF host achieves with a
+    /// <c>cmd /c "set PATH=…"</c> wrapper. Keeps whatever spelling of the name the
+    /// environment already uses (<c>Path</c> on Windows).
+    /// </summary>
+    public static void PrependPath(IDictionary<string, string> env, string dir, char? separator = null)
+    {
+        var sep = separator ?? Path.PathSeparator;
+        var key = env.Keys.FirstOrDefault(k => string.Equals(k, "PATH", StringComparison.OrdinalIgnoreCase)) ?? "PATH";
+        env.TryGetValue(key, out var current);
+        env[key] = string.IsNullOrEmpty(current) ? dir : dir + sep + current;
+    }
+
     public static bool ShouldDrop(string name)
     {
         foreach (var d in Drop)

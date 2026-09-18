@@ -16,6 +16,8 @@ public static class VulkanDeviceEnumerator
     // caller should treat that as "unknown, let native default pick".
     public static IReadOnlyList<VulkanDeviceInfo> Enumerate()
     {
+        // Vulkan + ggml-vulkan.dll are a Windows-only bundle in this repo (M0033).
+        if (!OperatingSystem.IsWindows()) return Array.Empty<VulkanDeviceInfo>();
         var text = RunVulkanInfo();
         if (string.IsNullOrEmpty(text)) return Array.Empty<VulkanDeviceInfo>();
 
