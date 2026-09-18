@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AgentZeroAvalonia.Terminal.XtermWebViewTerminalControl"
+             Background="#1e1e1e">
+    <!-- The banner sits ABOVE the renderer, never over it: the WebView is a native
+         child window, and on macOS nothing Avalonia draws can appear on top of it. -->
+    <Grid RowDefinitions="Auto,*">
+        <Border x:Name="HealthBanner" Grid.Row="0" IsVisible="False"
+                Background="#3a2a12" BorderBrush="#7a5a22" BorderThickness="0,0,0,1" Padding="10,5">
+            <DockPanel>
+                <Button x:Name="RestartButton" DockPanel.Dock="Right" Content="Restart terminal"
+                        FontSize="11" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <TextBlock x:Name="HealthText" Foreground="#f0c674" FontSize="12"
+                           VerticalAlignment="Center" TextWrapping="Wrap" />
+            </DockPanel>
+        </Border>
+        <NativeWebView x:Name="Web" Grid.Row="1" />
+    </Grid>
+</UserControl>

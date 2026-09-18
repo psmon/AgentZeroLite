@@ -67,4 +67,8 @@
     <None Update="AgentZeroLite.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentZeroAvalonia.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -63,6 +63,10 @@ internal static class CliMain
             "open-win" => OpenWin(),
             "close-win" => Simple(client, "{\"command\":\"close-win\"}", "Close signal sent to AgentZero Lite."),
             "selftest" => SelfTest.Run(rest),
+            "terminal-list" => TerminalVerbs.List(client),
+            "terminal-send" => TerminalVerbs.Send(client, rest),
+            "terminal-key" => TerminalVerbs.Key(client, rest),
+            "terminal-read" => TerminalVerbs.Read(client, rest),
             _ => Unknown(command),
         };
     }
@@ -155,6 +159,10 @@ internal static class CliMain
         Console.WriteLine("  open-win / close-win   Launch / close the GUI");
         Console.WriteLine("  help [agentzero]       This text, or the agent-facing guide");
         Console.WriteLine("  selftest pty|ipc|secrets   CI self-checks (no GUI needed)");
+        Console.WriteLine("  terminal-list          List workspaces and terminal tabs");
+        Console.WriteLine("  terminal-send <g> <t> <text...>   Type text + Enter into a terminal");
+        Console.WriteLine("  terminal-key <g> <t> <key>        Send a key (cr, esc, tab, ctrlc, up, ...)");
+        Console.WriteLine("  terminal-read <g> <t> [--last N]  Read the screen text (or the last N chars)");
         Console.WriteLine();
         Console.WriteLine("The GUI answers over a named pipe (AgentZeroLite.cli); it must be running.");
     }

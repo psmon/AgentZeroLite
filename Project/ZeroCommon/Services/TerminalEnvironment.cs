@@ -124,7 +124,11 @@ public static class TerminalEnvironment
     public static void PrependPath(IDictionary<string, string> env, string dir, char? separator = null)
     {
         var sep = separator ?? Path.PathSeparator;
-        var key = env.Keys.FirstOrDefault(k => string.Equals(k, "PATH", StringComparison.OrdinalIgnoreCase)) ?? "PATH";
+        // Exact "PATH" first: a case-sensitive (POSIX) environment can carry both "Path"
+        // and "PATH", and dictionary order is not stable across processes.
+        var key = env.ContainsKey("PATH")
+            ? "PATH"
+            : env.Keys.FirstOrDefault(k => string.Equals(k, "PATH", StringComparison.OrdinalIgnoreCase)) ?? "PATH";
         env.TryGetValue(key, out var current);
         env[key] = string.IsNullOrEmpty(current) ? dir : dir + sep + current;
     }

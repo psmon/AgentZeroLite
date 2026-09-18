@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!-- Served by LocalAssetServer (127.0.0.1, token path), so 'self' is that loopback
+       origin and nothing else. default-src stays 'none': no network from here. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';">
+  <link rel="stylesheet" href="vendor/xterm.css">
+  <style>
+    /* JetBrains Mono, shipped with the app (OFL 1.1 — see vendor/fonts/OFL.txt).
+       Three faces because that is what xterm.js asks for; it synthesises nothing
+       else, so the rest of the family would be dead weight in every download. */
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('vendor/fonts/JetBrainsMono-Regular.ttf') format('truetype');
+      font-weight: 400; font-style: normal; font-display: block;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('vendor/fonts/JetBrainsMono-Bold.ttf') format('truetype');
+      font-weight: 700; font-style: normal; font-display: block;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('vendor/fonts/JetBrainsMono-Italic.ttf') format('truetype');
+      font-weight: 400; font-style: italic; font-display: block;
+    }
+    html, body { margin: 0; height: 100%; background: #1e1e1e; overflow: hidden; }
+    #term { position: absolute; inset: 0; padding: 4px; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <div id="term"></div>
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="vendor/addon-web-links.js"></script>
+  <script src="vendor/addon-webgl.js"></script>
+  <script>
+    // Set from the host's query string before term.js decides on a renderer.
+    window.__azUseWebgl = /(?:\?|&)webgl=1(?:&|$)/.test(location.search);
+  </script>
+  <script src="term.js"></script>
+</body>
+</html>

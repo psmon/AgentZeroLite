@@ -13,6 +13,7 @@ on:
       - "Project/AgentZeroAvalonia/**"
       - "Project/ZeroCommon/**"
       - "Project/ZeroCommon.Tests/**"
+      - "Project/AgentZeroAvalonia.Tests/**"
       - ".github/workflows/avalonia-build.yml"
   workflow_dispatch:
 
@@ -36,6 +37,8 @@ jobs:
         run: dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release --no-restore
       - name: Headless tests (ZeroCommon)
         run: dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj -c Release
+      - name: Host tests (codec, asset server, ConPTY)
+        run: dotnet test Project/AgentZeroAvalonia.Tests/AgentZeroAvalonia.Tests.csproj -c Release
       - name: CLI self-test
         run: Project/AgentZeroAvalonia/bin/Release/net10.0/AgentZeroLite.exe -cli selftest all
       - name: Publish win-x64
@@ -60,6 +63,8 @@ jobs:
         run: dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --no-restore
       - name: Headless tests on macOS (ZeroCommon)
         run: dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj -c Release
+      - name: Host tests on macOS (codec, asset server, Porta.Pty)
+        run: dotnet test Project/AgentZeroAvalonia.Tests/AgentZeroAvalonia.Tests.csproj -c Release
       - name: Publish osx-arm64
         run: dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -o publish-avalonia/osx-arm64
       - name: CLI self-test (no display)

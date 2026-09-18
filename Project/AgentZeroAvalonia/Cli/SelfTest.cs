@@ -1,28 +1,31 @@
+using System.Text;
 using System.Text.Json;
 using Agent.Common.Platform;
 using Agent.Common.Security;
+using AgentZeroAvalonia.Services;
 
 namespace AgentZeroAvalonia.Cli;
 
 /// <summary>
-/// <c>-cli selftest pty|ipc|secrets</c> — what a CI runner without a display can still
-/// prove (M0034; the pty check gains its PTY host in M0035). Each prints one line per
-/// check and exits non-zero on the first failure.
+/// <c>-cli selftest pty|ipc|secrets|all</c> — what a CI runner without a display can still
+/// prove. Each prints one line per check and exits non-zero on the first failure.
+/// The pty check spawns the real backend for this OS (ConPTY on Windows, Porta.Pty on
+/// macOS/Linux) and waits for a marker to come back through it.
 /// </summary>
 internal static class SelfTest
 {
     public static int Run(string[] args)
     {
         var which = args.Length > 0 ? args[0].ToLowerInvariant() : "all";
-        var failures = 0;
-        if (which is "ipc" or "all") failures += Check("ipc", Ipc);
-        if (which is "secrets" or "all") failures += Check("secrets", Secrets);
-        if (which is "pty" or "all") failures += Check("pty", Pty);
         if (which is not ("ipc" or "secrets" or "pty" or "all"))
         {
             Console.Error.WriteLine("Usage: selftest pty|ipc|secrets|all");
             return 2;
         }
+        var failures = 0;
+        if (which is "ipc" or "all") failures += Check("ipc", Ipc);
+        if (which is "secrets" or "all") failures += Check("secrets", Secrets);
+        if (which is "pty" or "all") failures += Check("pty", Pty);
         return failures == 0 ? 0 : 1;
     }
 
@@ -63,8 +66,26 @@ internal static class SelfTest
 
     private static string Pty()
     {
-        var host = Services.PtyHostFactory.TryCreate(out var reason);
-        if (host is null) throw new PlatformNotSupportedException(reason ?? "no PTY host on this platform yet");
-        return host;
+        if (!PtyHostFactory.IsSupported) throw new PlatformNotSupportedException($"no PTY backend for {Environment.OSVersion}");
+        var marker = "AZ_PTY_" + Environment.ProcessId;
+        var spec = PtyHostFactory.EchoSpec(marker);
+        var seen = new ManualResetEventSlim();
+        var sb = new StringBuilder();
+        using var host = PtyHostFactory.Start(spec, 80, 24);
+        host.Output += s =>
+        {
+            lock (sb)
+            {
+                sb.Append(s);
+                if (sb.ToString().Contains(marker, StringComparison.Ordinal)) seen.Set();
+            }
+        };
+        if (!seen.Wait(10_000))
+        {
+            string got;
+            lock (sb) got = sb.ToString();
+            throw new TimeoutException($"'{marker}' not echoed within 10 s | {host.Diagnostics} | got {got.Length} chars");
+        }
+        return $"{PtyHostFactory.BackendName} echoed the marker | {host.Diagnostics}";
     }
 }

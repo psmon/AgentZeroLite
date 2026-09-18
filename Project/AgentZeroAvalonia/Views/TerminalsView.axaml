@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             x:Class="AgentZeroAvalonia.Views.TerminalsView"
+             x:DataType="vm:MainWindowViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.tab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+        </Style>
+        <Style Selector="Border.tab.selected">
+            <Setter Property="Background" Value="{DynamicResource CyberBgDeep}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+        </Style>
+        <Style Selector="Button.tabtitle">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,5,6,5" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="Border.tab.selected Button.tabtitle">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        </Style>
+        <Style Selector="Button.tabclose">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <Style Selector="Button.tabclose:pointerover">
+            <Setter Property="Foreground" Value="#f14c4c" />
+        </Style>
+        <Style Selector="Button.strip">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="Button.strip:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Tab strip -->
+        <Border Grid.Row="0" Background="{DynamicResource CyberBgToolbar}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="4,0">
+                    <Button Classes="strip" Content="＋" ToolTip.Tip="New terminal (default CLI)"
+                            Command="{Binding NewTerminalDefaultCommand}" />
+                    <Button x:Name="NewTerminalMenuButton" Classes="strip" Content="▾" ToolTip.Tip="New terminal…">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight" />
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Left" Text="{Binding ActiveWorkspace.DisplayName}" FontSize="11"
+                           Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" Margin="10,0,6,0" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding ActiveWorkspace.Tabs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TerminalTabViewModel">
+                                <Border Classes="tab" Classes.selected="{Binding IsActive}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Classes="tabtitle" Content="{Binding Title}" Command="{Binding ActivateCommand}"
+                                                ToolTip.Tip="{Binding HealthText}" />
+                                        <Button Classes="tabclose" Content="✕" Command="{Binding CloseCommand}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- Terminal surface: every tab's renderer lives here, one visible at a time
+             (M0036 turns this into the split-pane surface host). -->
+        <Panel Grid.Row="1" x:Name="Surface" Background="#1e1e1e" />
+
+        <!-- Empty state -->
+        <Border Grid.Row="1" IsVisible="{Binding !HasActiveTab}" Background="{DynamicResource CyberBgDeep}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                <TextBlock Text="AgentZero Lite — Avalonia host" FontSize="16" FontWeight="Bold"
+                           Foreground="{DynamicResource CyberCyanBrush}" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding EmptyStateHint}" Foreground="{DynamicResource TextDim}"
+                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="460" />
+                <Button Content="Open a terminal here" HorizontalAlignment="Center"
+                        IsVisible="{Binding HasActiveWorkspace}" Command="{Binding NewTerminalDefaultCommand}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

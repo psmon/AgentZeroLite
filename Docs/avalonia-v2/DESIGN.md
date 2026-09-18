@@ -214,3 +214,54 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
 - `Project/AgentZeroWpf/UI/APP/AgentBotWindow.xaml.cs` 1211–1300 — 에이전트 루프 바인딩 원본
 - `Project/AgentZeroWpf/Actors/ActorSystemManager.cs` — 그대로 복사
 - `Project/ZeroCommon/Module/ICliGroupInfo.cs`, `Project/AgentZeroWpf/Module/CliTerminalIpcHelper.cs` — 카탈로그 계약·JSON 형식
+
+## 구현 기록 — M0035 터미널 (2026-09-19)
+
+계획 Phase 3을 구현하면서 확정된 사실. 계획과 다른 결정은 굵게.
+
+### NativeWebView 12.1.0 실제 API (리플렉션 덤프)
+
+- `InvokeScript(string) : Task<string>`, `Navigate(Uri)`, `NavigateToString(text, baseUri)`, `Source` 속성.
+- `WebMessageReceived` 인자는 `Body`(string) 하나. JS 쪽 진입점은 `window.invokeCSharpAction(body)`.
+- `WebResourceRequested`는 `Request`(Uri·Method·Headers)만 노출하고 응답을 합성할 수 없다. 따라서
+  **`LocalAssetServer`는 폴백이 아니라 정본**이다(스파이크 불필요 판정).
+- `EnvironmentRequested`는 어댑터 생성 전에 오며 `WindowsWebView2EnvironmentRequestedEventArgs.UserDataFolder`,
+  `AppleWKWebViewEnvironmentRequestedEventArgs.ScriptHandlerMessageName` 등을 준다. `EnableDevTools`는 Debug에서 켠다.
+- **`BeginReparenting(bool)` / `BeginReparentingAsync()`가 공식 API로 존재한다** ("네이티브 컨트롤의 파괴를 부모 변경 동안 지연").
+  M0036의 표면 호스트(재부모화 회피) 결정은 유지하되, 이 API로 페인 간 이동을 단순화할 수 있는지 스파이크 항목으로 남긴다.
+
+### 자산 서빙
+
+`Services/LocalAssetServer` = `TcpListener` 위의 손수 만든 HTTP/1.1 응답기. `HttpListener`를 쓰지 않은 이유: Windows http.sys URL 예약이
+필요 없고, macOS에서도 같은 코드가 돈다. 127.0.0.1 임시 포트, 64 hex 토큰 경로, 확장자 화이트리스트, `..`/역슬래시/콜론 거부,
+루트 밖 실제 경로 거부, `Cache-Control: no-store`, `Connection: close`. `index.html`의 CSP `'self'`는 이 루프백 origin이다.
+
+### 브리지
+
+- JS → 호스트: `term.js` 사본의 `post()`는 `invokeCSharpAction` → `chrome.webview.postMessage` → `webkit.messageHandlers.*` 순으로 전송을
+  고르고, 아직 주입되지 않았으면 큐에 담아 50 ms 간격으로 재시도한다(`ready`가 사라지지 않게).
+- 호스트 → JS: `XtermMessages.BuildRecvScript`가 `window.zeroHost.recv({...})` 스크립트를 만들고 `InvokeScript`로 보낸다.
+  출력은 `out64`(UTF-8의 base64, 64 KiB 단위, 코드포인트 경계 보존)로 가고 xterm.js가 바이트를 직접 디코드한다.
+  펌프는 하나(`PumpAsync`): 이전 스크립트가 도는 동안 쌓인 출력을 다음 배치로 합친다.
+- 어휘는 WPF와 동일 + `out64`, `hotkey`, `config.hotkeys`(M0036이 표를 채움).
+- 처리량(Windows, DOM 렌더러, Debug): 5 MB `type` → 화면에 마지막 줄까지 7.8 s(0.5 s 폴링 포함). 입력 정지 여부는 운영자 스모크 항목.
+
+### ConPTY 사본에서 잡은 것 두 가지 (WPF 원본에는 없는 코드)
+
+1. **표준 핸들 상속.** 콘솔 자식은 `bInheritHandles=false`여도 부모의 표준 핸들 사본을 받는다(호환 규칙). WPF는 GUI라 표준 핸들이
+   없어 드러나지 않았지만, stdio가 파이프인 부모(`-cli selftest`, 테스트 러너)에서는 cmd의 출력이 의사콘솔을 우회해 그 파이프로
+   나갔다(진단: 파이프에는 conhost의 `?9001h ?1004h` 16자만 오고 마커는 부모 stdout에 찍힘). `CreateProcess` 동안
+   `SetStdHandle(..., 0)`으로 비우고 복원한다. `ConPtyHost.Start` 참조.
+2. **종료 감지.** ConPTY는 자식 종료 후에도 출력 파이프를 열어 두므로 EOF는 종료 신호가 아니다. 프로세스 핸들을 기다리는 감시
+   스레드가 `Exited`를 정확히 한 번 올린다. 그래서 "프로세스가 종료됨" 배너와 `terminal-send`의 "PTY dead" 거부가 Windows에서도
+   즉시 동작한다(스모크: `exit` 후 0.3 s 내 로그, 이후 send 거부).
+
+### ZeroCommon 수정 1건 (M0033 버그)
+
+`TerminalEnvironment.PrependPath`가 `Path`/`PATH`가 공존하는 대소문자 구분 환경에서 열거 순서에 따라 엉뚱한 키에 붙였다
+(문자열 해시가 프로세스마다 달라 간헐 실패). 정확한 `PATH` 키를 우선한다.
+
+### 테스트
+
+`Project/AgentZeroAvalonia.Tests`(xUnit, 헤드리스): `XtermMessages` 코덱 5, `LocalAssetServer` 해석·실서빙 2, PTY 백엔드 에코/종료 2 +
+이론 케이스. CI 두 잡 모두 실행한다. `Avalonia.Headless.XUnit`는 아직 필요 없어 넣지 않았다(M0036 SplitTree도 순수 모델).

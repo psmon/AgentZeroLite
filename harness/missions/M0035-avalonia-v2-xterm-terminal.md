@@ -3,7 +3,9 @@ id: M0035
 title: Avalonia v2 ③ — xterm.js WebView 터미널 (자산 서빙·PTY 호스트 2종·브리지·헬스)
 operator: psmon
 language: ko
-status: inbox
+status: done
+started: 2026-09-19T00:20:00+09:00
+finished: 2026-09-19T01:00:00+09:00
 priority: high
 created: 2026-09-18
 related: [M0034]

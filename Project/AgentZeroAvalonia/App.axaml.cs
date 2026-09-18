@@ -56,10 +56,13 @@ public partial class App : Application
                 SynchronizationContext.SetSynchronizationContext(new AvaloniaSynchronizationContext());
             ActorSystemManager.Initialize();
 
-            var router = new CliCommandRouter(desktop);
+            var vm = new MainWindowViewModel();
+            vm.LoadState();
+
+            var router = new CliCommandRouter(desktop) { Groups = () => vm.Groups };
             _cliServer = CliServer.Start(router);
 
-            desktop.MainWindow = new MainWindow { DataContext = new MainWindowViewModel() };
+            desktop.MainWindow = new MainWindow { DataContext = vm };
 
             desktop.ShutdownRequested += (_, _) =>
             {

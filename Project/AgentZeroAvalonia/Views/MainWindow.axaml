@@ -1,15 +1,48 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+        xmlns:views="using:AgentZeroAvalonia.Views"
         x:Class="AgentZeroAvalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Width="1180" Height="760" MinWidth="820" MinHeight="520"
         Background="{DynamicResource CyberBgDeep}"
         Title="AgentZero Lite">
 
-    <!-- The WPF MainWindow's frame: activity bar (48) · sidebar · content · status bar.
-         Terminal panes, the bot pane and settings plug into the content area in
-         M0035–M0038; the shell itself is complete here. -->
+    <Window.Styles>
+        <Style Selector="Border.ws">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Margin" Value="6,1" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Border.ws.selected">
+            <Setter Property="Background" Value="{DynamicResource CyberBgDeep}" />
+        </Style>
+        <Style Selector="Button.side">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="Border.ws.selected Button.side">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        </Style>
+        <Style Selector="Button.sidex">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.sidex:pointerover">
+            <Setter Property="Foreground" Value="#f14c4c" />
+        </Style>
+    </Window.Styles>
+
+    <!-- The WPF MainWindow's frame: activity bar (48) · sidebar · content · status bar. -->
     <Grid RowDefinitions="*,24">
 
         <Grid Grid.Row="0" ColumnDefinitions="48,Auto,*,Auto">
@@ -32,36 +65,55 @@
                 </DockPanel>
             </Border>
 
-            <!-- Sidebar: workspaces -->
+            <!-- Sidebar: workspaces + the active workspace's sessions -->
             <Border Grid.Column="1" Width="220" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0"
                     IsVisible="{Binding SidebarExpanded}">
                 <DockPanel Margin="0,6">
-                    <TextBlock DockPanel.Dock="Top" Text="WORKSPACES" FontSize="10" FontWeight="Bold"
-                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
-                    <TextBlock DockPanel.Dock="Top" Text="No workspace yet. Add a folder to open terminals in it (M0035)."
+                    <DockPanel DockPanel.Dock="Top" Margin="12,2,6,2">
+                        <Button x:Name="AddWorkspaceButton" DockPanel.Dock="Right" Classes="sidex" Content="＋"
+                                FontSize="14" ToolTip.Tip="Add workspace folder" />
+                        <TextBlock Text="WORKSPACES" FontSize="10" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBlock DockPanel.Dock="Top" IsVisible="{Binding HasNoWorkspaces}"
+                               Text="No workspace yet. Add a folder to open terminals in it."
                                TextWrapping="Wrap" FontSize="11"
                                Foreground="{DynamicResource TextDim}" Margin="12,4" />
+                    <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Workspaces}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:WorkspaceViewModel">
+                                <Border Classes="ws" Classes.selected="{Binding IsActive}">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Classes="sidex" Content="✕"
+                                                ToolTip.Tip="Remove workspace" Command="{Binding RemoveCommand}" />
+                                        <Button Classes="side" Content="{Binding DisplayName}"
+                                                ToolTip.Tip="{Binding DirectoryPath}" Command="{Binding ActivateCommand}" />
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <Border DockPanel.Dock="Top" Height="1" Background="{DynamicResource BorderColor}" Margin="10,8" />
                     <TextBlock DockPanel.Dock="Top" Text="SESSIONS" FontSize="10" FontWeight="Bold"
                                Foreground="{DynamicResource TextDim}" Margin="12,4" />
-                    <TextBlock Text="Open tabs will be listed here." TextWrapping="Wrap" FontSize="11"
-                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
+                    <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding ActiveWorkspace.Tabs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TerminalTabViewModel">
+                                <Border Classes="ws" Classes.selected="{Binding IsActive}">
+                                    <Button Classes="side" Content="{Binding Title}" ToolTip.Tip="{Binding HealthText}"
+                                            Command="{Binding ActivateCommand}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Panel />
                 </DockPanel>
             </Border>
 
             <!-- Content: one page at a time -->
             <Panel Grid.Column="2">
-                <Border IsVisible="{Binding IsTerminalsPage}" Background="{DynamicResource CyberBgDeep}">
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                        <TextBlock Text="AgentZero Lite — Avalonia host" FontSize="16" FontWeight="Bold"
-                                   Foreground="{DynamicResource CyberCyanBrush}" HorizontalAlignment="Center" />
-                        <TextBlock Text="Terminal panes arrive in M0035 (xterm.js + PTY), splits in M0036."
-                                   Foreground="{DynamicResource TextDim}" HorizontalAlignment="Center" />
-                        <TextBlock Text="{Binding VersionLabel}" Foreground="{DynamicResource TextDim}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
-                </Border>
+                <views:TerminalsView IsVisible="{Binding IsTerminalsPage}" />
                 <Border IsVisible="{Binding IsSettingsPage}" Background="{DynamicResource CyberBgDeep}" Padding="16">
                     <TextBlock Text="Settings (M0038)" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
                 </Border>
