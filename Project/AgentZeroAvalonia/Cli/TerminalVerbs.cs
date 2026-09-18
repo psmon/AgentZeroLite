@@ -5,9 +5,9 @@ using Agent.Common.Platform;
 namespace AgentZeroAvalonia.Cli;
 
 /// <summary>
-/// The client side of the four terminal verbs (M0035): the same arguments, request JSON
-/// and printed shapes as the WPF <c>CliHandler</c>, over the pipe instead of WM_COPYDATA.
-/// The alias form (<c>--alias name</c>) arrives with M0039.
+/// The client side of the terminal, layout and bot verbs (M0035–M0039): the same arguments,
+/// request JSON and printed shapes as the WPF <c>CliHandler</c>, over the pipe instead of
+/// WM_COPYDATA. A target is <c>&lt;group&gt; &lt;tab&gt;</c> or <c>--alias &lt;name&gt;</c>.
 /// </summary>
 internal static class TerminalVerbs
 {
@@ -56,15 +56,15 @@ internal static class TerminalVerbs
 
     public static int Send(CliClient client, string[] args)
     {
-        if (!TryTarget(args, "terminal-send <group_index> <tab_index> <text...>", out var g, out var t)) return 1;
-        if (args.Length < 3)
+        if (!TryParseTarget(args, "terminal-send <group_index> <tab_index> <text...>", out var target, out var consumed)) return 1;
+        if (args.Length <= consumed)
         {
-            Console.Error.WriteLine("Usage: terminal-send <group_index> <tab_index> <text...>");
+            Console.Error.WriteLine("Usage: terminal-send <group_index> <tab_index> <text...>   (or --alias <name>)");
             return 1;
         }
-        var text = string.Join(" ", args.Skip(2));
-        var request = $"{{\"command\":\"terminal-send\",\"group_index\":{g},\"tab_index\":{t},\"text\":\"{CliIpcProtocol.Escape(text)}\"}}";
-        return Simple(client, request, root => $"Sent {CliClient.Str(root, "sent_length", "?")} chars to terminal [{g}:{t}].");
+        var text = string.Join(" ", args.Skip(consumed));
+        var request = "{\"command\":\"terminal-send\"" + target + ",\"text\":\"" + CliIpcProtocol.Escape(text) + "\"}";
+        return Simple(client, request, root => $"Sent {CliClient.Str(root, "sent_length", "?")} chars to terminal [{CliClient.Str(root, "group_index", "?")}:{CliClient.Str(root, "tab_index", "?")}].");
     }
 
     public static int Key(CliClient client, string[] args)
@@ -74,21 +74,22 @@ internal static class TerminalVerbs
             Console.WriteLine("Keys: cr|enter lf crlf esc tab shifttab|backtab backspace del ctrlc ctrld up down left right hex:<bytes>");
             return 0;
         }
-        if (!TryTarget(args, "terminal-key <group_index> <tab_index> <key>", out var g, out var t)) return 1;
-        if (args.Length < 3)
+        if (!TryParseTarget(args, "terminal-key <group_index> <tab_index> <key>", out var target, out var consumed)) return 1;
+        if (args.Length <= consumed)
         {
-            Console.Error.WriteLine("Usage: terminal-key <group_index> <tab_index> <key>");
+            Console.Error.WriteLine("Usage: terminal-key <group_index> <tab_index> <key>   (or --alias <name>)");
             return 1;
         }
-        var request = $"{{\"command\":\"terminal-key\",\"group_index\":{g},\"tab_index\":{t},\"key\":\"{CliIpcProtocol.Escape(args[2])}\"}}";
-        return Simple(client, request, _ => $"Sent key '{args[2]}' to terminal [{g}:{t}].");
+        var key = args[consumed];
+        var request = "{\"command\":\"terminal-key\"" + target + ",\"key\":\"" + CliIpcProtocol.Escape(key) + "\"}";
+        return Simple(client, request, root => $"Sent key '{key}' to terminal [{CliClient.Str(root, "group_index", "?")}:{CliClient.Str(root, "tab_index", "?")}].");
     }
 
     public static int Read(CliClient client, string[] args)
     {
-        if (!TryTarget(args, "terminal-read <group_index> <tab_index> [--last N]", out var g, out var t)) return 1;
+        if (!TryParseTarget(args, "terminal-read <group_index> <tab_index> [--last N]", out var target, out var consumed)) return 1;
         var lastN = 0;
-        for (var i = 2; i < args.Length - 1; i++)
+        for (var i = consumed; i < args.Length - 1; i++)
         {
             if (args[i].Equals("--last", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var n))
             {
@@ -96,17 +97,29 @@ internal static class TerminalVerbs
                 break;
             }
         }
-        var request = $"{{\"command\":\"terminal-read\",\"group_index\":{g},\"tab_index\":{t},\"last\":{lastN}}}";
-        var reply = client.Send(request);
-        if (reply is null) return client.NoWait ? 0 : 1;
+        var text = ReadText(client, target, lastN, out var error);
+        if (text is null)
+        {
+            if (error is not null) Console.Error.WriteLine("Error: " + error);
+            return client.NoWait && error is null ? 0 : 1;
+        }
+        Console.WriteLine(text);
+        return 0;
+    }
+
+    /// <summary>One terminal-read round trip; null with <paramref name="error"/> set on a reply error, null without one when there was no reply.</summary>
+    internal static string? ReadText(CliClient client, string targetJson, int lastN, out string? error)
+    {
+        error = null;
+        var reply = client.Send("{\"command\":\"terminal-read\"" + targetJson + ",\"last\":" + lastN + "}");
+        if (reply is null) return null;
         var root = CliClient.Parse(reply);
         if (!CliClient.Ok(root))
         {
-            Console.Error.WriteLine($"Error: {CliClient.Str(root, "error", "unknown")}");
-            return 1;
+            error = CliClient.Str(root, "error", "unknown");
+            return null;
         }
-        Console.WriteLine(CliClient.Str(root, "text", ""));
-        return 0;
+        return CliClient.Str(root, "text", "");
     }
 
     public static int Layout(CliClient client, string[] args)
@@ -158,16 +171,32 @@ internal static class TerminalVerbs
         return Simple(client, request, _ => "Sent to AgentBot (AI mode). Watch the pane or the log for [AIMODE] result.");
     }
 
-    private static bool TryTarget(string[] args, string usage, out int g, out int t)
+    /// <summary>
+    /// <c>&lt;g&gt; &lt;t&gt;</c> → <c>,"group_index":g,"tab_index":t</c>; <c>--alias name</c> → <c>,"alias":"name"</c>.
+    /// <paramref name="consumed"/> is how many leading args the target took.
+    /// </summary>
+    internal static bool TryParseTarget(string[] args, string usage, out string targetJson, out int consumed)
     {
-        g = t = -1;
-        if (args.Length >= 2 && int.TryParse(args[0], out g) && int.TryParse(args[1], out t)) return true;
+        targetJson = "";
+        consumed = 0;
+        if (args.Length >= 2 && args[0].Equals("--alias", StringComparison.OrdinalIgnoreCase))
+        {
+            targetJson = ",\"alias\":\"" + CliIpcProtocol.Escape(args[1]) + "\"";
+            consumed = 2;
+            return true;
+        }
+        if (args.Length >= 2 && int.TryParse(args[0], out var g) && int.TryParse(args[1], out var t))
+        {
+            targetJson = $",\"group_index\":{g},\"tab_index\":{t}";
+            consumed = 2;
+            return true;
+        }
         Console.Error.WriteLine("Usage: " + usage);
-        Console.Error.WriteLine("  Use 'terminal-list' to see group and tab indexes.");
+        Console.Error.WriteLine("  Target is '<group_index> <tab_index>' or '--alias <name>'. Use 'terminal-list' / 'terminal-alias list'.");
         return false;
     }
 
-    private static int Simple(CliClient client, string request, Func<JsonElement, string> okLine)
+    internal static int Simple(CliClient client, string request, Func<JsonElement, string> okLine)
     {
         var reply = client.Send(request);
         if (reply is null) return client.NoWait ? 0 : 1;

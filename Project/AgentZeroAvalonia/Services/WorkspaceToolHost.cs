@@ -23,7 +23,9 @@ namespace AgentZeroAvalonia.Services;
 /// </summary>
 internal sealed class WorkspaceToolHost : IAgentToolbelt
 {
-    private static readonly HeadlessWebToolSurface Web = new();
+    /// <summary>One headless web surface for the whole host: the agent's web tools and <c>-cli web</c> share its tabs.</summary>
+    internal static HeadlessWebToolSurface SharedWeb { get; } = new();
+    private static HeadlessWebToolSurface Web => SharedWeb;
     private static readonly MediaPlaybackTracker MediaTracker = new();
 
     private readonly Func<IReadOnlyList<ICliGroupInfo>> _groups;

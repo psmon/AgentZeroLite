@@ -315,3 +315,16 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
   `TerminalsView`가 열린 모든 렌더러에 `config`를 다시 보낸다(라이브). WebGL은 새로 여는 터미널부터.
 - XAML 주의: 같은 요소에 `DataContext`와 `IsVisible` 바인딩을 두면 `IsVisible`이 새 DataContext에서 해석된다(컴파일 바인딩 오류) —
   가시성은 바깥 `Panel`에.
+
+## 구현 기록 — M0039 CLI (2026-09-19)
+
+- **동사 표(Avalonia 호스트)**: help [topic] · version · status · open-win · close-win · selftest · terminal-list · terminal-send/-key/-read
+  (`<g> <t>` 또는 `--alias <name>`) · terminal-wait · terminal-alias list|set|rm · layout · bot-chat · bot-ask(신규) · web open|search|read|tabs.
+  요청 JSON은 WPF `CliHandler`와 같고(`{"command":…}` + `group_index/tab_index` 또는 `alias`, `sub`, `verb/req/url/query/tab/mode/find/max/max_chars`),
+  응답도 WPF MMF 페이로드와 같다.
+- **라우터** `CliCommandRouter`: UI 스레드에서 실행, `web`만 `Task.Run`으로 비동기(`CliServer`가 `Dispatcher.InvokeAsync(Func<Task<string>>)`를
+  await하므로 accept 루프도 UI 스레드도 막히지 않음). 별칭은 `TerminalAliasRegistry`(WPF와 같은 파일; 테스트는 임시 경로).
+  헤드리스 웹 표면은 `WorkspaceToolHost.SharedWeb` 하나를 에이전트 도구와 CLI가 공유한다(탭 상태 공유).
+- **클라이언트**: `CliClient.Send`는 파이프 연결 실패 시 이유(+Windows에서 WPF 힌트)를 찍고 null. `terminal-wait`는 `terminal-read --last`
+  폴링(WPF와 동일 옵션·종료 코드 0/2/3).
+- **래퍼**: `AgentZeroLite.ps1`(WPF 사본), `AgentZeroLite.sh`(`exec "$dir/AgentZeroLite" -cli "$@"`, .app의 Contents/MacOS에 동봉).

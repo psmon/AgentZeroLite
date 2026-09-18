@@ -70,6 +70,9 @@ internal static class CliMain
             "layout" => TerminalVerbs.Layout(client, rest),
             "bot-chat" => TerminalVerbs.BotChat(client, rest),
             "bot-ask" => TerminalVerbs.BotAsk(client, rest),
+            "terminal-wait" => MoreVerbs.TerminalWait(client, rest),
+            "terminal-alias" => MoreVerbs.TerminalAlias(client, rest),
+            "web" => MoreVerbs.Web(client, rest),
             _ => Unknown(command),
         };
     }
@@ -156,7 +159,7 @@ internal static class CliMain
         Console.WriteLine();
         Console.WriteLine("Usage: AgentZeroLite -cli <command> [--no-wait] [--timeout N]");
         Console.WriteLine();
-        Console.WriteLine("Commands (phase 1 — more arrive with M0039):");
+        Console.WriteLine("Commands:");
         Console.WriteLine("  status                 Show app state");
         Console.WriteLine("  version                Print the version of this exe");
         Console.WriteLine("  open-win / close-win   Launch / close the GUI");
@@ -166,6 +169,9 @@ internal static class CliMain
         Console.WriteLine("  terminal-send <g> <t> <text...>   Type text + Enter into a terminal");
         Console.WriteLine("  terminal-key <g> <t> <key>        Send a key (cr, esc, tab, ctrlc, up, ...)");
         Console.WriteLine("  terminal-read <g> <t> [--last N]  Read the screen text (or the last N chars)");
+        Console.WriteLine("  terminal-wait <g> <t> [--until working|blocked|idle|done] [--agent <name>] [--timeout-ms N] [--idle-ms N]");
+        Console.WriteLine("  terminal-alias list | set <g> <t> <name> | rm <name>   Name a terminal; then use --alias <name> as the target");
+        Console.WriteLine("  web open|search|read|tabs ...        Web surface (headless in this host); 'web help' for options");
         Console.WriteLine("  layout [status|split-right|split-down|close-tab|close-pane|add|next-tab|prev-tab|move-tab|focus-<dir>]");
         Console.WriteLine("  bot-chat <message> [--from <name>]   Deliver a message to AgentBot (DONE(...) is the peer envelope)");
         Console.WriteLine("  bot-ask <text...>                    Ask AgentBot in AI mode (starts an agent-loop turn)");

@@ -3,7 +3,9 @@ id: M0039
 title: Avalonia v2 ⑦ — `-cli` 표면 (NamedPipe 서버/클라이언트·1차 동사·셸 래퍼)
 operator: psmon
 language: ko
-status: inbox
+status: done
+started: 2026-09-19T03:00:00+09:00
+finished: 2026-09-19T03:25:00+09:00
 priority: medium
 created: 2026-09-18
 related: [M0038]

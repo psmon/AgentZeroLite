@@ -7,6 +7,7 @@ using Agent.Common.Data;
 using Agent.Common.Platform;
 using AgentZeroAvalonia.Actors;
 using AgentZeroAvalonia.Cli;
+using AgentZeroAvalonia.Services;
 using AgentZeroAvalonia.ViewModels;
 using AgentZeroAvalonia.Views;
 
@@ -63,6 +64,7 @@ public partial class App : Application
             {
                 Groups = () => vm.Groups,
                 ExecuteWindowCommand = vm.HandleHotkey,
+                WebSurface = WorkspaceToolHost.SharedWeb,
                 BotAsk = text =>
                 {
                     vm.BotVisible = true;

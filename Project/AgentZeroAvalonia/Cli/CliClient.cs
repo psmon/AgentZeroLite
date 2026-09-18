@@ -34,7 +34,10 @@ internal sealed class CliClient
     public static JsonElement Parse(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     public static string Str(JsonElement e, string name, string fallback = "")
-        => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? fallback : fallback;
+        => !e.TryGetProperty(name, out var v) ? fallback
+         : v.ValueKind == JsonValueKind.String ? v.GetString() ?? fallback
+         : v.ValueKind is JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False ? v.GetRawText()
+         : fallback;
 
     public static bool Ok(JsonElement e) => e.TryGetProperty("ok", out var v) && v.ValueKind == JsonValueKind.True;
 }
