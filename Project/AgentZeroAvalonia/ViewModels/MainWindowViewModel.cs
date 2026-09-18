@@ -52,6 +52,12 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>The AgentBot pane (M0037), fed the active terminal and the workspace list.</summary>
     public AgentBotViewModel Bot { get; }
 
+    /// <summary>The settings page (M0038).</summary>
+    public SettingsViewModel Settings { get; }
+
+    /// <summary>Terminal appearance was saved — the view re-posts the config to every open renderer.</summary>
+    public event Action? TerminalAppearanceChanged;
+
     /// <summary>The active tab, the active workspace, or the split layout changed — the view re-lays the renderers out.</summary>
     public event Action? ActiveTerminalChanged;
 
@@ -103,6 +109,28 @@ public partial class MainWindowViewModel : ObservableObject
             if (e.PropertyName is nameof(AgentBotViewModel.Mode) or nameof(AgentBotViewModel.AiBusy))
                 BotStatus = $"Bot: {Bot.ModeLabel}" + (Bot.AiBusy ? " · working" : "");
         };
+
+        Settings = new SettingsViewModel();
+        Settings.CliDefinitionsChanged += ReloadCliDefinitions;
+        Settings.AppearanceChanged += () => TerminalAppearanceChanged?.Invoke();
+    }
+
+    /// <summary>Re-read the definitions this OS can launch (after the settings page changed them).</summary>
+    public void ReloadCliDefinitions()
+    {
+        try
+        {
+            using var db = new AppDbContext();
+            var fresh = db.CliDefinitions.AsNoTracking().OrderBy(d => d.SortOrder).ThenBy(d => d.Id).ToList()
+                .Where(d => TerminalLaunchPlanner.IsAvailableOnThisOs(d)).ToList();
+            CliDefinitions.Clear();
+            foreach (var d in fresh) CliDefinitions.Add(d);
+            AppLogger.Log($"[Workspaces] CLI definitions reloaded: {CliDefinitions.Count}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[Workspaces] reloading CLI definitions failed", ex);
+        }
     }
 
     public bool IsTerminalsPage => Page == AppPage.Terminals;

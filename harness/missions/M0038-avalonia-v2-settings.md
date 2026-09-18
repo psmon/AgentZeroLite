@@ -3,7 +3,9 @@ id: M0038
 title: Avalonia v2 ⑥ — 설정 (External LLM·CLI 정의 CRUD·터미널 외관·Windows 로컬 LLM)
 operator: psmon
 language: ko
-status: inbox
+status: done
+started: 2026-09-19T02:30:00+09:00
+finished: 2026-09-19T02:55:00+09:00
 priority: medium
 created: 2026-09-18
 related: [M0037]

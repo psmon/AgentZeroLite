@@ -52,6 +52,7 @@ public partial class TerminalsView : UserControl
             _vm.WorkspaceRemoved -= OnWorkspaceRemoved;
             _vm.FocusPaneRequested -= OnFocusPane;
             _vm.RestartRequested -= Restart;
+            _vm.TerminalAppearanceChanged -= OnAppearanceChanged;
         }
         _vm = vm;
         if (_vm is null) return;
@@ -60,7 +61,14 @@ public partial class TerminalsView : UserControl
         _vm.WorkspaceRemoved += OnWorkspaceRemoved;
         _vm.FocusPaneRequested += OnFocusPane;
         _vm.RestartRequested += Restart;
+        _vm.TerminalAppearanceChanged += OnAppearanceChanged;
         OnActiveTerminalChanged();
+    }
+
+    /// <summary>Settings saved a new appearance: every open renderer gets the config message (live, no restart).</summary>
+    private void OnAppearanceChanged()
+    {
+        foreach (var control in _controls.Values) control.PostAppearance();
     }
 
     private void RebuildNewTerminalMenu()

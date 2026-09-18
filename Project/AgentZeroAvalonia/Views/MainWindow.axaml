@@ -114,9 +114,9 @@
             <!-- Content: one page at a time -->
             <Panel Grid.Column="2">
                 <views:TerminalsView IsVisible="{Binding IsTerminalsPage}" />
-                <Border IsVisible="{Binding IsSettingsPage}" Background="{DynamicResource CyberBgDeep}" Padding="16">
-                    <TextBlock Text="Settings (M0038)" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
-                </Border>
+                <Panel IsVisible="{Binding IsSettingsPage}">
+                    <views:SettingsView DataContext="{Binding Settings}" />
+                </Panel>
             </Panel>
 
             <!-- AgentBot pane (right dock) -->

@@ -298,3 +298,20 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
 - **ZeroCommon 추가 1건**: `Llm/Tools/GemmaNativeToolCall` — Gemma 4 네이티브 `<|tool_call>call: name{args}<tool_call|>`을
   봉투로 변환. `ExternalAgentLoop`가 `ExtractFirstJsonObject` 전에 한 번 호출(교정 예산 소모 없음). WPF도 같은 혜택.
 - 측정: WebnoriA2 · gemma-4-e4b, 2 툴 턴 + done = 13.6 s(턴당 1.2–9.4 s, 모델 응답 시간이 전부).
+
+## 구현 기록 — M0038 설정 (2026-09-19)
+
+- **뷰모델** `SettingsViewModel`(섹션 LLM / CLI / Terminal) + `CliDefinitionItem`(편집 중인 정의 1건; `Validate`, `ApplyTo(entity, protect)`).
+  스토어는 전부 WPF 것: `LlmSettingsStore`(키는 Save 시 `SecretProtection.Protect` — Windows DPAPI 사본 / macOS AES-GCM),
+  `AppDbContext.CliDefinitions`, `TerminalSettingsStore`.
+- **LLM**: External은 전 OS(공급자 콤보 = `ExternalProviderNames.All`, 공급자별 키/URL 필드는 선택 시만 표시, "Test connection"은
+  저장 후 `LlmGateway.OpenSession().SendAsync` 45 s). Local 라디오는 Windows에서만 활성(툴팁 안내); 카탈로그 콤보·CPU/Vulkan·
+  Vulkan 장치(`VulkanDeviceEnumerator`)·컨텍스트/GPU 레이어·파일 상태·다운로드(`LlmModelDownloader`, 진행률)·Load/Unload
+  (`LlmService`, `StateChanged`).
+- **CLI 정의**: 이 OS에서 실행 가능한 것만 나열(`TerminalLaunchPlanner.IsAvailableOnThisOs` — macOS에서 `.exe` 숨김), New/Save/Delete
+  (built-in 삭제 불가)/▲▼(SortOrder 교환), 실행 파일·키 파일 피커, SSH 필드는 Windows에서만 편집 가능. 저장 후
+  `CliDefinitionsChanged` → 셸의 새 탭 메뉴 즉시 갱신.
+- **터미널 외관**: 폰트·크기(8–32)·행간(0.8–2.0)·테마(`TerminalThemeCatalog.Names`)·커서 깜빡임·WebGL. 저장 시 `AppearanceChanged` →
+  `TerminalsView`가 열린 모든 렌더러에 `config`를 다시 보낸다(라이브). WebGL은 새로 여는 터미널부터.
+- XAML 주의: 같은 요소에 `DataContext`와 `IsVisible` 바인딩을 두면 `IsVisible`이 새 DataContext에서 해석된다(컴파일 바인딩 오류) —
+  가시성은 바깥 `Panel`에.

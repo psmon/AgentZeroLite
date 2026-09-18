@@ -1,0 +1,238 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             x:Class="AgentZeroAvalonia.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.nav">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="Button.nav.selected">
+            <Setter Property="Background" Value="{DynamicResource CyberBgDeep}" />
+            <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
+        </Style>
+        <Style Selector="TextBlock.h1">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+        <Style Selector="TextBlock.h2">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="Margin" Value="0,14,0,6" />
+        </Style>
+        <Style Selector="TextBlock.lbl">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource CyberTealBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="Grid.form > TextBox, Grid.form > ComboBox, Grid.form > NumericUpDown, Grid.form > CheckBox, Grid.form > StackPanel">
+            <Setter Property="Margin" Value="0,3" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="170,*" Background="{DynamicResource CyberBgDeep}">
+
+        <!-- Left navigation -->
+        <Border Grid.Column="0" Background="{DynamicResource CyberBgPanel}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
+            <StackPanel Margin="0,10">
+                <TextBlock Text="SETTINGS" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextDim}" Margin="12,4,12,8" />
+                <Button Classes="nav" Classes.selected="{Binding IsLlm}" Content="LLM" Command="{Binding ShowLlmCommand}" />
+                <Button Classes="nav" Classes.selected="{Binding IsCli}" Content="CLI definitions" Command="{Binding ShowCliCommand}" />
+                <Button Classes="nav" Classes.selected="{Binding IsTerminal}" Content="Terminal" Command="{Binding ShowTerminalCommand}" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" Padding="20,16">
+            <Panel>
+
+                <!-- ═══ LLM ═══ -->
+                <StackPanel IsVisible="{Binding IsLlm}" MaxWidth="640" HorizontalAlignment="Left">
+                    <TextBlock Classes="h1" Text="LLM" />
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton Content="External (OpenAI-compatible)" IsChecked="{Binding UseExternal}" GroupName="backend" />
+                        <RadioButton Content="Local (LLamaSharp)" IsChecked="{Binding UseLocal}" GroupName="backend"
+                                     IsEnabled="{Binding LocalSupported}" ToolTip.Tip="{Binding LocalTooltip}" />
+                    </StackPanel>
+
+                    <TextBlock Classes="h2" Text="EXTERNAL" />
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Classes="lbl" Grid.Row="0" Text="Provider" />
+                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Providers}" SelectedItem="{Binding Provider}" MinWidth="220" HorizontalAlignment="Left" />
+                        <TextBlock Classes="lbl" Grid.Row="1" Text="Model" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ExternalModel}" Watermark="google/gemma-4-e4b" />
+                        <TextBlock Classes="lbl" Grid.Row="2" Text="Max tokens / turn" />
+                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ExternalMaxTokens}" Minimum="256" Maximum="32768" Increment="256" HorizontalAlignment="Left" Width="160" />
+                        <TextBlock Classes="lbl" Grid.Row="3" Text="Temperature" />
+                        <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Temperature}" Minimum="0" Maximum="2" Increment="0.1" FormatString="0.0" HorizontalAlignment="Left" Width="160" />
+                        <TextBlock Classes="lbl" Grid.Row="4" Text="OpenAI API key" IsVisible="{Binding ShowOpenAI}" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding OpenAIApiKey}" PasswordChar="●" IsVisible="{Binding ShowOpenAI}" Watermark="sk-..." />
+                        <TextBlock Classes="lbl" Grid.Row="5" Text="OpenAI base URL" IsVisible="{Binding ShowOpenAI}" />
+                        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding OpenAIBaseUrl}" IsVisible="{Binding ShowOpenAI}" Watermark="(default)" />
+                        <TextBlock Classes="lbl" Grid.Row="6" Text="LM Studio base URL / key" IsVisible="{Binding ShowLMStudio}" />
+                        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowLMStudio}">
+                            <TextBox Text="{Binding LMStudioBaseUrl}" Width="260" Watermark="http://localhost:1234/v1" />
+                            <TextBox Text="{Binding LMStudioApiKey}" Width="160" PasswordChar="●" Watermark="key (optional)" />
+                        </StackPanel>
+                        <TextBlock Classes="lbl" Grid.Row="7" Text="Ollama base URL" IsVisible="{Binding ShowOllama}" />
+                        <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding OllamaBaseUrl}" IsVisible="{Binding ShowOllama}" Watermark="(default)" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                        <Button Content="Save" Command="{Binding SaveLlmCommand}" />
+                        <Button Content="Test connection" Command="{Binding TestExternalCommand}" IsEnabled="{Binding !IsTesting}" />
+                    </StackPanel>
+                    <TextBlock Classes="status" Text="{Binding LlmStatus}" />
+
+                    <StackPanel IsVisible="{Binding LocalSupported}">
+                        <TextBlock Classes="h2" Text="LOCAL MODEL (WINDOWS)" />
+                        <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                            <TextBlock Classes="lbl" Grid.Row="0" Text="Model" />
+                            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" MinWidth="360" HorizontalAlignment="Left">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ModelChoice">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Classes="lbl" Grid.Row="1" Text="Backend" />
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <RadioButton Content="CPU" IsChecked="{Binding !LocalBackendVulkan}" GroupName="lbe" />
+                                <RadioButton Content="Vulkan" IsChecked="{Binding LocalBackendVulkan}" GroupName="lbe" />
+                                <ComboBox ItemsSource="{Binding VulkanDevices}" SelectedIndex="{Binding VulkanDeviceIndex}" IsVisible="{Binding LocalBackendVulkan}" MinWidth="200" />
+                            </StackPanel>
+                            <TextBlock Classes="lbl" Grid.Row="2" Text="Context / GPU layers" />
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <NumericUpDown Value="{Binding ContextSize}" Minimum="1024" Maximum="32768" Increment="1024" Width="150" />
+                                <NumericUpDown Value="{Binding GpuLayerCount}" Minimum="0" Maximum="999" Increment="1" Width="120" />
+                            </StackPanel>
+                            <TextBlock Classes="lbl" Grid.Row="3" Text="File" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ModelStatus}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" />
+                            <TextBlock Classes="lbl" Grid.Row="4" Text="Engine" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding LocalState}" FontSize="11" Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                            <Button Content="Save options" Command="{Binding SaveLlmCommand}" />
+                            <Button Content="Download" Command="{Binding DownloadModelCommand}" IsEnabled="{Binding !IsDownloading}" />
+                            <Button Content="Load" Command="{Binding LoadModelCommand}" />
+                            <Button Content="Unload" Command="{Binding UnloadModelCommand}" />
+                        </StackPanel>
+                        <TextBlock Classes="status" Text="{Binding LocalStatus}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- ═══ CLI DEFINITIONS ═══ -->
+                <Grid IsVisible="{Binding IsCli}" ColumnDefinitions="240,*" MaxWidth="900" HorizontalAlignment="Left">
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Classes="h1" Text="CLI definitions" />
+                        <ListBox ItemsSource="{Binding CliDefinitions}" SelectedItem="{Binding SelectedCli}" Height="360"
+                                 Background="{DynamicResource CyberBgPanel}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CliDefinitionItem">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Name}" FontSize="12" />
+                                        <TextBlock Text="built-in" FontSize="9" Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" IsVisible="{Binding IsBuiltIn}" />
+                                        <TextBlock Text="ssh" FontSize="9" Foreground="{DynamicResource CyberTealBrush}" VerticalAlignment="Center" IsVisible="{Binding IsRemote}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+                            <Button Content="New" Command="{Binding NewCliCommand}" />
+                            <Button Content="▲" Command="{Binding MoveUpCommand}" />
+                            <Button Content="▼" Command="{Binding MoveDownCommand}" />
+                            <Button Content="Delete" Command="{Binding DeleteCliCommand}" IsEnabled="{Binding CanDeleteCli}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" DataContext="{Binding SelectedCli}" x:DataType="vm:CliDefinitionItem" IsVisible="{Binding !!.}">
+                        <TextBlock Classes="h2" Text="DEFINITION" />
+                        <Grid Classes="form" ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                            <TextBlock Classes="lbl" Grid.Row="0" Text="Name" />
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name}" />
+                            <TextBlock Classes="lbl" Grid.Row="1" Text="Executable" />
+                            <DockPanel Grid.Row="1" Grid.Column="1">
+                                <Button DockPanel.Dock="Right" x:Name="PickExeButton" Content="…" Margin="6,0,0,0" />
+                                <TextBox Text="{Binding ExePath}" Watermark="cmd.exe / /bin/zsh / claude" />
+                            </DockPanel>
+                            <TextBlock Classes="lbl" Grid.Row="2" Text="Arguments" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Arguments}" />
+                            <TextBlock Classes="lbl" Grid.Row="3" Text="" />
+                            <CheckBox Grid.Row="3" Grid.Column="1" Content="Reduced motion (ask the CLI not to animate)" IsChecked="{Binding ReducedMotion}" />
+                        </Grid>
+                        <TextBlock Classes="h2" Text="REMOTE SHELL (SSH)" />
+                        <Grid Classes="form" ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                              IsEnabled="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SshEditable}">
+                            <TextBlock Classes="lbl" Grid.Row="0" Text="" />
+                            <CheckBox Grid.Row="0" Grid.Column="1" Content="Connect over SSH after the shell starts" IsChecked="{Binding IsRemote}" />
+                            <TextBlock Classes="lbl" Grid.Row="1" Text="Host / user" />
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <TextBox Text="{Binding SshHost}" Width="220" Watermark="host" />
+                                <TextBox Text="{Binding SshUser}" Width="140" Watermark="user" />
+                            </StackPanel>
+                            <TextBlock Classes="lbl" Grid.Row="2" Text="Auth" />
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <RadioButton Content="Public key" IsChecked="{Binding UsePublicKey}" GroupName="ssh" />
+                                <RadioButton Content="Password" IsChecked="{Binding !UsePublicKey}" GroupName="ssh" />
+                            </StackPanel>
+                            <TextBlock Classes="lbl" Grid.Row="3" Text="Key file" />
+                            <DockPanel Grid.Row="3" Grid.Column="1">
+                                <Button DockPanel.Dock="Right" x:Name="PickKeyButton" Content="…" Margin="6,0,0,0" />
+                                <TextBox Text="{Binding SshKeyPath}" Watermark=".pem" />
+                            </DockPanel>
+                            <TextBlock Classes="lbl" Grid.Row="4" Text="Password" />
+                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding NewPassword}" PasswordChar="●" Watermark="{Binding PasswordHint}" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+                <StackPanel IsVisible="{Binding IsCli}" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="256,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                        <Button Content="Save definition" Command="{Binding SaveCliCommand}" />
+                    </StackPanel>
+                    <TextBlock Classes="status" Text="{Binding CliStatus}" />
+                </StackPanel>
+
+                <!-- ═══ TERMINAL ═══ -->
+                <StackPanel IsVisible="{Binding IsTerminal}" MaxWidth="640" HorizontalAlignment="Left">
+                    <TextBlock Classes="h1" Text="Terminal appearance" />
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Classes="lbl" Grid.Row="0" Text="Font family" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding FontFamily}" Watermark="JetBrains Mono, Cascadia Mono, Consolas, monospace" />
+                        <TextBlock Classes="lbl" Grid.Row="1" Text="Font size" />
+                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding FontSize}" Minimum="8" Maximum="32" Increment="1" Width="140" HorizontalAlignment="Left" />
+                        <TextBlock Classes="lbl" Grid.Row="2" Text="Line height" />
+                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding LineHeight}" Minimum="0.8" Maximum="2" Increment="0.05" FormatString="0.00" Width="140" HorizontalAlignment="Left" />
+                        <TextBlock Classes="lbl" Grid.Row="3" Text="Theme" />
+                        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding ThemeName}" MinWidth="200" HorizontalAlignment="Left" />
+                        <TextBlock Classes="lbl" Grid.Row="4" Text="" />
+                        <CheckBox Grid.Row="4" Grid.Column="1" Content="Blink the cursor" IsChecked="{Binding CursorBlink}" />
+                        <TextBlock Classes="lbl" Grid.Row="5" Text="" />
+                        <CheckBox Grid.Row="5" Grid.Column="1" Content="WebGL renderer (applies to terminals opened afterwards)" IsChecked="{Binding UseWebGl}" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                        <Button Content="Apply and save" Command="{Binding SaveTerminalCommand}" />
+                    </StackPanel>
+                    <TextBlock Classes="status" Text="{Binding TerminalStatus}" />
+                </StackPanel>
+            </Panel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
