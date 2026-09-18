@@ -26,6 +26,7 @@ public partial class SettingsPanel : UserControl
             InitializeVisionTab();
             InitializeBudgetTab();
             InitializeTerminalTab();
+            InitializeShortcutsTab();
         };
     }
 

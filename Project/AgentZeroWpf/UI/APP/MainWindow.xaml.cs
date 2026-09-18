@@ -148,6 +148,16 @@ public partial class MainWindow : Window
         Array.Empty<(Agent.Common.Services.ShortcutGesture, string)>();
     private bool _shortcutsEnabled;
 
+    /// <summary>
+    /// Set while Settings is listening for the next keypress to record it as a binding.
+    ///
+    /// <para>Without this, a shortcut cannot be re-bound once it works: this handler is
+    /// on the window's <c>PreviewKeyDown</c>, which tunnels from the top, so pressing
+    /// Ctrl+Alt+Right over the capture box would split the pane instead of being
+    /// written down.</para>
+    /// </summary>
+    internal bool ShortcutCaptureActive { get; set; }
+
     /// <summary>Re-read the keymap. Called at startup and when Settings saves.</summary>
     internal void ReloadShortcuts()
     {
@@ -195,6 +205,11 @@ public partial class MainWindow : Window
 
     private void OnGlobalKeyDown(object sender, KeyEventArgs e)
     {
+        // Settings is recording this keypress as a binding. Everything below — the
+        // user's keymap and the built-ins alike — has to stand down, or the very
+        // combinations worth re-binding are the ones that cannot be typed.
+        if (ShortcutCaptureActive) return;
+
         // The user's own keymap first — the built-ins below predate it, but a
         // binding someone set deliberately should win over one they inherited.
         if (TryRunShortcut(e)) { e.Handled = true; return; }
@@ -605,6 +620,7 @@ public partial class MainWindow : Window
         // Command palette (Ctrl+J) — fuzzy jump to workspaces / commands.
         PreviewKeyDown += (_, ke) =>
         {
+            if (ShortcutCaptureActive) return;   // Settings is recording; see OnGlobalKeyDown
             if (ke.Key == System.Windows.Input.Key.J
                 && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
             {

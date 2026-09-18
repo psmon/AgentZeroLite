@@ -2050,6 +2050,108 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Shortcuts Tab. The rows are built in code from WindowCommandIds.All,
+                 not listed here: the CLI dispatches that same registry, and a command
+                 that exists for one front end and not the other is the bug this
+                 avoids. -->
+            <TabItem Header="&#x2328; Shortcuts" Style="{StaticResource SettingsTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,0,0">
+
+                        <!-- The switch -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42"
+                                BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#00FFF0" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="WINDOW SHORTCUTS" FontSize="11" FontWeight="Bold"
+                                               Foreground="#00FFF0" FontFamily="Consolas"/>
+                                </StackPanel>
+
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#808080" LineHeight="16" Margin="0,0,0,8">
+                                    <Run>Off by default, and deliberately so. Every combination currently belongs</Run>
+                                    <LineBreak/>
+                                    <Run>to whatever runs inside your terminals — a CLI, an editor, a TUI. Turning</Run>
+                                    <LineBreak/>
+                                    <Run>these on takes those keys away from it.</Run>
+                                </TextBlock>
+
+                                <CheckBox x:Name="chkShortcutsEnabled" Foreground="#C8C8D8"
+                                          FontFamily="Consolas" FontSize="11"
+                                          Content="Enable keyboard shortcuts"
+                                          Checked="OnShortcutsEnabledChanged"
+                                          Unchecked="OnShortcutsEnabledChanged"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- The keymap -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42"
+                                BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <Button x:Name="btnShortcutsSuggested" Content="Use suggested"
+                                                Style="{StaticResource DarkButton}" Padding="12,4"
+                                                Click="OnUseSuggestedShortcuts" Margin="0,0,6,0"/>
+                                        <Button x:Name="btnShortcutsClear" Content="Clear all"
+                                                Style="{StaticResource DarkButton}" Padding="12,4"
+                                                Click="OnClearAllShortcuts"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Rectangle Width="3" Height="10" Fill="#8B00FF" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                        <TextBlock Text="KEYMAP" FontSize="11" FontWeight="Bold"
+                                                   Foreground="#8B00FF" FontFamily="Consolas"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#556677" LineHeight="16" Margin="0,0,0,8">
+                                    <Run>Click a box and press the combination. Backspace clears it.</Run>
+                                </TextBlock>
+
+                                <ItemsControl x:Name="icShortcutRows"/>
+
+                                <TextBlock x:Name="lblShortcutStatus" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#556677" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- The rules, so a box that refuses a combination is not a mystery -->
+                        <Border Background="#1A1A2E" BorderBrush="#3E3E42"
+                                BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Rectangle Width="3" Height="10" Fill="#FF2D95" RadiusX="1" RadiusY="1" Margin="0,0,6,0"/>
+                                    <TextBlock Text="RULES" FontSize="11" FontWeight="Bold"
+                                               Foreground="#FF2D95" FontFamily="Consolas"/>
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#808080" LineHeight="16">
+                                    <Run>&#x25B8; At least one modifier is required — a bare letter would fire while</Run>
+                                    <LineBreak/>
+                                    <Run>&#x2003; you type in a terminal, which is where you spend all your time.</Run>
+                                    <LineBreak/>
+                                    <Run>&#x25B8; Two commands on one combination: the first still runs, the rest are</Run>
+                                    <LineBreak/>
+                                    <Run>&#x2003; ignored and named below the keymap.</Run>
+                                    <LineBreak/>
+                                    <Run>&#x25B8; Ctrl+J opens the command palette and Ctrl+Shift+1/2/3 drive the bottom</Run>
+                                    <LineBreak/>
+                                    <Run>&#x2003; panel; binding over one of those loses the built-in.</Run>
+                                    <LineBreak/>
+                                    <Run>&#x25B8; Every command here is also a CLI verb: AgentZeroLite.exe -cli layout help</Run>
+                                </TextBlock>
+                                <TextBlock x:Name="lblShortcutFilePath" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#556677" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- Budget Tab (orca cost layer — mission W9 follow-up) -->
             <TabItem Header="&#x1F4B2; Budget" Style="{StaticResource SettingsTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
