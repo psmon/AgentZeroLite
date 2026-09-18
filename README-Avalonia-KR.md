@@ -33,6 +33,23 @@ WPF를 걷어내지 않습니다. Windows에서 무언가를 가장 빨리 시�
 5. **Windows 전용은 Windows 전용으로, `OperatingSystem.IsWindows()`로 울타리** (LLamaSharp 로컬 LLM, DPAPI, BLE, OS 자동화).
    macOS는 External 공급자 경로와 AES-GCM 비밀 보호를 씁니다.
 
+## 스택
+
+| 계층 | 패키지 / 구성요소 | 버전 | 비고 |
+|---|---|---|---|
+| 런타임 | .NET | 10.0 (`net10.0`) | 순수 TFM — Avalonia 호스트·ZeroCommon 모두 `-windows` 접미사 없음 |
+| UI | Avalonia · Avalonia.Desktop · Avalonia.Themes.Fluent · Avalonia.Fonts.Inter | 12.1.2 | MIT |
+| 웹뷰 | Avalonia.Controls.WebView (`NativeWebView`) | 12.1.0 | Windows는 WebView2, macOS는 WKWebView |
+| MVVM | CommunityToolkit.Mvvm | 8.4.0 | `ObservableObject`, `[RelayCommand]` |
+| 터미널 렌더러 | xterm.js (+ fit, web-links, webgl 애드온) | 5.5.0 (동봉) | `Project/AgentZeroWpf/Wasm/xterm/vendor`를 WPF 호스트와 공유 |
+| PTY (Windows) | kernel32 P/Invoke ConPTY (`ConPtyHost`) | Windows 10 1809+ | 네이티브 DLL 동봉 없음 |
+| PTY (macOS / Linux) | Porta.Pty | 2.2.2 | forkpty 심, 네이티브 동봉 |
+| 액터 | Akka · Akka.Streams · Akka.DependencyInjection | 1.5.67 | WPF 호스트와 같은 토폴로지 |
+| 영속 | Microsoft.EntityFrameworkCore.Sqlite · SQLitePCLRaw.bundle_e_sqlite3 | 10.0.0-preview.3 · 3.0.3 | 두 호스트가 DB 파일 하나를 공유 |
+| 비밀 보호 | System.Security.Cryptography.ProtectedData (DPAPI, Windows) · AES-GCM 파일 키 (그 외) | 10.0.0 | `SecretProtection.Protector` |
+| 로컬 LLM (Windows 전용) | LLamaSharp | 0.26.0 | External 공급자(OpenAI 호환 REST)는 전 OS |
+| 폰트 | JetBrains Mono | OFL 1.1 | xterm 번들과 함께 동봉 |
+
 ## 빌드·실행·테스트
 
 ```bash

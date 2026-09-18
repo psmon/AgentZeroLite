@@ -34,6 +34,23 @@ Rules that keep the two hosts honest:
 5. **Windows-only pieces stay Windows-only, fenced by `OperatingSystem.IsWindows()`** (local LLM via LLamaSharp,
    DPAPI, BLE, OS automation). macOS gets the External-provider path and AES-GCM secrets instead.
 
+## Stack
+
+| Layer | Package / component | Version | Notes |
+|---|---|---|---|
+| Runtime | .NET | 10.0 (`net10.0`) | plain TFM — no `-windows` suffix on the Avalonia host or ZeroCommon |
+| UI | Avalonia · Avalonia.Desktop · Avalonia.Themes.Fluent · Avalonia.Fonts.Inter | 12.1.2 | MIT |
+| Web view | Avalonia.Controls.WebView (`NativeWebView`) | 12.1.0 | WebView2 on Windows, WKWebView on macOS |
+| MVVM | CommunityToolkit.Mvvm | 8.4.0 | `ObservableObject`, `[RelayCommand]` |
+| Terminal renderer | xterm.js (+ fit, web-links, webgl add-ons) | 5.5.0 (vendored) | shared with the WPF host from `Project/AgentZeroWpf/Wasm/xterm/vendor` |
+| PTY (Windows) | ConPTY via kernel32 P/Invoke (`ConPtyHost`) | Windows 10 1809+ | no native DLLs shipped |
+| PTY (macOS / Linux) | Porta.Pty | 2.2.2 | forkpty shim, natives bundled |
+| Actors | Akka · Akka.Streams · Akka.DependencyInjection | 1.5.67 | same topology as the WPF host |
+| Persistence | Microsoft.EntityFrameworkCore.Sqlite · SQLitePCLRaw.bundle_e_sqlite3 | 10.0.0-preview.3 · 3.0.3 | one DB file for both hosts |
+| Secrets | System.Security.Cryptography.ProtectedData (DPAPI, Windows) · AES-GCM file key (elsewhere) | 10.0.0 | `SecretProtection.Protector` |
+| Local LLM (Windows only) | LLamaSharp | 0.26.0 | External providers (OpenAI-compatible REST) on every OS |
+| Fonts | JetBrains Mono | OFL 1.1 | vendored with the xterm bundle |
+
 ## Build, run, test
 
 ```bash
