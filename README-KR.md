@@ -6,6 +6,8 @@
 >
 > 🧩 **확장 기능 매뉴얼** (파일 도구 · Diff 리뷰 · 커맨드 팔레트 · 멀티 에이전트 CLI ·
 > worktree · 오케스트레이션 · 예약 자동화 · 비용): **[확장 매뉴얼 → README-EX.md](README-EX.md)** · [English](README-EX.en.md)
+>
+> 🖥️ **Avalonia 호스트 (Windows + macOS)** — 멀티 OS 판과 WPF 퍼스트 변환 플레이북: **[README-Avalonia-KR.md](README-Avalonia-KR.md)** · [English](README-Avalonia.md)
 
 ---
 

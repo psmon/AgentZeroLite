@@ -189,9 +189,11 @@ Two things that are easy to get wrong here:
 ### Mermaid/Pencil rendering
 `Assets/mermaid.min.js` is embedded as a logical resource (`LogicalName="mermaid.min.js"`) for offline Markdown preview; `MarkdownViewer` + `MermaidRenderer` + WebView2 handle the render. Pencil (`.pen`) files go through the `pencil` MCP server — those files are encrypted, never read them with `Read`/`Grep`.
 
-### Cross-platform host — `Project/AgentZeroAvalonia` (branch `feat/avalonia-v2`, M0033–M0040)
+### Cross-platform host — `Project/AgentZeroAvalonia` (M0033–M0040, merged 2026-09-19)
 
-A second GUI host, Avalonia 12 on plain `net10.0`, that runs on Windows **and macOS** beside the WPF one. It shares ZeroCommon (actors, agent loop, stores, database) and **the WPF project is never edited by this work** — every milestone checks `git diff --stat main -- Project/AgentZeroWpf` is empty. Design and per-milestone findings: `Docs/avalonia-v2/DESIGN.md`.
+A second GUI host, Avalonia 12 on plain `net10.0`, that runs on Windows **and macOS** beside the WPF one. It shares ZeroCommon (actors, agent loop, stores, database). Guide + conversion playbook: `README-Avalonia.md` / `README-Avalonia-KR.md`; design and per-milestone findings: `Docs/avalonia-v2/DESIGN.md`.
+
+**Strategy: WPF first, then converge.** WPF is not being replaced — it is the Windows-first lab where features are built and tried quickly; what earns its keep is *converted* into the Avalonia host so it reaches macOS. Keep the conversion cheap: logic without a UI dependency goes to `ZeroCommon` (if a feature cannot be converted without copying logic, move the logic down first); both hosts read and write the same DB/settings/layout rows; the CLI JSON contract is one for both; Windows-only pieces stay fenced by `OperatingSystem.IsWindows()`. **Conversion work never edits the WPF project** — the gate is `git diff --stat main -- Project/AgentZeroWpf` empty for conversion commits; shared fixes go into ZeroCommon. When a WPF feature changes, list its conversion in `README-Avalonia.md`'s table (✅ / ⏳) and keep the playbook there current.
 
 ```bash
 dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Debug         # Windows dev build

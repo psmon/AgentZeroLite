@@ -6,6 +6,8 @@
 >
 > 🧩 **Extension features** (file tools · Diff Review · command palette · multi-agent CLI ·
 > worktrees · orchestration · automations · cost): **[Extension Manual → README-EX.en.md](README-EX.en.md)** · [한국어](README-EX.md)
+>
+> 🖥️ **Avalonia host (Windows + macOS)** — the multi-OS edition and the WPF-first conversion playbook: **[README-Avalonia.md](README-Avalonia.md)** · [한국어](README-Avalonia-KR.md)
 
 ---
 
