@@ -1,0 +1,21 @@
+{
+  "profiles": {
+    "AgentZeroLite (Avalonia GUI)": {
+      "commandName": "Project",
+      "workingDirectory": "$(ProjectDir)",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "AgentZeroLite -cli status": {
+      "commandName": "Project",
+      "commandLineArgs": "-cli status",
+      "workingDirectory": "$(ProjectDir)"
+    },
+    "AgentZeroLite -cli selftest all": {
+      "commandName": "Project",
+      "commandLineArgs": "-cli selftest all",
+      "workingDirectory": "$(ProjectDir)"
+    }
+  }
+}
