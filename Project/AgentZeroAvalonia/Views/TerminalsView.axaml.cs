@@ -38,7 +38,7 @@ public partial class TerminalsView : UserControl
     {
         InitializeComponent();
         DataContextChanged += (_, _) => Attach(DataContext as MainWindowViewModel);
-        NewTerminalMenuButton.Click += (_, _) => RebuildNewTerminalMenu();
+        NewTerminalMenuButton.Flyout = BuildDefinitionsFlyout(null);
         SurfaceHost.LayoutUpdated += (_, _) => PlaceSurfaces();
     }
 
@@ -62,6 +62,8 @@ public partial class TerminalsView : UserControl
         _vm.FocusPaneRequested += OnFocusPane;
         _vm.RestartRequested += Restart;
         _vm.TerminalAppearanceChanged += OnAppearanceChanged;
+        _vm.CliDefinitions.CollectionChanged += (_, _) => NewTerminalMenuButton.Flyout = BuildDefinitionsFlyout(null);
+        NewTerminalMenuButton.Flyout = BuildDefinitionsFlyout(null);
         OnActiveTerminalChanged();
     }
 
@@ -71,20 +73,23 @@ public partial class TerminalsView : UserControl
         foreach (var control in _controls.Values) control.PostAppearance();
     }
 
-    private void RebuildNewTerminalMenu()
+    /// <summary>A menu of the CLI definitions this OS can launch; picking one opens it in <paramref name="pane"/> (null = the active pane).</summary>
+    private MenuFlyout BuildDefinitionsFlyout(Pane? pane)
     {
-        if (NewTerminalMenuButton.Flyout is not MenuFlyout menu) return;
-        menu.Items.Clear();
-        if (_vm is null) return;
-        foreach (var def in _vm.CliDefinitions)
+        var menu = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+        if (_vm is not null)
         {
-            var item = new MenuItem { Header = def.Name };
-            var captured = def;
-            item.Click += (_, _) => _vm.NewTerminal(captured);
-            menu.Items.Add(item);
+            foreach (var def in _vm.CliDefinitions)
+            {
+                var item = new MenuItem { Header = def.Name };
+                var captured = def;
+                item.Click += (_, _) => _vm.NewTerminal(captured, pane);
+                menu.Items.Add(item);
+            }
         }
         if (menu.Items.Count == 0)
             menu.Items.Add(new MenuItem { Header = "No CLI definitions for this OS", IsEnabled = false });
+        return menu;
     }
 
     // ── layout → tree ────────────────────────────────────────────────────────
@@ -177,9 +182,8 @@ public partial class TerminalsView : UserControl
         // Tab strip
         var strip = new Border { Classes = { "panestrip" } };
         var stripDock = new DockPanel();
-        var add = new Button { Classes = { "strip" }, Content = "＋", FontSize = 12 };
-        ToolTip.SetTip(add, "New terminal in this pane");
-        add.Click += (_, _) => _vm?.NewTerminal(_vm.CliDefinitions.FirstOrDefault(), pane);
+        var add = new Button { Classes = { "strip" }, Content = "＋", FontSize = 12, Flyout = BuildDefinitionsFlyout(pane) };
+        ToolTip.SetTip(add, "New terminal in this pane (choose the CLI)");
         DockPanel.SetDock(add, Dock.Right);
         stripDock.Children.Add(add);
         var tabs = new StackPanel { Orientation = Orientation.Horizontal };

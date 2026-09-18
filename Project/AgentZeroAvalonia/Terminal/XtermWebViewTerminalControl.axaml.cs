@@ -221,8 +221,11 @@ public partial class XtermWebViewTerminalControl : UserControl
             {
                 var text = _outbox.ToString();
                 _outbox.Clear();
-                foreach (var b64 in XtermMessages.ChunkUtf8Base64(text))
-                    await InvokeAsync(XtermMessages.BuildRecvScript(new { type = "out64", data = b64 }));
+                // All chunks of the batch in one script: xterm.js queues the writes back to
+                // back and paints once, so a TUI frame that straddles a chunk boundary is
+                // never shown half-drawn (it was, between two InvokeScript calls).
+                var chunks = XtermMessages.ChunkUtf8Base64(text).ToArray();
+                await InvokeAsync(XtermMessages.BuildRecvScript(new { type = "out64", data = chunks }));
             }
         }
         finally

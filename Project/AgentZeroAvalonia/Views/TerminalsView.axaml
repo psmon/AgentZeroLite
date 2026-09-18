@@ -75,11 +75,7 @@
                     <Button Classes="strip" Content="⫽" ToolTip.Tip="Split down" Command="{Binding SplitDownCommand}" />
                     <Button Classes="strip" Content="＋" ToolTip.Tip="New terminal (default CLI)"
                             Command="{Binding NewTerminalDefaultCommand}" />
-                    <Button x:Name="NewTerminalMenuButton" Classes="strip" Content="▾" ToolTip.Tip="New terminal">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="BottomEdgeAlignedRight" />
-                        </Button.Flyout>
-                    </Button>
+                    <Button x:Name="NewTerminalMenuButton" Classes="strip" Content="▾" ToolTip.Tip="New terminal (choose the CLI)" />
                 </StackPanel>
                 <TextBlock Text="{Binding ActiveWorkspace.DisplayName}" FontSize="11" FontWeight="Bold"
                            Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" Margin="10,0,6,0" />

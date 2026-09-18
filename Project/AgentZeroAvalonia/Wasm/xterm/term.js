@@ -5,7 +5,7 @@
 //   host → JS : window.zeroHost.recv(message), called through InvokeScript.
 // Messages:
 //   host → JS : { type: 'out', data }     write VT text to the screen
-//               { type: 'out64', data }   write VT bytes (base64 of UTF-8) — the hot path
+//               { type: 'out64', data }   write VT bytes (base64 of UTF-8, string or array of chunks) — the hot path
 //               { type: 'clear' }         clear the viewport
 //               { type: 'focus' }         focus the terminal
 //               { type: 'config', fontFamily, fontSize, lineHeight, cursorBlink, theme, hotkeys }
@@ -211,7 +211,14 @@
   }
   function recv(m) {
     if (!m || !m.type) return;
-    if (m.type === 'out64') { term.write(b64ToBytes(m.data), scheduleScreen); }
+    if (m.type === 'out64') {
+      // One batch = an array of base64 chunks (or a single string). Queue them all
+      // before yielding so xterm.js renders the batch as one frame.
+      var parts = Array.isArray(m.data) ? m.data : [m.data];
+      for (var i = 0; i < parts.length; i++) {
+        term.write(b64ToBytes(parts[i]), i === parts.length - 1 ? scheduleScreen : undefined);
+      }
+    }
     else if (m.type === 'out') { term.write(m.data, scheduleScreen); }
     else if (m.type === 'clear') { term.clear(); scheduleScreen(); }
     else if (m.type === 'focus') { term.focus(); }

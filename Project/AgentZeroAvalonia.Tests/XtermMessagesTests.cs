@@ -72,4 +72,15 @@ public class XtermMessagesTests
     {
         Assert.False(XtermMessages.TryParseInbound(body, out _));
     }
+
+    [Fact]
+    public void Out64_batch_carries_every_chunk_in_one_script()
+    {
+        var chunks = XtermMessages.ChunkUtf8Base64(new string('x', 200), maxBytes: 64).ToArray();
+        Assert.Equal(4, chunks.Length);
+        var script = XtermMessages.BuildRecvScript(new { type = "out64", data = chunks });
+        Assert.StartsWith("window.zeroHost&&window.zeroHost.recv({", script);
+        Assert.Contains("\"data\":[", script);
+        foreach (var c in chunks) Assert.Contains(c, script);
+    }
 }
