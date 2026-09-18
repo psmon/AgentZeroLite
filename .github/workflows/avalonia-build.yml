@@ -1,0 +1,80 @@
+name: Avalonia host — build & self-test
+
+# The cross-platform host (Project/AgentZeroAvalonia). Separate from release.yml on
+# purpose: that workflow ships the WPF app and is not touched by the Avalonia work.
+# Job A proves the Windows build + the headless suites; job B proves the macOS build,
+# the .app bundle, and everything a runner without a display can still exercise
+# (PTY spawn, named-pipe IPC, secret protection, the ZeroCommon suite on macOS).
+
+on:
+  push:
+    branches: [feat/avalonia-v2]
+    paths:
+      - "Project/AgentZeroAvalonia/**"
+      - "Project/ZeroCommon/**"
+      - "Project/ZeroCommon.Tests/**"
+      - ".github/workflows/avalonia-build.yml"
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  windows:
+    name: A · windows-latest (build + tests + win-x64 publish)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          dotnet-quality: preview
+      - name: Restore
+        run: dotnet restore Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj
+      - name: Build
+        run: dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release --no-restore
+      - name: Headless tests (ZeroCommon)
+        run: dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj -c Release
+      - name: CLI self-test
+        run: Project/AgentZeroAvalonia/bin/Release/net10.0/AgentZeroLite.exe -cli selftest all
+      - name: Publish win-x64
+        run: dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish-avalonia/win-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AgentZeroLite-Avalonia-win-x64
+          path: publish-avalonia/win-x64
+
+  macos:
+    name: B · macos-14 (build + osx-arm64 .app + self-test)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          dotnet-quality: preview
+      - name: Restore
+        run: dotnet restore Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -r osx-arm64
+      - name: Build
+        run: dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --no-restore
+      - name: Headless tests on macOS (ZeroCommon)
+        run: dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj -c Release
+      - name: Publish osx-arm64
+        run: dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -o publish-avalonia/osx-arm64
+      - name: CLI self-test (no display)
+        run: |
+          chmod +x publish-avalonia/osx-arm64/AgentZeroLite
+          publish-avalonia/osx-arm64/AgentZeroLite -cli version
+          publish-avalonia/osx-arm64/AgentZeroLite -cli selftest all
+      - name: Bundle .app
+        run: |
+          if [ -f Project/AgentZeroAvalonia/macos/build-app.sh ]; then
+            bash Project/AgentZeroAvalonia/macos/build-app.sh publish-avalonia/osx-arm64 publish-avalonia/AgentZeroLite.app
+          else
+            echo "build-app.sh arrives with M0040 — skipping bundle"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AgentZeroLite-Avalonia-osx-arm64
+          path: publish-avalonia

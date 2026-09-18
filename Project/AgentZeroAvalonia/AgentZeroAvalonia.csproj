@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The cross-platform host (M0034). Plain net10.0 on purpose: no -windows TFM, no
+         WPF, no WinRT. Everything Windows-specific it needs (ConPTY, DPAPI, the console
+         attach for -cli) is a kernel32/user32/crypt32 P/Invoke fenced by
+         OperatingSystem.IsWindows(). ZeroCommon stays the shared brain; this project is
+         the shell. -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AgentZeroAvalonia</RootNamespace>
+    <!-- Same exe name as the WPF host so the CLI wrappers, the skill guides and the
+         `-cli help agentzero` text stay true. The two builds live in different output
+         folders and refuse to run side by side (same single-instance name). -->
+    <AssemblyName>AgentZeroLite</AssemblyName>
+    <Configurations>Debug;Release;AgentCLI</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <!-- Hangul normalisation in SuperTonic and Korean paths need real globalization. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <!-- One version for both hosts: read the WPF project's version.txt. The Release bump
+       target stays in the WPF csproj only — one project bumps, both read. -->
+  <PropertyGroup>
+    <AppVersion>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/../AgentZeroWpf/version.txt').Trim())</AppVersion>
+    <Version>$(AppVersion)</Version>
+    <AssemblyVersion>$(AppVersion).0</AssemblyVersion>
+    <FileVersion>$(AppVersion).0</FileVersion>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <!-- macOS/Linux PTY (forkpty). Windows uses the ConPTY host copied from the WPF
+         app and never loads this package's natives. -->
+    <PackageReference Include="Porta.Pty" Version="2.2.2" />
+    <!-- DPAPI is inbox only on the -windows TFM; on plain net10.0 it is a package. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- xterm.js and its fonts are one bundle, kept in the WPF folder and linked here:
+         the renderer must stay byte-identical between hosts. index.html / term.js are
+         this host's own copies (Wasm/xterm/) because the message transport differs. -->
+    <Content Include="..\AgentZeroWpf\Wasm\xterm\vendor\**\*"
+             Link="Wasm\xterm\vendor\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Wasm\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\AgentZeroWpf\version.txt" Link="version.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="AgentZeroLite.sh" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="AgentZeroLite.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

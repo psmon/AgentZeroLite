@@ -1,0 +1,99 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+        x:Class="AgentZeroAvalonia.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="1180" Height="760" MinWidth="820" MinHeight="520"
+        Background="{DynamicResource CyberBgDeep}"
+        Title="AgentZero Lite">
+
+    <!-- The WPF MainWindow's frame: activity bar (48) · sidebar · content · status bar.
+         Terminal panes, the bot pane and settings plug into the content area in
+         M0035–M0038; the shell itself is complete here. -->
+    <Grid RowDefinitions="*,24">
+
+        <Grid Grid.Row="0" ColumnDefinitions="48,Auto,*,Auto">
+
+            <!-- Activity bar -->
+            <Border Grid.Column="0" Background="{DynamicResource CyberBgPanel}"
+                    BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <Button Classes="activity" Classes.selected="{Binding IsTerminalsPage}"
+                                Content="▣" ToolTip.Tip="Terminals" Command="{Binding ShowTerminalsCommand}" />
+                        <Button Classes="activity" Classes.selected="{Binding BotVisible}"
+                                Content="🤖" ToolTip.Tip="AgentBot" Command="{Binding ToggleBotCommand}" />
+                        <Button Classes="activity" Content="▤" ToolTip.Tip="Toggle sidebar"
+                                Command="{Binding ToggleSidebarCommand}" />
+                    </StackPanel>
+                    <Button DockPanel.Dock="Bottom" Classes="activity" Classes.selected="{Binding IsSettingsPage}"
+                            Content="⚙" ToolTip.Tip="Settings" VerticalAlignment="Bottom"
+                            Command="{Binding ShowSettingsCommand}" />
+                </DockPanel>
+            </Border>
+
+            <!-- Sidebar: workspaces -->
+            <Border Grid.Column="1" Width="220" Background="{DynamicResource CyberBgPanel}"
+                    BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0"
+                    IsVisible="{Binding SidebarExpanded}">
+                <DockPanel Margin="0,6">
+                    <TextBlock DockPanel.Dock="Top" Text="WORKSPACES" FontSize="10" FontWeight="Bold"
+                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
+                    <TextBlock DockPanel.Dock="Top" Text="No workspace yet. Add a folder to open terminals in it (M0035)."
+                               TextWrapping="Wrap" FontSize="11"
+                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
+                    <Border DockPanel.Dock="Top" Height="1" Background="{DynamicResource BorderColor}" Margin="10,8" />
+                    <TextBlock DockPanel.Dock="Top" Text="SESSIONS" FontSize="10" FontWeight="Bold"
+                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
+                    <TextBlock Text="Open tabs will be listed here." TextWrapping="Wrap" FontSize="11"
+                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
+                </DockPanel>
+            </Border>
+
+            <!-- Content: one page at a time -->
+            <Panel Grid.Column="2">
+                <Border IsVisible="{Binding IsTerminalsPage}" Background="{DynamicResource CyberBgDeep}">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                        <TextBlock Text="AgentZero Lite — Avalonia host" FontSize="16" FontWeight="Bold"
+                                   Foreground="{DynamicResource CyberCyanBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="Terminal panes arrive in M0035 (xterm.js + PTY), splits in M0036."
+                                   Foreground="{DynamicResource TextDim}" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding VersionLabel}" Foreground="{DynamicResource TextDim}"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <Border IsVisible="{Binding IsSettingsPage}" Background="{DynamicResource CyberBgDeep}" Padding="16">
+                    <TextBlock Text="Settings (M0038)" FontSize="14" Foreground="{DynamicResource TextPrimary}" />
+                </Border>
+            </Panel>
+
+            <!-- AgentBot pane (right dock) -->
+            <Border Grid.Column="3" Width="360" Background="{DynamicResource CyberBgPanel}"
+                    BorderBrush="{DynamicResource BorderColor}" BorderThickness="1,0,0,0"
+                    IsVisible="{Binding BotVisible}">
+                <DockPanel Margin="10">
+                    <TextBlock DockPanel.Dock="Top" Text="AGENTBOT" FontSize="10" FontWeight="Bold"
+                               Foreground="{DynamicResource TextDim}" />
+                    <TextBlock Text="Chat + agent loop land in M0037." TextWrapping="Wrap" FontSize="11"
+                               Foreground="{DynamicResource TextDim}" Margin="0,6" />
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="1" Background="{DynamicResource CyberBgToolbar}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="10,0">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Fill="{DynamicResource CyberTealBrush}" />
+                    <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{DynamicResource TextDim}" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding BotStatus}" FontSize="11"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextDim}" />
+                <TextBlock Grid.Column="2" Text="{Binding VersionLabel}" FontSize="11"
+                           VerticalAlignment="Center" Foreground="{DynamicResource TextDim}" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

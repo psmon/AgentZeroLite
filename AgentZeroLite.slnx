@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Project/AgentZeroWpf/AgentZeroWpf.csproj" />
+  <Project Path="Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj" />
   <Configurations>
     <BuildType Name="AgentCLI" />
     <BuildType Name="Debug" />

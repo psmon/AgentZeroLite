@@ -1,0 +1,12 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AgentZeroAvalonia.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Styles>
+        <FluentTheme />
+        <!-- The WPF app's dark palette, re-expressed for Avalonia. -->
+        <StyleInclude Source="avares://AgentZeroLite/Styles/Theme.axaml" />
+    </Application.Styles>
+
+</Application>

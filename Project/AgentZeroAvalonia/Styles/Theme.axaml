@@ -1,0 +1,92 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- The WPF host's cyber-dark palette (App.xaml / MainWindow resources), flat VS Code
+         style. Same keys the WPF resources use where they overlap, so a panel ported from
+         WPF reads the same names. -->
+
+    <Styles.Resources>
+        <SolidColorBrush x:Key="CyberBgDeep"    Color="#1E1E1E" />
+        <SolidColorBrush x:Key="CyberBgPanel"   Color="#252526" />
+        <SolidColorBrush x:Key="CyberBgToolbar" Color="#2D2D30" />
+        <SolidColorBrush x:Key="CyberInputBg"   Color="#1F1F1F" />
+        <SolidColorBrush x:Key="EditorBg"       Color="#1E1E1E" />
+        <SolidColorBrush x:Key="PanelBg"        Color="#252526" />
+        <SolidColorBrush x:Key="ToolbarBg"      Color="#2D2D30" />
+
+        <SolidColorBrush x:Key="CyberCyanBrush"    Color="#3794FF" />
+        <SolidColorBrush x:Key="CyberMagentaBrush" Color="#C586C0" />
+        <SolidColorBrush x:Key="CyberTealBrush"    Color="#4EC9B0" />
+        <SolidColorBrush x:Key="CyberMintBrush"    Color="#7CFDB0" />
+        <SolidColorBrush x:Key="CyberYellowBrush"  Color="#DCDCAA" />
+
+        <SolidColorBrush x:Key="TextPrimary"    Color="#D4D4D4" />
+        <SolidColorBrush x:Key="TextDim"        Color="#858585" />
+        <SolidColorBrush x:Key="BorderColor"    Color="#3E3E42" />
+        <SolidColorBrush x:Key="CyberSelection" Color="#264F78" />
+
+        <FontFamily x:Key="MonoFont">Consolas, Cascadia Mono, Menlo, JetBrains Mono, monospace</FontFamily>
+    </Styles.Resources>
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource CyberBgDeep}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="10,5" />
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#333337" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource CyberCyanBrush}" />
+    </Style>
+
+    <Style Selector="Button.accent">
+        <Setter Property="Background" Value="#333337" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
+        <Setter Property="BorderThickness" Value="1.5" />
+    </Style>
+
+    <!-- Activity bar icons: transparent, 48 px rail, cyan when selected. -->
+    <Style Selector="Button.activity">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        <Setter Property="Width" Value="48" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.activity:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2D2D30" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource CyberCyanBrush}" />
+    </Style>
+    <Style Selector="Button.activity.selected">
+        <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
+        <Setter Property="BorderThickness" Value="2,0,0,0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{DynamicResource CyberInputBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource CyberSelection}" />
+    </Style>
+
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+    </Style>
+</Styles>
