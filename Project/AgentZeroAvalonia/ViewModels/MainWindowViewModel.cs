@@ -320,11 +320,13 @@ public partial class MainWindowViewModel : ObservableObject
         if (ws is null) return;
         if (!ReferenceEquals(ActiveWorkspace, ws)) ActiveWorkspace = ws;
         if (!ReferenceEquals(ws.ActiveTab, tab)) ws.ActiveTab = tab;
-        else
+        else if (ws.Layout.PaneOf(tab) is { } pane && !ReferenceEquals(pane.ActiveTab, tab))
         {
-            if (ws.Layout.PaneOf(tab) is { } pane && !ReferenceEquals(pane.ActiveTab, tab)) pane.ActiveTab = tab;
+            pane.ActiveTab = tab;
             RaiseActiveTerminalChanged();
         }
+        // Clicking the tab that is already active (every click inside its renderer
+        // reports one) changes nothing and must not rebuild the pane tree.
     }
 
     public void CloseTab(WorkspaceViewModel ws, TerminalTabViewModel tab)

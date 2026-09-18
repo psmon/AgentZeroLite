@@ -27,6 +27,15 @@ public sealed record HotkeyBinding(string Name, string Key, bool Ctrl = false, b
 public partial class XtermWebViewTerminalControl : UserControl
 {
     private const int MaxPendingChars = 4 * 1024 * 1024;
+
+    /// <summary>
+    /// How long a batch gathers before it is sent. ConPTY on this Windows build does not
+    /// pass DEC 2026 through, so a TUI repaint arrives as "clear" then "redraw" in separate
+    /// reads; sent as separate scripts, the renderer paints the blank in between (the
+    /// flicker the WPF host never showed, because its posts do not wait for a reply).
+    /// One frame's worth of gathering puts both halves in the same script.
+    /// </summary>
+    private static readonly TimeSpan GatherWindow = TimeSpan.FromMilliseconds(12);
     private static readonly TimeSpan SyncFrameTimeout = TimeSpan.FromMilliseconds(150);
 
     private IPtyHost? _host;
@@ -207,9 +216,10 @@ public partial class XtermWebViewTerminalControl : UserControl
     }
 
     /// <summary>
-    /// One writer, in order: whatever accumulated while the previous script ran goes
-    /// out as the next batch, so a slow renderer gets fewer, larger writes rather than
-    /// a queue of small ones.
+    /// One writer, in order: gather for <see cref="GatherWindow"/>, then send whatever
+    /// accumulated as one script; anything that arrives while that script runs forms
+    /// the next batch. A slow renderer gets fewer, larger writes rather than a queue
+    /// of small ones, and a repaint burst lands whole.
     /// </summary>
     private async Task PumpAsync()
     {
@@ -217,6 +227,7 @@ public partial class XtermWebViewTerminalControl : UserControl
         _pumping = true;
         try
         {
+            await Task.Delay(GatherWindow);
             while (_outbox.Length > 0)
             {
                 var text = _outbox.ToString();
