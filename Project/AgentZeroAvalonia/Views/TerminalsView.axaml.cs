@@ -103,16 +103,21 @@ public partial class TerminalsView : UserControl
 
         var tab = ws?.ActiveTab;
         TerminalActorBinder.SetActive(ws, tab);
+        RefreshStatusText();
         if (tab is not null && _controls.TryGetValue(tab, out var active))
-        {
-            _vm.StatusText = $"{ws!.DisplayName}/{tab.Title}" + (tab.HealthText.Length > 0 ? $" · {tab.HealthText}" : "")
-                             + (ws.Layout.PaneCount > 1 ? $" · {ws.Layout.PaneCount} panes" : "");
             Dispatcher.UIThread.Post(active.FocusTerminal, DispatcherPriority.Background);
-        }
-        else
-        {
-            _vm.StatusText = "Ready";
-        }
+    }
+
+    /// <summary>The status bar line for the active terminal — cheap, no layout work.</summary>
+    private void RefreshStatusText()
+    {
+        if (_vm is null) return;
+        var ws = _vm.ActiveWorkspace;
+        var tab = ws?.ActiveTab;
+        _vm.StatusText = tab is null || ws is null
+            ? "Ready"
+            : $"{ws.DisplayName}/{tab.Title}" + (tab.HealthText.Length > 0 ? $" · {tab.HealthText}" : "")
+              + (ws.Layout.PaneCount > 1 ? $" · {ws.Layout.PaneCount} panes" : "");
     }
 
     private void RebuildTree(WorkspaceViewModel? ws)
@@ -361,8 +366,9 @@ public partial class TerminalsView : UserControl
         session.HealthChanged += state => Dispatcher.UIThread.Post(() =>
         {
             control.ApplyHealth(state);
-            tab.HealthText = state == TerminalHealthState.Alive ? "" : state.ToString();
-            if (_vm?.ActiveWorkspace?.ActiveTab == tab) OnActiveTerminalChanged();
+            // Only Dead is worth a word; Stale is the tracker's normal reading mid-keystroke.
+            tab.HealthText = state == TerminalHealthState.Dead ? "Dead" : "";
+            if (_vm?.ActiveWorkspace?.ActiveTab == tab) RefreshStatusText();
         });
         TerminalActorBinder.Bind(ws, tab);
         AppLogger.Log($"[Terminals] started {ws.DisplayName}/{tab.Title} | {spec.CommandLine}");

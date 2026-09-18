@@ -395,7 +395,11 @@ public partial class XtermWebViewTerminalControl : UserControl
 
     // ── health banner ─────────────────────────────────────────────────────────
 
-    /// <summary>Reflect the session's health FSM (Alive → Stale → Dead) on the banner.</summary>
+    /// <summary>
+    /// Reflect the session's health FSM on the banner — Dead only, as the WPF host does.
+    /// Stale flips on and off while typing into a TUI that batches its repaints; a banner
+    /// following it would resize the renderer several times a second.
+    /// </summary>
     public void ApplyHealth(TerminalHealthState state)
     {
         switch (state)
@@ -403,10 +407,7 @@ public partial class XtermWebViewTerminalControl : UserControl
             case TerminalHealthState.Dead:
                 ShowBanner("No response to input — the terminal looks wedged.", restart: true);
                 break;
-            case TerminalHealthState.Stale:
-                ShowBanner("Waiting for the terminal to respond…", restart: false);
-                break;
-            default:
+            case TerminalHealthState.Alive:
                 if (_host?.IsRunning == true) HideBanner();
                 break;
         }
