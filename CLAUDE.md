@@ -189,6 +189,28 @@ Two things that are easy to get wrong here:
 ### Mermaid/Pencil rendering
 `Assets/mermaid.min.js` is embedded as a logical resource (`LogicalName="mermaid.min.js"`) for offline Markdown preview; `MarkdownViewer` + `MermaidRenderer` + WebView2 handle the render. Pencil (`.pen`) files go through the `pencil` MCP server — those files are encrypted, never read them with `Read`/`Grep`.
 
+### Cross-platform host — `Project/AgentZeroAvalonia` (branch `feat/avalonia-v2`, M0033–M0040)
+
+A second GUI host, Avalonia 12 on plain `net10.0`, that runs on Windows **and macOS** beside the WPF one. It shares ZeroCommon (actors, agent loop, stores, database) and **the WPF project is never edited by this work** — every milestone checks `git diff --stat main -- Project/AgentZeroWpf` is empty. Design and per-milestone findings: `Docs/avalonia-v2/DESIGN.md`.
+
+```bash
+dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Debug         # Windows dev build
+dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64
+dotnet test  Project/AgentZeroAvalonia.Tests/AgentZeroAvalonia.Tests.csproj      # headless: codec, asset server, PTY, layout, hotkeys, bot, settings, router
+Project/AgentZeroAvalonia/bin/Debug/net10.0/AgentZeroLite.exe                    # GUI (same exe name, different folder)
+Project/AgentZeroAvalonia/bin/Debug/net10.0/AgentZeroLite.exe -cli status        # drives THIS host over a named pipe
+Project/AgentZeroAvalonia/bin/Debug/net10.0/AgentZeroLite.exe -cli selftest all  # ipc / secrets / pty without a display (CI uses it)
+```
+
+What differs from the WPF host, and why:
+
+- **Terminal**: xterm.js inside `NativeWebView`, served by `LocalAssetServer` (loopback, token path) because the Avalonia WebView cannot map a folder; the PTY is `ConPtyHost` (a copy of `ManagedConPtyHost`) on Windows and `PortaPtyHost` (Porta.Pty) on macOS behind ZeroCommon's `IPtyHost`/`XtermTerminalSession`. Two ConPTY facts the WPF copy never hit: a parent whose stdio is a pipe hands its std handles to the child (blanked around `CreateProcess`), and pipe EOF is not the exit signal (a process-handle watcher is).
+- **Split panes**: `WorkspaceLayout<T>` + one Canvas that positions every renderer over its pane slot — no native re-parenting. The stored `CliGroup.LayoutJson` is byte-identical to what WPF writes.
+- **CLI**: same request/response JSON as WPF over the pipe `AgentZeroLite.cli` (not WM_COPYDATA), so `-cli help agentzero` applies; extra verbs `bot-ask` and `layout`. Wrappers: `AgentZeroLite.ps1` / `AgentZeroLite.sh`.
+- **Both GUIs share the SQLite file and the settings files** and refuse to run side by side (same single-instance mutex on Windows). Secrets: DPAPI on Windows, AES-GCM (`aesg:v1:`) elsewhere.
+- **Local LLM is Windows-only** (LLamaSharp DLLs); macOS uses External providers. Gemma 4's native tool-call syntax is converted to the JSON envelope by `GemmaNativeToolCall` (ZeroCommon, benefits both hosts).
+- CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-14, `.app` bundle via `macos/build-app.sh`); `release.yml` is untouched. macOS GUI checks need a person: `Docs/avalonia-v2/macos-smoke.md`.
+
 ## Ancestor reference — AgentWin (Origin)
 
 AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). When the user mentions *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"the ancestor"*, or asks to *"compare with origin"* / *"오리진이랑 비교"* / *"오리진 참고"*, **read `Docs/agent-origin/` first** instead of crawling the Origin codebase from scratch:

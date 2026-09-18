@@ -35,16 +35,21 @@ internal static class PtyHostFactory
         throw new PlatformNotSupportedException($"No PTY backend for {Environment.OSVersion}");
     }
 
-    /// <summary>The spec a self-test uses: a shell that echoes a marker and exits.</summary>
+    /// <summary>
+    /// The spec a self-test uses: a shell that echoes a marker, lingers a second, and exits.
+    /// The linger matters: a child that exits within milliseconds can be gone before the
+    /// reader thread attaches, and on macOS the pty master discards what was never read
+    /// (seen on the CI runner with a bare echo). Real terminals are long-lived shells.
+    /// </summary>
     public static TerminalLaunchSpec EchoSpec(string marker)
     {
         if (OperatingSystem.IsWindows())
         {
             var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
-            return new TerminalLaunchSpec(cmd, new[] { "/c", "echo", marker }, Environment.CurrentDirectory,
+            return new TerminalLaunchSpec(cmd, new[] { "/c", "echo " + marker + " & ping -n 2 127.0.0.1 >nul" }, Environment.CurrentDirectory,
                 TerminalEnvironment.Build(), "selftest");
         }
-        return new TerminalLaunchSpec("/bin/sh", new[] { "-c", "echo " + marker }, Environment.CurrentDirectory,
+        return new TerminalLaunchSpec("/bin/sh", new[] { "-c", "echo " + marker + "; sleep 1" }, Environment.CurrentDirectory,
             TerminalEnvironment.BuildPosix(), "selftest");
     }
 }
