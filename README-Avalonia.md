@@ -2,6 +2,8 @@
 
 > 🇰🇷 한국어: [README-Avalonia-KR.md](README-Avalonia-KR.md) · Main manual: [README.md](README.md) · Design record: [Docs/avalonia-v2/DESIGN.md](Docs/avalonia-v2/DESIGN.md)
 
+![AgentZero Lite — Avalonia host](Docs/avalonia-v2/agent-app.png)
+
 AgentZero Lite ships **two GUI hosts over one shared core**:
 
 | | WPF host (`Project/AgentZeroWpf`) | Avalonia host (`Project/AgentZeroAvalonia`) |

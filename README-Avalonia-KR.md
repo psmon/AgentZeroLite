@@ -2,6 +2,8 @@
 
 > English: [README-Avalonia.md](README-Avalonia.md) · 본 매뉴얼: [README-KR.md](README-KR.md) · 설계 기록: [Docs/avalonia-v2/DESIGN.md](Docs/avalonia-v2/DESIGN.md)
 
+![AgentZero Lite — Avalonia 호스트](Docs/avalonia-v2/agent-app.png)
+
 AgentZero Lite는 **하나의 공유 코어 위에 두 개의 GUI 호스트**를 둡니다.
 
 | | WPF 호스트 (`Project/AgentZeroWpf`) | Avalonia 호스트 (`Project/AgentZeroAvalonia`) |
