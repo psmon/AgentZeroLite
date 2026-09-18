@@ -1,6 +1,6 @@
 /**
  * Skills — `.claude/skills/<skill>/SKILL.md` card view (in-repo plugins)
- * plus hardcoded external entries (e.g. harness-kakashi-creator) that
+ * plus hardcoded external entries (e.g. harness-creator) that
  * open the upstream URL on click instead of routing to a detail page.
  * Resource-Reference mode (read-only).
  *

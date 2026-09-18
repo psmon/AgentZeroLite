@@ -216,8 +216,8 @@
         {
           "kind": "p",
           "text": {
-            "en": "The orchestration view of this loop lives in `harness/engine/mission-dispatch.md` step 10, with three explicit evaluation axes: Iteration capture / Diagnose-before-patch / As-built design sync. The skill `harness-kakashi-creator` enforces it as a binding contract — operators don't have to remember it; the harness does.",
-            "ko": "이 루프의 오케스트레이션 뷰는 `harness/engine/mission-dispatch.md` step 10 에 있으며, 세 개의 명시적 평가 축을 가진다: Iteration capture / Diagnose-before-patch / As-built design sync. 스킬 `harness-kakashi-creator` 가 이를 binding contract 로 강제한다 — operator 가 외울 필요가 없다, 하네스가 외운다."
+            "en": "The orchestration view of this loop lives in `harness/engine/mission-dispatch.md` step 10, with three explicit evaluation axes: Iteration capture / Diagnose-before-patch / As-built design sync. The skill `harness-creator` enforces it as a binding contract — operators don't have to remember it; the harness does.",
+            "ko": "이 루프의 오케스트레이션 뷰는 `harness/engine/mission-dispatch.md` step 10 에 있으며, 세 개의 명시적 평가 축을 가진다: Iteration capture / Diagnose-before-patch / As-built design sync. 스킬 `harness-creator` 가 이를 binding contract 로 강제한다 — operator 가 외울 필요가 없다, 하네스가 외운다."
           }
         }
       ]

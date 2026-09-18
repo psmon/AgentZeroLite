@@ -1,6 +1,6 @@
 {
   "$schema": "kakashi-harness",
-  "$schemaVersion": "1.0.0",
+  "$schemaVersion": "1.2.0",
   "name": "AgentZero Lite Harness",
   "description": "QA & research garden for AgentZero Lite — Windows-native multi-CLI shell with on-device LLM experiments and prompt-injection-aware security review",
   "version": "1.13.0",

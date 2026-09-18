@@ -3,14 +3,24 @@
   "sort": "semver-desc",
   "items": [
     {
+      "file": "v1.13.0.md",
+      "title": "v1.13.0",
+      "heading": "device-smith 영입 (기기 쪽 빌드/디버그)",
+      "path": "v1.13.0.md",
+      "size": 4004,
+      "modified": "2026-09-17",
+      "author": "smpark-luna",
+      "committed": "2026-09-18"
+    },
+    {
       "file": "v1.12.1.md",
       "title": "v1.12.1",
       "heading": "B3 knowledge/test-debt adoption (agent-band docs + JS mini test runner)",
       "path": "v1.12.1.md",
       "size": 3834,
       "modified": "2026-08-29",
-      "author": null,
-      "committed": null
+      "author": "smpark-luna",
+      "committed": "2026-08-29"
     },
     {
       "file": "v1.12.0.md",
@@ -217,8 +227,8 @@
       "title": "README",
       "heading": "Harness — 정원",
       "path": "README.md",
-      "size": 1287,
-      "modified": "2026-05-28",
+      "size": 1169,
+      "modified": "2026-09-18",
       "author": "psmon",
       "committed": "2026-04-25"
     }
@@ -227,58 +237,58 @@
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 71.9
+      "percent": 67.6
     },
     {
       "name": "smpark-luna",
-      "commits": 48,
-      "percent": 28.1
+      "commits": 59,
+      "percent": 32.4
     }
   ],
   "contributorsAll": [
     {
       "name": "psmon",
       "commits": 123,
-      "percent": 71.9
+      "percent": 67.6
     },
     {
       "name": "smpark-luna",
-      "commits": 48,
-      "percent": 28.1
+      "commits": 59,
+      "percent": 32.4
     }
   ],
   "contributorsRecent": [
     {
       "name": "smpark-luna",
-      "commits": 7,
+      "commits": 5,
       "percent": 100
     }
   ],
   "contributorsWindowDays": 14,
   "commitStats": {
-    "totalAllTime": 171,
-    "last7d": 2,
-    "last30d": 20
+    "totalAllTime": 182,
+    "last7d": 5,
+    "last30d": 18
   },
   "topChangedFiles": [
     {
       "path": "harness/harness.config.json",
-      "commits": 5
+      "commits": 4
     },
     {
       "path": "harness/engine/pr-review.md",
       "commits": 3
     },
     {
-      "path": "harness/logs/pr-review/2026-08-21-11-05-pr12-p0-cleanup-merge-approval.md",
+      "path": "harness/logs/device-smith/2026-09-18-00-57-first-run-askbot-associate-race.md",
       "commits": 2
     },
     {
-      "path": "harness/docs/v1.10.0.md",
+      "path": "harness/knowledge/README.md",
       "commits": 2
     },
     {
-      "path": "harness/engine/audio-regression-review.md",
+      "path": "harness/knowledge/voice-curator/native-inference-lifetime.md",
       "commits": 2
     }
   ]

@@ -159,6 +159,6 @@ test-runner directly"*. Every collapse breaks audit, search, and
 the harness viewer's per-layer rendering. Worse, they reintroduce
 the hidden coupling that made earlier harnesses ungovernable.
 
-Tamer's job description (정원지기 카카시) is exactly to enforce these
+Tamer's job description (정원지기) is exactly to enforce these
 layers as the garden grows. Read this file every time you tend the
 garden.

@@ -45,7 +45,7 @@ The file IS the request log. It does not need to be copied elsewhere.
 
 1. Operator says **"M{NNNN} 수행해"** / **"M{NNNN} 진행해"** /
    **"run mission M{NNNN}"**.
-2. The tamer (kakashi summon, via `/harness-kakashi-creator`) reads
+2. The tamer (정원지기 summon, via `/harness-creator`) reads
    `harness/missions/M{NNNN}-*.md`.
 3. Tamer classifies the mission and dispatches to the matching specialist(s):
    - code change → `code-coach` (or direct edit)

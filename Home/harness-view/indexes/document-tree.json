@@ -136,6 +136,13 @@
     },
     {
       "type": "file",
+      "name": "loop-engineering.md",
+      "path": "loop-engineering.md",
+      "size": 16936,
+      "modified": "2026-08-30"
+    },
+    {
+      "type": "file",
       "name": "OsControl.md",
       "path": "OsControl.md",
       "size": 6318,
@@ -147,6 +154,20 @@
       "path": "resaerch-geema4.md",
       "size": 25431,
       "modified": "2026-05-28"
+    },
+    {
+      "type": "file",
+      "name": "wearable-device.kr.md",
+      "path": "wearable-device.kr.md",
+      "size": 6943,
+      "modified": "2026-09-17"
+    },
+    {
+      "type": "file",
+      "name": "wearable-device.md",
+      "path": "wearable-device.md",
+      "size": 6181,
+      "modified": "2026-09-17"
     }
   ]
 }

@@ -19,11 +19,11 @@
       "modified": "2026-08-12"
     },
     {
-      "id": "harness-kakashi-creator",
-      "name": "harness-kakashi-creator",
-      "description": "깡통 모드 카카시 하네스 — 새 프로젝트의 비어있는 4-layer (knowledge / agents / engine + logs) 정원을 부트스트랩하는 시작점. 이 AgentZero 하네스도 여기서 fork 되어 자라났다.",
+      "id": "harness-creator",
+      "name": "harness-creator",
+      "description": "깡통 모드 정원지기 하네스 — 새 프로젝트의 비어있는 4-layer (knowledge / agents / engine + logs) 정원을 부트스트랩하는 시작점. 이 AgentZero 하네스도 여기서 fork 되어 자라났다.",
       "source": "github.com/psmon/harness-kakashi",
-      "url": "https://github.com/psmon/harness-kakashi/blob/main/plugins/harness-kakashi/skills/harness-kakashi-creator/SKILL.md",
+      "url": "https://github.com/psmon/harness-kakashi/blob/main/plugins/harness-kakashi/skills/harness-creator/SKILL.md",
       "external": true
     },
     {

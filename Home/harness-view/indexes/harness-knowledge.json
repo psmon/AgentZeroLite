@@ -155,6 +155,15 @@
       "modified": "2026-05-28"
     },
     {
+      "id": "harness/knowledge/device-smith/wearable-device-toolchain.md",
+      "file": "harness/knowledge/device-smith/wearable-device-toolchain.md",
+      "name": "wearable-device-toolchain.md",
+      "title": "wearable-device-toolchain",
+      "heading": "웨어러블 기기 툴체인 — USB로 빌드·플래시·관찰",
+      "size": 8453,
+      "modified": "2026-09-17"
+    },
+    {
       "id": "harness/knowledge/music-curator/agent-band-mapping.md",
       "file": "harness/knowledge/music-curator/agent-band-mapping.md",
       "name": "agent-band-mapping.md",
@@ -383,6 +392,20 @@
           "path": "code-coach/wpf-xaml-resource-and-window-pitfalls.md",
           "size": 18952,
           "modified": "2026-05-28"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "name": "device-smith",
+      "path": "device-smith",
+      "children": [
+        {
+          "type": "file",
+          "name": "wearable-device-toolchain.md",
+          "path": "device-smith/wearable-device-toolchain.md",
+          "size": 8453,
+          "modified": "2026-09-17"
         }
       ]
     },

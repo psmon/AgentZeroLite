@@ -5,6 +5,7 @@
     "audio-regression-review",
     "build-doctor",
     "code-coach",
+    "device-smith",
     "herdr-adoption",
     "kakashi-copy",
     "mission-records",
@@ -21,20 +22,93 @@
     "agent-band": 9,
     "audio-regression-review": 1,
     "build-doctor": 6,
-    "code-coach": 25,
-    "herdr-adoption": 2,
+    "code-coach": 26,
+    "device-smith": 1,
+    "herdr-adoption": 3,
     "kakashi-copy": 1,
-    "mission-records": 28,
+    "mission-records": 29,
     "music-curator": 1,
-    "orca-adoption": 12,
+    "orca-adoption": 13,
     "pr-review": 1,
     "pre-commit-review": 8,
     "release-build-pipeline": 6,
     "security-guard": 8,
-    "tamer": 26,
+    "tamer": 31,
     "voice-curator": 5
   },
   "items": [
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-09-18-14-11-migrate-gardener-naming.md",
+      "date": "2026-09-18",
+      "time": "14:11",
+      "title": "migrate gardener naming",
+      "size": 7961
+    },
+    {
+      "category": "device-smith",
+      "file": "harness/logs/device-smith/2026-09-18-00-57-first-run-askbot-associate-race.md",
+      "date": "2026-09-18",
+      "time": "00:57",
+      "title": "first run askbot associate race",
+      "size": 8485
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-09-18-00-45-recruit-device-smith.md",
+      "date": "2026-09-18",
+      "time": "00:45",
+      "title": "recruit device smith",
+      "size": 4809
+    },
+    {
+      "category": "code-coach",
+      "file": "harness/logs/code-coach/2026-09-18-00-24-wearable-ble-reconnect-fixes.md",
+      "date": "2026-09-18",
+      "time": "00:24",
+      "title": "wearable ble reconnect fixes",
+      "size": 6968
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-09-12-08-13-terminal-link-detection.md",
+      "date": "2026-09-12",
+      "time": "08:13",
+      "title": "terminal link detection",
+      "size": 4802
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-31-00-53-modern-terminal-webview-spike.md",
+      "date": "2026-08-31",
+      "time": "00:53",
+      "title": "modern terminal webview spike",
+      "size": 3638
+    },
+    {
+      "category": "tamer",
+      "file": "harness/logs/tamer/2026-08-30-15-00-b4-product-polish.md",
+      "date": "2026-08-30",
+      "time": "15:00",
+      "title": "b4 product polish",
+      "size": 3906
+    },
+    {
+      "category": "herdr-adoption",
+      "file": "harness/logs/herdr-adoption/2026-08-29-15-30-h3-launch-h5-alias-h4-authority.md",
+      "date": "2026-08-29",
+      "time": "15:30",
+      "title": "h3 launch h5 alias h4 authority",
+      "size": 3674
+    },
+    {
+      "category": "orca-adoption",
+      "file": "harness/logs/orca-adoption/2026-08-29-15-30-budget-price-table-ui.md",
+      "date": "2026-08-29",
+      "time": "15:30",
+      "title": "budget price table ui",
+      "size": 2900
+    },
     {
       "category": "tamer",
       "file": "harness/logs/tamer/2026-08-29-14-40-b3-knowledge-test-debt.md",
@@ -1146,6 +1220,14 @@
       "time": null,
       "title": "M0030-수행결과",
       "size": 13426
+    },
+    {
+      "category": "mission-records",
+      "file": "harness/logs/mission-records/M0031-execution-result.md",
+      "date": null,
+      "time": null,
+      "title": "M0031-execution-result",
+      "size": 7161
     }
   ]
 }

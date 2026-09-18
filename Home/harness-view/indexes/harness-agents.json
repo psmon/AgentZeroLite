@@ -8,7 +8,7 @@
       "title": "build-doctor",
       "heading": "Build Doctor",
       "size": 5331,
-      "modified": "2026-05-28"
+      "modified": "2026-09-11"
     },
     {
       "id": "harness/agents/code-coach.md",
@@ -18,6 +18,15 @@
       "heading": "Code Coach",
       "size": 14525,
       "modified": "2026-05-28"
+    },
+    {
+      "id": "harness/agents/device-smith.md",
+      "file": "harness/agents/device-smith.md",
+      "name": "device-smith.md",
+      "title": "device-smith",
+      "heading": "Device Smith",
+      "size": 4710,
+      "modified": "2026-09-17"
     },
     {
       "id": "harness/agents/music-curator.md",
@@ -42,9 +51,9 @@
       "file": "harness/agents/tamer.md",
       "name": "tamer.md",
       "title": "tamer",
-      "heading": "정원지기 카카시 (Tamer)",
-      "size": 15044,
-      "modified": "2026-08-29"
+      "heading": "정원지기 (Tamer)",
+      "size": 14800,
+      "modified": "2026-09-18"
     },
     {
       "id": "harness/agents/test-runner.md",
