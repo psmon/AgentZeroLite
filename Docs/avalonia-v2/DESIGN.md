@@ -328,3 +328,19 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
 - **클라이언트**: `CliClient.Send`는 파이프 연결 실패 시 이유(+Windows에서 WPF 힌트)를 찍고 null. `terminal-wait`는 `terminal-read --last`
   폴링(WPF와 동일 옵션·종료 코드 0/2/3).
 - **래퍼**: `AgentZeroLite.ps1`(WPF 사본), `AgentZeroLite.sh`(`exec "$dir/AgentZeroLite" -cli "$@"`, .app의 Contents/MacOS에 동봉).
+
+## 구현 기록 — M0040 패키징/CI (2026-09-19)
+
+- **워크플로** `.github/workflows/avalonia-build.yml`: push(feat/avalonia-v2, 경로 필터) + dispatch. A windows-latest → ZeroCommon 테스트 →
+  호스트 테스트 → `selftest all` → win-x64 self-contained publish → `AgentZeroLite-Avalonia-v{ver}-win-x64.zip`. B macos-14 → osx-arm64 빌드 →
+  ZeroCommon 테스트(`--filter` 로 Windows 경로 픽스처 3개 제외) → 호스트 테스트 → publish → `-cli version`·`selftest all`·`.sh version` →
+  `macos/build-app.sh` → 번들 내 `AgentZeroLite.sh version` → `ditto` zip. 첫 초록: run 35370508727.
+- **.app**: `Contents/MacOS`에 publish 전체(관리 어셈블리·Avalonia/Skia/HarfBuzz·`libporta_pty.dylib`·`Wasm/`·래퍼), `Info.plist`
+  (`com.psmon.agentzerolite`, `LSMinimumSystemVersion 12.0`), `entitlements.plist`(.NET JIT 3종 + 루프백 서버/클라이언트), ad-hoc `codesign --deep`.
+  Developer ID/공증은 `harness/knowledge/_shared/code-signing.md` §7.
+- **macOS에서 확인된 사실**: Porta.Pty forkpty 스폰·에코·종료 OK, AES-GCM 파일 보호기 OK, NamedPipe IPC OK, `.sh` 래퍼 OK, 호스트 테스트 42 전부
+  통과. 짧게 끝나는 자식(`sh -c echo`)은 리더가 붙기 전에 pty 마스터의 출력이 버려질 수 있다 — 자가진단 자식은 1 s linger.
+- **미확인(사람 필요)**: WKWebView 렌더링·IME·z-order·Cmd 단축키 — `Docs/avalonia-v2/macos-smoke.md`.
+- **후속(main PR 전)**: Windows 경로를 전제한 ZeroCommon 픽스처 3개를 OS 인식으로; `AgentSkillGuides`에 `bot-ask`/`layout` 언급;
+  `AgentTest.ManagedConPtyHostTests.Write_reaches_child_stdin`은 병렬 실행 시 간헐(재실행 통과) — WPF 원본에도 M0035의 표준 핸들 발견을
+  적용할지 결정(이 브랜치는 WPF 무변경 원칙으로 보류).

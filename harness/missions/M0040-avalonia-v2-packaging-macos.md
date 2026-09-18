@@ -3,8 +3,9 @@ id: M0040
 title: Avalonia v2 ⑧ — 패키징/CI (win-x64 zip·osx-arm64 .app·macOS 스모크)
 operator: psmon
 language: ko
-status: in_progress
+status: done
 started: 2026-09-19T03:30:00+09:00
+finished: 2026-09-19T03:55:00+09:00
 priority: medium
 created: 2026-09-18
 related: [M0039]
