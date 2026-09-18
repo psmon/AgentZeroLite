@@ -63,6 +63,17 @@ public partial class App : Application
             {
                 Groups = () => vm.Groups,
                 ExecuteWindowCommand = vm.HandleHotkey,
+                BotAsk = text =>
+                {
+                    vm.BotVisible = true;
+                    vm.Bot.AttachActors();
+                    vm.Bot.AskAi(text);
+                },
+                BotChat = (from, message) =>
+                {
+                    vm.Bot.AttachActors();
+                    vm.Bot.ReceiveExternalChat(from, message);
+                },
                 LayoutStatus = () => (vm.ActiveWorkspace?.DockLayoutJson, vm.ActiveWorkspace?.Layout.PaneCount ?? 0, vm.ActiveWorkspace?.DisplayName),
             };
             _cliServer = CliServer.Start(router);

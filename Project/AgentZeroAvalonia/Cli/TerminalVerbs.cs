@@ -127,6 +127,37 @@ internal static class TerminalVerbs
         return 0;
     }
 
+    public static int BotChat(CliClient client, string[] args)
+    {
+        var from = "CLI";
+        var parts = new List<string>();
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i].Equals("--from", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) { from = args[++i]; continue; }
+            parts.Add(args[i]);
+        }
+        var message = string.Join(" ", parts).Trim();
+        if (message.Length == 0)
+        {
+            Console.Error.WriteLine("Usage: bot-chat <message> [--from <name>]");
+            return 1;
+        }
+        var request = "{\"command\":\"bot-chat\",\"message\":\"" + CliIpcProtocol.Escape(message) + "\",\"from\":\"" + CliIpcProtocol.Escape(from) + "\"}";
+        return Simple(client, request, root => $"Delivered to AgentBot (from={CliClient.Str(root, "from", from)}, {CliClient.Str(root, "message_length", "?")} chars).");
+    }
+
+    public static int BotAsk(CliClient client, string[] args)
+    {
+        var text = string.Join(" ", args).Trim();
+        if (text.Length == 0)
+        {
+            Console.Error.WriteLine("Usage: bot-ask <text...>");
+            return 1;
+        }
+        var request = "{\"command\":\"bot-ask\",\"text\":\"" + CliIpcProtocol.Escape(text) + "\"}";
+        return Simple(client, request, _ => "Sent to AgentBot (AI mode). Watch the pane or the log for [AIMODE] result.");
+    }
+
     private static bool TryTarget(string[] args, string usage, out int g, out int t)
     {
         g = t = -1;

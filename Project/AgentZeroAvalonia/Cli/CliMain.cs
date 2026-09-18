@@ -68,6 +68,8 @@ internal static class CliMain
             "terminal-key" => TerminalVerbs.Key(client, rest),
             "terminal-read" => TerminalVerbs.Read(client, rest),
             "layout" => TerminalVerbs.Layout(client, rest),
+            "bot-chat" => TerminalVerbs.BotChat(client, rest),
+            "bot-ask" => TerminalVerbs.BotAsk(client, rest),
             _ => Unknown(command),
         };
     }
@@ -165,6 +167,8 @@ internal static class CliMain
         Console.WriteLine("  terminal-key <g> <t> <key>        Send a key (cr, esc, tab, ctrlc, up, ...)");
         Console.WriteLine("  terminal-read <g> <t> [--last N]  Read the screen text (or the last N chars)");
         Console.WriteLine("  layout [status|split-right|split-down|close-tab|close-pane|add|next-tab|prev-tab|move-tab|focus-<dir>]");
+        Console.WriteLine("  bot-chat <message> [--from <name>]   Deliver a message to AgentBot (DONE(...) is the peer envelope)");
+        Console.WriteLine("  bot-ask <text...>                    Ask AgentBot in AI mode (starts an agent-loop turn)");
         Console.WriteLine();
         Console.WriteLine("The GUI answers over a named pipe (AgentZeroLite.cli); it must be running.");
     }

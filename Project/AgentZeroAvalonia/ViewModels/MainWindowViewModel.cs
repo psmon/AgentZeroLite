@@ -49,6 +49,9 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>The chords both the renderer and the window answer to.</summary>
     public IReadOnlyList<HotkeyBinding> Hotkeys { get; }
 
+    /// <summary>The AgentBot pane (M0037), fed the active terminal and the workspace list.</summary>
+    public AgentBotViewModel Bot { get; }
+
     /// <summary>The active tab, the active workspace, or the split layout changed — the view re-lays the renderers out.</summary>
     public event Action? ActiveTerminalChanged;
 
@@ -86,6 +89,20 @@ public partial class MainWindowViewModel : ObservableObject
 
         _persistTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _persistTimer.Tick += (_, _) => FlushPersist();
+
+        Bot = new AgentBotViewModel
+        {
+            ActiveSession = () => ActiveWorkspace?.ActiveTab?.Session,
+            ActiveSessionLabel = () => ActiveWorkspace?.ActiveTab is { } t ? $"{ActiveWorkspace.DisplayName} / {t.Title}" : null,
+            Groups = () => Groups,
+            ActiveDirectory = () => ActiveWorkspace?.DirectoryPath,
+            Post = a => Dispatcher.UIThread.Post(a),
+        };
+        Bot.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(AgentBotViewModel.Mode) or nameof(AgentBotViewModel.AiBusy))
+                BotStatus = $"Bot: {Bot.ModeLabel}" + (Bot.AiBusy ? " · working" : "");
+        };
     }
 
     public bool IsTerminalsPage => Page == AppPage.Terminals;
@@ -120,7 +137,11 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand] private void ShowTerminals() => Page = AppPage.Terminals;
     [RelayCommand] private void ShowSettings() => Page = Page == AppPage.Settings ? AppPage.Terminals : AppPage.Settings;
     [RelayCommand] private void ToggleSidebar() => SidebarExpanded = !SidebarExpanded;
-    [RelayCommand] private void ToggleBot() => BotVisible = !BotVisible;
+    [RelayCommand] private void ToggleBot()
+    {
+        BotVisible = !BotVisible;
+        if (BotVisible) Bot.AttachActors();
+    }
     [RelayCommand] private void NewTerminalDefault() => NewTerminal(CliDefinitions.FirstOrDefault());
     [RelayCommand] private void SplitRight() => Split(vertical: false);
     [RelayCommand] private void SplitDown() => Split(vertical: true);

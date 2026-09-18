@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             x:Class="AgentZeroAvalonia.Views.AgentBotView"
+             x:DataType="vm:AgentBotViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.bubble">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0,3" />
+            <Setter Property="Background" Value="{DynamicResource CyberBgDeep}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.bubble.user">
+            <Setter Property="Background" Value="#1f2a3a" />
+            <Setter Property="BorderBrush" Value="#2f4f7f" />
+            <Setter Property="Margin" Value="24,3,0,3" />
+        </Style>
+        <Style Selector="Border.bubble.bot">
+            <Setter Property="Margin" Value="0,3,24,3" />
+        </Style>
+        <Style Selector="Border.bubble.system">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,2" />
+        </Style>
+        <Style Selector="Border.bubble.tool">
+            <Setter Property="Background" Value="#1a2420" />
+            <Setter Property="BorderBrush" Value="#2f5f4f" />
+        </Style>
+        <Style Selector="Border.bubble.progress">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style Selector="TextBlock.body">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        </Style>
+        <Style Selector="Border.bubble.system TextBlock.body">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="TextBlock.detail">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, monospace" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style Selector="Button.mode">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="MinWidth" Value="44" />
+        </Style>
+        <Style Selector="Button.small">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel Margin="8">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2">
+                <Button Classes="small" Content="↻" ToolTip.Tip="New session (reset agent memory)"
+                        Command="{Binding NewSessionCommand}" IsVisible="{Binding IsAiMode}" />
+                <Button Classes="small" Content="■" ToolTip.Tip="Cancel the running turn"
+                        Command="{Binding CancelCommand}" IsVisible="{Binding AiBusy}" />
+            </StackPanel>
+            <TextBlock Text="AGENTBOT" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextDim}" />
+        </DockPanel>
+
+        <!-- Composer -->
+        <Border DockPanel.Dock="Bottom" Margin="0,6,0,0">
+            <DockPanel>
+                <Button DockPanel.Dock="Left" Classes="mode" Content="{Binding ModeLabel}"
+                        ToolTip.Tip="Cycle mode: CHT → KEY → AI" Command="{Binding CycleModeCommand}" Margin="0,0,6,0" />
+                <Button DockPanel.Dock="Right" Content="➤" Padding="8,3" Command="{Binding SendCommand}" Margin="6,0,0,0" />
+                <TextBox x:Name="InputBox" Text="{Binding Input}" Watermark="Message… (Enter to send)"
+                         AcceptsReturn="False" FontSize="12" />
+            </DockPanel>
+        </Border>
+        <TextBlock DockPanel.Dock="Bottom" Text="{Binding StatusLine}" FontSize="10"
+                   Foreground="{DynamicResource TextDim}" Margin="0,4,0,0" />
+
+        <!-- Transcript -->
+        <ScrollViewer x:Name="Transcript" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChatItem">
+                        <Border Classes="bubble"
+                                Classes.user="{Binding IsUser}" Classes.bot="{Binding IsBot}"
+                                Classes.system="{Binding IsSystem}" Classes.tool="{Binding IsTool}"
+                                Classes.progress="{Binding IsProgress}">
+                            <StackPanel>
+                                <DockPanel IsVisible="{Binding !IsSystem}">
+                                    <TextBlock DockPanel.Dock="Right" Classes="label" Text="{Binding TimeLabel}" />
+                                    <TextBlock Classes="label" Text="{Binding Label}" />
+                                </DockPanel>
+                                <TextBlock Classes="body" Text="{Binding Text}" />
+                                <TextBlock Classes="detail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

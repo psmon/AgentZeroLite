@@ -117,6 +117,13 @@ public sealed class ExternalAgentLoop : IAgentLoop
                 return true;
             }
 
+            // Gemma 4 may answer in its native call syntax rather than the envelope; take
+            // it as the envelope it means instead of spending a format correction on it.
+            if (GemmaNativeToolCall.TryConvert(assistantText, out var nativeEnvelope))
+            {
+                AppLogger.Log($"[ExternalAgentLoop] native tool-call syntax converted to the JSON envelope at iteration {iter}");
+                assistantText = nativeEnvelope;
+            }
             var rawJson = ExtractFirstJsonObject(assistantText!);
             if (rawJson is null)
             {

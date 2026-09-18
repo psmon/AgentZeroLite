@@ -283,3 +283,18 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
   같은 `{"command":"layout","sub":...}`, 응답에 `panes`와 저장 JSON.
 - **영속**: `WorkspaceViewModel.DockLayoutJson = Layout.ToJson(Tabs)`; 변경은 500 ms 디바운스 후 `SaveCliGroups`, 종료 시 즉시.
 - 골든 행이 로컬 DB에 없어 `DockPaneLayout.ToJson` 산출로 고정(페인에도 `"Vertical":false`).
+
+## 구현 기록 — M0037 AgentBot (2026-09-19)
+
+- **뷰모델** `AgentBotViewModel`: `Items`(User/Bot/System/Tool/Progress), `Mode`(`ChatModeCycle`, AI 가용성은
+  `AgentLoopWiring.Unavailability()`), `Send/CycleMode/NewSession/Cancel`. 액터 콜백은 `Post`(UI 스레드 마샬링, 테스트는 동기)로
+  `ApplyProgress/ApplyResult`에 들어온다. 첫 AI 요청은 봇 액터 부착(비동기 `CreateBot` Ask)이 끝날 때까지 보류된다.
+- **배선** `AgentLoopWiring.Build` = WPF `EnsureAgentLoopWiring`의 `AgentLoopBindings`(ToolbeltFactory / OptionsFactory /
+  AgentLoopFactory). Local은 `LlmService.Llm as LlamaSharpLocalLlm`이 있을 때만(=Windows), External은 전 OS.
+- **툴벨트** `WorkspaceToolHost`: 터미널 = `TerminalCatalogJson` + 핸드셰이크(`IntroduceTerminalIfFirst` Ask, `MarkHandshakeSent`,
+  `MarkConversationActive`), 키는 `CliCommandRouter.KeySequence` 재사용; 파일 = `FileToolCore`; `open_file`은
+  `Process.Start(UseShellExecute)`(Windows ShellExecute / macOS open); `stop_media`의 폴백 키는 Windows에서만; 웹 = headless.
+- **CLI** `bot-chat`(WPF와 같은 요청 `{command, message, from}`·응답 `{ok, from, message_length}`), `bot-ask`(신규, AI 턴 시작).
+- **ZeroCommon 추가 1건**: `Llm/Tools/GemmaNativeToolCall` — Gemma 4 네이티브 `<|tool_call>call: name{args}<tool_call|>`을
+  봉투로 변환. `ExternalAgentLoop`가 `ExtractFirstJsonObject` 전에 한 번 호출(교정 예산 소모 없음). WPF도 같은 혜택.
+- 측정: WebnoriA2 · gemma-4-e4b, 2 툴 턴 + done = 13.6 s(턴당 1.2–9.4 s, 모델 응답 시간이 전부).

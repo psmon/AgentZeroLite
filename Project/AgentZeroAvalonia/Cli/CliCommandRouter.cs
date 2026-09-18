@@ -25,6 +25,12 @@ internal sealed class CliCommandRouter
     /// <summary>Run a window command by id (the hotkey table's ids) — <c>-cli layout &lt;verb&gt;</c>.</summary>
     public Action<string>? ExecuteWindowCommand { get; set; }
 
+    /// <summary><c>bot-chat</c>: (from, message) into the AgentBot pane and on to the bot actor.</summary>
+    public Action<string, string>? BotChat { get; set; }
+
+    /// <summary><c>bot-ask</c>: hand a request to the agent loop as if typed in AI mode (agent-facing smoke).</summary>
+    public Action<string>? BotAsk { get; set; }
+
     /// <summary>The active workspace's split layout as stored JSON (null while unsplit), plus its pane count.</summary>
     public Func<(string? Json, int Panes, string? Workspace)>? LayoutStatus { get; set; }
 
@@ -65,6 +71,26 @@ internal sealed class CliCommandRouter
 
                     case "layout":
                         return Task.FromResult(Layout(root));
+
+                    case "bot-ask":
+                    {
+                        var text = root.TryGetProperty("text", out var tp2) ? tp2.GetString() ?? "" : "";
+                        if (BotAsk is null) return Task.FromResult(CliIpcProtocol.ErrorJson("AgentBot is not available in this host"));
+                        if (text.Trim().Length == 0) return Task.FromResult(CliIpcProtocol.ErrorJson("text is empty"));
+                        BotAsk(text);
+                        AppLogger.Log($"[IPC] bot-ask len={text.Length}");
+                        return Task.FromResult($"{{\"ok\":true,\"length\":{text.Length}}}");
+                    }
+
+                    case "bot-chat":
+                    {
+                        var message = root.TryGetProperty("message", out var mp) ? mp.GetString() ?? "" : "";
+                        var from = root.TryGetProperty("from", out var fp) ? fp.GetString() ?? "CLI" : "CLI";
+                        if (BotChat is null) return Task.FromResult(CliIpcProtocol.ErrorJson("AgentBot is not available in this host"));
+                        BotChat(from, message);
+                        AppLogger.Log($"[IPC] bot-chat from={from}, len={message.Length}");
+                        return Task.FromResult($"{{\"ok\":true,\"from\":\"{CliIpcProtocol.Escape(from)}\",\"message_length\":{message.Length}}}");
+                    }
 
                     default:
                         return Task.FromResult(CliIpcProtocol.ErrorJson($"unknown command '{command}' (not ported to the Avalonia host yet)"));

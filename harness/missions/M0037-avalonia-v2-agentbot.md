@@ -3,7 +3,9 @@ id: M0037
 title: Avalonia v2 ⑤ — AgentBot 채팅 + 에이전트 루프 (모드 순환·진행 카드·툴벨트)
 operator: psmon
 language: ko
-status: inbox
+status: done
+started: 2026-09-19T01:50:00+09:00
+finished: 2026-09-19T02:20:00+09:00
 priority: high
 created: 2026-09-18
 related: [M0036]

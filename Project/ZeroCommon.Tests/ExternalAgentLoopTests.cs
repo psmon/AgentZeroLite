@@ -430,7 +430,7 @@ public sealed class ExternalAgentLoopTests
         }
     }
 
-    private sealed class ScriptedProvider : ILlmProvider
+    internal sealed class ScriptedProvider : ILlmProvider
     {
         private readonly Queue<string> _scripts;
         public ScriptedProvider(IEnumerable<string> scripts) => _scripts = new Queue<string>(scripts);

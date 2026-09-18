@@ -123,12 +123,7 @@
             <Border Grid.Column="3" Width="360" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="1,0,0,0"
                     IsVisible="{Binding BotVisible}">
-                <DockPanel Margin="10">
-                    <TextBlock DockPanel.Dock="Top" Text="AGENTBOT" FontSize="10" FontWeight="Bold"
-                               Foreground="{DynamicResource TextDim}" />
-                    <TextBlock Text="Chat + agent loop land in M0037." TextWrapping="Wrap" FontSize="11"
-                               Foreground="{DynamicResource TextDim}" Margin="0,6" />
-                </DockPanel>
+                <views:AgentBotView DataContext="{Binding Bot}" />
             </Border>
         </Grid>
 
