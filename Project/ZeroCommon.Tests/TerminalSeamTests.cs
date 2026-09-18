@@ -215,7 +215,10 @@ public sealed class TerminalSeamTests
         // Long text goes through the chunked writer and ends with a CR.
         var big = new string('a', 450);
         await session.WriteAsync(big.AsMemory());
-        await Task.Delay(XtermTerminalSession.ChunkDelayMs * 3 + XtermTerminalSession.FinalDelayMs + 200);
+        // The write loop runs on the thread pool with 50 ms gaps between chunks; a busy CI
+        // runner schedules it late, so wait for the four writes rather than a fixed time.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (pty.Written.Count < 6 && DateTime.UtcNow < deadline) await Task.Delay(25);
         var chunks = pty.Written.Skip(2).ToList();
         Assert.Equal(new[] { 200, 200, 50, 1 }, chunks.Select(c => c.Length));
         Assert.Equal("\r", chunks[^1]);

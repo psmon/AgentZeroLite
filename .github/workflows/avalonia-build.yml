@@ -43,10 +43,15 @@ jobs:
         run: Project/AgentZeroAvalonia/bin/Release/net10.0/AgentZeroLite.exe -cli selftest all
       - name: Publish win-x64
         run: dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish-avalonia/win-x64
+      - name: Zip win-x64
+        shell: pwsh
+        run: |
+          $v = (Get-Content Project/AgentZeroWpf/version.txt -Raw).Trim()
+          Compress-Archive -Path publish-avalonia/win-x64/* -DestinationPath "publish-avalonia/AgentZeroLite-Avalonia-v$v-win-x64.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: AgentZeroLite-Avalonia-win-x64
-          path: publish-avalonia/win-x64
+          path: publish-avalonia/*.zip
 
   macos:
     name: B · macos-14 (build + osx-arm64 .app + self-test)
@@ -61,25 +66,27 @@ jobs:
         run: dotnet restore Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -r osx-arm64
       - name: Build
         run: dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --no-restore
+      # Three fixtures assert Windows path semantics (C:\ roots, pwsh.exe, .pem quoting); they
+      # test Windows-only code paths and are excluded here until they are made OS-aware.
       - name: Headless tests on macOS (ZeroCommon)
-        run: dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj -c Release
+        run: dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj -c Release --filter "FullyQualifiedName!~Mp3ScannerTests&FullyQualifiedName!~SshCommandBuilderTests&FullyQualifiedName!~WhisperModelStoreTests"
       - name: Host tests on macOS (codec, asset server, Porta.Pty)
         run: dotnet test Project/AgentZeroAvalonia.Tests/AgentZeroAvalonia.Tests.csproj -c Release
       - name: Publish osx-arm64
         run: dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -o publish-avalonia/osx-arm64
       - name: CLI self-test (no display)
         run: |
-          chmod +x publish-avalonia/osx-arm64/AgentZeroLite
+          chmod +x publish-avalonia/osx-arm64/AgentZeroLite publish-avalonia/osx-arm64/AgentZeroLite.sh
           publish-avalonia/osx-arm64/AgentZeroLite -cli version
           publish-avalonia/osx-arm64/AgentZeroLite -cli selftest all
-      - name: Bundle .app
+          publish-avalonia/osx-arm64/AgentZeroLite.sh version
+      - name: Bundle .app (ad-hoc signed)
         run: |
-          if [ -f Project/AgentZeroAvalonia/macos/build-app.sh ]; then
-            bash Project/AgentZeroAvalonia/macos/build-app.sh publish-avalonia/osx-arm64 publish-avalonia/AgentZeroLite.app
-          else
-            echo "build-app.sh arrives with M0040 — skipping bundle"
-          fi
+          v=$(tr -d '[:space:]' < Project/AgentZeroWpf/version.txt)
+          sh Project/AgentZeroAvalonia/macos/build-app.sh publish-avalonia/osx-arm64 publish-avalonia/AgentZeroLite.app "$v"
+          publish-avalonia/AgentZeroLite.app/Contents/MacOS/AgentZeroLite.sh version
+          cd publish-avalonia && ditto -c -k --keepParent AgentZeroLite.app "AgentZeroLite-Avalonia-v$v-osx-arm64.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: AgentZeroLite-Avalonia-osx-arm64
-          path: publish-avalonia
+          path: publish-avalonia/*.zip

@@ -110,3 +110,34 @@
 - 릴리스 파이프라인: `.github/workflows/release.yml`, `installer/AgentZeroLite.iss`
 - 릴리스 스킬: `.claude/skills/agent-zero-build`
 - 타임스탬프(`/tr`)는 항상 포함 — 인증서 만료 후에도 서명 유효.
+
+---
+
+## 7. macOS `.app` — Developer ID 서명·공증 (Avalonia 호스트, M0040)
+
+현재 상태: CI(`avalonia-build.yml` macos-14 잡)의 `Project/AgentZeroAvalonia/macos/build-app.sh`가 **ad-hoc 서명**(`codesign --sign -`)까지만
+한다. 다른 Mac에서는 `xattr -dr com.apple.quarantine AgentZeroLite.app` 후 실행(`Docs/avalonia-v2/macos-smoke.md`). Developer ID + 공증은
+아래 절차로 후속.
+
+전제: Apple Developer Program($99/년), `Developer ID Application: <Team> (<TEAMID>)` 인증서, `xcrun notarytool`.
+
+1. 서명 — 하드닝 런타임 + 엔타이틀먼트(`macos/entitlements.plist`: .NET JIT 때문에 `allow-jit`·`allow-unsigned-executable-memory`·
+   `disable-library-validation` 필수, 루프백 자산 서버/외부 LLM 때문에 `network.server`/`network.client`):
+   ```sh
+   codesign --force --deep --options runtime --timestamp \
+     --entitlements Project/AgentZeroAvalonia/macos/entitlements.plist \
+     --sign "Developer ID Application: <Team> (<TEAMID>)" AgentZeroLite.app
+   codesign --verify --deep --strict --verbose=2 AgentZeroLite.app
+   ```
+   `--deep`이 Avalonia/Skia/HarfBuzz·Porta.Pty(`libporta_pty.dylib`) 등 동봉 dylib까지 서명한다. 서명 후 번들 내용을 건드리면 깨진다.
+2. 공증 — `notarytool store-credentials AC_PROFILE --apple-id <id> --team-id <TEAMID> --password <app-specific>`(1회) 후:
+   ```sh
+   ditto -c -k --keepParent AgentZeroLite.app AgentZeroLite.zip
+   xcrun notarytool submit AgentZeroLite.zip --keychain-profile AC_PROFILE --wait
+   xcrun stapler staple AgentZeroLite.app
+   ditto -c -k --keepParent AgentZeroLite.app AgentZeroLite-Avalonia-vX-osx-arm64.zip   # 배포본은 스테이플 후 다시 압축
+   ```
+3. CI 배선(비밀 있을 때만): `MACOS_CERT_P12`(base64)·`MACOS_CERT_PASSWORD`·`AC_APPLE_ID`·`AC_TEAM_ID`·`AC_PASSWORD` → 임시 키체인에 import →
+   `build-app.sh` 뒤에 위 1·2 실행. 비밀이 없으면 ad-hoc 단계 유지(현재).
+4. 함정: 엔타이틀먼트를 줄이면 .NET 런타임이 기동 중 크래시; 공증이 "unsigned nested binary"로 거부되면 `--deep` 누락;
+   Windows 쪽 Certum 인증서는 Apple 서명에 쓸 수 없다(별도 Apple 인증서).
