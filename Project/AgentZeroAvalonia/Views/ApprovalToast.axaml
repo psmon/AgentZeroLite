@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             x:Class="AgentZeroAvalonia.Views.ApprovalToast"
+             x:DataType="vm:ApprovalToastViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.approval">
+            <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="MaxWidth" Value="400" />
+        </Style>
+        <Style Selector="Button.approvalopt">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+        <Style Selector="TextBlock.countdown">
+            <Setter Property="FontSize" Value="9" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.approvaltitle">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#C42B1C" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Classes="approval">
+        <StackPanel Spacing="4">
+            <!-- Header. The WPF toast uses Segoe MDL2 glyphs; plain text travels to macOS. -->
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="✕" FontSize="10" Padding="4,1"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="{DynamicResource TextDim}"
+                        ToolTip.Tip="Dismiss" Command="{Binding HideCommand}" />
+                <TextBlock Classes="approvaltitle" Text="⚠ Approval Required" />
+            </DockPanel>
+
+            <TextBlock Text="{Binding Command}" FontSize="11" TextWrapping="Wrap" MaxHeight="40"
+                       FontFamily="Cascadia Mono, Consolas, Menlo, monospace"
+                       Foreground="{DynamicResource TextPrimary}" />
+
+            <ItemsControl ItemsSource="{Binding Options}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ToastOption">
+                        <Button Classes="approvalopt" Content="{Binding Label}"
+                                Command="{Binding $parent[ItemsControl].((vm:ApprovalToastViewModel)DataContext).SelectOptionCommand}"
+                                CommandParameter="{Binding}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Classes="countdown" Text="{Binding RemainingSeconds, StringFormat='{}{0}s'}" />
+                <Button Content="Mute 5 min" FontSize="9" Padding="4,1"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="{DynamicResource TextDim}"
+                        ToolTip.Tip="Stop showing approval prompts for five minutes"
+                        Command="{Binding MuteCommand}" />
+            </DockPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

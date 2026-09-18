@@ -80,10 +80,14 @@ macOS: download `AgentZeroLite-Avalonia-v<ver>-osx-arm64.zip` from the *Avalonia
 | Split panes (right/down, close, move tab, focus by direction), layout restore | ✅ | `WorkspaceLayout<T>`; `CliGroup.LayoutJson` byte-identical to WPF |
 | Hotkeys, incl. while the renderer has focus | ✅ | one table; Ctrl→Cmd on macOS |
 | AgentBot: CHT / KEY / AI modes, progress + tool cards, handshake | ✅ | same actor topology (`/user/stage/bot/loop`) |
+| AgentBot UX: approval toast + auto-approve, URL bubbles, session header, clipboard attachment, key chords, selectable text | ✅ | `AgentEventStream` per active terminal; rules shared in `ZeroCommon/Agents` |
+| AgentBot as a docked pane **and** a floating window (Ctrl+Shift+`) | ✅ | one view model, two views; docked along the **bottom** as in WPF (280px, splitter, maximize keeps a 90px sliver of terminal), spanning everything but the activity bar. A sibling row, never an overlay — an Avalonia surface drawn over the terminal's native web view is invisible on macOS. WPF's other bottom tabs (OUTPUT/LOG/NOTE) are not converted, so there is no tab strip |
 | Tool belt: terminals, files, `find_files/open_file/stop_media`, web (headless) | ✅ | `WorkspaceToolHost` |
 | Settings: External LLM (+ test), CLI definitions CRUD, terminal appearance (live) | ✅ | Local LLM section on Windows only |
 | CLI: status, terminal-list/send/key/read/wait/alias (`--alias`), layout, bot-chat, bot-ask, web, selftest | ✅ | pipe `AgentZeroLite.cli`; `.ps1` / `.sh` wrappers |
 | CI: windows-latest + macos-14, win-x64 zip, `.app` bundle | ✅ | `.github/workflows/avalonia-build.yml` |
+| AgentBot skills: SkillSync, starter-pack import, `.agent-zero/` cache, slash autocomplete | ⏳ not yet | one dependency chain — the slash list is empty without SkillSync, which drives the Claude CLI through a Windows-only shell probe |
+| AgentBot voice (mic, VAD, STT, TTS, mute, delegation) | ⏳ not yet | needs the audio capture layer in ZeroCommon first; NAudio/WASAPI is Windows-only |
 | Browser page (tabbed WebView), OS control, Voice, Vision, Music, Remote, Wearable BLE, Note/Document viewers, Scrap, WebDev plugins | ⏳ not yet | second phase; web tools run headless meanwhile |
 | Local LLM on macOS (Metal) | ⏳ investigate | External providers only for now |
 | Installer, Developer ID signing / notarization | ⏳ | procedure in `harness/knowledge/_shared/code-signing.md` |

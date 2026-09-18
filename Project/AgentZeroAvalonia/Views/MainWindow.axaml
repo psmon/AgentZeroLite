@@ -40,15 +40,41 @@
         <Style Selector="Button.sidex:pointerover">
             <Setter Property="Foreground" Value="#f14c4c" />
         </Style>
+        <!-- M0041: bot pane chrome -->
+        <Style Selector="Button.chrome">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="5,1" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="Button.chrome:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        </Style>
+        <Style Selector="GridSplitter">
+            <Setter Property="Background" Value="{DynamicResource BorderColor}" />
+        </Style>
     </Window.Styles>
 
     <!-- The WPF MainWindow's frame: activity bar (48) · sidebar · content · status bar. -->
     <Grid RowDefinitions="*,24">
 
-        <Grid Grid.Row="0" ColumnDefinitions="48,Auto,*,Auto">
+        <Grid Grid.Row="0" x:Name="ShellGrid">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="48" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="300" />
+            </Grid.ColumnDefinitions>
+            <!-- Rows, as in the WPF host: content · bot splitter · bot dock. Heights are
+                 driven from code-behind so a hidden dock takes no space. -->
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" MinHeight="90" />
+                <RowDefinition Height="0" />
+                <RowDefinition Height="0" />
+            </Grid.RowDefinitions>
 
             <!-- Activity bar -->
-            <Border Grid.Column="0" Background="{DynamicResource CyberBgPanel}"
+            <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="3" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
@@ -66,7 +92,7 @@
             </Border>
 
             <!-- Sidebar: workspaces + the active workspace's sessions -->
-            <Border Grid.Column="1" Width="220" Background="{DynamicResource CyberBgPanel}"
+            <Border Grid.Column="1" Grid.Row="0" Width="220" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0"
                     IsVisible="{Binding SidebarExpanded}">
                 <DockPanel Margin="0,6">
@@ -112,18 +138,40 @@
             </Border>
 
             <!-- Content: one page at a time -->
-            <Panel Grid.Column="2">
+            <Panel Grid.Column="2" Grid.Row="0">
                 <views:TerminalsView IsVisible="{Binding IsTerminalsPage}" />
                 <Panel IsVisible="{Binding IsSettingsPage}">
                     <views:SettingsView DataContext="{Binding Settings}" />
                 </Panel>
             </Panel>
 
-            <!-- AgentBot pane (right dock) -->
-            <Border Grid.Column="3" Width="360" Background="{DynamicResource CyberBgPanel}"
-                    BorderBrush="{DynamicResource BorderColor}" BorderThickness="1,0,0,0"
-                    IsVisible="{Binding BotVisible}">
-                <views:AgentBotView DataContext="{Binding Bot}" />
+            <!-- AgentBot: a sibling row spanning everything but the activity bar, as in the
+                 WPF host. A sibling, never an overlay — on macOS an Avalonia surface drawn
+                 over the terminal's native web view is invisible, so the dock has to take
+                 space rather than float above the content. -->
+            <GridSplitter Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="BotSplitter"
+                          Height="6" ResizeDirection="Rows"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          IsVisible="{Binding BotDockVisible}" />
+            <Border Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="BotPane"
+                    Background="{DynamicResource CyberBgPanel}"
+                    BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0"
+                    IsVisible="{Binding BotDockVisible}">
+                <DockPanel>
+                    <!-- Pane chrome: undock · maximize/restore · close -->
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
+                                HorizontalAlignment="Right" Spacing="1" Margin="0,2,4,0">
+                        <Button Classes="chrome" Content="⧉" ToolTip.Tip="Float in its own window (Ctrl+Shift+`)"
+                                Command="{Binding UndockBotCommand}" />
+                        <Button Classes="chrome" Content="▣" ToolTip.Tip="Maximize / restore the pane"
+                                Command="{Binding ToggleBotMaximizedCommand}" />
+                        <Button Classes="chrome" Content="✕" ToolTip.Tip="Close the bot"
+                                Command="{Binding CloseBotCommand}" />
+                    </StackPanel>
+                    <Panel>
+                        <views:AgentBotView DataContext="{Binding Bot}" />
+                    </Panel>
+                </DockPanel>
             </Border>
         </Grid>
 

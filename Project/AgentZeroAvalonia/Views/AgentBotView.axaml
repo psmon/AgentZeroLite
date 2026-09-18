@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             xmlns:views="using:AgentZeroAvalonia.Views"
              x:Class="AgentZeroAvalonia.Views.AgentBotView"
              x:DataType="vm:AgentBotViewModel">
 
@@ -70,55 +71,231 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
         </Style>
+
+        <!-- M0041 -->
+        <Style Selector="Border.bubble.termout">
+            <Setter Property="Background" Value="#1f2a3a" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="Margin" Value="12,3,0,3" />
+        </Style>
+        <Style Selector="Border.bubble.termin">
+            <Setter Property="Background" Value="#1a2420" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberTealBrush}" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="Margin" Value="0,3,12,3" />
+        </Style>
+        <Style Selector="Border.bubble.url">
+            <Setter Property="Background" Value="#1a2b2b" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberTealBrush}" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+        </Style>
+        <Style Selector="Border.optionsbar">
+            <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style Selector="Border.attachtag">
+            <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="4,2" />
+        </Style>
+        <Style Selector="Border.toast">
+            <Setter Property="Background" Value="{DynamicResource CyberBgToolbar}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style Selector="Button.minikey">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="MinWidth" Value="26" />
+        </Style>
+        <Style Selector="Button.chip">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="4,1" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Foreground" Value="{DynamicResource CyberYellowBrush}" />
+        </Style>
+        <Style Selector="Button.linkbtn">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Foreground" Value="{DynamicResource CyberTealBrush}" />
+        </Style>
+        <Style Selector="Thumb.inputresize">
+            <Setter Property="Background" Value="{DynamicResource BorderColor}" />
+            <Setter Property="Cursor" Value="SizeNorthSouth" />
+        </Style>
+        <Style Selector="TextBlock.sessiongroup">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
+        </Style>
+        <Style Selector="TextBlock.sessiontab">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource CyberMagentaBrush}" />
+        </Style>
+        <Style Selector="SelectableTextBlock.body">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        </Style>
+        <Style Selector="Border.bubble.system SelectableTextBlock.body">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="SelectableTextBlock.detail">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, monospace" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
     </UserControl.Styles>
 
     <DockPanel Margin="8">
-        <!-- Header -->
-        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <!-- Header: session (group / tab) + options toggle + AI controls -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2">
                 <Button Classes="small" Content="↻" ToolTip.Tip="New session (reset agent memory)"
                         Command="{Binding NewSessionCommand}" IsVisible="{Binding IsAiMode}" />
                 <Button Classes="small" Content="■" ToolTip.Tip="Cancel the running turn"
                         Command="{Binding CancelCommand}" IsVisible="{Binding AiBusy}" />
+                <Button Classes="small" Content="⋯" ToolTip.Tip="Toggle options"
+                        Command="{Binding ToggleOptionsCommand}" />
             </StackPanel>
-            <TextBlock Text="AGENTBOT" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextDim}" />
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Text="AGENTBOT" FontSize="10" FontWeight="Bold"
+                           Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding HasSession}">
+                    <TextBlock Text="·" Classes="label" VerticalAlignment="Center" />
+                    <TextBlock Classes="sessiongroup" Text="{Binding SessionGroup}" VerticalAlignment="Center" />
+                    <TextBlock Text="/" Classes="label" VerticalAlignment="Center" />
+                    <TextBlock Classes="sessiontab" Text="{Binding SessionTab}" VerticalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
         </DockPanel>
+
+        <!-- Options bar (collapsible) -->
+        <Border DockPanel.Dock="Top" Classes="optionsbar" IsVisible="{Binding OptionsExpanded}">
+            <WrapPanel Orientation="Horizontal">
+                <TextBlock Text="Auto-approve delay" Classes="label" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBox Text="{Binding AutoApproveDelayText}" Width="34" FontSize="11"
+                         ToolTip.Tip="Seconds to wait before answering (0–30, 0 = at once)" Margin="0,0,10,0" />
+                <CheckBox IsChecked="{Binding AutoApprove}" Content="Auto" FontSize="11" Margin="0,0,10,0"
+                          ToolTip.Tip="Answer terminal approval prompts automatically" />
+                <CheckBox IsChecked="{Binding HideSystemMessages}" Content="Hide notices" FontSize="11"
+                          ToolTip.Tip="Keep auto-approve lines, session banners and timings out of the chat" />
+            </WrapPanel>
+        </Border>
 
         <!-- Composer -->
         <Border DockPanel.Dock="Bottom" Margin="0,6,0,0">
             <DockPanel>
                 <Button DockPanel.Dock="Left" Classes="mode" Content="{Binding ModeLabel}"
-                        ToolTip.Tip="Cycle mode: CHT → KEY → AI" Command="{Binding CycleModeCommand}" Margin="0,0,6,0" />
-                <Button DockPanel.Dock="Right" Content="➤" Padding="8,3" Command="{Binding SendCommand}" Margin="6,0,0,0" />
-                <TextBox x:Name="InputBox" Text="{Binding Input}" Watermark="Message… (Enter to send)"
-                         AcceptsReturn="False" FontSize="12" />
+                        ToolTip.Tip="Cycle mode: CHT → KEY → AI (Shift+Tab)"
+                        Command="{Binding CycleModeCommand}" Margin="0,0,6,0" />
+                <Button DockPanel.Dock="Right" Content="➤" Padding="8,3"
+                        Command="{Binding SendCommand}" Margin="6,0,0,0" />
+                <TextBox x:Name="InputBox" Text="{Binding Input}"
+                         Watermark="Message… (Enter to send, Shift+Enter for a new line)"
+                         AcceptsReturn="True" TextWrapping="Wrap" FontSize="12"
+                         MaxHeight="{Binding InputMaxHeight}" VerticalContentAlignment="Top" />
             </DockPanel>
         </Border>
+
+        <!-- Mini key pad -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+            <Button DockPanel.Dock="Left" Classes="small" Content="⌨" ToolTip.Tip="Toggle key buttons"
+                    Command="{Binding ToggleMiniKeysCommand}" />
+            <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding MiniKeysExpanded}">
+                <Button Classes="minikey" Content="◀" ToolTip.Tip="Left"  Command="{Binding SendMiniKeyCommand}" CommandParameter="left" />
+                <Button Classes="minikey" Content="▲" ToolTip.Tip="Up"    Command="{Binding SendMiniKeyCommand}" CommandParameter="up" />
+                <Button Classes="minikey" Content="▼" ToolTip.Tip="Down"  Command="{Binding SendMiniKeyCommand}" CommandParameter="down" />
+                <Button Classes="minikey" Content="▶" ToolTip.Tip="Right" Command="{Binding SendMiniKeyCommand}" CommandParameter="right" />
+                <Button Classes="minikey" Content="⏎" ToolTip.Tip="Enter" Command="{Binding SendMiniKeyCommand}" CommandParameter="enter" />
+                <Button Classes="minikey" Content="⇥" ToolTip.Tip="Tab"   Command="{Binding SendMiniKeyCommand}" CommandParameter="tab" />
+                <Button Classes="minikey" Content="esc" ToolTip.Tip="Escape" Command="{Binding SendMiniKeyCommand}" CommandParameter="esc" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Clipboard attachment chip -->
+        <Border DockPanel.Dock="Bottom" Classes="attachtag" Margin="0,4,0,0"
+                IsVisible="{Binding AttachmentTag, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="small" Content="✕" ToolTip.Tip="Remove the attachment"
+                        Command="{Binding ClearAttachmentCommand}" />
+                <Button Classes="chip" Command="{Binding PreviewAttachmentCommand}"
+                        ToolTip.Tip="Show a preview in the chat"
+                        Content="{Binding AttachmentTag}" />
+            </DockPanel>
+        </Border>
+
+        <!-- Input resize grip: drag up to make the composer taller -->
+        <Thumb DockPanel.Dock="Bottom" Classes="inputresize" Height="5" Margin="0,4,0,0"
+               DragDelta="OnInputResize" />
+
         <TextBlock DockPanel.Dock="Bottom" Text="{Binding StatusLine}" FontSize="10"
                    Foreground="{DynamicResource TextDim}" Margin="0,4,0,0" />
 
-        <!-- Transcript -->
-        <ScrollViewer x:Name="Transcript" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Items}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ChatItem">
-                        <Border Classes="bubble"
-                                Classes.user="{Binding IsUser}" Classes.bot="{Binding IsBot}"
-                                Classes.system="{Binding IsSystem}" Classes.tool="{Binding IsTool}"
-                                Classes.progress="{Binding IsProgress}">
-                            <StackPanel>
-                                <DockPanel IsVisible="{Binding !IsSystem}">
-                                    <TextBlock DockPanel.Dock="Right" Classes="label" Text="{Binding TimeLabel}" />
-                                    <TextBlock Classes="label" Text="{Binding Label}" />
-                                </DockPanel>
-                                <TextBlock Classes="body" Text="{Binding Text}" />
-                                <TextBlock Classes="detail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <!-- Transcript, with the toasts over it. Both overlay Avalonia content only —
+             the terminal's native web view lives in TerminalsView, never under this pane. -->
+        <Panel>
+            <ScrollViewer x:Name="Transcript" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ChatItem">
+                            <Border Classes="bubble"
+                                    Classes.user="{Binding IsUser}" Classes.bot="{Binding IsBot}"
+                                    Classes.system="{Binding IsSystem}" Classes.tool="{Binding IsTool}"
+                                    Classes.progress="{Binding IsProgress}"
+                                    Classes.termout="{Binding IsTerminalOut}" Classes.termin="{Binding IsTerminalIn}"
+                                    Classes.url="{Binding IsUrl}">
+                                <StackPanel>
+                                    <DockPanel IsVisible="{Binding !IsSystem}">
+                                        <TextBlock DockPanel.Dock="Right" Classes="label" Text="{Binding TimeLabel}" />
+                                        <TextBlock Classes="label" Text="{Binding Label}" />
+                                    </DockPanel>
+                                    <SelectableTextBlock Classes="body" Text="{Binding Text}"
+                                                         IsVisible="{Binding !IsUrl}" />
+                                    <Button Classes="linkbtn" Content="{Binding Text}" IsVisible="{Binding IsUrl}"
+                                            ToolTip.Tip="Open in the browser"
+                                            Command="{Binding $parent[ItemsControl].((vm:AgentBotViewModel)DataContext).OpenLinkCommand}"
+                                            CommandParameter="{Binding}" />
+                                    <SelectableTextBlock Classes="detail" Text="{Binding Detail}"
+                                                         IsVisible="{Binding HasDetail}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Mode toast -->
+            <Border Classes="toast" HorizontalAlignment="Center" VerticalAlignment="Top" ZIndex="99"
+                    IsVisible="{Binding ModeToast, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding ModeToast}" FontSize="11" FontWeight="Bold"
+                           Foreground="{DynamicResource CyberCyanBrush}" />
+            </Border>
+
+            <!-- Approval toast -->
+            <Panel HorizontalAlignment="Stretch" VerticalAlignment="Top" ZIndex="100"
+                   IsVisible="{Binding Approval.IsOpen}">
+                <views:ApprovalToast DataContext="{Binding Approval}" />
+            </Panel>
+        </Panel>
     </DockPanel>
 </UserControl>

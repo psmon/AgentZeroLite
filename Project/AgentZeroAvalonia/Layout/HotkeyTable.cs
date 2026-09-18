@@ -26,6 +26,9 @@ public static class HotkeyTable
     public const string FocusDown = "layout.focus-down";
     public const string BotToggle = "bot.toggle";
 
+    /// <summary>Move the bot between the docked pane and its own window (M0041).</summary>
+    public const string BotEmbedToggle = "bot.embed-toggle";
+
     /// <summary>Host defaults for ids the WPF suggested table does not bind.</summary>
     public static readonly IReadOnlyDictionary<string, string> HostDefaults = new Dictionary<string, string>
     {
@@ -39,6 +42,7 @@ public static class HotkeyTable
         [FocusUp] = "Alt+Up",
         [FocusDown] = "Alt+Down",
         [BotToggle] = "Ctrl+Alt+B",
+        [BotEmbedToggle] = "Ctrl+Shift+Backquote",
     };
 
     /// <summary>Ids this host implements; anything else in the settings is ignored here.</summary>
@@ -47,6 +51,7 @@ public static class HotkeyTable
         WindowCommandIds.SplitRight, WindowCommandIds.SplitDown, WindowCommandIds.CloseTab,
         WindowCommandIds.TerminalAdd, WindowCommandIds.PanelToggle,
         NextTab, PrevTab, MoveTabNextPane, ClosePane, FocusLeft, FocusRight, FocusUp, FocusDown, BotToggle,
+        BotEmbedToggle,
     };
 
     public static IReadOnlyList<HotkeyBinding> Build(ShortcutSettings? settings, bool isMac)
@@ -104,6 +109,10 @@ public static class HotkeyTable
         Key.Return => "Enter",
         Key.OemPlus => "Plus",
         Key.OemMinus => "Minus",
+        // Spelled the way the renderer reports it. term.js matches e.key OR e.code, and with
+        // Shift held e.key is "~" - only e.code === "Backquote" matches. Spelling this
+        // "OemTilde" would work in the window and fail silently inside a focused terminal.
+        Key.OemTilde => "Backquote",
         _ => key.ToString(),
     };
 }
