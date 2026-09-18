@@ -1,7 +1,11 @@
 using Akka.Actor;
 using Akka.Configuration;
+using Agent.Common.Actors;
+using Agent.Common.Llm.Tools;
 using Agent.Common.Voice;
 using Agent.Common.Wearable;
+using Agent.Common.Wearable.Actors;
+using Agent.Common.Web;
 using ZeroWearable.Actors;
 using ZeroWearable.Agent;
 using ZeroWearable.Ble;
@@ -73,12 +77,19 @@ public static class Program
         if (Arg(args, "--speak") is { } speakText) return Speak(voice, speakText, args);
         if (Arg(args, "--hear") is { } hearPath) return Hear(stt, hearPath, args);
 
-        var brain = WearableBrainFactory.Create(settings, (level, message) => Log("brain", level, message),
-            out var brainStatus);
+        // Two shapes of brain: AgentZero's own agent is an actor subtree (M0032), an agent
+        // CLI is a child process beside the actor system. Only one is ever non-null.
+        IWearableBrain? brain = null;
+        WearableAgentPlan? plan = null;
+        string brainStatus;
+        if (WearableBrainFactory.UsesAgentActor(settings))
+            plan = WearableBrainFactory.CreateAgentPlan(settings, (level, message) => Log("brain", level, message), out brainStatus);
+        else
+            brain = WearableBrainFactory.CreateCliBrain(settings, (level, message) => Log("brain", level, message), out brainStatus);
 
         if (Arg(args, "--ask") is { } askText)
         {
-            var code = Ask(brain, askText, Arg(args, "--session") ?? "console", Arg(args, "--lang"));
+            var code = Ask(brain, plan, settings, askText, Arg(args, "--session") ?? "console", Arg(args, "--lang"));
             brain?.DisposeAsync().AsTask().GetAwaiter().GetResult();
             return code;
         }
@@ -111,7 +122,9 @@ public static class Program
         using var system = ActorSystem.Create(settings.SystemName, hocon);
 
         var ask = system.ActorOf(Props.Create(() => new AskActor()), "ask");
-        var chat = system.ActorOf(Props.Create(() => new ChatActor(settings, voice, stt, brain)), "chat");
+        var agent = plan is null ? null : SpawnAgent(system, plan, settings);
+        var agentName = plan?.Name;
+        var chat = system.ActorOf(Props.Create(() => new ChatActor(settings, voice, stt, brain, agent, agentName)), "chat");
         stt.Preload();
 
         Log("host", "info", $"--- run started {DateTime.Now:yyyy-MM-dd HH:mm:ss} ---");
@@ -119,7 +132,10 @@ public static class Program
         Log("host", "info", $"up as akka.tcp://{settings.SystemName}@{advertise}:{settings.RemotingPort}");
         Log("host", "info", "  /user/ask    echo actor (protocol smoke test)");
         Log("host", "info", "  /user/chat   conversation actor, shared by AskBot, Chat and the proxy");
-        Log("brain", "info", brain is null ? $"off — {brainStatus}" : brainStatus);
+        if (agent is not null)
+            Log("host", "info", "  /user/agent  AgentZero's agent (sessions + /files + /web tool actors)");
+        Log("brain", "info", brain is null && plan is null ? $"off — {brainStatus}" : brainStatus);
+        LogTools(settings);
         Log("voice", "info", $"out: {voice.Status}");
         if (voice.Available) Log("voice", "info", $"     voices: {string.Join(" ", voice.AvailableVoices)}");
         Log("stt", "info", $"in:  {stt.Status}");
@@ -239,15 +255,17 @@ public static class Program
                 // what it answered without holding the watch.
                 if (line.StartsWith("? "))
                 {
-                    if (brain is null)
+                    if (brain is null && agent is null)
                     {
                         Console.WriteLine($"  brain is off — {brainStatus}");
                         continue;
                     }
                     try
                     {
-                        var answer = brain.AskAsync(line[2..], "console", null, CancellationToken.None)
-                            .GetAwaiter().GetResult();
+                        var answer = agent is not null
+                            ? AskAgent(system, agent, line[2..], "console", null)
+                            : brain!.AskAsync(line[2..], "console", null, CancellationToken.None)
+                                .GetAwaiter().GetResult();
                         Console.WriteLine($"  <- {answer}");
                     }
                     catch (Exception ex)
@@ -316,19 +334,34 @@ public static class Program
     /// <summary>
     /// <c>AgentZeroWearable.exe --ask "..."</c> — one question through the configured brain,
     /// no watch and no radio needed. What the Wearable panel's "Test brain" button runs.
+    /// The agent brains go through the same actor subtree the watch uses (a local, non-remoting
+    /// ActorSystem stands in for the host's), so this smoke test exercises the real path.
     /// </summary>
-    private static int Ask(IWearableBrain? brain, string text, string session, string? language)
+    private static int Ask(IWearableBrain? brain, WearableAgentPlan? plan, WearableSettings settings,
+        string text, string session, string? language)
     {
-        if (brain is null)
+        if (brain is null && plan is null)
         {
             Console.Error.WriteLine("[brain/error] no brain configured — see Settings → LLM");
             return 3;
         }
-        Console.WriteLine($"brain: {brain.Status}");
+        Console.WriteLine($"brain: {brain?.Status ?? plan!.Status}");
         try
         {
-            var answer = brain.AskAsync(text, session, language, CancellationToken.None)
-                .GetAwaiter().GetResult();
+            string answer;
+            if (plan is not null)
+            {
+                using var system = ActorSystem.Create("AskBotConsole");
+                var agent = SpawnAgent(system, plan, settings);
+                LogTools(settings);
+                answer = AskAgent(system, agent, text, session, language);
+                system.Terminate().GetAwaiter().GetResult();
+            }
+            else
+            {
+                answer = brain!.AskAsync(text, session, language, CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
             Console.WriteLine($"<- {answer}");
             return 0;
         }
@@ -337,6 +370,73 @@ public static class Program
             Console.Error.WriteLine($"[brain/error] {ex.Message}");
             return 4;
         }
+    }
+
+    /// <summary>
+    /// The agent subtree: <c>/user/agent</c> with <c>/files</c> (allow-listed folders,
+    /// open_file) and <c>/web</c> (the GUI's Browser page through <c>-cli web</c>, else a
+    /// headless fetch) underneath, and one AgentLoopActor per conversation created on demand.
+    /// </summary>
+    private static IActorRef SpawnAgent(ActorSystem system, WearableAgentPlan plan, WearableSettings settings)
+    {
+        var roots = new AllowedRootResolver(settings.AllowedRoots);
+        Func<bool> stopKey = MediaKeys.SendStop;   // user32 stays host-side; the actor only knows a delegate
+        var filesProps = Props.Create(() => new FileToolActor(roots, null, stopKey, null));
+
+        var hostDir = AppContext.BaseDirectory;
+        var guiExePath = settings.GuiExePath;
+        var gui = new GuiCliWebToolSurface(
+            () => GuiCliWebToolSurface.ResolveGuiExe(guiExePath, hostDir),
+            (level, message) => Log("web", level, message));
+        var headless = new HeadlessWebToolSurface();
+        var webEnabled = settings.WebToolsEnabled;
+        var webMaxChars = settings.WebMaxChars;
+        var webProps = Props.Create(() => new WebToolActor(gui, headless, webEnabled, webMaxChars));
+
+        var bindings = plan.Bindings;
+        var owned = plan.Owned;
+        return system.ActorOf(Props.Create(() => new WearableAgentActor(bindings, filesProps, webProps, owned)), "agent");
+    }
+
+    /// <summary>
+    /// One question, synchronously, through the agent actor — for the console and
+    /// <c>--ask</c>. Progress messages are printed as they arrive so a slow tool call is
+    /// visible instead of a silent wait.
+    /// </summary>
+    private static string AskAgent(ActorSystem system, IActorRef agent, string text, string session, string? language)
+    {
+        var inbox = Inbox.Create(system);
+        agent.Tell(new WearableAgentActor.Ask(session, 1, text, language), inbox.Receiver);
+        var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            var message = inbox.Receive(deadline - DateTime.UtcNow);
+            switch (message)
+            {
+                case WearableAgentActor.Progress p when p.Phase == AgentLoopPhase.Acting:
+                    Console.WriteLine($"   .. tool {p.Text} (round {p.Round})");
+                    break;
+                case WearableAgentActor.Answer a:
+                    if (a.Success) return a.Text.Trim().Length > 0 ? a.Text.Trim() : "I have no answer for that.";
+                    throw new InvalidOperationException(a.FailureReason ?? a.Text);
+            }
+        }
+        throw new TimeoutException("the agent did not answer within 5 minutes");
+    }
+
+    /// <summary>What the watch's agent may reach on this PC, said once at startup.</summary>
+    private static void LogTools(WearableSettings settings)
+    {
+        var roots = new AllowedRootResolver(settings.AllowedRoots);
+        Log("tools", "info", roots.IsEmpty
+            ? "files: none — add allowed folders in the Wearable panel"
+            : "files: " + string.Join(", ", roots.Roots.Select(r => r.Alias + (r.Writable ? " (rw)" : " (ro)"))));
+        var gui = GuiCliWebToolSurface.ResolveGuiExe(settings.GuiExePath, AppContext.BaseDirectory);
+        Log("tools", "info", !settings.WebToolsEnabled
+            ? "web: off"
+            : gui is null
+                ? "web: headless only (AgentZeroLite.exe not found for the Browser page)"
+                : $"web: GUI Browser page when running, else headless ({gui})");
     }
 
     /// <summary>

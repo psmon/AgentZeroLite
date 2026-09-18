@@ -46,6 +46,13 @@ public static class AgentSkillGuides
         Peer messaging (report back to the AgentBot coordinator):
           bot-chat "DONE(<msg>)" --from <yourName>
 
+        Web (the GUI's Browser page — the same tabs web_search / web_open / web_read use):
+          web search "<query>" [--max N]      DuckDuckGo results as JSON rows.
+          web open <url> [--tab N]            Open a page in a tab; prints its summary.
+          web read [--tab N] [--mode summary|links|find] [--find <kw>]
+                                              Extract an open tab's text as JSON.
+          web tabs                            List open tabs.
+
         Workspaces (git worktrees — isolated parallel checkouts):
           worktree list                       Show this repo's worktrees.
           worktree add <path> [branch]        Create an isolated worktree.

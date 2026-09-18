@@ -40,6 +40,37 @@ Mitigations to look for:
 - MMF naming includes a per-process random suffix or session-scoped token.
 - Rate / concurrency limits to prevent flooding.
 
+## Wearable tool surface (M0032) — files, open_file, web
+
+The wearable host (`AgentZeroWearable.exe`) lets a device across the room read files
+and browse the web through a tool-calling model. Three boundaries, each pure and
+unit-tested in `ZeroCommon.Tests`:
+
+| Boundary | Where | What holds it |
+|---|---|---|
+| Allow-listed folders | `Llm/Tools/AllowedRootResolver.cs` + `FileToolCore.TryResolve` | `alias/relative/path` only; absolute paths, `:`/ADS, `..` and unknown aliases refused at the resolver, and the resolved path is re-checked against the root by `FileToolCore`. Real paths never appear in envelopes. Writes need the per-folder `Writable` grant. |
+| `open_file` → ShellExecute | `Llm/Tools/FileOpenPolicy.cs`, `Wearable/Actors/FileToolActor.cs` | Extension **allow-list** (media / image / document). `.exe .lnk .ps1 .bat .cmd .js .msi .html` and everything unlisted are refused; `song.mp3.exe` is `.exe`. The file must exist inside an allowed root. |
+| Web content → model | `Web/HeadlessWebFetcher.cs`, `Web/WebPageExtractor.cs`, `AgentToolGrammar` prompt | http(s) only; loopback / link-local / `localhost` refused on the requested URL **and** on the redirect target; 15 s / 2 MB caps. Page text is delivered as data under `source: untrusted web content`, the system prompt says never to follow instructions in it, and the watch frame repeats it. |
+
+Two more outbound calls since follow-up #1, both GET, both through the same fetcher
+policy: `web_search` opens its first result (`top_page`), and a weather question also
+asks `https://wttr.in/<place>?format=j1` — the place is a word from the user's own query,
+URL-escaped. `stop_media` may close a player process; it only touches the process
+ShellExecute returned or a known player that started after our launch, else it sends the
+system media-stop key.
+
+Threat surface still open (accepted, tracked):
+- Junctions / symlinks inside an allowed root are not resolved (`GetFullPath` does not
+  follow them) — same property as the main app's workspace sandbox.
+- Private LAN addresses are reachable by the headless fetch on purpose (a home NAS is
+  a legitimate target); only loopback and link-local are blocked.
+- `wearable-settings.json` `GuiExePath` names the exe the web bridge launches — it is the
+  user's own settings file (same trust as the app), but a tampered file is a tampered
+  launcher.
+- Prompt injection is mitigated by framing, not prevented; a model can still be talked
+  into calling `web_open` on a page's link. Consequences are bounded by the tool policy
+  above (no shell, no terminals, no writes outside `Writable` roots).
+
 ## Native binary trust
 
 DLLs that ship with the app:

@@ -216,7 +216,77 @@ public static class FileToolCore
         return JsonSerializer.Serialize(new { ok = true, count = entries.Count, truncated, entries });
     }
 
+    /// <summary>The "any kind" filter for <see cref="FindFiles"/>.</summary>
+    public const string KindAny = "any";
+
+    /// <summary>
+    /// Find files by kind and name words (M0032 follow-up #2). A small model asked to
+    /// "play some 이문세" reliably calls one search and unreliably walks a folder tree, so
+    /// the walk lives here: every file under the root is classified with
+    /// <see cref="FileOpenPolicy"/>, filtered by <paramref name="kind"/> (media / image /
+    /// document / any), and scored by how many words of <paramref name="query"/> its
+    /// relative path contains (at least one, best first). An empty query lists every
+    /// file of that kind.
+    /// </summary>
+    public static string FindFiles(string? root, string? query, string? kind, int maxResults = 50)
+    {
+        if (string.IsNullOrEmpty(root))
+            return Envelope(false, error: "no workspace root bound");
+        maxResults = Math.Clamp(maxResults, 1, 500);
+        var tokens = (query ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var wantKind = NormalizeKind(kind);
+
+        var hits = new List<(int Score, string Path, string Kind, long Bytes)>();
+        try
+        {
+            foreach (var file in EnumerateTextFiles(Path.GetFullPath(root)))
+            {
+                var rel = Rel(root, file);
+                if (!FileOpenPolicy.TryClassify(rel, out var fileKind, out _)) fileKind = "other";
+                if (wantKind != KindAny && fileKind != wantKind) continue;
+
+                var score = tokens.Count(t => rel.Contains(t, StringComparison.OrdinalIgnoreCase));
+                if (tokens.Length > 0 && score == 0) continue;
+
+                long size = 0;
+                try { size = new FileInfo(file).Length; } catch { }
+                hits.Add((score, rel, fileKind, size));
+            }
+        }
+        catch (Exception ex) { return Envelope(false, error: ex.Message); }
+
+        var ordered = hits.OrderByDescending(h => h.Score).ThenBy(h => h.Path, StringComparer.OrdinalIgnoreCase).ToList();
+        var entries = ordered.Take(maxResults)
+            .Select(h => new { path = h.Path, kind = h.Kind, bytes = h.Bytes, score = h.Score })
+            .ToList();
+        return JsonSerializer.Serialize(new
+        {
+            ok = true,
+            count = entries.Count,
+            total = ordered.Count,
+            truncated = ordered.Count > entries.Count,
+            kind = wantKind,
+            entries,
+        }, ToolJson.Options);
+    }
+
+    /// <summary>Accepts the words a model is likely to use for a kind.</summary>
+    public static string NormalizeKind(string? kind) => (kind ?? "").Trim().ToLowerInvariant() switch
+    {
+        "media" or "music" or "audio" or "song" or "video" or "movie" => FileOpenPolicy.KindMedia,
+        "image" or "photo" or "picture" or "pictures" or "photos" => FileOpenPolicy.KindImage,
+        "document" or "doc" or "docs" or "text" or "note" or "notes" => FileOpenPolicy.KindDocument,
+        _ => KindAny,
+    };
+
     // ------------------------------------------------------------------ helpers
+
+    /// <summary>
+    /// Public face of the sandbox check for callers that need the resolved path itself
+    /// (e.g. <c>open_file</c>, which hands it to the shell rather than reading it).
+    /// </summary>
+    public static bool TryResolveInsideRoot(string? root, string path, out string full, out string error)
+        => TryResolve(root, path, out full, out error);
 
     /// <summary>
     /// Resolves <paramref name="path"/> against <paramref name="root"/> and

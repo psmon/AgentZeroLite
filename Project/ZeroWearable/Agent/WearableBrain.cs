@@ -1,3 +1,5 @@
+using Akka.Actor;
+using Agent.Common.Actors;
 using Agent.Common.Llm;
 using Agent.Common.Llm.Tools;
 using Agent.Common.Wearable;
@@ -6,9 +8,11 @@ using ZeroWearable.Chat;
 namespace ZeroWearable.Agent;
 
 /// <summary>
-/// Whatever answers the watch. Two shapes exist — AgentZero's own agent loop
-/// (<see cref="AgentLoopBrain"/>) and an agent CLI as a child process
-/// (<see cref="CliBrain"/>) — and <see cref="ChatActor"/> does not care which it holds.
+/// Whatever answers the watch <i>outside</i> the actor system — today only an agent CLI as a
+/// child process (<see cref="CliBrain"/>). AgentZero's own agent no longer implements this:
+/// since M0032 it is an actor subtree (<see cref="Agent.Common.Wearable.Actors.WearableAgentActor"/>)
+/// that <see cref="Actors.ChatActor"/> talks to with messages, so a running tool call never
+/// blocks the device's mailbox and progress can flow back per phase.
 /// </summary>
 public interface IWearableBrain : IAsyncDisposable
 {
@@ -29,174 +33,6 @@ public interface IWearableBrain : IAsyncDisposable
 
     /// <summary>Forget a conversation — the device's "new conversation" button.</summary>
     void Reset(string session);
-}
-
-/// <summary>
-/// The watch talking to <b>AgentZero's own agent</b>: the same
-/// <see cref="IAgentLoop"/> the AgentBot window drives, with the same GBNF tool envelope
-/// and the same LLM settings — Local (on-device GGUF) or External (Webnori / LM Studio /
-/// OpenAI / Ollama) exactly as Settings → LLM says. Nothing about the model is configured
-/// twice.
-///
-/// <para>One loop per session, because the loop <i>is</i> the conversation: it holds the
-/// KV cache (Local) or the replayed message list (External). A device that starts a new
-/// conversation gets its loop disposed, which is also how the history is dropped.</para>
-///
-/// <para>The loop's tool surface is <see cref="WearableToolbelt"/> — files only, and only
-/// inside the configured root.</para>
-/// </summary>
-public sealed class AgentLoopBrain : IWearableBrain
-{
-    private readonly Func<IAgentToolbelt, IAgentLoop?> _factory;
-    private readonly IAgentToolbelt _toolbelt;
-    private readonly Action<string, string> _log;
-    private readonly Dictionary<string, IAgentLoop> _sessions = new(StringComparer.Ordinal);
-    private readonly SemaphoreSlim _slot = new(1, 1);
-    private readonly object _lock = new();
-
-    /// <param name="owned">
-    /// Something the factory closes over that outlives the individual loops — the loaded
-    /// GGUF, for the on-device brain. Disposed with the brain, not with a session.
-    /// </param>
-    public AgentLoopBrain(string name, string status, IAgentToolbelt toolbelt,
-        Func<IAgentToolbelt, IAgentLoop?> factory, Action<string, string> log,
-        IAsyncDisposable? owned = null)
-    {
-        Name = name;
-        Status = status;
-        _toolbelt = toolbelt;
-        _factory = factory;
-        _log = log;
-        _owned = owned;
-    }
-
-    private readonly IAsyncDisposable? _owned;
-
-    public string Name { get; }
-    public string Status { get; }
-
-    public async Task<string> AskAsync(string prompt, string session, string? replyLanguage,
-        CancellationToken ct)
-    {
-        // One question at a time. A local model serves one prompt at a time anyway, and
-        // serialising here keeps two devices from interleaving tool calls.
-        await _slot.WaitAsync(ct);
-        try
-        {
-            var loop = Loop(session);
-            var run = await loop.RunAsync(Frame(prompt, replyLanguage), ct);
-
-            var answer = (run.FinalMessage ?? "").Trim();
-            if (answer.Length == 0)
-            {
-                // A loop that stopped with nothing to say is still an answer to report:
-                // say what happened rather than showing the watch an empty bubble.
-                answer = run.FailureReason is { Length: > 0 } reason
-                    ? $"I could not finish that ({reason})."
-                    : "I have no answer for that.";
-            }
-            if (!run.TerminatedCleanly)
-                _log("warn", $"agent loop ended unclean after {run.TurnCount} turn(s): {run.FailureReason}");
-            return answer;
-        }
-        finally
-        {
-            _slot.Release();
-        }
-    }
-
-    /// <summary>
-    /// The watch's constraints, carried per request rather than baked into the shared
-    /// system prompt: <see cref="AgentToolGrammar.SystemPrompt"/> belongs to the whole app
-    /// and must not grow a wearable clause. A small model also answers a Korean question in
-    /// English unless the language is named — asking it to "match the user" did not work.
-    /// </summary>
-    private static string Frame(string prompt, string? replyLanguage)
-    {
-        var language = LanguageName(replyLanguage, prompt);
-        return $"""
-                [The answer is shown on a small round smartwatch screen and read aloud.
-                 Answer in {language}, in at most two short sentences, plain text only —
-                 no markdown, no lists, no code blocks, no URLs.]
-
-                {prompt}
-                """;
-    }
-
-    private static string LanguageName(string? requested, string prompt)
-    {
-        var code = (requested ?? "").Trim().ToLowerInvariant();
-        if (code.Length == 0 || code == "auto" || code == "na")
-            code = prompt.Any(c => c >= 0xAC00 && c <= 0xD7A3) ? "ko" : "en";
-
-        return code switch
-        {
-            "ko" or "ko-kr" => "Korean",
-            "en" or "en-us" or "en-gb" => "English",
-            "ja" => "Japanese",
-            "zh" => "Chinese",
-            _ => code,
-        };
-    }
-
-    private IAgentLoop Loop(string session)
-    {
-        lock (_lock)
-        {
-            if (_sessions.TryGetValue(session, out var existing)) return existing;
-            var created = _factory(_toolbelt)
-                ?? throw new InvalidOperationException(
-                    "no agent loop could be built — check Settings → LLM (model loaded? provider reachable?)");
-            _sessions[session] = created;
-            _log("info", $"agent loop opened for session {session}");
-            return created;
-        }
-    }
-
-    public void Reset(string session)
-    {
-        IAgentLoop? loop;
-        lock (_lock)
-        {
-            if (!_sessions.Remove(session, out loop)) return;
-        }
-        _ = DisposeQuietly(loop);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        List<IAgentLoop> loops;
-        lock (_lock)
-        {
-            loops = _sessions.Values.ToList();
-            _sessions.Clear();
-        }
-        foreach (var loop in loops) await DisposeQuietly(loop);
-        if (_owned is not null)
-        {
-            try
-            {
-                await _owned.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                _log("warn", $"unloading the model threw: {ex.Message}");
-            }
-        }
-        _slot.Dispose();
-    }
-
-    private async Task DisposeQuietly(IAgentLoop loop)
-    {
-        try
-        {
-            await loop.DisposeAsync();
-        }
-        catch (Exception ex)
-        {
-            _log("warn", $"disposing an agent loop threw: {ex.Message}");
-        }
-    }
 }
 
 /// <summary>
@@ -236,107 +72,126 @@ public sealed class CliBrain : IWearableBrain
 }
 
 /// <summary>
+/// Everything the actor-backed brain needs, decided from Settings → LLM before any actor
+/// exists: a name for the device's status line, a status line for the banner, the loop
+/// bindings (built once the tool actors exist, since the toolbelt is an adapter over them)
+/// and, for the on-device brain, the model handle whose life is the agent actor's.
+/// </summary>
+public sealed record WearableAgentPlan(
+    string Name,
+    string Status,
+    Func<IActorRef, IActorRef, AgentLoopBindings> Bindings,
+    IAsyncDisposable? Owned);
+
+/// <summary>
 /// Builds the configured brain out of AgentZero's own settings. Returns null with a reason
 /// when the choice cannot be honoured, so the host can start and tell the device it has no
 /// agent rather than dying at the first question.
 /// </summary>
 public static class WearableBrainFactory
 {
-    public static IWearableBrain? Create(WearableSettings settings, Action<string, string> log,
-        out string status)
+    /// <summary>The two AgentZero brains run inside the actor system; the CLI brain runs beside it.</summary>
+    public static bool UsesAgentActor(WearableSettings settings)
+        => !string.Equals(settings.Brain, WearableBrainNames.Cli, StringComparison.OrdinalIgnoreCase);
+
+    public static IWearableBrain CreateCliBrain(WearableSettings settings, Action<string, string> log, out string status)
     {
-        switch (settings.Brain)
+        var name = CliProviderCatalog.Normalize(settings.CliProvider);
+        var config = CliProviderCatalog.Resolve(name);
+        status = $"cli:{name} — {config.Description}";
+        return new CliBrain(name, config, settings.ReplyStyle, log);
+    }
+
+    /// <summary>
+    /// The same <see cref="IAgentLoop"/> the AgentBot window drives, with the same GBNF tool
+    /// envelope and the same LLM settings — Local (on-device GGUF) or External (Webnori /
+    /// LM Studio / OpenAI / Ollama) exactly as Settings → LLM says. Nothing about the model
+    /// is configured twice.
+    /// </summary>
+    public static WearableAgentPlan? CreateAgentPlan(WearableSettings settings, Action<string, string> log, out string status)
+    {
+        if (string.Equals(settings.Brain, WearableBrainNames.AgentLocal, StringComparison.OrdinalIgnoreCase))
         {
-            case WearableBrainNames.Cli:
+            var llm = settings.LocalModelId;
+            var entry = string.IsNullOrWhiteSpace(llm)
+                ? LlmModelCatalog.Default
+                : LlmModelCatalog.FindById(llm);
+            if (!LlmModelLocator.IsAvailable(entry))
             {
-                var name = CliProviderCatalog.Normalize(settings.CliProvider);
-                var config = CliProviderCatalog.Resolve(name);
-                status = $"cli:{name} — {config.Description}";
-                return new CliBrain(name, config, settings.ReplyStyle, log);
+                status = $"local model '{entry.Id}' is not downloaded — " +
+                         "Settings → LLM → Download, or pick the External brain";
+                return null;
             }
 
-            case WearableBrainNames.AgentLocal:
-            {
-                var llm = settings.LocalModelId;
-                var entry = string.IsNullOrWhiteSpace(llm)
-                    ? LlmModelCatalog.Default
-                    : LlmModelCatalog.FindById(llm);
-                if (!LlmModelLocator.IsAvailable(entry))
-                {
-                    status = $"local model '{entry.Id}' is not downloaded — " +
-                             "Settings → LLM → Download, or pick the External brain";
-                    return null;
-                }
+            var runtime = LlmSettingsStore.Load();
+            var options = LoopOptions(Math.Max(256, runtime.AgentToolLoopMaxTokens), runtime.Temperature);
+            var template = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+                ? ChatTemplates.Llama31
+                : ChatTemplates.Gemma;
+            var modelPath = LlmModelLocator.ResolveExistingOrTarget(entry);
 
-                var toolbelt = new WearableToolbelt(settings.WorkspaceRoot, log);
-                var runtime = LlmSettingsStore.Load();
-                var options = LoopOptions(Math.Max(256, runtime.AgentToolLoopMaxTokens), runtime.Temperature);
-                var template = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
-                    ? ChatTemplates.Llama31
-                    : ChatTemplates.Gemma;
-                var modelPath = LlmModelLocator.ResolveExistingOrTarget(entry);
+            // The GGUF is loaded lazily but ONCE, and shared by every session's loop: the
+            // first question pays the load, a host with no watch in range never pays it,
+            // and a second conversation does not put a second copy of the model in VRAM.
+            // LocalAgentLoop takes its own LLamaContext off these weights, which is the
+            // per-conversation state.
+            var modelLock = new object();
+            LlamaSharpLocalLlm? loaded = null;
+            var holder = new LocalModelHolder(() => loaded);
 
-                // The GGUF is loaded lazily but ONCE, and shared by every session's loop: the
-                // first question pays the load, a host with no watch in range never pays it,
-                // and a second conversation does not put a second copy of the model in VRAM.
-                // LocalAgentLoop takes its own LLamaContext off these weights, which is the
-                // per-conversation state.
-                var modelLock = new object();
-                LlamaSharpLocalLlm? loaded = null;
-                var holder = new LocalModelHolder(() => loaded);
-
-                status = $"agent:{Short(entry.Id)} on-device ({entry.FileName})";
-                return new AgentLoopBrain(
-                    name: "agent:" + Short(entry.Id),
-                    status: status,
-                    toolbelt,
-                    factory: host =>
+            status = $"agent:{Short(entry.Id)} on-device ({entry.FileName})";
+            return new WearableAgentPlan(
+                Name: "agent:" + Short(entry.Id),
+                Status: status,
+                Bindings: (files, web) => new AgentLoopBindings(
+                    ToolbeltFactory: () => new WearableToolbelt(files, web),
+                    OptionsFactory: () => options,
+                    // `opts` (not `options`) carries the actor's progress callbacks.
+                    AgentLoopFactory: (opts, host) =>
                     {
                         lock (modelLock)
                         {
                             loaded ??= LlamaSharpLocalLlm
                                 .CreateAsync(runtime.ToOptions(modelPath))
                                 .GetAwaiter().GetResult();
-                            return new LocalAgentLoop(loaded, host, options, template);
+                            return new LocalAgentLoop(loaded, host, opts, template);
                         }
-                    },
-                    log,
-                    owned: holder);
-            }
-
-            default:
+                    }),
+                Owned: holder);
+        }
+        else
+        {
+            var runtime = LlmSettingsStore.Load();
+            var provider = runtime.CreateExternalProvider();
+            var model = runtime.ResolveExternalModel();
+            if (provider is null || string.IsNullOrEmpty(model))
             {
-                var runtime = LlmSettingsStore.Load();
-                var provider = runtime.CreateExternalProvider();
-                var model = runtime.ResolveExternalModel();
-                if (provider is null || string.IsNullOrEmpty(model))
-                {
-                    status = $"external provider '{runtime.External.Provider}' has no model selected — " +
-                             "Settings → LLM";
-                    return null;
-                }
-
-                var toolbelt = new WearableToolbelt(settings.WorkspaceRoot, log);
-                var options = LoopOptions(Math.Max(256, runtime.External.MaxTokens), runtime.Temperature);
-
-                status = $"agent:{Short(model)} at {provider.ProviderName}";
-                return new AgentLoopBrain(
-                    name: "agent:" + Short(model),
-                    status: status,
-                    toolbelt,
-                    factory: host => new ExternalAgentLoop(provider, model, host, options),
-                    log);
+                status = $"external provider '{runtime.External.Provider}' has no model selected — " +
+                         "Settings → LLM";
+                return null;
             }
+
+            var options = LoopOptions(Math.Max(256, runtime.External.MaxTokens), runtime.Temperature);
+            status = $"agent:{Short(model)} at {provider.ProviderName}";
+            return new WearableAgentPlan(
+                Name: "agent:" + Short(model),
+                Status: status,
+                Bindings: (files, web) => new AgentLoopBindings(
+                    ToolbeltFactory: () => new WearableToolbelt(files, web),
+                    OptionsFactory: () => options,
+                    AgentLoopFactory: (opts, host) => new ExternalAgentLoop(provider, model, host, opts)),
+                Owned: null);
         }
     }
 
     /// <summary>
     /// The watch asks one question and wants one answer, so the loop is kept short: a
-    /// runaway relay would be minutes of silence on a screen with no scrollback.
+    /// runaway relay would be minutes of silence on a screen with no scrollback. Eight
+    /// turns is list → read → done with room for one web search → open → done.
     /// </summary>
     private static AgentLoopOptions LoopOptions(int maxTokensPerTurn, float temperature) => new()
     {
-        MaxIterations = 6,
+        MaxIterations = 8,
         MaxTokensPerTurn = maxTokensPerTurn,
         Temperature = temperature,
     };
@@ -350,7 +205,7 @@ public static class WearableBrainFactory
     }
 
     /// <summary>
-    /// Hands the brain's disposal a handle on a model that may never have been loaded —
+    /// Hands the agent actor's disposal a handle on a model that may never have been loaded —
     /// the closure decides at dispose time whether there is anything to unload.
     /// </summary>
     private sealed class LocalModelHolder(Func<LlamaSharpLocalLlm?> current) : IAsyncDisposable

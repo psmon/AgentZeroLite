@@ -744,6 +744,13 @@
                                         Content="&#xE702;" ToolTip="Wearable — smartwatch host"
                                         Click="OnActivityWearableClick"/>
 
+                                <!-- Browser Icon (M0032) — the web tools' visible surface: the
+                                     tabs the watch's agent (and AgentBot) open with web_search /
+                                     web_open, driven from outside through `-cli web`. -->
+                                <Button x:Name="btnActivityBrowser" Style="{StaticResource ActivityBarIcon}"
+                                        Content="&#xE909;" ToolTip="Browser — web tools"
+                                        Click="OnActivityBrowserClick"/>
+
                             </StackPanel>
                         </DockPanel>
                     </Border>
@@ -1087,6 +1094,16 @@
                                                   Grid.Column="1" Grid.ColumnSpan="3"
                                                   Grid.Row="0" Grid.RowSpan="3"
                                                   Visibility="Collapsed"/>
+
+                    <!-- ===== Browser Page (full overlay) — M0032 =====
+                         Tabbed WebView2 behind the web_search / web_open / web_read tools
+                         and `-cli web`. Same overlay pattern; toggled from
+                         OnActivityBrowserClick, and shown automatically when a tool opens
+                         a page so the user sees what the agent is reading. -->
+                    <components:BrowserPagePanel x:Name="BrowserPage"
+                                                 Grid.Column="1" Grid.ColumnSpan="3"
+                                                 Grid.Row="0" Grid.RowSpan="3"
+                                                 Visibility="Collapsed"/>
 
                     <!-- ===== Note Page (full overlay) — M0022-7 =====
                          Hosts the reparented NoteWindow Grid (file tree +

@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Text.Json;
 using Akka.Actor;
 using Akka.Event;
+using Agent.Common.Actors;
 using Agent.Common.Wearable;
+using Agent.Common.Wearable.Actors;
 using ZeroWearable.Agent;
 using ZeroWearable.Chat;
 using ZeroWearable.Voice;
@@ -22,9 +24,14 @@ namespace ZeroWearable.Actors;
 ///
 /// <para>Ported from <c>samples/akka/host/AkkaHost</c> with one deliberate simplification:
 /// there, AskBot drove an in-house LLM while the Chat app shelled out to an agent CLI. Here
-/// both apps share one <see cref="IWearableBrain"/> — AgentZero already has an agent, and
-/// two brains answering the same watch differently was a property of the sample, not a
-/// feature.</para>
+/// both apps share one brain — AgentZero already has an agent, and two brains answering
+/// the same watch differently was a property of the sample, not a feature.</para>
+///
+/// <para>Since M0032 this actor is the device gateway only. AgentZero's agent lives in its
+/// own subtree (<see cref="WearableAgentActor"/>, <c>/user/agent</c>): a question is an
+/// <see cref="WearableAgentActor.Ask"/> Tell, the answer comes back as messages, and the
+/// tool calls in between run in their own actors. Only the CLI brain still runs as a Task
+/// here — it is a whole agent of its own with nothing for the actor system to host.</para>
 /// </summary>
 public sealed class ChatActor : UntypedActor
 {
@@ -40,6 +47,14 @@ public sealed class ChatActor : UntypedActor
     /// device is then told so per question instead of the host refusing to start.
     /// </summary>
     private readonly IWearableBrain? _brain;
+
+    /// <summary>AgentZero's own agent as an actor (<see cref="WearableAgentActor"/>). Null when
+    /// the CLI brain is configured or no agent could be built.</summary>
+    private readonly IActorRef? _agent;
+    private readonly string? _agentName;
+
+    /// <summary>Which device (and which ref to push to) each in-flight agent session belongs to.</summary>
+    private readonly Dictionary<string, (string Key, IActorRef Target)> _agentRequests = new(StringComparer.Ordinal);
 
     // Per-device state, keyed by the sender's address (one entry per board).
     private sealed class Device
@@ -103,12 +118,14 @@ public sealed class ChatActor : UntypedActor
     private readonly int _talkMs;
 
     public ChatActor(WearableSettings settings, WearableVoice? voice = null, WearableStt? stt = null,
-        IWearableBrain? brain = null)
+        IWearableBrain? brain = null, IActorRef? agent = null, string? agentName = null)
     {
         _settings = settings;
         _voice = voice;
         _stt = stt;
         _brain = brain;
+        _agent = agent;
+        _agentName = agentName;
         _talkMs = settings.TalkOnConnectMs;
         _announce = string.IsNullOrWhiteSpace(settings.AnnounceOnConnect)
             ? null
@@ -117,7 +134,7 @@ public sealed class ChatActor : UntypedActor
 
     /// <summary>What the device shows in its status line — 24 bytes on the firmware side,
     /// which is why the brain trims the model's vendor prefix rather than being truncated.</summary>
-    private string BrainName => _brain?.Name ?? "offline";
+    private string BrainName => _agentName ?? _brain?.Name ?? "offline";
 
     protected override void OnReceive(object message)
     {
@@ -133,6 +150,14 @@ public sealed class ChatActor : UntypedActor
 
             case Answered answered:
                 Complete(answered);
+                break;
+
+            case WearableAgentActor.Progress progress:
+                AgentProgress(progress);
+                break;
+
+            case WearableAgentActor.Answer answer:
+                AgentAnswered(answer);
                 break;
 
             case Failed failed:
@@ -277,6 +302,7 @@ public sealed class ChatActor : UntypedActor
                     // Newest-question-wins is the rule the BLE host settled on: a
                     // cancel abandons the answer rather than refusing the next one.
                     device.Cancel?.Cancel();
+                    _agent?.Tell(new WearableAgentActor.CancelSession(SessionKey(key, device)), Self);
                     device.RunningRequest = 0;
                     DropCapture(device);
                     Tell(sender, Stage("idle", id));
@@ -287,6 +313,7 @@ public sealed class ChatActor : UntypedActor
                     // The CLI brains key their history off the session name, so a new number is a
                     // new conversation; the agent loop holds its history in memory and is told.
                     _brain?.Reset(SessionKey(key, device));
+                    _agent?.Tell(new WearableAgentActor.ResetSession(SessionKey(key, device)), Self);
                     device.Conversation++;
                     _log.Info("device {0} starts conversation {1}", sender.Path.Address, device.Conversation);
                     Tell(sender, Json.Write(writer =>
@@ -318,7 +345,7 @@ public sealed class ChatActor : UntypedActor
         }
 
         var brain = _brain;
-        if (brain is null)
+        if (brain is null && _agent is null)
         {
             Tell(target, Stage("err", id, text: "no brain configured on the host"));
             return;
@@ -337,6 +364,15 @@ public sealed class ChatActor : UntypedActor
         var session = SessionKey(key, device);
         var self = Self;
 
+        if (_agent is not null)
+        {
+            // The agent path: one Tell, and the answer arrives as messages. The agent actor
+            // applies newest-question-wins itself (cancel + queue), so nothing is awaited here.
+            _agentRequests[session] = (key, target);
+            _agent.Tell(new WearableAgentActor.Ask(session, id, prompt, outLanguage), Self);
+            return;
+        }
+
         _ = Task.Run(async () =>
         {
             try
@@ -353,6 +389,47 @@ public sealed class ChatActor : UntypedActor
                 if (!cancel.IsCancellationRequested) self.Tell(new Failed(key, id, ex.Message, target));
             }
         }, cancel.Token);
+    }
+
+    /// <summary>
+    /// A phase change of the run answering a device. The firmware shows a single "thinking"
+    /// state and ignores stage text, so this re-sends <c>think</c> on each tool call — a
+    /// keep-alive for a search that takes a while — and logs the tool for the host log.
+    /// </summary>
+    private void AgentProgress(WearableAgentActor.Progress progress)
+    {
+        if (!_agentRequests.TryGetValue(progress.Session, out var owner)) return;
+        var device = GetDevice(owner.Key);
+        if (device.RunningRequest != progress.RequestId) return;
+
+        if (progress.Phase == AgentLoopPhase.Acting)
+        {
+            _log.Info("#{0} tool {1} (round {2})", progress.RequestId, progress.Text, progress.Round);
+            Tell(owner.Target, Stage("think", progress.RequestId));
+        }
+    }
+
+    private void AgentAnswered(WearableAgentActor.Answer answer)
+    {
+        if (!_agentRequests.Remove(answer.Session, out var owner)) return;
+        var device = GetDevice(owner.Key);
+        if (device.RunningRequest != answer.RequestId) return;   // a newer question won
+
+        if (answer.Success)
+        {
+            var text = answer.Text.Trim();
+            if (text.Length == 0)
+                text = answer.FailureReason is { Length: > 0 } reason
+                    ? $"I could not finish that ({reason})."
+                    : "I have no answer for that.";
+            Complete(new Answered(owner.Key, answer.RequestId, text, owner.Target));
+            return;
+        }
+
+        device.RunningRequest = 0;
+        var error = answer.FailureReason ?? answer.Text;
+        _log.Warning("#{0} agent run failed after {1} turn(s): {2}", answer.RequestId, answer.Turns, error);
+        Tell(owner.Target, Stage("err", answer.RequestId, text: error));
     }
 
     private void Complete(Answered answered)
@@ -629,6 +706,9 @@ public sealed class ChatActor : UntypedActor
     {
         if (!_devices.Remove(key, out var device)) return;
         device.Cancel?.Cancel();
+        _agent?.Tell(new WearableAgentActor.ForgetSessions(SessionPrefix(key)), Self);
+        foreach (var session in _agentRequests.Where(kv => kv.Value.Key == key).Select(kv => kv.Key).ToList())
+            _agentRequests.Remove(session);
         DropCapture(device);
         _log.Info("device {0} went away after conversation {1}; its state is dropped",
             key, device.Conversation);
@@ -650,9 +730,13 @@ public sealed class ChatActor : UntypedActor
     /// side, a file name.
     /// </summary>
     private static string SessionKey(string address, Device device)
+        => $"{SessionPrefix(address)}{device.Conversation}";
+
+    /// <summary>Every session of one device starts with this — what the agent actor is told to forget.</summary>
+    private static string SessionPrefix(string address)
     {
         var chars = address.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray();
-        return $"askbot-{new string(chars).Trim('-')}-{device.Conversation}";
+        return $"askbot-{new string(chars).Trim('-')}-";
     }
 
     private static string Head(string s, int max) => s.Length <= max ? s : s[..max] + "...";

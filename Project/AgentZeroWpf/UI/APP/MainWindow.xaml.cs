@@ -614,6 +614,11 @@ public partial class MainWindow : Window
         _wearableHost = new Services.Wearable.WearableHostProcess();
         WearablePage.Initialize(_wearableHost, _wearableSettings);
         WearablePage.CloseRequested += CloseWearable;
+
+        // M0032 — the Browser page is the web tools' surface for both AgentBot (in-process,
+        // through the registry) and the wearable host (through `-cli web`).
+        BrowserPage.CloseRequested += CloseBrowser;
+        Services.Browser.BrowserToolSurfaceRegistry.Current = BrowserPage;
         if (_wearableSettings.Enabled)
             _wearableHost.Start();
 
@@ -757,6 +762,12 @@ public partial class MainWindow : Window
             if (command == "status")
             {
                 WriteStatusResponse();
+                return;
+            }
+
+            if (command == "web")
+            {
+                HandleWebCommand(root);
                 return;
             }
 
@@ -1524,6 +1535,95 @@ public partial class MainWindow : Window
         }
 
         IpcMemoryMappedResponseWriter.WriteJson(TerminalReadMmfName, TerminalReadMmfSize, resultJson, "[IPC] terminal-read response write failed");
+    }
+
+    // =========================================================================
+    //  IPC: web — drive the Browser page (M0032)
+    //
+    //  Asynchronous on purpose: a navigation takes seconds and WndProc has to return
+    //  at once (wm-copydata pitfall P2). Two guards keep the polling CLI honest: the
+    //  response map is cleared synchronously before the work starts, and the reply
+    //  echoes the request's `req` id, which the CLI insists on.
+    // =========================================================================
+
+    private const string WebMmfName = Services.Browser.WebCliCommands.MmfName;
+    private const int WebMmfSize = Services.Browser.WebCliCommands.MmfSize;
+
+    private void HandleWebCommand(JsonElement root)
+    {
+        Agent.Common.Module.IpcMemoryMappedResponseWriter.Clear(WebMmfName, WebMmfSize);
+
+        static string Str(JsonElement r, string name)
+            => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+        static int Int(JsonElement r, string name, int fallback)
+            => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : fallback;
+
+        var verb = Str(root, "verb");
+        var req = Str(root, "req");
+        var url = Str(root, "url");
+        var query = Str(root, "query");
+        var mode = Str(root, "mode");
+        var find = Str(root, "find");
+        var tab = Int(root, "tab", 0);
+        var max = Int(root, "max", 5);
+        var maxChars = Int(root, "max_chars", 0);
+
+        // Not `_ = RunWebCommandAsync(...)`: that would run synchronously up to the first
+        // real await — and the first tab's WebView2 initialisation has a multi-second
+        // synchronous stretch — while the CLI's SendMessageTimeout (3 s) is still waiting
+        // on this WndProc. Queue it behind the message instead, so WndProc returns now.
+        _ = Dispatcher.InvokeAsync(
+            () => RunWebCommandAsync(verb, req, url, query, mode, find, tab, max, maxChars),
+            System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    private async Task RunWebCommandAsync(string verb, string req, string url, string query, string mode,
+        string find, int tab, int max, int maxChars)
+    {
+        string json;
+        try
+        {
+            // The user should see what the agent is about to read.
+            if (verb is "open" or "search") ShowPage(AppPage.Browser);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+            json = verb switch
+            {
+                "open"   => await BrowserPage.OpenAsync(url, tab, cts.Token),
+                "search" => await BrowserPage.SearchAsync(query, Math.Clamp(max, 1, 10), cts.Token),
+                "read"   => await BrowserPage.ReadAsync(tab, string.IsNullOrEmpty(mode) ? "summary" : mode,
+                                string.IsNullOrEmpty(find) ? null : find, maxChars, cts.Token),
+                "tabs"   => await BrowserPage.ListTabsAsync(cts.Token),
+                _        => Agent.Common.Llm.Tools.ToolJson.Fail($"unknown web verb '{verb}'"),
+            };
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[IPC] web {verb} failed: {ex.GetType().Name}: {ex.Message}");
+            json = Agent.Common.Llm.Tools.ToolJson.Fail(ex.Message);
+        }
+
+        json = WithReq(json, req);
+        if (Encoding.UTF8.GetByteCount(json) > WebMmfSize - 64)
+            json = WithReq(Agent.Common.Llm.Tools.ToolJson.Fail("response too large for the IPC buffer; lower max_chars"), req);
+
+        Agent.Common.Module.IpcMemoryMappedResponseWriter.WriteJson(WebMmfName, WebMmfSize, json, "[IPC] web response write failed");
+        AppLogger.Log($"[IPC] web {verb} -> {json.Length} chars");
+    }
+
+    private static string WithReq(string json, string req)
+    {
+        if (string.IsNullOrEmpty(req)) return json;
+        try
+        {
+            var node = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+            node["req"] = req;
+            return node.ToJsonString(Agent.Common.Llm.Tools.ToolJson.Options);
+        }
+        catch
+        {
+            return json;
+        }
     }
 
     // =========================================================================
@@ -4614,12 +4714,12 @@ public partial class MainWindow : Window
     // Visibility directly - an old code path, a designer, a future panel - is
     // corrected on the next transition rather than desyncing a field.
 
-    private enum AppPage { None, Settings, WebDev, Scrap, Harness, Diff, Remote, Wearable, Note }
+    private enum AppPage { None, Settings, WebDev, Scrap, Harness, Diff, Remote, Wearable, Note, Browser }
 
     private static readonly AppPage[] OverlayPages =
     {
         AppPage.Settings, AppPage.WebDev, AppPage.Scrap, AppPage.Harness,
-        AppPage.Diff, AppPage.Remote, AppPage.Wearable, AppPage.Note,
+        AppPage.Diff, AppPage.Remote, AppPage.Wearable, AppPage.Note, AppPage.Browser,
     };
 
     private FrameworkElement? PanelFor(AppPage page) => page switch
@@ -4632,6 +4732,7 @@ public partial class MainWindow : Window
         AppPage.Remote   => RemotePage,
         AppPage.Wearable => WearablePage,
         AppPage.Note     => NotePage,
+        AppPage.Browser  => BrowserPage,
         _ => null,
     };
 
@@ -4691,6 +4792,7 @@ public partial class MainWindow : Window
         Mark(btnActivityDiff,     page == AppPage.Diff);
         Mark(btnActivityRemote,   page == AppPage.Remote);
         Mark(btnActivityWearable, page == AppPage.Wearable);
+        Mark(btnActivityBrowser,  page == AppPage.Browser);
 
         static void Mark(System.Windows.Controls.Button? b, bool selected)
         {
@@ -4800,6 +4902,18 @@ public partial class MainWindow : Window
     private void CloseWearable()
     {
         if (ActivePage == AppPage.Wearable) ShowPage(AppPage.None);
+    }
+
+    /// <summary>Toggle the Browser overlay (M0032). Mirrors OnActivityWebDevClick.</summary>
+    private void OnActivityBrowserClick(object sender, RoutedEventArgs e)
+    {
+        TogglePage(AppPage.Browser);
+    }
+
+    /// <summary>Tear down the Browser overlay. Idempotent; tabs stay open behind it.</summary>
+    private void CloseBrowser()
+    {
+        if (ActivePage == AppPage.Browser) ShowPage(AppPage.None);
     }
 
     // =========================================================================

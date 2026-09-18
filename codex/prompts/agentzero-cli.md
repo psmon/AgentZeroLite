@@ -56,5 +56,6 @@ Repo-local deep references (read when orchestrating terminals):
 - **Terminals (GUI up):** `terminal-list` → `terminal-send <G> <T> "<text>"` → `terminal-wait <G> <T> --until done` → `terminal-read <G> <T> --last N`. Control keys via `terminal-key`.
 - **Peer reply / handshake:** a peer sends back only by running, in its own terminal, `AgentZeroLite.exe -cli bot-chat "DONE(<text>)" --from <peerName>`. `--from` must match the tab identity or the broker drops it.
 - **Native Windows control (no GUI):** `os list-windows|screenshot|element-tree|activate|dpi` (read-only); `os mouse-*|keypress` gated by `--allow-input` / `AGENTZERO_OS_INPUT_ALLOWED=1`.
+- **Web tools (GUI required, M0032):** `web open <url> [--tab N]` / `web search <query> [--max N]` / `web read [--tab N] [--mode summary|links|find] [--find <kw>]` / `web tabs` drive the Browser page and print one JSON object; default timeout 45 s.
 - **No-GUI in-process:** `os *`, `worktree`, `cost`, `automation`, `version`.
 - **IPC commands need the GUI** — if "GUI is not running", run `-cli open-win` and retry.

@@ -1,3 +1,5 @@
+using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Agent.Common.Voice;
 using Agent.Common.Wearable;
@@ -28,7 +30,10 @@ public sealed class WearableSettingsTests
         Assert.Equal(8765, s.HudPort);                           // what installed Claude hooks post to
         Assert.Equal(WearableBrainNames.AgentExternal, s.Brain);  // no model in this process by default
         Assert.Equal("echo", s.CliProvider);                     // offline loopback
-        Assert.Equal("", s.WorkspaceRoot);                       // file tools default-deny
+        Assert.Equal("", s.WorkspaceRoot);                       // legacy field, migrated on load
+        Assert.Empty(s.AllowedRoots);                            // file tools default-deny (M0032)
+        Assert.True(s.WebToolsEnabled);
+        Assert.Equal(6000, s.WebMaxChars);
         Assert.Equal(400, s.ChunkBytes);
         Assert.Equal(1200, s.MaxReplyChars);
         Assert.Equal(0, s.TalkOnConnectMs);
@@ -199,5 +204,74 @@ public sealed class WhisperModelStoreTests
         {
             if (File.Exists(path) && new FileInfo(path).Length == 1024) File.Delete(path);
         }
+    }
+
+    // ── M0032: allow-listed folders ─────────────────────────────────────────
+
+    /// <summary>
+    /// A settings file written before M0032 carries one <c>WorkspaceRoot</c>. Loading it must
+    /// yield the same grant as an allow-list entry — writable, since that single root was —
+    /// and clear the legacy field so a later "remove all folders" cannot resurrect it.
+    /// </summary>
+    [Fact]
+    public void Legacy_WorkspaceRoot_migrates_into_AllowedRoots_on_load()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "aztest-wearable-" + Guid.NewGuid().ToString("n") + ".json");
+        try
+        {
+            File.WriteAllText(path, """{"WorkspaceRoot":"C:\\Users\\me\\Documents","DeviceName":"w"}""");
+            var s = WearableSettingsStore.Load(path);
+
+            var root = Assert.Single(s.AllowedRoots);
+            Assert.Equal("workspace", root.Alias);
+            Assert.Equal(@"C:\Users\me\Documents", root.Path);
+            Assert.True(root.Writable);
+            Assert.Equal("", s.WorkspaceRoot);
+            Assert.Equal("w", s.DeviceName);
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    [Fact]
+    public void Normalize_names_aliasless_roots_after_their_folder_and_keeps_aliases_unique()
+    {
+        var s = new WearableSettings
+        {
+            AllowedRoots =
+            [
+                new AllowedRoot { Alias = "", Path = @"D:\Media\Music" },
+                new AllowedRoot { Alias = "music", Path = @"E:\Other Music" },
+                new AllowedRoot { Alias = "  ", Path = "   " },          // dropped
+                new AllowedRoot { Alias = "My Docs", Path = @"C:\Docs", Writable = true },
+            ],
+        };
+
+        s.Normalize();
+
+        Assert.Equal(new[] { "music", "music-2", "my-docs" }, s.AllowedRoots.Select(r => r.Alias));
+        Assert.True(s.AllowedRoots[2].Writable);
+        Assert.False(s.AllowedRoots[0].Writable);
+    }
+
+    [Fact]
+    public void AllowedRoots_round_trip_through_json()
+    {
+        var s = new WearableSettings
+        {
+            AllowedRoots = [new AllowedRoot { Alias = "docs", Path = @"C:\Docs", Writable = true }],
+            WebToolsEnabled = false,
+            WebMaxChars = 900,
+            GuiExePath = @"C:\x\AgentZeroLite.exe",
+        };
+        var back = JsonSerializer.Deserialize<WearableSettings>(JsonSerializer.Serialize(s))!;
+        var root = Assert.Single(back.AllowedRoots);
+        Assert.Equal("docs", root.Alias);
+        Assert.True(root.Writable);
+        Assert.False(back.WebToolsEnabled);
+        Assert.Equal(900, back.WebMaxChars);
+        Assert.Equal(s.GuiExePath, back.GuiExePath);
     }
 }

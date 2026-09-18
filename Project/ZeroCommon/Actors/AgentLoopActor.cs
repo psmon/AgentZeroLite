@@ -69,11 +69,18 @@ public sealed class AgentLoopActor : ReceiveActor
                     // Inject actor-mailbox callbacks so the loop's thread-pool
                     // task can post progress events back through Self.Tell —
                     // every state mutation stays single-threaded.
+                    //
+                    // `self` is captured HERE, inside the handler: the callbacks run on a
+                    // thread-pool thread, where `Self` (= Context.Self) throws "There is
+                    // no active ActorContext" — and the loops swallow callback exceptions,
+                    // so Acting progress silently never arrived (found by M0032's
+                    // wearable tests; the AgentBot cards had the same gap).
+                    var self = Self;
                     var wired = baseOpts with
                     {
-                        OnTurnCompleted = turn => Self.Tell(new TurnCompletedInternal(turn)),
+                        OnTurnCompleted = turn => self.Tell(new TurnCompletedInternal(turn)),
                         OnGenerationProgress = (phase, tokens) =>
-                            Self.Tell(new GenerationProgressInternal(phase, tokens)),
+                            self.Tell(new GenerationProgressInternal(phase, tokens)),
                     };
 
                     var loop = _bindings.AgentLoopFactory(wired, host);

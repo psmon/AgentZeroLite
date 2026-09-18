@@ -1,0 +1,141 @@
+<UserControl x:Class="AgentZeroWpf.UI.Components.BrowserPagePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource EditorBg}">
+    <!--
+        Browser — the web tools' visible surface (M0032).
+        The watch's agent (and AgentBot's) open pages here through `-cli web …`; the user
+        sees the tab, can type a URL or a search into the address bar, and can close tabs.
+        Every WebView2 belongs to one tab and stays alive while the tab is open, so a
+        `web_read` after a `web_open` reads the page that is actually on screen.
+
+        Tab strip and toolbar are plain Buttons with our own templates — WPF's TabControl
+        keeps its inner chrome in SystemColors (Pitfall 6).
+    -->
+    <UserControl.Resources>
+        <Style x:Key="TabChip" TargetType="Button">
+            <Setter Property="Background" Value="#1E2A30"/>
+            <Setter Property="Foreground" Value="#9FB3BA"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0,0,2,0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MaxWidth" Value="180"/>
+            <Setter Property="ToolTipService.InitialShowDelay" Value="400"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}" CornerRadius="4,4,0,0">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2A3A42"/>
+                                <Setter Property="Foreground" Value="#E5EEF1"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="on">
+                                <Setter TargetName="Bd" Property="Background" Value="#0F1113"/>
+                                <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ToolbarButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#9FB3BA"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="9,3"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}" CornerRadius="3">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2A3A42"/>
+                                <Setter Property="Foreground" Value="#E5EEF1"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#4A555A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- 0: header -->
+            <RowDefinition Height="Auto"/>  <!-- 1: tab strip -->
+            <RowDefinition Height="Auto"/>  <!-- 2: address bar -->
+            <RowDefinition Height="*"/>     <!-- 3: page -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource ToolbarBg}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" x:Name="btnClose" Content="✕"
+                        Style="{DynamicResource FlatButton}" FontSize="13"
+                        ToolTip="Close" Click="OnCloseClick"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE909;" FontFamily="Segoe MDL2 Assets"
+                               Foreground="{DynamicResource CyberCyanBrush}"
+                               FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Browser — web tools" FontSize="14" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="lblHint" Margin="14,0,0,0" FontSize="11" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextDim}"
+                               Text="tabs the watch's agent and AgentBot open with web_search / web_open · also: AgentZeroLite.exe -cli web open &lt;url&gt;"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Tab strip -->
+        <Border Grid.Row="1" Background="#16262B" Padding="8,6,8,0">
+            <DockPanel LastChildFill="True">
+                <Button DockPanel.Dock="Right" x:Name="btnNewTab" Content="＋" Style="{StaticResource ToolbarButton}"
+                        ToolTip="New tab" Click="OnNewTabClick" Margin="4,0,0,4"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="tabStrip" Orientation="Horizontal"/>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- Address bar -->
+        <Border Grid.Row="2" Background="#0F1113" BorderBrush="{DynamicResource BorderColor}"
+                BorderThickness="0,0,0,1" Padding="8,6">
+            <DockPanel LastChildFill="True">
+                <Button DockPanel.Dock="Left" x:Name="btnBack" Content="←" Style="{StaticResource ToolbarButton}"
+                        ToolTip="Back" Click="OnBackClick"/>
+                <Button DockPanel.Dock="Left" x:Name="btnReload" Content="↻" Style="{StaticResource ToolbarButton}"
+                        ToolTip="Reload" Click="OnReloadClick"/>
+                <Button DockPanel.Dock="Right" x:Name="btnGo" Content="Go" Style="{StaticResource ToolbarButton}"
+                        ToolTip="Open the address, or search it" Click="OnGoClick"/>
+                <TextBox x:Name="txtUrl" Style="{DynamicResource DarkTextBox}" Margin="6,0"
+                         VerticalContentAlignment="Center" KeyDown="OnUrlKeyDown"
+                         ToolTip="A URL opens; anything else is searched (DuckDuckGo)"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Page -->
+        <Grid Grid.Row="3" x:Name="viewHost" Background="#0A0A14">
+            <TextBlock x:Name="lblEmpty" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="520"
+                       Foreground="{DynamicResource TextDim}" FontSize="12"
+                       Text="No tab is open. Ask the watch to search for something, type a URL above, or run: AgentZeroLite.exe -cli web open https://example.com"/>
+        </Grid>
+    </Grid>
+</UserControl>

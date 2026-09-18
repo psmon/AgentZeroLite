@@ -32,7 +32,7 @@ public static class WearableSettingsStore
             if (!File.Exists(path))
                 return new WearableSettings();
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<WearableSettings>(json) ?? new WearableSettings();
+            return (JsonSerializer.Deserialize<WearableSettings>(json) ?? new WearableSettings()).Normalize();
         }
         catch
         {

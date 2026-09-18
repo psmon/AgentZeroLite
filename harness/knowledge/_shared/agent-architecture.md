@@ -2,7 +2,7 @@
 agent: _shared
 topic: agent-architecture
 audience: anyone editing Project/ZeroCommon/Actors/ or Project/ZeroCommon/Llm/Tools/
-last_synced: 2026-05-05
+last_synced: 2026-09-18
 ---
 
 # Agent architecture — canonical vocabulary
@@ -132,6 +132,47 @@ mode/state belongs to `AgentBotActor`; KV-cache + tool dispatch belong to
    `GenerationProgressInternal`, `RunCompletedInternal`,
    `RunFailedInternal` are nested inside `AgentLoopActor` because they're
    PipeTo / Self.Tell only. Don't promote them.
+
+## Toolbelt verbs added in M0032
+
+| Verb | Toolbelt method | Meaning |
+|---|---|---|
+| `find_files` | `FindFilesAsync` | Search the host's folders by kind (media / image / document / any) and name words, best matches first (`FileToolCore.FindFiles`); the step a small model would not take on its own. |
+| `open_file` | `OpenFileAsync` | Hand a media / image / document file to the OS default program. Gated by `FileOpenPolicy` (extension allow-list) and the host's sandbox. |
+| `stop_media` | `StopMediaAsync` | Stop what `open_file` started: the returned process, a known player that appeared after the launch, or the system media-stop key (`MediaPlaybackTracker` + host-side `keybd_event`). |
+| `web_search` | `WebSearchAsync` | DuckDuckGo HTML results → `{title,url,snippet}` rows (`WebSearchParser`). |
+| `web_open` | `WebOpenAsync` | Open a URL in a browser tab (0 = new) and return the tab id plus a short summary. |
+| `web_read` | `WebReadAsync` | Read an open tab in `summary` / `links` / `find` mode (`WebPageExtractor`). |
+
+Both loops dispatch them; `IAgentToolbelt` carries "not available" defaults so hosts
+and test doubles that don't implement them keep compiling. `IWebToolSurface`
+(`Agent.Common.Web`) is where a host says *where* it browses: the WPF
+`BrowserPagePanel`, the `-cli web` bridge (`GuiCliWebToolSurface`), or
+`HeadlessWebToolSurface`.
+
+## Wearable actor topology (M0032)
+
+The wearable host composes the same vocabulary into its own subtree instead of a
+second loop implementation:
+
+```
+/user/chat                 ChatActor            — device gateway (BLE / AskBot / voice I/O only)
+/user/agent                WearableAgentActor   — sessions, routing, newest-question-wins
+    /files                 FileToolActor        — AllowedRootResolver + AllowedRootFileTools + open_file
+    /web                   WebToolActor         — GuiCliWebToolSurface → HeadlessWebToolSurface fallback
+    /session-<key>         AgentLoopActor       — reused as-is; one IAgentLoop per conversation
+```
+
+| Message | Direction | Meaning |
+|---|---|---|
+| `WearableAgentActor.Ask` | chat → agent | One question for a session; the sender gets the replies. |
+| `WearableAgentActor.Progress` | agent → chat | Forwarded `AgentLoopProgress` (phase, tool, round). |
+| `WearableAgentActor.Answer` | agent → chat | Forwarded `AgentLoopResult` (success, text, turns, reason). |
+| `ResetSession` / `CancelSession` / `ForgetSessions` | chat → agent | New conversation / cancel / device gone. |
+
+`WearableToolbelt` is an `Ask`-adapter over `/files` and `/web`; the loop never touches
+disk or network on its own thread. All of it lives in `ZeroCommon/Wearable/` (WinRT-free)
+so `ZeroCommon.Tests/Wearable/WearableAgentActorTests` drives it with TestKit.
 
 ## Related
 

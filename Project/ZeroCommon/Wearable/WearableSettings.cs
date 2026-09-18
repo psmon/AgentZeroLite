@@ -31,6 +31,33 @@ public static class WearableBrainNames
 }
 
 /// <summary>
+/// One folder the watch's file tools may reach (M0032). <see cref="Alias"/> is the name the
+/// model uses (<c>docs/notes.txt</c>); <see cref="Path"/> is where that really is on disk.
+/// </summary>
+public sealed class AllowedRoot
+{
+    public string Alias { get; set; } = "";
+    public string Path { get; set; } = "";
+
+    /// <summary>
+    /// Whether <c>write_file</c> / <c>edit_file</c> may touch this folder. Off by default: a
+    /// device across the room reading a folder and one rewriting it are different grants.
+    /// </summary>
+    public bool Writable { get; set; }
+
+    /// <summary>Lower-case letters, digits, <c>-</c> and <c>_</c>, at most 32 characters; anything else is dropped.</summary>
+    public static string NormalizeAlias(string? alias)
+    {
+        if (string.IsNullOrWhiteSpace(alias)) return "";
+        var chars = alias.Trim().ToLowerInvariant()
+            .Select(c => char.IsAsciiLetterOrDigit(c) ? c : (c is '-' or '_' ? c : '-'))
+            .ToArray();
+        var s = new string(chars).Trim('-', '_');
+        return s.Length > 32 ? s[..32] : s;
+    }
+}
+
+/// <summary>
 /// Persisted options for the Wearable host (M0031) — the second process that owns the
 /// watch's single BLE link and serves its three apps (AskBot over Akka remoting, Chat
 /// over the line protocol, Claude HUD over :8765).
@@ -103,11 +130,69 @@ public sealed class WearableSettings
     public string LocalModelId { get; set; } = "";
 
     /// <summary>
-    /// Folder the watch's file tools are sandboxed to. Empty = no file tools at all
-    /// (default-deny): a device across the room should not reach the whole disk because
-    /// nobody chose a root.
+    /// Legacy single folder for the watch's file tools (pre-M0032). Kept only so an older
+    /// <c>wearable-settings.json</c> still loads: <see cref="Normalize"/> migrates a non-empty
+    /// value into <see cref="AllowedRoots"/> (alias <c>workspace</c>, writable) and clears it.
+    /// New code reads <see cref="AllowedRoots"/> only.
     /// </summary>
     public string WorkspaceRoot { get; set; } = "";
+
+    /// <summary>
+    /// The folders the watch's file tools may reach (M0032). Empty = no file tools at all
+    /// (default-deny): a device across the room should not reach the whole disk because
+    /// nobody chose a root. The model addresses files as <c>alias/relative/path</c>; the
+    /// real path never leaves this process.
+    /// </summary>
+    public List<AllowedRoot> AllowedRoots { get; set; } = new();
+
+    /// <summary>
+    /// Whether the watch's agent may search the web and read pages (M0032). When the GUI is
+    /// running the pages open in its Browser page; otherwise the host fetches headlessly.
+    /// </summary>
+    public bool WebToolsEnabled { get; set; } = true;
+
+    /// <summary>Hard cap on the page text one <c>web_read</c> hands the model.</summary>
+    public int WebMaxChars { get; set; } = 6000;
+
+    /// <summary>
+    /// Explicit path of <c>AgentZeroLite.exe</c> for the web tools' GUI bridge. Empty = resolve
+    /// from the host's own location (shipped layout: the parent folder; dev layout: the
+    /// AgentZeroWpf build output). <c>off</c> = never use the GUI: browse headlessly even
+    /// while it runs (nothing opens on screen).
+    /// </summary>
+    public string GuiExePath { get; set; } = "";
+
+    /// <summary>
+    /// Bring a loaded file into the shape the host expects: migrate the legacy
+    /// <see cref="WorkspaceRoot"/>, drop roots without a path, give alias-less roots the
+    /// folder's name, and make aliases unique. Idempotent; called by the store on load.
+    /// </summary>
+    public WearableSettings Normalize()
+    {
+        AllowedRoots ??= new List<AllowedRoot>();
+        if (AllowedRoots.Count == 0 && !string.IsNullOrWhiteSpace(WorkspaceRoot))
+            AllowedRoots.Add(new AllowedRoot { Alias = "workspace", Path = WorkspaceRoot.Trim(), Writable = true });
+        WorkspaceRoot = "";
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var kept = new List<AllowedRoot>();
+        foreach (var root in AllowedRoots)
+        {
+            if (root is null || string.IsNullOrWhiteSpace(root.Path)) continue;
+            root.Path = root.Path.Trim();
+            var alias = AllowedRoot.NormalizeAlias(root.Alias);
+            if (alias.Length == 0)
+                alias = AllowedRoot.NormalizeAlias(System.IO.Path.GetFileName(root.Path.TrimEnd('\\', '/')));
+            if (alias.Length == 0) alias = "root";
+            var unique = alias;
+            for (var n = 2; !seen.Add(unique); n++) unique = $"{alias}-{n}";
+            root.Alias = unique;
+            kept.Add(root);
+        }
+        AllowedRoots = kept;
+        if (WebMaxChars < 500) WebMaxChars = 500;
+        return this;
+    }
 
     /// <summary>
     /// Style instructions prepended for the CLI brain. The agent brains carry their own

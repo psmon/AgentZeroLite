@@ -334,6 +334,49 @@ public sealed class LocalAgentLoop : IAgentLoop
                 return await _host.ListFilesAsync(string.IsNullOrEmpty(pathFilter) ? null : pathFilter, maxEntries, ct);
             }
 
+            // ---- Open + web (mission M0032) ------------------------------
+            // Toolbelt returns a JSON envelope directly; forward verbatim.
+
+            case "find_files":
+            {
+                var query = ReadString(call.Args, "query", "");
+                var kind = ReadString(call.Args, "kind", "");
+                var maxResults = ReadInt(call.Args, "max_results", 20);
+                return await _host.FindFilesAsync(query, kind, maxResults, ct);
+            }
+
+            case "open_file":
+            {
+                var path = ReadString(call.Args, "path", "");
+                return await _host.OpenFileAsync(path, ct);
+            }
+
+            case "stop_media":
+                return await _host.StopMediaAsync(ct);
+
+            case "web_search":
+            {
+                var query = ReadString(call.Args, "query", "");
+                var maxResults = Math.Clamp(ReadInt(call.Args, "max_results", 5), 1, 10);
+                return await _host.WebSearchAsync(query, maxResults, ct);
+            }
+
+            case "web_open":
+            {
+                var url = ReadString(call.Args, "url", "");
+                var tab = ReadInt(call.Args, "tab", 0);
+                return await _host.WebOpenAsync(url, tab, ct);
+            }
+
+            case "web_read":
+            {
+                var tab = ReadInt(call.Args, "tab", 0);
+                var mode = ReadString(call.Args, "mode", "summary");
+                var find = ReadString(call.Args, "find", "");
+                var maxChars = ReadInt(call.Args, "max_chars", 0);
+                return await _host.WebReadAsync(tab, mode, string.IsNullOrEmpty(find) ? null : find, maxChars, ct);
+            }
+
             default:
                 return $"{{\"error\":\"unknown tool {EscapeJsonString(call.Tool)}\"}}";
         }

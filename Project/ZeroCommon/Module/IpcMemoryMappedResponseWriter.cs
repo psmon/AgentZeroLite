@@ -11,6 +11,34 @@ public static class IpcMemoryMappedResponseWriter
     private static readonly object Sync = new();
     private static readonly Dictionary<string, MemoryMappedFile> Maps = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Empty the map so a reader that polls it sees "no response yet" rather than the
+    /// previous command's answer. Needed by handlers that answer asynchronously (the web
+    /// commands, M0032): the CLI starts polling the moment <c>SendMessageTimeout</c>
+    /// returns, and a stale length would be read as this call's result.
+    /// </summary>
+    public static void Clear(string mapName, int capacity)
+    {
+        try
+        {
+            lock (Sync)
+            {
+                if (!Maps.TryGetValue(mapName, out var mmf))
+                {
+                    mmf = MemoryMappedFile.CreateOrOpen(mapName, capacity);
+                    Maps[mapName] = mmf;
+                }
+                using var accessor = mmf.CreateViewAccessor(0, 4);
+                accessor.Write(0, 0);
+                accessor.Flush();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[IPC] clear {mapName} failed: {ex.Message}");
+        }
+    }
+
     public static void WriteJson(string mapName, int capacity, string json, string errorContext)
     {
         try

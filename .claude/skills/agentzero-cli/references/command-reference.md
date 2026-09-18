@@ -61,6 +61,17 @@ Exit codes: `0` reached/idle · `2` timeout · `3` stalled.
 |---------|-------|
 | `bot-chat "<text>" [--from <name>]` | Deliver a message to the AgentBot broker. From a peer terminal, wrap replies as `DONE(<text>)` and set `--from <peerName>` matching the tab identity, or the broker drops it as an inactive-peer signal. `--from` default is `CLI`. |
 
+## Browser / web tools (IPC — GUI required) — M0032
+
+| Command | Notes |
+|---------|-------|
+| `web open <url> [--tab N]` | Open a URL in the GUI's Browser page (tab 0 = new tab). Prints `{ok, tab, url, title, text…}`; the page is shown to the user. |
+| `web search <query...> [--max N]` | DuckDuckGo search in the Browser page. Prints `{ok, query, results:[{title,url,snippet}]}`. |
+| `web read [--tab N] [--mode summary\|links\|find] [--find <kw>] [--max-chars N]` | Extract an open tab (tab 0 = active). `summary` = title + main text, `links` = the page's links, `find` = paragraphs containing the keyword. |
+| `web tabs` | List open tabs. |
+
+The group's default `--timeout` is 45 s (page loads). Replies are produced asynchronously on the GUI side and carry a `req` id; the CLI waits for the matching one. The wearable host is the main caller (its `web_*` tools), which is why the page opens in the GUI: the user sees what the watch's agent is reading. Exit code 0 when the JSON's `ok` is true.
+
 ## Worktrees (in-process git — no GUI)
 
 | Command | Notes |

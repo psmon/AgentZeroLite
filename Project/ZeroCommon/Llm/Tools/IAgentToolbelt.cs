@@ -94,6 +94,36 @@ public interface IAgentToolbelt
     /// <summary>List files/dirs under the workspace root so the agent can find exact names. JSON envelope.</summary>
     Task<string> ListFilesAsync(string? pathFilter, int maxEntries, CancellationToken ct)
         => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
+
+    // ====================== Open + web surface (mission M0032) ================
+    // Default implementations keep every existing host and test double compiling.
+    // The wearable host implements all four (file open through FileOpenPolicy, web
+    // through the GUI's Browser page or a headless fetch); the WPF host implements
+    // them against the active workspace and its own Browser page.
+
+    /// <summary>Find files by kind (media / image / document / any) and name words across the host's folders. JSON envelope.</summary>
+    Task<string> FindFilesAsync(string? query, string? kind, int maxResults, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"no workspace root bound\"}");
+
+    /// <summary>Open a media / image / document file with the OS default program. JSON envelope.</summary>
+    Task<string> OpenFileAsync(string path, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"open_file not available in this host\"}");
+
+    /// <summary>Stop the media playback that <see cref="OpenFileAsync"/> started. JSON envelope.</summary>
+    Task<string> StopMediaAsync(CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"stop_media not available in this host\"}");
+
+    /// <summary>Web search; returns <c>{ok, results:[{title,url,snippet}]}</c>.</summary>
+    Task<string> WebSearchAsync(string query, int maxResults, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"web tools not available in this host\"}");
+
+    /// <summary>Open a URL in a browser tab (0 = new tab) and return a short summary of the page.</summary>
+    Task<string> WebOpenAsync(string url, int tab, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"web tools not available in this host\"}");
+
+    /// <summary>Read an open tab: mode summary | links | find.</summary>
+    Task<string> WebReadAsync(int tab, string? mode, string? find, int maxChars, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"web tools not available in this host\"}");
 }
 
 /// <summary>

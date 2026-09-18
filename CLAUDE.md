@@ -85,6 +85,8 @@ Actor names sometimes contain user input (workspace names, terminal IDs). Route 
 ### CLI ↔ GUI IPC
 `AgentZeroLite.exe -cli <cmd>` talks to the running GUI over `WM_COPYDATA` with marker `0x414C "AL"` (send side in `CliHandler.cs`, receive in `CliTerminalIpcHelper.cs` / `MainWindow`). The GUI writes JSON responses to named memory-mapped files with the `AgentZeroLite_*` prefix; the CLI side polls (default 5s timeout; `--no-wait` skips the wait entirely). Helper wrapper: `Project/AgentZeroWpf/AgentZeroLite.ps1` (launches with `-NoNewWindow -Wait` to make stdio visible).
 
+The `web` command group (M0032, `Services/Browser/WebCliCommands.cs`) is the one group whose GUI handler answers **asynchronously** (a navigation takes seconds and WndProc must return at once). Two guards keep the polling CLI honest: `HandleWebCommand` clears its MMF synchronously before the work starts, and the reply echoes the request's `req` id, which the CLI insists on. Default `--timeout` for the group is 45 s.
+
 ### CLI test skills (agent-facing usage guides)
 `.claude/skills/agentzero-cli/` is a **guide-level skill authored to exercise the `-cli` surface** — it teaches an agent to locate the exe (Debug build preferred for internal testing), invoke it on Windows (WinExe → `Start-Process -NoNewWindow -Wait` or the `.ps1` wrapper), drive terminal tabs, run the handshake / `DONE()` reverse channel and two-terminal discussion loop, and use the native `os` control verbs. It's a testing/dev aid, not product code; `dotnet` builds ignore it. `scripts/find-cli.ps1` resolves the exe by priority; `references/` holds the full command + interaction detail. `codex/prompts/agentzero-cli.md` is the project-bundled Codex analog (Codex has no `skills/` auto-discovery — copy/symlink it into `~/.codex/prompts/` to get `/agentzero-cli`). Both stay thin pointers to `-cli help agentzero` so they can't drift from the binary. Official plugin packaging is tracked separately.
 
@@ -113,11 +115,40 @@ loads the bundles the app already installed:
 | Ear | Settings → Voice (WhisperLocal) | `WhisperModelStore` + Whisper.net, incl. the Vulkan→CPU probe |
 | Brain | Settings → LLM | `IAgentLoop` (`LocalAgentLoop` / `ExternalAgentLoop`) over `WearableToolbelt` |
 
-`WearableToolbelt` implements only the **file** surface (via `FileToolCore`, sandboxed to
-`WorkspaceRoot`, empty = default-deny) and lets `IAgentToolbelt`'s defaults answer
-"not available" for terminals/OS — a device across the room does not drive the machine.
-Music tools from the sample were **not** ported: the tool catalog is fixed by the shared
-`AgentToolGrammar`, and adding verbs there would change the main app's agent contract.
+`WearableToolbelt` (M0032, in `ZeroCommon/Wearable/`) is a thin adapter over two tool
+actors — **files** (`FileToolActor`) and **web** (`WebToolActor`). Terminals, mouse,
+keyboard and screenshots stay unimplemented and answer "not available": a device across
+the room does not drive the machine. The file side is sandboxed to the **allow-listed
+folders** in `wearable-settings.json` (`AllowedRoots`: alias + path + per-folder
+`Writable`; the model addresses files as `alias/relative/path`, `list_files` with no path
+returns the aliases, an empty list is default-deny; a pre-M0032 `WorkspaceRoot` is
+migrated on load). `open_file` hands a file to ShellExecute only when `FileOpenPolicy`
+classifies its extension as media / image / document — that allow-list is the line between
+"play this song" and "run this program". The web side (`web_search` / `web_open` /
+`web_read`) uses the GUI's **Browser** page through `AgentZeroLite.exe -cli web …` while
+the GUI is running and a headless fetch (`HeadlessWebFetcher` + `WebPageExtractor`)
+otherwise; both paths run the same extractor and every envelope says `via: gui | headless`.
+`web_search` also opens the first result (`top_page`) and, for weather questions, attaches
+a `weather` block from wttr.in — a small model answers from text it is handed and rarely
+goes to fetch it. `GuiExePath: "off"` in the settings file keeps browsing headless even
+while the GUI runs. Page text is handed to the model as data, with the prompt saying so.
+`stop_media` ends what `open_file` started (`MediaPlaybackTracker`: the returned process,
+a known player that appeared after the launch, else the system media-stop key).
+
+The agent itself is an actor subtree of the host's ActorSystem, mirroring the main app's
+`AgentBotActor` / `AgentLoopActor` split: `ChatActor` is the device gateway only, and
+`/user/agent` (`WearableAgentActor`) supervises `/files`, `/web` and one reused
+`AgentLoopActor` per conversation (`/session-<key>`). It adds newest-question-wins — cancel
+the running loop, queue the new question until the loop is idle — which the main app's
+loop actor does not need. `AgentZeroWearable.exe --ask` runs the same subtree on a local,
+non-remoting ActorSystem, so the panel's "Test brain" is a real smoke test of that path.
+
+**The tool catalog was extended on purpose in M0032** (`find_files`, `open_file`, `stop_media`,
+`web_search`, `web_open`, `web_read`): GBNF, `KnownTools` and the prompt text in `AgentToolGrammar`
+move together and `AgentToolCatalogTests` keeps them in step. The main app implements
+the same verbs (`WorkspaceTerminalToolHost`: `open_file` inside the active workspace, web
+tools against the Browser page via `BrowserToolSurfaceRegistry`). The sample's music
+tools were still not ported — a verb family with no use outside the watch.
 
 Link-only settings live in `wearable-settings.json` (`Agent.Common.Wearable`), and that file
 is the entire contract between the two processes — the host reads it once at startup, so

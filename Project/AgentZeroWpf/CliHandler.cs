@@ -21,6 +21,12 @@ internal static class CliHandler
     // === Global CLI Options ===
     private static bool _noWait = false;
     private static int _timeoutMs = 5000;   // default 5 seconds
+    private static bool _timeoutExplicit = false;
+
+    // Read by command groups in other files (web, M0032) that reuse the GUI round-trip.
+    internal static bool NoWait => _noWait;
+    internal static bool TimeoutExplicit => _timeoutExplicit;
+    internal static int TimeoutMs { get => _timeoutMs; set => _timeoutMs = value; }
     private const int PollIntervalMs = 300; // polling interval for MMF read
 
     public static int Run(string[] args)
@@ -50,7 +56,10 @@ internal static class CliHandler
                      && i + 1 < cliArgs.Count)
             {
                 if (int.TryParse(cliArgs[i + 1], out int t))
+                {
                     _timeoutMs = t;
+                    _timeoutExplicit = true;
+                }
                 cliArgs.RemoveAt(i + 1);
                 cliArgs.RemoveAt(i);
             }
@@ -98,6 +107,7 @@ internal static class CliHandler
             "orchestrate" => Orchestrate(cliArgs.Skip(1).ToArray()),
             "automation" => Automation(cliArgs.Skip(1).ToArray()),
             "os" => OsCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
+            "web" => Services.Browser.WebCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             "ai" => AiCliCommands.Dispatch(cliArgs.Skip(1).ToArray()),
             _ => PrintUnknownCommand(command),
         };
@@ -109,7 +119,7 @@ internal static class CliHandler
     // "CLI 블락 현상" — see harness/logs/code-coach/2026-05-10-07-51-cli-block-recurrence-rca.md.
     private const uint WpfSendTimeoutMs = 3000;
 
-    private static bool SendWpfCommand(IntPtr agentWnd, string jsonCommand)
+    internal static bool SendWpfCommand(IntPtr agentWnd, string jsonCommand)
     {
         byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonCommand);
         var gch = GCHandle.Alloc(jsonBytes, GCHandleType.Pinned);
@@ -141,7 +151,11 @@ internal static class CliHandler
         }
     }
 
-    private static string? TryReadMmf(string mmfName, int mmfSize)
+    /// <param name="accept">
+    /// Optional filter: keep polling until a response satisfies it. Asynchronous handlers
+    /// (web, M0032) echo a request id so a stale map can never be taken for this call's answer.
+    /// </param>
+    internal static string? TryReadMmf(string mmfName, int mmfSize, Func<string, bool>? accept = null)
     {
         if (_noWait)
         {
@@ -162,7 +176,8 @@ internal static class CliHandler
                 {
                     byte[] data = new byte[dataLen];
                     accessor.ReadArray(4, data, 0, dataLen);
-                    return Encoding.UTF8.GetString(data);
+                    var text = Encoding.UTF8.GetString(data);
+                    if (accept is null || accept(text)) return text;
                 }
             }
             catch (FileNotFoundException)
@@ -434,7 +449,7 @@ internal static class CliHandler
         Console.Error.WriteLine("Start AgentZeroLite.exe first (GUI mode), then retry.");
     }
 
-    private static IntPtr FindAgentZero()
+    internal static IntPtr FindAgentZero()
     {
         IntPtr hwnd = LocateAgentZeroWindow();
         if (hwnd == IntPtr.Zero) PrintNotRunning();
@@ -1789,6 +1804,7 @@ internal static class CliHandler
         Console.WriteLine();
         Console.WriteLine("Commands:");
         Console.WriteLine("  status                                  Show Lite app state");
+        Console.WriteLine("  web open|search|read|tabs [...]         Drive the Browser page (web tools, M0032); 'web help'");
         Console.WriteLine("  copy                                    Copy captured text to clipboard");
         Console.WriteLine("  open-win                                Launch the GUI");
         Console.WriteLine("  close-win                               Close the GUI");

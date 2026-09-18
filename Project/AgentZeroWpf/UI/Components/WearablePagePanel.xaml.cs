@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -35,6 +36,17 @@ public partial class WearablePagePanel : UserControl
     private WearableHostProcess? _host;
     private WearableSettings? _settings;
     private readonly Queue<string> _log = new();
+
+    /// <summary>One editable row of the allow-list (M0032). Plain properties: the TextBoxes
+    /// push into it on every keystroke and Save reads it back; nothing observes it.</summary>
+    public sealed class RootRow
+    {
+        public string Alias { get; set; } = "";
+        public string Path { get; set; } = "";
+        public bool Writable { get; set; }
+    }
+
+    private readonly ObservableCollection<RootRow> _roots = new();
 
     /// <summary>Raised when the user clicks the panel's close button.</summary>
     public event Action? CloseRequested;
@@ -78,7 +90,11 @@ public partial class WearablePagePanel : UserControl
             "netclaw" => 2,
             _ => 0,
         };
-        txtRoot.Text = _settings.WorkspaceRoot;
+        _roots.Clear();
+        foreach (var root in _settings.Normalize().AllowedRoots)
+            _roots.Add(new RootRow { Alias = root.Alias, Path = root.Path, Writable = root.Writable });
+        lstRoots.ItemsSource = _roots;
+        chkWebTools.IsChecked = _settings.WebToolsEnabled;
         txtAnnounce.Text = _settings.AnnounceOnConnect;
         txtTalkMs.Text = _settings.TalkOnConnectMs.ToString();
         UpdateBrainEnablement();
@@ -108,7 +124,13 @@ public partial class WearablePagePanel : UserControl
             2 => "netclaw",
             _ => "echo",
         };
-        _settings.WorkspaceRoot = txtRoot.Text.Trim();
+        _settings.AllowedRoots = _roots
+            .Where(r => !string.IsNullOrWhiteSpace(r.Path))
+            .Select(r => new AllowedRoot { Alias = r.Alias, Path = r.Path.Trim(), Writable = r.Writable })
+            .ToList();
+        _settings.WorkspaceRoot = "";   // legacy field; the list above is the contract now
+        _settings.WebToolsEnabled = chkWebTools.IsChecked == true;
+        _settings.Normalize();
         _settings.AnnounceOnConnect = txtAnnounce.Text.Trim();
         if (int.TryParse(txtTalkMs.Text, out var talkMs) && talkMs >= 0)
             _settings.TalkOnConnectMs = talkMs;
@@ -137,16 +159,27 @@ public partial class WearablePagePanel : UserControl
         cboCli.IsEnabled = cboBrain.SelectedIndex == 2;
     }
 
-    private void OnPickRootClick(object sender, RoutedEventArgs e)
+    private void OnAddRootClick(object sender, RoutedEventArgs e)
     {
         using var dialog = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "Folder the watch's file tools may reach (everything outside it is refused)",
+            Description = "A folder the watch's file tools may reach (everything outside the list is refused)",
             UseDescriptionForTitle = true,
-            SelectedPath = Directory.Exists(txtRoot.Text) ? txtRoot.Text : "",
         };
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            txtRoot.Text = dialog.SelectedPath;
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+        var path = dialog.SelectedPath;
+        var alias = AllowedRoot.NormalizeAlias(System.IO.Path.GetFileName(path.TrimEnd('\\', '/')));
+        if (alias.Length == 0) alias = "root";
+        var unique = alias;
+        for (var n = 2; _roots.Any(r => string.Equals(r.Alias, unique, StringComparison.OrdinalIgnoreCase)); n++)
+            unique = $"{alias}-{n}";
+        _roots.Add(new RootRow { Alias = unique, Path = path, Writable = false });
+    }
+
+    private void OnRemoveRootClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is RootRow row) _roots.Remove(row);
     }
 
     // ── Host control ─────────────────────────────────────────────────────────

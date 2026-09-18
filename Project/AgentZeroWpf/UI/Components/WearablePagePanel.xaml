@@ -116,6 +116,8 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Who answers"
@@ -137,19 +139,51 @@
                         <ComboBoxItem Content="netclaw"/>
                     </ComboBox>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="File-tool root"
-                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Center"/>
-                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,4" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" x:Name="btnPickRoot" Content="Browse…"
-                                Style="{DynamicResource FlatButton}" Padding="10,3" Margin="6,0,0,0"
-                                Click="OnPickRootClick"/>
-                        <TextBox x:Name="txtRoot" Style="{DynamicResource DarkTextBox}"
-                                 ToolTip="Leave empty to turn the file tools off entirely (default-deny). This is the only folder the watch can reach."/>
-                    </DockPanel>
+                    <!-- M0032: several allow-listed folders instead of one root. The alias is
+                         what the watch's agent writes (docs/notes.txt); the real path never
+                         reaches the model. Writable is per folder, off by default. -->
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Allowed folders"
+                               Foreground="{DynamicResource TextDim}" VerticalAlignment="Top" Margin="0,8,0,0"/>
+                    <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,4">
+                        <ItemsControl x:Name="lstRoots">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,0,0,4" LastChildFill="True">
+                                        <Button DockPanel.Dock="Right" Content="✕"
+                                                Style="{DynamicResource FlatButton}" Padding="6,2" Margin="6,0,0,0"
+                                                ToolTip="Remove this folder" Click="OnRemoveRootClick"/>
+                                        <CheckBox DockPanel.Dock="Right" Content="writable" Margin="8,0,0,0"
+                                                  IsChecked="{Binding Writable, UpdateSourceTrigger=PropertyChanged}"
+                                                  Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"
+                                                  ToolTip="Let write_file / edit_file change files here. Reading and open_file never need this."/>
+                                        <TextBox DockPanel.Dock="Left" Width="110" Margin="0,0,6,0"
+                                                 Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource DarkTextBox}"
+                                                 ToolTip="Alias the watch uses: &lt;alias&gt;/relative/path (letters, digits, - and _)"/>
+                                        <TextBox Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource DarkTextBox}"
+                                                 ToolTip="The folder on this PC"/>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button x:Name="btnAddRoot" Content="+ Add folder…"
+                                Style="{DynamicResource FlatButton}" Padding="10,3"
+                                HorizontalAlignment="Left" Click="OnAddRootClick"/>
+                    </StackPanel>
 
                     <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" FontSize="11"
                                Foreground="{DynamicResource TextDim}" Margin="0,2,0,0"
-                               Text="The watch's agent gets file tools only — terminals, mouse, keyboard and screenshots are left unimplemented and answer &quot;not available&quot;. With no root set, the file tools are refused too."/>
+                               Text="The watch's agent can list, read and search inside these folders, open media / image / document files with the PC's default program (open_file), and use the web tools below. Terminals, mouse, keyboard and screenshots stay unavailable. With no folder listed, the file tools are refused."/>
+
+                    <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="chkWebTools" Margin="0,10,0,4"
+                              Content="Allow web search and page reading from the watch"
+                              Foreground="{DynamicResource TextPrimary}"
+                              ToolTip="web_search / web_open / web_read. Pages open in AgentZero's Browser page while the GUI runs; otherwise the host fetches them headlessly."/>
+
+                    <TextBlock Grid.Row="5" Grid.Column="1" TextWrapping="Wrap" FontSize="11"
+                               Foreground="{DynamicResource TextDim}" Margin="0,0,0,0"
+                               Text="Pages open in the Browser page (activity bar) when AgentZero is running, so you see what the agent reads; with the GUI closed the host fetches pages itself. Page text is handed to the model as data, never as instructions."/>
                 </Grid>
 
                 <!-- ── On connect ── -->

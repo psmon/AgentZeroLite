@@ -378,6 +378,94 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
         return Task.FromResult(result);
     }
 
+    // ---- Open + web (mission M0032) ------------------------------------
+    // open_file: the same workspace sandbox as the file tools plus the
+    // FileOpenPolicy allow-list (ShellExecute runs whatever the extension is
+    // associated with, so only media / image / document types get through).
+    // web_*: the Browser page, if MainWindow has registered it.
+
+    // One tracker per process: AgentBot's open_file / stop_media pair shares it across
+    // toolbelt instances (a new host is built per agent loop session).
+    private static readonly Agent.Common.Wearable.MediaPlaybackTracker MediaTracker = new();
+
+    public Task<string> FindFilesAsync(string? query, string? kind, int maxResults, CancellationToken ct)
+        => Task.FromResult(FileToolCore.FindFiles(_workspaceRootProvider?.Invoke(), query, kind, maxResults));
+
+    public Task<string> OpenFileAsync(string path, CancellationToken ct)
+    {
+        var root = _workspaceRootProvider?.Invoke();
+        if (!FileOpenPolicy.TryClassify(path, out var kind, out var error))
+            return Task.FromResult(ToolJson.Fail(error));
+        if (!FileToolCore.TryResolveInsideRoot(root, path, out var full, out error))
+            return Task.FromResult(ToolJson.Fail(error));
+        if (!System.IO.File.Exists(full))
+            return Task.FromResult(ToolJson.Fail("file not found"));
+        try
+        {
+            var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(full) { UseShellExecute = true });
+            if (kind == FileOpenPolicy.KindMedia) MediaTracker.Record(process, path);
+            else process?.Dispose();
+            AppLogger.Log($"[AIMODE] open_file {full} ({kind})");
+            return Task.FromResult(JsonSerializer.Serialize(new
+            {
+                ok = true,
+                opened = true,
+                path,
+                kind,
+                note = kind == FileOpenPolicy.KindMedia ? "now playing on the PC (stop_media stops it)" : "shown on the PC",
+            }, ToolJson.Options));
+        }
+        catch (System.Exception ex)
+        {
+            AppLogger.Log($"[AIMODE] open_file FAILED {full}: {ex.GetType().Name}: {ex.Message}");
+            return Task.FromResult(ToolJson.Fail(ex.Message));
+        }
+    }
+
+    public Task<string> StopMediaAsync(CancellationToken ct)
+    {
+        var was = MediaTracker.LastPath;
+        var (stopped, how) = MediaTracker.Stop(SendMediaStopKey);
+        AppLogger.Log($"[AIMODE] stop_media: {how} ({was ?? "-"})");
+        return Task.FromResult(stopped
+            ? JsonSerializer.Serialize(new { ok = true, stopped = true, path = was, detail = how }, ToolJson.Options)
+            : ToolJson.Fail(how));
+    }
+
+    /// <summary>The keyboard's ⏹ button, system-wide — what every player honours when we hold no handle on it.</summary>
+    private static bool SendMediaStopKey()
+    {
+        const byte VK_MEDIA_STOP = 0xB2;
+        try
+        {
+            NativeMethods.keybd_event(VK_MEDIA_STOP, 0, 0, System.IntPtr.Zero);
+            NativeMethods.keybd_event(VK_MEDIA_STOP, 0, NativeMethods.KEYEVENTF_KEYUP, System.IntPtr.Zero);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public Task<string> WebSearchAsync(string query, int maxResults, CancellationToken ct)
+        => Web(surface => surface.SearchAsync(query, maxResults, ct));
+
+    public Task<string> WebOpenAsync(string url, int tab, CancellationToken ct)
+        => Web(surface => surface.OpenAsync(url, tab, ct));
+
+    public Task<string> WebReadAsync(int tab, string? mode, string? find, int maxChars, CancellationToken ct)
+        => Web(surface => surface.ReadAsync(tab, mode, find, maxChars, ct));
+
+    private static Task<string> Web(System.Func<Agent.Common.Web.IWebToolSurface, Task<string>> op)
+    {
+        var surface = Browser.BrowserToolSurfaceRegistry.Current;
+        return surface is null
+            ? Task.FromResult(ToolJson.Fail("the Browser page is not available in this host"))
+            : op(surface);
+    }
+
     public Task<string> ListFilesAsync(string? pathFilter, int maxEntries, CancellationToken ct)
     {
         var root = Root();
