@@ -9,8 +9,8 @@ namespace ZeroCommon.Tests;
 /// Pure-CPU unit tests for <see cref="ExternalAgentLoop"/>. The class
 /// has one piece of non-trivial standalone logic — pulling a balanced JSON
 /// object out of noisy model output — and that's what we test here. The
-/// loop itself needs a network endpoint and lives behind the online smoke
-/// suite (<see cref="WebnoriExternalSmokeTests"/>).
+/// loop itself needs a network endpoint, so it is exercised by hand against
+/// whichever provider the operator has configured rather than in this suite.
 /// </summary>
 public sealed class ExternalAgentLoopTests
 {

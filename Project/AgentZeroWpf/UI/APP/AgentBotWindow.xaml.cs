@@ -1199,7 +1199,7 @@ public partial class AgentBotWindow : Window
             // expects; user gets fail-fast messages from ExternalAgentLoop.
             if (!modelId.Contains("gemma", StringComparison.OrdinalIgnoreCase))
             {
-                AddSystemMessage($"⚠️ AIMODE toolchain is standardised on Gemma 4. Model '{modelId}' is non-Gemma — expect malformed JSON envelopes. Switch to Webnori / google/gemma-4-e4b for reliable AIMODE.");
+                AddSystemMessage($"⚠️ AIMODE toolchain is standardised on Gemma 4. Model '{modelId}' is non-Gemma — expect malformed JSON envelopes. Point your provider at a Gemma 4 model for reliable AIMODE.");
             }
             AppLogger.Log($"[AIMODE] StartAgentLoop sent (backend=External, provider={savedSettings.External.Provider}, model={modelId})");
         }

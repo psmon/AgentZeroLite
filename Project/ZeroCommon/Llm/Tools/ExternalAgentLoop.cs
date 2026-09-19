@@ -8,7 +8,7 @@ namespace Agent.Common.Llm.Tools;
 
 /// <summary>
 /// AIMODE agent loop that drives an external OpenAI-compatible provider
-/// (Webnori/OpenAI/LMStudio/Ollama) instead of an on-device LLamaSharp model.
+/// (Ollama/OpenAI/LMStudio) instead of an on-device LLamaSharp model.
 ///
 /// Toolchain stance: <b>Gemma 4 is the standard.</b> We send the same
 /// <see cref="AgentToolGrammar.SystemPrompt"/> + tool catalog as the local

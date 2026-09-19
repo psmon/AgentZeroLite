@@ -139,7 +139,7 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private bool _useExternal = true;
     [ObservableProperty] private bool _useLocal;
-    [ObservableProperty] private string _provider = ExternalProviderNames.Webnori;
+    [ObservableProperty] private string _provider = ExternalProviderNames.Ollama;
     [ObservableProperty] private string _externalModel = "";
     [ObservableProperty] private decimal? _externalMaxTokens = 4096;
     [ObservableProperty] private decimal? _temperature = 0.7m;
@@ -195,7 +195,9 @@ public partial class SettingsViewModel : ObservableObject
         try { s = LlmSettingsStore.Load(); } catch (Exception ex) { LlmStatus = "Could not read the LLM settings: " + ex.Message; s = new LlmRuntimeSettings(); }
         UseExternal = s.ActiveBackend == LlmActiveBackend.External || !LocalSupported;
         UseLocal = !UseExternal;
-        Provider = Providers.Contains(s.External.Provider) ? s.External.Provider : ExternalProviderNames.Webnori;
+        // A settings file written before the bundled hosts were removed may name one
+        // that no longer ships; fall back rather than showing an empty selection.
+        Provider = Providers.Contains(s.External.Provider) ? s.External.Provider : ExternalProviderNames.Ollama;
         ExternalModel = s.External.SelectedModel;
         ExternalMaxTokens = s.External.MaxTokens;
         Temperature = (decimal)s.Temperature;

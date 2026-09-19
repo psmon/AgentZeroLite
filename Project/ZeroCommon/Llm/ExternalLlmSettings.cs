@@ -12,16 +12,20 @@ namespace Agent.Common.Llm;
 /// </summary>
 public sealed class ExternalLlmSettings
 {
-    /// <summary>"Webnori" | "WebnoriA2" | "OpenAI" | "LMStudio" | "Ollama". See <see cref="ExternalProviderNames"/>.</summary>
-    public string Provider { get; set; } = ExternalProviderNames.Webnori;
+    /// <summary>"Ollama" | "OpenAI" | "LMStudio". See <see cref="ExternalProviderNames"/>.</summary>
+    /// <remarks>
+    /// Ollama is the default because it needs no credential: a fresh install points at
+    /// <c>localhost:11434</c> and works as soon as the user has Ollama running. A file
+    /// written by an older build may still say "Webnori"; that host is gone, so the name
+    /// simply resolves to no provider and the UI asks the user to pick one.
+    /// </remarks>
+    public string Provider { get; set; } = ExternalProviderNames.Ollama;
 
     /// <summary>
-    /// Model id sent on each request. When empty for Webnori a1/a2 we fall
-    /// back to that host's default (<see cref="WebnoriDefaults.DefaultModel"/>
-    /// or <see cref="WebnoriDefaults.DefaultModelA2"/>); for other providers
-    /// an empty value means the user hasn't picked one yet (Refresh + select required).
+    /// Model id sent on each request. Empty means the user hasn't picked one yet
+    /// (Refresh + select required) — no provider ships a hardcoded default model.
     /// </summary>
-    public string SelectedModel { get; set; } = WebnoriDefaults.DefaultModel;
+    public string SelectedModel { get; set; } = "";
 
     /// <summary>
     /// Per-request token cap. Externally-hosted models do all other tuning

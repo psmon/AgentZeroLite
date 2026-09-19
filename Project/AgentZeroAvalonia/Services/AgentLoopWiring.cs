@@ -67,7 +67,7 @@ internal static class AgentLoopWiring
             });
     }
 
-    /// <summary>"Webnori · google/gemma-4-e4b" or the local model's display name — for the status line.</summary>
+    /// <summary>"Ollama · llama3" or the local model's display name — for the status line.</summary>
     public static string ActiveModelLabel()
     {
         try

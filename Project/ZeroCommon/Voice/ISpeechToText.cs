@@ -3,7 +3,7 @@ namespace Agent.Common.Voice;
 /// <summary>
 /// Speech-to-Text provider abstraction. Implementations convert PCM audio to
 /// text. Ported verbatim from the AgentWin origin so concrete providers
-/// (Whisper.net, OpenAI Whisper, Webnori-Gemma audio, on-device Gemma audio)
+/// (Whisper.net, OpenAI Whisper, on-device Gemma audio)
 /// can be added behind a single switch without UI churn.
 /// </summary>
 public interface ISpeechToText

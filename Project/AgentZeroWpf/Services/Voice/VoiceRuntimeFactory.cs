@@ -23,7 +23,6 @@ internal static class VoiceRuntimeFactory
                 GpuDeviceIndex = v.SttGpuDeviceIndex,
             },
             SttProviderNames.OpenAIWhisper => new OpenAiWhisperStt(v.SttOpenAIApiKey),
-            SttProviderNames.WebnoriGemma => new WebnoriGemmaStt(v.SttWebnoriModel),
             SttProviderNames.LocalGemma => new LocalGemmaStt(v.SttLocalGemmaModelId),
             _ => null,
         };
