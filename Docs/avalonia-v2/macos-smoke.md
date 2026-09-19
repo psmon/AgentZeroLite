@@ -27,7 +27,7 @@ Mac에서 확인해야 한다. 결과는 아래 표에 날짜·기기·OS 버전
 | 8 | 팝업·메뉴 | 탭 우클릭 메뉴와 ▾ 메뉴가 터미널 **위에** 보임 (NativeControlHost z-order) | |
 | 9 | claude 탭 | `Claude` 정의로 탭 → Claude Code TUI 렌더·입력 | |
 | 10 | CLI | `AgentZeroLite.sh terminal-list`, `terminal-send 0 0 "ls"`, `terminal-read 0 0`, `layout split-right` | |
-| 11 | AgentBot AI | 설정 → LLM → External(Webnori) → 봇 페인 AI 모드로 "list my terminals" → 카드·결과 | |
+| 11 | AgentBot AI | 설정 → LLM → External(Ollama 등 직접 구성) → 봇 페인 AI 모드로 "list my terminals" → 카드·결과 | |
 | 12 | 설정 저장 | External 키 입력 → 저장 → `llm-settings.json`의 키가 `aesg:v1:`로 시작, `secret.key` 권한 0600 | |
 | 13 | 종료 | 창 닫기 후 `ps aux | grep zsh`에 고아 zsh 없음, 파이프/락 파일 정리 | |
 | 14 | 재실행 | 워크스페이스·탭·분할 복원 | |

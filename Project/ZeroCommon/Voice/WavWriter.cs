@@ -1,9 +1,8 @@
 namespace Agent.Common.Voice;
 
 /// <summary>
-/// Minimal RIFF WAV serialiser used by both <see cref="OpenAiWhisperStt"/> and
-/// <see cref="WebnoriGemmaStt"/> when shipping raw PCM through APIs that
-/// require a self-describing audio container.
+/// Minimal RIFF WAV serialiser used by <see cref="OpenAiWhisperStt"/> when shipping
+/// raw PCM through APIs that require a self-describing audio container.
 /// </summary>
 internal static class WavWriter
 {

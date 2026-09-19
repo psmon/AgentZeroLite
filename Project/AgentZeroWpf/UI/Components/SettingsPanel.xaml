@@ -481,7 +481,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- LLM Tab — Local (Gemma) + External (Webnori/OpenAI/LMStudio/Ollama) -->
+            <!-- LLM Tab — Local (Gemma) + External (Ollama/OpenAI/LMStudio) -->
             <TabItem Header="&#x1F916; LLM" Style="{StaticResource SettingsTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,8,0,0">
@@ -505,14 +505,14 @@
                                                  VerticalAlignment="Center" Margin="0,0,16,0"
                                                  Checked="OnActiveBackendChanged"/>
                                     <RadioButton x:Name="rbBackendExternal" GroupName="LlmBackend"
-                                                 Content="External (Webnori / OpenAI / LMStudio / Ollama)"
+                                                 Content="External (Ollama / OpenAI / LMStudio)"
                                                  Foreground="#C8C8D8" FontFamily="Consolas" FontSize="10"
                                                  VerticalAlignment="Center"
                                                  Checked="OnActiveBackendChanged"/>
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="9"
                                            Foreground="#556677" Margin="0,6,0,0"
-                                           Text="Local needs a downloaded GGUF + Load. External just needs a provider/model (Webnori is preconfigured for contributors). AIMODE toolchain is Gemma-4-shaped — non-Gemma external models will likely fail JSON envelope parsing."/>
+                                           Text="Local needs a downloaded GGUF + Load. External needs a provider and a model — Ollama on localhost works with no key. AIMODE toolchain is Gemma-4-shaped — non-Gemma external models will likely fail JSON envelope parsing."/>
                             </StackPanel>
                         </Border>
 
@@ -774,11 +774,9 @@
                                                 <ComboBox x:Name="cbExtProvider" Style="{StaticResource DarkComboBox}"
                                                           Margin="0,0,0,6"
                                                           SelectionChanged="OnExtProviderChanged">
-                                                    <ComboBoxItem Content="Webnori a1 — workhorse (Gemma 4 / GPT-OSS / embeddings · test key bundled)"/>
-                                                    <ComboBoxItem Content="Webnori a2 — experimental (Qwen3.6-27B / Nemotron-3-Nano-4B · same test key)"/>
+                                                    <ComboBoxItem Content="Ollama (localhost:11434 — no key)"/>
                                                     <ComboBoxItem Content="OpenAI (api.openai.com — requires key)"/>
                                                     <ComboBoxItem Content="LMStudio (your own LM Studio server)"/>
-                                                    <ComboBoxItem Content="Ollama (localhost:11434)"/>
                                                 </ComboBox>
                                                 <TextBlock x:Name="tbExtProviderHint" TextWrapping="Wrap"
                                                            FontFamily="Consolas" FontSize="9"
@@ -786,7 +784,7 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <!-- Endpoint config (per-provider; Webnori is read-only) -->
+                                        <!-- Endpoint config (per-provider) -->
                                         <Border Background="#1A1A2E" BorderBrush="#3E3E42" BorderThickness="1"
                                                 CornerRadius="3" Padding="12,8" Margin="0,0,0,8">
                                             <StackPanel>
@@ -819,7 +817,7 @@
                                                 </Grid>
                                                 <TextBlock TextWrapping="Wrap" FontFamily="Consolas" FontSize="9"
                                                            Foreground="#556677" Margin="0,6,0,0"
-                                                           Text="OpenAI: leave Base URL empty to use api.openai.com. LMStudio: typical http://localhost:1234. Ollama: empty defaults to localhost:11434. Webnori: read-only."/>
+                                                           Text="OpenAI: leave Base URL empty to use api.openai.com. LMStudio: typical http://localhost:1234. Ollama: empty defaults to localhost:11434."/>
                                             </StackPanel>
                                         </Border>
 
@@ -1000,7 +998,6 @@
                                           SelectionChanged="OnSttProviderChanged">
                                     <ComboBoxItem Content="Whisper Local  (offline, embedded)" Tag="WhisperLocal"/>
                                     <ComboBoxItem Content="OpenAI Whisper API" Tag="OpenAIWhisper"/>
-                                    <ComboBoxItem Content="Webnori Gemma  (audio-capable)" Tag="WebnoriGemma"/>
                                     <ComboBoxItem Content="Local Gemma  (on-device, audio-capable)" Tag="LocalGemma"/>
                                 </ComboBox>
                             </Grid>
@@ -1057,23 +1054,6 @@
                                            Foreground="#888899" VerticalAlignment="Center"/>
                                 <PasswordBox x:Name="pbSttOpenAIKey" Grid.Column="1"
                                              Style="{StaticResource DarkPasswordBox}"/>
-                            </Grid>
-
-                            <!-- WebnoriGemma-specific: re-uses LLM-tab Webnori URL/key, only need model picker -->
-                            <Grid x:Name="grdSttWebnoriModel" Margin="0,0,0,6" Visibility="Collapsed">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="120"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Webnori Model" FontFamily="Consolas" FontSize="10"
-                                           Foreground="#888899" VerticalAlignment="Center"/>
-                                <ComboBox x:Name="cbSttWebnoriModel" Grid.Column="1"
-                                          Style="{StaticResource DarkComboBox}"/>
-                                <Button x:Name="btnSttRefreshWebnoriModels" Grid.Column="2"
-                                        Content="Refresh" Padding="10,3" Margin="6,0,0,0"
-                                        Style="{StaticResource DarkButton}"
-                                        Click="OnSttRefreshWebnoriModels"/>
                             </Grid>
 
                             <!-- LocalGemma-specific: catalog model picker -->
@@ -1510,7 +1490,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Max Tokens" FontFamily="Consolas" FontSize="10"
                                            Foreground="#888899" VerticalAlignment="Center"
-                                           ToolTip="Cap on the AI reply length so TTS playback stays short. 128 ≈ 5–10 s. Applies to External LLM (Webnori/OpenAI/LMStudio/Ollama); Local uses the LLM-tab cap because LlmService loads MaxTokens at model-load time."/>
+                                           ToolTip="Cap on the AI reply length so TTS playback stays short. 128 ≈ 5–10 s. Applies to External LLM (Ollama/OpenAI/LMStudio); Local uses the LLM-tab cap because LlmService loads MaxTokens at model-load time."/>
                                 <TextBox x:Name="tbVoiceLlmMaxTokens" Grid.Column="1"
                                          Style="{StaticResource DarkTextBox}" Width="100"
                                          HorizontalAlignment="Left"/>

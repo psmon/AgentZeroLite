@@ -78,36 +78,22 @@ public partial class SettingsPanel
             tcLlmBackend.SelectedIndex = s.ActiveBackend == LlmActiveBackend.Local ? 0 : 1;
 
             // Provider dropdown
+            // An unknown name (e.g. a settings file from before the bundled hosts were
+            // removed) falls to index 0 so the panel still opens on something usable.
             cbExtProvider.SelectedIndex = s.External.Provider switch
             {
-                ExternalProviderNames.Webnori => 0,
-                ExternalProviderNames.WebnoriA2 => 1,
-                ExternalProviderNames.OpenAI => 2,
-                ExternalProviderNames.LMStudio => 3,
-                ExternalProviderNames.Ollama => 4,
+                ExternalProviderNames.Ollama => 0,
+                ExternalProviderNames.OpenAI => 1,
+                ExternalProviderNames.LMStudio => 2,
                 _ => 0,
             };
 
             ApplyProviderSlotsToUi(s);
 
-            // Seed model dropdown FIRST so the saved id can match a list entry
-            // (lets non-editable callers see SelectionBoxItem; editable callers
-            // get the typed Text either way).
-            if (s.External.Provider == ExternalProviderNames.Webnori)
-                PopulateModelDropdown(WebnoriDefaults.KnownModels);
-            else if (s.External.Provider == ExternalProviderNames.WebnoriA2)
-                PopulateModelDropdown(WebnoriDefaults.KnownModelsA2);
-            else
-                cbExtModel.Items.Clear();
-
-            cbExtModel.Text = string.IsNullOrEmpty(s.External.SelectedModel)
-                ? s.External.Provider switch
-                {
-                    ExternalProviderNames.Webnori => WebnoriDefaults.DefaultModel,
-                    ExternalProviderNames.WebnoriA2 => WebnoriDefaults.DefaultModelA2,
-                    _ => "",
-                }
-                : s.External.SelectedModel;
+            // No provider ships a model catalogue any more; Refresh fetches the live
+            // /v1/models list for whichever endpoint is configured.
+            cbExtModel.Items.Clear();
+            cbExtModel.Text = s.External.SelectedModel;
 
             tbExtMaxTokens.Text = s.External.MaxTokens.ToString();
 
@@ -126,26 +112,9 @@ public partial class SettingsPanel
         s.External.Provider = ProviderFromIndex(cbExtProvider.SelectedIndex);
         ApplyProviderSlotsToUi(s);
 
-        // Re-seed model dropdown for the new provider.
-        if (s.External.Provider == ExternalProviderNames.Webnori)
-        {
-            PopulateModelDropdown(WebnoriDefaults.KnownModels);
-            cbExtModel.Text = string.IsNullOrEmpty(s.External.SelectedModel)
-                ? WebnoriDefaults.DefaultModel
-                : s.External.SelectedModel;
-        }
-        else if (s.External.Provider == ExternalProviderNames.WebnoriA2)
-        {
-            PopulateModelDropdown(WebnoriDefaults.KnownModelsA2);
-            cbExtModel.Text = string.IsNullOrEmpty(s.External.SelectedModel)
-                ? WebnoriDefaults.DefaultModelA2
-                : s.External.SelectedModel;
-        }
-        else
-        {
-            cbExtModel.Items.Clear();
-            cbExtModel.Text = s.External.SelectedModel;
-        }
+        // Re-seed the model dropdown for the new provider — empty until Refresh.
+        cbExtModel.Items.Clear();
+        cbExtModel.Text = s.External.SelectedModel;
 
         // We don't auto-save the provider change — user clicks Save Options.
         // But the per-provider URL/Key fields *visually* swap so the user
@@ -268,32 +237,16 @@ public partial class SettingsPanel
 
     private static string ProviderFromIndex(int idx) => idx switch
     {
-        0 => ExternalProviderNames.Webnori,
-        1 => ExternalProviderNames.WebnoriA2,
-        2 => ExternalProviderNames.OpenAI,
-        3 => ExternalProviderNames.LMStudio,
-        4 => ExternalProviderNames.Ollama,
-        _ => ExternalProviderNames.Webnori,
+        0 => ExternalProviderNames.Ollama,
+        1 => ExternalProviderNames.OpenAI,
+        2 => ExternalProviderNames.LMStudio,
+        _ => ExternalProviderNames.Ollama,
     };
 
     private void ApplyProviderSlotsToUi(LlmRuntimeSettings s)
     {
         switch (s.External.Provider)
         {
-            case ExternalProviderNames.Webnori:
-                tbExtBaseUrl.Text = WebnoriDefaults.BaseUrl;
-                tbExtApiKey.Text = WebnoriDefaults.ApiKey;
-                tbExtBaseUrl.IsReadOnly = true;
-                tbExtApiKey.IsReadOnly = true;
-                tbExtProviderHint.Text = "🧪 Webnori a1 — workhorse host (Gemma 4 / GPT-OSS / embeddings). Bundled test key shipped with the app so any AgentZero Lite user can try the External LLM path immediately without setting up their own credentials. Endpoint accepts unauthenticated calls too; the bundled key is shipped on purpose (not a secret) and is included on every request for consistent identification while you evaluate the app. For sustained / production use, switch to Local or your own provider.";
-                break;
-            case ExternalProviderNames.WebnoriA2:
-                tbExtBaseUrl.Text = WebnoriDefaults.BaseUrlA2;
-                tbExtApiKey.Text = WebnoriDefaults.ApiKey;
-                tbExtBaseUrl.IsReadOnly = true;
-                tbExtApiKey.IsReadOnly = true;
-                tbExtProviderHint.Text = "🧪 Webnori a2 — experimental comparison group (Qwen3.6-27B / Nemotron-3-Nano-4B). Same bundled test key as a1; pick this when you want to A/B against a non-Gemma model. Note: AgentZero's AIMODE toolchain is Gemma-4-shaped — non-Gemma models on a2 may struggle with the JSON envelope. Best used from the LLM PlayGround for free-form chat comparison.";
-                break;
             case ExternalProviderNames.OpenAI:
                 tbExtBaseUrl.Text = s.External.OpenAIBaseUrl;
                 tbExtApiKey.Text = s.External.OpenAIApiKey;
@@ -335,7 +288,7 @@ public partial class SettingsPanel
             : LlmActiveBackend.Local;
         s.External.Provider = ProviderFromIndex(cbExtProvider.SelectedIndex);
 
-        // Persist to the matching per-provider slot — Webnori is hardcoded.
+        // Persist to the matching per-provider slot.
         switch (s.External.Provider)
         {
             case ExternalProviderNames.OpenAI:

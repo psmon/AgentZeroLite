@@ -10,7 +10,7 @@ namespace Agent.Common.Llm.Providers;
 
 /// <summary>
 /// OpenAI-compatible REST provider. Same wire format works for OpenAI, LM Studio,
-/// Ollama (/v1 endpoint) and Webnori. Streaming uses SSE (data: lines).
+/// Ollama (/v1 endpoint) and LM Studio. Streaming uses SSE (data: lines).
 ///
 /// Trimmed v1: text-only (no audio, no multimodal, no tool_calls). The Gemma 4
 /// AIMODE toolchain emits textual JSON envelopes in-context, so OpenAI native

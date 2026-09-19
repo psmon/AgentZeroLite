@@ -621,7 +621,6 @@ public partial class AgentBotWindow
     {
         SttProviderNames.WhisperLocal => $"Whisper {v.SttWhisperModel}",
         SttProviderNames.OpenAIWhisper => "OpenAI Whisper",
-        SttProviderNames.WebnoriGemma => "Webnori Gemma",
         SttProviderNames.LocalGemma => "Local Gemma",
         _ => v.SttProvider,
     };

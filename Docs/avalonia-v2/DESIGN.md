@@ -198,7 +198,7 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
 - **새 `Project/AgentZeroAvalonia.Tests`**(xUnit + `Avalonia.Headless.XUnit` 12, `[AvaloniaFact]`): SplitTree 모델/매퍼, `TerminalSurfaceHost` 사각형 매핑, `AgentBotViewModel` 모드·카드,
   `CliCommandRouter`(가짜 세션), `XtermBridge` 코덱, `LocalAssetServer`(토큰·트래버설·MIME), `PortaPtyHost`/`ConPtyHost` 에코 왕복(각 OS 러너).
 - **회귀(매 마일스톤)**: `git diff --stat main -- Project/AgentZeroWpf` 가 비어 있음; WPF Debug 빌드·`AgentTest`·`ZeroCommon.Tests` 전부 통과.
-- **수동 스모크 Windows**: WPF 종료 후 Avalonia 실행 → cmd/pwsh/Claude 탭 → 2×2 분할 → 한글 입력·5 KB 붙여넣기 → `AgentZeroLite.ps1 terminal-list/-send/-read/-wait` → AI 모드(Webnori) →
+- **수동 스모크 Windows**: WPF 종료 후 Avalonia 실행 → cmd/pwsh/Claude 탭 → 2×2 분할 → 한글 입력·5 KB 붙여넣기 → `AgentZeroLite.ps1 terminal-list/-send/-read/-wait` → AI 모드(External: Ollama 등) →
   설정 왕복 → 재시작 레이아웃 복원 → WPF 실행해 같은 워크스페이스 열림 확인.
 - **수동 스모크 macOS**(`Docs/avalonia-v2/macos-smoke.md`): `xattr` 후 첫 실행, zsh 탭 색상·`LANG`, `claude` 탭, Cmd 코드, 분할/닫기, `AgentZeroLite.sh status/terminal-*`,
   External LLM 채팅, `secret.key` 0600, 종료 시 고아 `zsh` 없음, 팝업/메뉴가 터미널 위에 보임.

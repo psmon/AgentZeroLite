@@ -18,13 +18,6 @@ public static class SttProviderNames
     public const string OpenAIWhisper = "OpenAIWhisper";
 
     /// <summary>
-    /// Webnori-hosted multimodal Gemma endpoint. Re-uses the LLM-tab Webnori
-    /// credentials (no duplicate API key here) and the model picker on this
-    /// tab is filtered to audio-capable Webnori models.
-    /// </summary>
-    public const string WebnoriGemma = "WebnoriGemma";
-
-    /// <summary>
     /// On-device Gemma audio variant loaded via the same self-built llama.dll
     /// runtime AgentZeroLite already ships. Active when an audio-capable GGUF
     /// is present in <c>LlmModelCatalog</c>; the local LLM must be loaded.
@@ -111,12 +104,6 @@ public sealed class VoiceSettings
     /// derived at runtime from <c>LlmModelCatalog</c> entries flagged as audio.
     /// </summary>
     public string SttLocalGemmaModelId { get; set; } = "";
-
-    /// <summary>
-    /// Selected model id when WebnoriGemma is the active provider. Refresh on
-    /// the Voice tab fetches the audio-capable subset of Webnori's model list.
-    /// </summary>
-    public string SttWebnoriModel { get; set; } = "";
 
     // ── TTS ──────────────────────────────────────────────────────────────
     public string TtsProvider { get; set; } = TtsProviderNames.Off;

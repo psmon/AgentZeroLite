@@ -481,7 +481,6 @@ public partial class TestToolsWindow : Window
     {
         SttProviderNames.WhisperLocal => $"WhisperLocal · model={v.SttWhisperModel} · lang={v.SttLanguage} · gpu={v.SttUseGpu}",
         SttProviderNames.OpenAIWhisper => $"OpenAIWhisper · lang={v.SttLanguage}",
-        SttProviderNames.WebnoriGemma => $"WebnoriGemma · model={(string.IsNullOrEmpty(v.SttWebnoriModel) ? "(default)" : v.SttWebnoriModel)} · lang={v.SttLanguage}",
         SttProviderNames.LocalGemma => $"LocalGemma · model={(string.IsNullOrEmpty(v.SttLocalGemmaModelId) ? "(unset)" : v.SttLocalGemmaModelId)} · lang={v.SttLanguage}",
         _ => $"{v.SttProvider}",
     };

@@ -6,7 +6,7 @@ namespace Agent.Common.Llm;
 /// <summary>
 /// Which engine answers TestBot/AgentBot/AIMODE prompts.
 /// Local = on-device GGUF via LLamaSharp (everything below ContextSize/Backend etc).
-/// External = OpenAI-compatible REST (Webnori/OpenAI/LMStudio/Ollama). Externally
+/// External = OpenAI-compatible REST (Ollama/OpenAI/LMStudio). Externally
 /// served models tune themselves server-side, so the only knob exposed here is
 /// MaxTokens.
 /// </summary>
@@ -15,9 +15,10 @@ public enum LlmActiveBackend { Local, External }
 public sealed class LlmRuntimeSettings
 {
     // ── Active backend selector ──
-    // Default = External + Webnori + gemma-4-e4b. New AgentZeroLite installs
-    // get a working AIMODE without downloading multi-GB GGUFs first; user can
-    // switch to Local from the LLM tab.
+    // Default = External + Ollama. It needs no credential and no multi-GB GGUF
+    // download, so a fresh install has a usable AIMODE as soon as Ollama is
+    // running locally; the user can switch to Local or another provider from
+    // the LLM tab.
     public LlmActiveBackend ActiveBackend { get; set; } = LlmActiveBackend.External;
 
     public ExternalLlmSettings External { get; set; } = new();
@@ -79,7 +80,7 @@ public sealed class LlmRuntimeSettings
 
     /// <summary>
     /// Builds the external <see cref="ILlmProvider"/> from the persisted
-    /// settings (Webnori/OpenAI/LMStudio/Ollama). Returns null when
+    /// settings (Ollama/OpenAI/LMStudio). Returns null when
     /// <c>External.Provider</c> is unrecognised — caller should surface that
     /// to the user.
     /// </summary>
@@ -87,8 +88,6 @@ public sealed class LlmRuntimeSettings
     {
         return External.Provider switch
         {
-            ExternalProviderNames.Webnori => LlmProviderFactory.CreateWebnori(),
-            ExternalProviderNames.WebnoriA2 => LlmProviderFactory.CreateWebnoriA2(),
             ExternalProviderNames.OpenAI => LlmProviderFactory.CreateOpenAI(External.OpenAIApiKey, External.OpenAIBaseUrl),
             ExternalProviderNames.LMStudio => LlmProviderFactory.CreateLmStudio(External.LMStudioBaseUrl, External.LMStudioApiKey),
             ExternalProviderNames.Ollama => LlmProviderFactory.CreateOllama(External.OllamaBaseUrl),
@@ -99,14 +98,9 @@ public sealed class LlmRuntimeSettings
     /// <summary>Resolves the model id to send to the active external provider.</summary>
     public string ResolveExternalModel()
     {
-        if (!string.IsNullOrEmpty(External.SelectedModel))
-            return External.SelectedModel;
-        return External.Provider switch
-        {
-            ExternalProviderNames.Webnori => WebnoriDefaults.DefaultModel,
-            ExternalProviderNames.WebnoriA2 => WebnoriDefaults.DefaultModelA2,
-            _ => "",
-        };
+        // No provider ships a hardcoded default model any more — an empty value means
+        // the user has not picked one, and the caller turns that into a clear message.
+        return External.SelectedModel;
     }
 
     public LocalLlmOptions ToOptions(string modelPath) => new()

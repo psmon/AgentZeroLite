@@ -42,9 +42,7 @@ public static class LlmGateway
             && string.IsNullOrWhiteSpace(s.External.OpenAIApiKey))
             return false;
 
-        return s.External.Provider == ExternalProviderNames.Webnori
-            || s.External.Provider == ExternalProviderNames.WebnoriA2
-            || s.External.Provider == ExternalProviderNames.OpenAI
+        return s.External.Provider == ExternalProviderNames.OpenAI
             || s.External.Provider == ExternalProviderNames.LMStudio
             || s.External.Provider == ExternalProviderNames.Ollama;
     }

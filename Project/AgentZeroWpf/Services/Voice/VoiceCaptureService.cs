@@ -14,7 +14,7 @@ namespace AgentZeroWpf.Services.Voice;
 ///
 /// Uses NAudio's <see cref="WaveInEvent"/> at 16 kHz mono 16-bit — the standard
 /// input shape every STT provider in <c>AgentZeroLite</c> expects, so the same
-/// PCM buffer is forwarded to Whisper / OpenAI / Webnori-Gemma without further
+/// PCM buffer is forwarded to Whisper / OpenAI without further
 /// resampling.
 ///
 /// The dual-VAD design (frame-level + utterance-level) is what lets the user

@@ -15,7 +15,7 @@ namespace AgentZeroWpf.UI.Components;
 ///
 /// Wires the Voice Test panel end-to-end:
 ///   1. NAudio mic capture → 16 kHz PCM buffer + dual-VAD events
-///   2. STT provider (Whisper.net local / OpenAI Whisper / Webnori-Gemma /
+///   2. STT provider (Whisper.net local / OpenAI Whisper /
 ///      Local-Gemma placeholder) → text
 ///   3. LlmGateway.OpenSession() — uses whatever the user picked on the LLM
 ///      tab (Local or External), no separate Voice-LLM provider
@@ -67,7 +67,6 @@ public partial class SettingsPanel
             pbSttOpenAIKey.Password = v.SttOpenAIApiKey;
             ApplySttProviderUi(v.SttProvider);
 
-            PreloadSingleItem(cbSttWebnoriModel, v.SttWebnoriModel);
             PopulateLocalGemmaModels(v.SttLocalGemmaModelId);
 
             SelectComboTag(cbTtsProvider, v.TtsProvider);
@@ -321,7 +320,6 @@ public partial class SettingsPanel
     {
         spSttWhisperLocal.Visibility = provider == SttProviderNames.WhisperLocal ? Visibility.Visible : Visibility.Collapsed;
         grdSttOpenAIKey.Visibility = provider == SttProviderNames.OpenAIWhisper ? Visibility.Visible : Visibility.Collapsed;
-        grdSttWebnoriModel.Visibility = provider == SttProviderNames.WebnoriGemma ? Visibility.Visible : Visibility.Collapsed;
         grdSttLocalGemmaModel.Visibility = provider == SttProviderNames.LocalGemma ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -343,9 +341,6 @@ public partial class SettingsPanel
         v.SttGpuDeviceIndex = (cbSttGpuDevice.SelectedItem as ComboBoxItem)?.Tag is string idxTag
                               && int.TryParse(idxTag, out var idx) ? idx : -1;
         v.SttOpenAIApiKey = pbSttOpenAIKey.Password ?? "";
-        v.SttWebnoriModel = (cbSttWebnoriModel.SelectedItem as string)
-                            ?? cbSttWebnoriModel.Text
-                            ?? "";
         v.SttLocalGemmaModelId = (cbSttLocalGemmaModel.SelectedItem as ComboBoxItem)?.Tag as string ?? v.SttLocalGemmaModelId;
 
         v.TtsProvider = ReadComboTag(cbTtsProvider, TtsProviderNames.Off);
@@ -602,76 +597,6 @@ public partial class SettingsPanel
         ApplySttProviderUi(prov);
         tbSttSaveStatus.Text = "Unsaved — click Save STT.";
         tbSttSaveStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
-    }
-
-    private async void OnSttRefreshWebnoriModels(object sender, RoutedEventArgs e)
-    {
-        // Pull the live /v1/models list — same path the LLM-External tab uses.
-        // Audio-capable gating is server-side; we don't pre-filter so users see
-        // every available model. If the call fails (offline / quota), fall back
-        // to the local catalog so the picker is never empty.
-        var current = (cbSttWebnoriModel.SelectedItem as string)
-                      ?? cbSttWebnoriModel.Text
-                      ?? "";
-
-        btnSttRefreshWebnoriModels.IsEnabled = false;
-        tbSttStatus.Text = "Listing models…";
-        tbSttStatus.Foreground = System.Windows.Media.Brushes.SkyBlue;
-
-        var provider = LlmProviderFactory.CreateWebnori();
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var models = await provider.ListModelsAsync(cts.Token);
-
-            cbSttWebnoriModel.Items.Clear();
-            foreach (var m in models)
-                cbSttWebnoriModel.Items.Add(m.Id);
-
-            if (cbSttWebnoriModel.Items.Count == 0)
-            {
-                foreach (var id in WebnoriDefaults.KnownModels)
-                    cbSttWebnoriModel.Items.Add(id);
-                tbSttStatus.Text = $"⚠ Server returned 0 models — catalog fallback ({cbSttWebnoriModel.Items.Count}).";
-                tbSttStatus.Foreground = System.Windows.Media.Brushes.Goldenrod;
-            }
-            else
-            {
-                tbSttStatus.Text = $"✓ {models.Count} model(s) listed (live).";
-                tbSttStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
-            }
-
-            RestoreOrPickFirst(cbSttWebnoriModel, current);
-        }
-        catch (Exception ex)
-        {
-            cbSttWebnoriModel.Items.Clear();
-            foreach (var id in WebnoriDefaults.KnownModels)
-                cbSttWebnoriModel.Items.Add(id);
-            RestoreOrPickFirst(cbSttWebnoriModel, current);
-            tbSttStatus.Text = $"✗ Live refresh failed: {ex.Message} — catalog fallback.";
-            tbSttStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-            AppLogger.LogError("[Voice-STT] Webnori ListModels failed", ex);
-        }
-        finally
-        {
-            (provider as IDisposable)?.Dispose();
-            btnSttRefreshWebnoriModels.IsEnabled = true;
-        }
-    }
-
-    private static void RestoreOrPickFirst(System.Windows.Controls.ComboBox box, string previous)
-    {
-        if (!string.IsNullOrEmpty(previous))
-        {
-            foreach (var item in box.Items)
-                if (item is string s && s == previous)
-                {
-                    box.SelectedItem = item;
-                    return;
-                }
-        }
-        if (box.Items.Count > 0) box.SelectedIndex = 0;
     }
 
     /// <summary>
