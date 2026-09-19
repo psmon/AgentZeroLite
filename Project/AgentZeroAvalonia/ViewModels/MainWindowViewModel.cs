@@ -36,6 +36,20 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _sidebarExpanded = true;
     [ObservableProperty] private bool _botVisible;
     [ObservableProperty] private string _botStatus = "Bot: not started";
+
+    /// <summary>
+    /// Whether the bot sits in the shell or in its own window (M0041). Persisted in the
+    /// shared <c>AppWindowState.IsBotDocked</c> column, so the WPF host comes up the same way.
+    /// </summary>
+    [ObservableProperty] private bool _botDocked = true;
+
+    /// <summary>
+    /// Height of the docked pane, remembered across a maximize/restore. 280 is the WPF
+    /// host's <c>_botDockNormalHeight</c>.
+    /// </summary>
+    [ObservableProperty] private double _botPaneHeight = 280;
+
+    [ObservableProperty] private bool _botMaximized;
     [ObservableProperty] private string _statusText = "Ready";
     [ObservableProperty] private WorkspaceViewModel? _activeWorkspace;
 
@@ -110,6 +124,16 @@ public partial class MainWindowViewModel : ObservableObject
                 BotStatus = $"Bot: {Bot.ModeLabel}" + (Bot.AiBusy ? " · working" : "");
         };
 
+        // M0041 — the bot follows the active terminal: header, session notice and the
+        // AgentEventStream that watches for approval prompts and links.
+        ActiveTerminalChanged += RefreshBotSession;
+
+        // Where the bot was last left. The column is shared with the WPF host. Written to the
+        // backing field so construction neither saves nor asks for a window that has no
+        // listener yet — the view reads BotDocked when it subscribes.
+        try { _botDocked = CliWorkspacePersistence.LoadWindowState()?.IsBotDocked ?? true; }
+        catch (Exception ex) { AppLogger.LogError("[Bot] dock state load failed", ex); }
+
         Settings = new SettingsViewModel();
         Settings.CliDefinitionsChanged += ReloadCliDefinitions;
         Settings.AppearanceChanged += () => TerminalAppearanceChanged?.Invoke();
@@ -169,6 +193,55 @@ public partial class MainWindowViewModel : ObservableObject
     {
         BotVisible = !BotVisible;
         if (BotVisible) Bot.AttachActors();
+    }
+
+    // ── M0041: docked pane ↔ floating window ─────────────────────────────────
+
+    /// <summary>True when the bot should be drawn inside the shell right now.</summary>
+    public bool BotDockVisible => BotVisible && BotDocked;
+
+    /// <summary>Raised with "should the floating window be open"; the view opens/closes it.</summary>
+    public event Action<bool>? BotFloatRequested;
+
+    partial void OnBotVisibleChanged(bool value)
+    {
+        OnPropertyChanged(nameof(BotDockVisible));
+        BotFloatRequested?.Invoke(value && !BotDocked);
+    }
+
+    partial void OnBotDockedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(BotDockVisible));
+        BotFloatRequested?.Invoke(BotVisible && !value);
+        CliWorkspacePersistence.SaveBotDocked(value);
+    }
+
+    /// <summary>Ctrl+Shift+` — move the bot between the shell and its own window.</summary>
+    [RelayCommand]
+    public void ToggleBotEmbedded()
+    {
+        if (!BotVisible)
+        {
+            // Nothing on screen to move: summon the bot first, as the WPF host does.
+            BotVisible = true;
+            Bot.AttachActors();
+            return;
+        }
+        BotDocked = !BotDocked;
+        StatusText = BotDocked ? "BOT EMBEDDED" : "BOT FLOATING";
+    }
+
+    [RelayCommand] public void EmbedBot() { if (!BotDocked) ToggleBotEmbedded(); }
+    [RelayCommand] public void UndockBot() { if (BotDocked) ToggleBotEmbedded(); }
+
+    [RelayCommand]
+    public void ToggleBotMaximized() => BotMaximized = !BotMaximized;
+
+    [RelayCommand]
+    public void CloseBot()
+    {
+        BotVisible = false;
+        BotMaximized = false;
     }
     [RelayCommand] private void NewTerminalDefault() => NewTerminal(CliDefinitions.FirstOrDefault());
     [RelayCommand] private void SplitRight() => Split(vertical: false);
@@ -436,6 +509,7 @@ public partial class MainWindowViewModel : ObservableObject
                 break;
             case WindowCommandIds.PanelToggle: ToggleBot(); break;
             case HotkeyTable.BotToggle: ToggleBot(); break;
+            case HotkeyTable.BotEmbedToggle: ToggleBotEmbedded(); break;
             case HotkeyTable.NextTab: CycleTab(+1); break;
             case HotkeyTable.PrevTab: CycleTab(-1); break;
             case HotkeyTable.MoveTabNextPane: MoveActiveTabToNextPane(); break;
@@ -452,6 +526,10 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasActiveTab));
         ActiveTerminalChanged?.Invoke();
     }
+
+    /// <summary>Points the bot at whichever terminal is now active — the WPF <c>RefreshSessionInfo</c>.</summary>
+    private void RefreshBotSession()
+        => Bot.OnActiveSessionChanged(ActiveWorkspace?.DisplayName, ActiveWorkspace?.ActiveTab?.Title);
 
     // ── persistence (debounced: a split or a drag can change the layout many times a second) ──
 

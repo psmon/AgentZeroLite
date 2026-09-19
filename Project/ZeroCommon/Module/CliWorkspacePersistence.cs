@@ -99,6 +99,33 @@ public static class CliWorkspacePersistence
         db.SaveChanges();
     }
 
+    /// <summary>
+    /// Writes only <see cref="AppWindowState.IsBotDocked"/> (M0041).
+    /// </summary>
+    /// <remarks>
+    /// Both GUI hosts share this row, and <see cref="SaveWindowState"/> writes all nine
+    /// columns. A host that wants to remember where its bot is must not stamp its own
+    /// geometry over the other host's — that is how the WPF window ends up jumping to the
+    /// Avalonia window's position on its next launch. Hence one column, read-modify-write.
+    /// </remarks>
+    public static void SaveBotDocked(bool isBotDocked)
+    {
+        using var db = new AppDbContext();
+        var state = db.AppWindowStates.Find(1);
+        if (state is null)
+        {
+            db.AppWindowStates.Add(new AppWindowState { IsBotDocked = isBotDocked });
+        }
+        else
+        {
+            if (state.IsBotDocked == isBotDocked) return;
+            state.IsBotDocked = isBotDocked;
+            db.AppWindowStates.Update(state);
+        }
+
+        db.SaveChanges();
+    }
+
     public static void SaveCliGroups(IReadOnlyList<ICliGroupInfo> groups)
     {
         using var db = new AppDbContext();

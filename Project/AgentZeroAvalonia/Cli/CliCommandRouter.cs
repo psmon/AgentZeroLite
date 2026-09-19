@@ -358,11 +358,13 @@ internal sealed class CliCommandRouter
             "focus-right" => HotkeyTable.FocusRight,
             "focus-up" => HotkeyTable.FocusUp,
             "focus-down" => HotkeyTable.FocusDown,
+            "bot-toggle" => HotkeyTable.BotToggle,
+            "bot-embed" => HotkeyTable.BotEmbedToggle,
             "status" or "" => null,
             _ => sub.Contains('.') ? sub : "?",
         };
         if (id == "?")
-            return CliIpcProtocol.ErrorJson($"Unknown layout verb '{sub}'. Use: status, split-right, split-down, close-tab, close-pane, add, next-tab, prev-tab, move-tab, focus-left|right|up|down");
+            return CliIpcProtocol.ErrorJson($"Unknown layout verb '{sub}'. Use: status, split-right, split-down, close-tab, close-pane, add, next-tab, prev-tab, move-tab, focus-left|right|up|down, bot-toggle, bot-embed");
         if (id is not null)
         {
             if (ExecuteWindowCommand is null) return CliIpcProtocol.ErrorJson("layout commands are not wired");

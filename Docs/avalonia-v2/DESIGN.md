@@ -344,3 +344,39 @@ CLI 정의: `CliWorkspacePersistence.LoadCliDefinitions`·`AppDbContext`·`CliDe
 - **후속(main PR 전)**: Windows 경로를 전제한 ZeroCommon 픽스처 3개를 OS 인식으로; `AgentSkillGuides`에 `bot-ask`/`layout` 언급;
   `AgentTest.ManagedConPtyHostTests.Write_reaches_child_stdin`은 병렬 실행 시 간헐(재실행 통과) — WPF 원본에도 M0035의 표준 핸들 발견을
   적용할지 결정(이 브랜치는 WPF 무변경 원칙으로 보류).
+
+## Phase 9 — AgentBot UX 파리티 (M0041)
+
+1차(M0033–M0040)가 AgentBot의 **코어**를 옮겼다면(M0037), 이 단계는 **표면**을 채운다. 음성은 제외 — `.Voice.cs` 1298줄은
+오디오 캡처 계층을 ZeroCommon으로 내리는 별도 작업이다.
+
+- **ZeroCommon 시임**(`Agents/`, 전부 헤드리스 테스트): `BotOptions`(지연 0–30 클램프, 시스템 메시지 숨김),
+  `ApprovalAutoResponder`(Down×N @150ms → 100ms → Enter, 지연 후 토글 재확인), `UrlNoticeThrottle`(30초 쿨다운, 100개 초과 evict),
+  `TerminalTextSender`(200자 초과 → `WriteAsync`, 개행 시 Enter 추가), `KeyChordTranslator`(Ctrl+A~Z → 0x01–0x1A,
+  Esc → 300ms → Interrupt), `ToolTurnPresenter`(터미널 read/write → `→`/`←` 교환 뷰, wait → 한 줄), `BotSessionHeader`(탭당 1회 공지).
+  `CliWorkspacePersistence.SaveBotDocked`는 **한 컬럼만** 쓴다 — 기존 `SaveWindowState`는 9개 컬럼을 덮어써서 WPF 창 위치를 튀게 한다.
+- **뷰모델**: `AgentBotViewModel`에 옵션 바·세션 헤더·`AgentEventStream` 부착/해제·승인/URL 처리·클립보드 첨부·모드 토스트·미니 키패드.
+  `Delay` 시임으로 토스트와 자동승인 지연을 테스트에서 즉시화. `ApprovalToastViewModel`은 10초 카운트다운 + 5분 뮤트.
+  `AddSystem`(잡담, 기본 숨김) / `AddNotice`(사용자가 봐야 하는 것, 항상 표시)로 분리 — WPF는 둘을 합쳐 두고
+  `xaml.cs:1000`에서 "숨기면 고장난 것처럼 보인다"고 주석으로 우회했다.
+- **CHT 파리티 갭 2건**: 대용량/개행 텍스트가 `WriteAndEnter` 한 번으로 나가던 것을 `TerminalTextSender`로,
+  그리고 WPF가 병행 전송하던 `UserInput` 액터 메시지를 추가.
+- **도크**: WPF와 같은 **하단** — `ShellGrid`에 행 3개(콘텐츠 `*`(MinHeight 90) · 스플리터 6px · 봇 280px)를 두고 활동바를
+  제외한 컬럼 1–2를 스팬한다. 높이는 코드비하인드가 정하므로 숨김 상태에서 0이 되어 빈 공간이 남지 않고, 최대화는 WPF처럼
+  상단에 터미널 90px만 남긴다(`BotMaximizedTopPx`). 폭이 아니라 **높이**를 영속한다(`BotPaneHeight`, 기본 280 = WPF `_botDockNormalHeight`).
+  중요한 것은 위치가 아니라 **형제 행이라는 점**이다 — 오버레이였다면 macOS에서 터미널 네이티브 뷰 위가 투명해진다(Phase 4 z-order 규약).
+  WPF 하단 패널의 나머지 탭(OUTPUT/LOG/NOTE)은 미변환이므로 탭 스트립은 두지 않았다.
+- **임베드/분리**: 재부모화하지 않는다. `AgentBotViewModel` 하나에 `AgentBotView` 둘(페인 / `AgentBotWindow`), 전환은 Show/Hide.
+  `AgentBotView`가 `DetachedFromVisualTree`에서 `ItemAdded`를 해제하지 않으면 토글할 때마다 핸들러가 쌓여 한 메시지에 N번 스크롤한다.
+  플로팅 창의 `Closing`은 취소하고 재도킹한다(WPF `EmbedBotFromBot` 계약). 상태는 공유 컬럼 `AppWindowState.IsBotDocked`.
+- **`ShutdownMode.OnMainWindowClose`**: 이 호스트에 두 번째 창이 처음 생긴다. 기본값 `OnLastWindowClose`면 메인 창을 닫아도
+  플로팅 봇이 떠 있는 한 프로세스가 남는다.
+- **핫키**: `bot.embed-toggle` = `Ctrl+Shift+Backquote`. **`OemTilde`가 아니라 `Backquote`로 적어야 한다** — `term.js`는
+  `e.key` 또는 `e.code`로 매칭하는데 Shift를 누르면 `e.key`가 `"~"`라서 `e.code === "Backquote"`만 맞는다. 틀리면
+  창에서는 되고 **터미널에 포커스가 있을 때만 조용히 실패**한다(정작 쓰는 순간). `HotkeyTableTests`가 이 계약을 고정한다.
+- **CLI**: 새 동사 없이 `layout`에 별칭만 — `bot-toggle`, `bot-embed`(`Layout`이 점 찍힌 id를 이미 통과시킨다).
+- **범위 밖**: SkillSync·스타터팩 임포트·`.agent-zero/` 캐시·슬래시 자동완성(하나의 의존 사슬 — 슬래시는 `_syncedSkills` 종속),
+  마크다운 렌더(`Markdown.Avalonia` 미채택), OS 제어 툴, 음성.
+  **WPF에서 죽은 코드라 옮길 것이 없는 것**: `chkThinking`(참조 0), MD 파일 첨부(필드 선언만), 웰컴 템플릿 12종.
+- 수용: ZeroCommon 시임 단위 테스트, 승인 토스트/자동승인 E2E, 세션 전환 시 헤더·스트림 재부착, `Ctrl+Shift+\``로 분리/임베드 왕복 및
+  재시작 복원, 메인 창 종료 시 프로세스 종료, `bot-ask` 3갈래 테스트, `git diff --stat main -- Project/AgentZeroWpf` 비어 있음.

@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+        xmlns:views="using:AgentZeroAvalonia.Views"
+        x:Class="AgentZeroAvalonia.Views.AgentBotWindow"
+        x:DataType="vm:AgentBotViewModel"
+        Title="AgentBot"
+        Width="420" Height="600" MinWidth="320" MinHeight="400"
+        Background="{DynamicResource CyberBgPanel}"
+        WindowStartupLocation="CenterOwner">
+
+    <!-- Native decorations rather than the WPF host's custom 32px chrome: macOS traffic
+         lights and a hand-drawn title bar do not mix, and embedding is a view-model flag
+         here, not a window mode. -->
+    <views:AgentBotView />
+</Window>

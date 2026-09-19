@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -60,6 +61,13 @@ public partial class App : Application
             var vm = new MainWindowViewModel();
             vm.LoadState();
 
+            // M0041: URL bubbles open in the OS browser.
+            vm.Bot.OpenUrl = url =>
+            {
+                try { desktop.MainWindow?.Launcher.LaunchUriAsync(new Uri(url)); }
+                catch (Exception ex) { AppLogger.Log($"[Bot] open url failed: {ex.GetType().Name}: {ex.Message}"); }
+            };
+
             var router = new CliCommandRouter(desktop)
             {
                 Groups = () => vm.Groups,
@@ -80,11 +88,16 @@ public partial class App : Application
             };
             _cliServer = CliServer.Start(router);
 
+            // M0041: the bot can now open a second window. Without this the default
+            // (OnLastWindowClose) would keep the process alive after the shell is closed
+            // while the floating bot is still up.
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = new MainWindow { DataContext = vm };
 
             desktop.ShutdownRequested += (_, _) =>
             {
                 try { vm.FlushPersist(); } catch { }
+                try { vm.Bot.Detach(); } catch { }
                 try { _cliServer?.Dispose(); } catch { }
                 ActorSystemManager.Shutdown();
             };
