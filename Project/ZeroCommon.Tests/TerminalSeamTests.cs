@@ -138,6 +138,56 @@ public sealed class TerminalSeamTests
         Assert.Equal(@"C:\app;C:\bin", winSpec.Env["Path"]);
     }
 
+    /// <summary>
+    /// A remote definition stores only the shell half of the launch (`-NoExit -Command`);
+    /// the planner owes it the `ssh …` that follows. Planning it as a local definition
+    /// hands PowerShell a `-Command` with nothing after it, and the tab shows the shell's
+    /// usage banner instead of the box — the SSH-mode bug in the Avalonia host.
+    /// </summary>
+    [Fact]
+    public void Planner_composes_the_ssh_command_for_a_remote_definition()
+    {
+        var def = new CliDefinition
+        {
+            Name = "M4MAC",
+            ExePath = "powershell.exe",
+            Arguments = "-NoExit -Command",
+            IsRemote = true,
+            SshHost = "192.168.0.50",
+            SshUser = "psmac",
+            SshAuthMethod = SshCommandBuilder.AuthMethodPublicKey,
+            SshKeyPath = @"C:\keys\id rsa.pem",
+        };
+
+        var spec = TerminalLaunchPlanner.Plan(def, @"C:\w", null, out var error, isWindows: true,
+            sourceEnvironment: new Hashtable { ["Path"] = @"C:\bin" })!;
+
+        Assert.Null(error);
+        Assert.Equal(
+            @"powershell.exe -NoExit -Command ssh -o StrictHostKeyChecking=accept-new -i ""C:\keys\id rsa.pem"" psmac@192.168.0.50",
+            spec.CommandLine);
+        // The key path keeps its single backslashes — re-joining the split argv would
+        // double them and PowerShell does not unescape those.
+        Assert.DoesNotContain(@"\\", spec.CommandLine);
+        Assert.Contains("psmac@192.168.0.50", spec.Args);
+
+        // cmd.exe takes /K instead, and a local definition is untouched.
+        var cmd = TerminalLaunchPlanner.Plan(
+            new CliDefinition { Name = "box", ExePath = "cmd.exe", IsRemote = true, SshHost = "h", SshUser = "u" },
+            @"C:\w", null, out _, isWindows: true)!;
+        Assert.Equal("cmd.exe /K ssh -o StrictHostKeyChecking=accept-new u@h", cmd.CommandLine);
+    }
+
+    [Fact]
+    public void Planner_refuses_a_remote_definition_that_has_no_host_or_user()
+    {
+        // Half-filled, the composer returns the shell's own arguments — which is the
+        // broken launch above. Better to say what is missing.
+        var def = new CliDefinition { Name = "half", ExePath = "powershell.exe", Arguments = "-NoExit -Command", IsRemote = true, SshHost = "h" };
+        Assert.Null(TerminalLaunchPlanner.Plan(def, @"C:\w", null, out var error, isWindows: true));
+        Assert.Contains("host/user", error);
+    }
+
     // ── health tracker ───────────────────────────────────────────────────────
 
     [Fact]

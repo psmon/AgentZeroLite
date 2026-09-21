@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using Agent.Common;
 using Agent.Common.Services;
 using AgentZeroAvalonia.Layout;
+using AgentZeroAvalonia.Security;
 using AgentZeroAvalonia.Services;
 using AgentZeroAvalonia.Terminal;
 using AgentZeroAvalonia.ViewModels;
@@ -29,6 +30,8 @@ using Pane = PaneNode<TerminalTabViewModel>;
 public partial class TerminalsView : UserControl
 {
     private readonly Dictionary<TerminalTabViewModel, XtermWebViewTerminalControl> _controls = new();
+    /// <summary>Password-auth ssh tabs waiting for their prompt; disposed with the tab.</summary>
+    private readonly Dictionary<TerminalTabViewModel, SshPasswordWatcher> _sshAutofill = new();
     private readonly Dictionary<Pane, Border> _slots = new();
     private readonly Dictionary<XtermWebViewTerminalControl, Rect> _placed = new();
     private MainWindowViewModel? _vm;
@@ -375,6 +378,12 @@ public partial class TerminalsView : UserControl
             if (_vm?.ActiveWorkspace?.ActiveTab == tab) RefreshStatusText();
         });
         TerminalActorBinder.Bind(ws, tab);
+
+        // Password-auth ssh: OpenSSH will not take the password on argv, so the stored
+        // one is typed at its prompt (the WPF host's M0021 autofill, now shared).
+        if (SshPasswordWatcher.ArmFor(def, session, SshPasswordVault.Unprotect) is { } autofill)
+            _sshAutofill[tab] = autofill;
+
         AppLogger.Log($"[Terminals] started {ws.DisplayName}/{tab.Title} | {spec.CommandLine}");
     }
 
@@ -388,6 +397,7 @@ public partial class TerminalsView : UserControl
 
     private void Teardown(WorkspaceViewModel ws, TerminalTabViewModel tab)
     {
+        if (_sshAutofill.Remove(tab, out var autofill)) autofill.Dispose();
         if (_controls.Remove(tab, out var control))
         {
             try { control.Shutdown(); } catch { }

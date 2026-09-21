@@ -12,10 +12,25 @@ public sealed record TerminalLaunchSpec(
     IReadOnlyDictionary<string, string> Env,
     string DisplayName)
 {
+    /// <summary>
+    /// The argument string exactly as the definition (and the SSH composer) wrote it.
+    /// <see cref="Args"/> is the POSIX reading of the same field; re-joining it for
+    /// Windows would re-quote every argument, and <see cref="CommandLineSplitter.Join"/>
+    /// doubles backslashes — which a shell like PowerShell does not undo, so
+    /// <c>-i "C:\keys\id.pem"</c> would reach ssh as <c>C:\\keys\\id.pem</c>. Windows
+    /// hands ConPTY one command line anyway, so it gets the original text.
+    /// </summary>
+    public string? RawArguments { get; init; }
+
     /// <summary>The Windows form — ConPTY takes one command line, not argv.</summary>
-    public string CommandLine => Args.Count == 0
-        ? Quote(App)
-        : Quote(App) + " " + CommandLineSplitter.Join(Args);
+    public string CommandLine
+    {
+        get
+        {
+            var tail = RawArguments ?? (Args.Count == 0 ? null : CommandLineSplitter.Join(Args));
+            return string.IsNullOrWhiteSpace(tail) ? Quote(App) : Quote(App) + " " + tail.Trim();
+        }
+    }
 
     private static string Quote(string s) => s.Contains(' ') && !s.StartsWith('"') ? $"\"{s}\"" : s;
 }
@@ -58,7 +73,28 @@ public static class TerminalLaunchPlanner
         }
 
         var exe = definition.ExePath.Trim();
-        var arguments = ReducedMotionArguments.Append(definition.Arguments, definition.ExePath, definition.ReducedMotion);
+
+        // A remote definition is "this shell, then an ssh into the box" — the shell's
+        // stored arguments are only half of it (`-NoExit -Command`, `/K`). Composing the
+        // other half used to live in the WPF window that launches tabs, so a host that
+        // planned from the definition alone started the bare shell with a dangling
+        // `-Command` and got the shell's usage banner instead of a session.
+        var ssh = new SshLaunchSettings(
+            IsRemote: definition.IsRemote,
+            Host: definition.SshHost,
+            User: definition.SshUser,
+            AuthMode: SshCommandBuilder.ParseAuthMethod(definition.SshAuthMethod),
+            KeyPath: definition.SshKeyPath);
+        if (definition.IsRemote && SshCommandBuilder.BuildSshCommand(ssh).Length == 0)
+        {
+            // Without both halves the composer returns the shell's own arguments, which
+            // is exactly the broken launch above. Say what is missing instead.
+            error = $"'{definition.Name}' is remote but has no SSH host/user to connect to";
+            return null;
+        }
+
+        var arguments = SshCommandBuilder.ComposeArguments(exe, definition.Arguments, ssh);
+        arguments = ReducedMotionArguments.Append(arguments, definition.ExePath, definition.ReducedMotion);
         var args = CommandLineSplitter.Split(arguments);
 
         IDictionary<string, string> env = windows
@@ -67,6 +103,9 @@ public static class TerminalLaunchPlanner
         if (!string.IsNullOrWhiteSpace(appDir))
             TerminalEnvironment.PrependPath(env, appDir, windows ? ';' : ':');
 
-        return new TerminalLaunchSpec(exe, args, workDir, new Dictionary<string, string>(env, env is SortedDictionary<string, string> ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal), definition.Name);
+        return new TerminalLaunchSpec(exe, args, workDir, new Dictionary<string, string>(env, env is SortedDictionary<string, string> ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal), definition.Name)
+        {
+            RawArguments = arguments,
+        };
     }
 }

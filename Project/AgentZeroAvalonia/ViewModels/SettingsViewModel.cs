@@ -7,6 +7,7 @@ using Agent.Common.Llm.Providers;
 using Agent.Common.Module;
 using Agent.Common.Security;
 using Agent.Common.Services;
+using AgentZeroAvalonia.Security;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -69,7 +70,10 @@ public partial class CliDefinitionItem : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Name)) return "A name is required.";
         if (string.IsNullOrWhiteSpace(ExePath)) return "An executable is required.";
+        // Both halves, because ssh is launched as user@host: with one missing the
+        // composer has no command to run and the tab would start a bare local shell.
         if (IsRemote && string.IsNullOrWhiteSpace(SshHost)) return "SSH needs a host.";
+        if (IsRemote && string.IsNullOrWhiteSpace(SshUser)) return "SSH needs a user.";
         return null;
     }
 
@@ -428,13 +432,13 @@ public partial class SettingsViewModel : ObservableObject
             if (item.Id == 0)
             {
                 entity = new CliDefinition { SortOrder = db.CliDefinitions.Any() ? db.CliDefinitions.Max(d => d.SortOrder) + 1 : 0 };
-                item.ApplyTo(entity, SecretProtection.Protect);
+                item.ApplyTo(entity, SshPasswordVault.Protect);
                 db.CliDefinitions.Add(entity);
             }
             else
             {
                 entity = db.CliDefinitions.Find(item.Id) ?? throw new InvalidOperationException("The definition no longer exists.");
-                item.ApplyTo(entity, SecretProtection.Protect);
+                item.ApplyTo(entity, SshPasswordVault.Protect);
             }
             db.SaveChanges();
             CliStatus = $"Saved '{entity.Name}'.";
