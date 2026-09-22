@@ -213,6 +213,40 @@ dotnet test  Project/AgentOne.Tests/AgentOne.Tests.csproj
 Project/AgentOne/bin/Debug/net10.0/agent-one --version
 ```
 
+### Running it from the source tree
+
+`agent-one.ps1` is the development shortcut: it builds the Debug binary if it
+is missing or older than the sources, then hands every argument straight to it
+and returns its exit code.
+
+```powershell
+.\Project\AgentOne\agent-one.ps1 run "hello" --provider echo
+.\Project\AgentOne\agent-one.ps1 tui
+.\Project\AgentOne\agent-one.ps1 -Rebuild tools list    # build first, always
+.\Project\AgentOne\agent-one.ps1 -NoBuild --version     # never build
+```
+
+Worth knowing:
+
+- It works from any directory, and the agent's workspace root stays **your**
+  current directory — not the script's — so `run`/`chat` see the folder you are
+  actually in.
+- It pins the version from `version.txt` (`SkipAutoBumpVersion`) so running the
+  wrapper never dirties a tracked file the way a plain `dotnet build` does.
+- It declares no PowerShell parameters. agent-one's own flags include `-r`, `-p`,
+  `-m` and `-v`, and PowerShell binds those to any parameter starting with the
+  same letter before the binary would ever see them — so the script reads `$args`
+  raw and lifts out only `-Rebuild` / `-NoBuild`.
+- It invokes the binary directly rather than through `Start-Process`, because the
+  TUI needs the real console.
+
+Handy once, then short forever:
+
+```powershell
+Set-Alias a1 C:\code\psmon\AgentZeroLite\Project\AgentOne\agent-one.ps1
+a1 tui
+```
+
 Native AOT single binary (8.3 MB on win-x64, no runtime dependency):
 
 ```bash

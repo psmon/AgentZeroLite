@@ -229,7 +229,19 @@ dotnet build Project/AgentOne/AgentOne.csproj -c Debug
 dotnet test  Project/AgentOne.Tests/AgentOne.Tests.csproj     # headless, cross-platform
 Project/AgentOne/bin/Debug/net10.0/agent-one run "hello" --provider echo
 dotnet publish Project/AgentOne/AgentOne.csproj -c Release -r win-x64 -o out/win-x64
+
+# Dev shortcut: builds if missing/stale, then runs. Works from any directory.
+Project/AgentOne/agent-one.ps1 run "hello" --provider echo
+Project/AgentOne/agent-one.ps1 tui
 ```
+
+`agent-one.ps1` declares **no** PowerShell parameters on purpose — agent-one's
+own flags include `-r`, `-p`, `-m` and `-v`, and PowerShell would bind those to
+any parameter whose name starts with the same letter (`-r` → `-Rebuild`) before
+the binary saw them. It reads `$args` raw and lifts out only `-Rebuild` /
+`-NoBuild`. It also pins the version from `version.txt` so the wrapper never
+dirties that tracked file, and calls the exe directly (not `Start-Process`)
+because the TUI needs the real console.
 
 **It references nothing else in this solution, and nothing references it.** That
 is the point, not an oversight: ZeroCommon's agent loop is bound to Akka, EF
