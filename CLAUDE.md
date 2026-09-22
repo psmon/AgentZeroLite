@@ -324,6 +324,17 @@ Tool output reaches the model as `[tool:<name>]` user messages and the system
 prompt states it is data, not instructions — naming web pages explicitly, since
 that is the one source written by strangers.
 
+**Progress and streaming**: `AgentLoop` raises `ActivityStarted` per turn and
+`AnswerDelta` per fragment; `ProgressDisplay` renders a live line on **stderr**
+(rewritten in place on a TTY, one plain line per step when redirected) and the
+answer streams to **stdout**, so pipes and `--json` are unaffected. Providers
+take an optional `onDelta` — the OpenAI one then switches to SSE, and the
+accumulated return value stays the truth while deltas are only a preview
+(`AgentRun.Unstreamed` is what is left to print). `FinalAnswerStreamer` decodes
+the `text` field out of the JSON envelope as it arrives, and deliberately streams
+**nothing** for a tool call, because `grep` also has a `text` argument and
+printing a search pattern as the answer would be a plausible-looking lie.
+
 ## Ancestor reference — AgentWin (Origin)
 
 AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). When the user mentions *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"the ancestor"*, or asks to *"compare with origin"* / *"오리진이랑 비교"* / *"오리진 참고"*, **read `Docs/agent-origin/` first** instead of crawling the Origin codebase from scratch:

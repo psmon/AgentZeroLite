@@ -82,7 +82,42 @@ that invocation only:
     --no-session      Do not write a transcript
     --json            One JSON object on stdout instead of prose
 -v, --verbose         Trace each tool call on stderr
+-q, --quiet           No progress display, no streaming
 ```
+
+### Watching it work
+
+A run that searches the web and reads two pages takes twenty seconds, and twenty
+silent seconds read as "it has hung". So it narrates, on **stderr**, and streams
+the answer to **stdout** as the model writes it:
+
+```console
+$ agent-one run "What is Akka.NET in one sentence? Search the web first."
+… searching the web for "What is Akka.NET"
+✓ web_search  (1.1s)
+… thinking about what came back
+Akka.NET is an open-source toolkit and runtime that provides an idiomatic .NET
+implementation of the actor model for building highly concurrent, distributed,
+and fault-tolerant applications.
+```
+
+The live line rewrites itself in place in a terminal, and degrades to one plain
+line per step when stderr is redirected — a CI log wants a record, not an
+animation. Because the narration is on stderr, a pipe is unaffected:
+
+```console
+$ agent-one run "reply with exactly: PIPED" > answer.txt
+… thinking
+$ cat answer.txt
+PIPED
+```
+
+`--quiet` silences it, and `--json` implies quiet.
+
+The model streams JSON — `{"tool":"final","args":{"text":"…"}}` — so what you see
+is the decoded `text` field being written, never the braces. A **tool call**
+streams nothing: `grep` also has a `text` argument, and printing a search pattern
+as though it were the answer would be a lie with a very plausible shape.
 
 Exit codes: `0` answered, `1` stopped early (budget, repeat, parse, provider),
 `2` usage error, `130` cancelled. `--json` makes the outcome machine-readable:

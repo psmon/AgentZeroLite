@@ -19,12 +19,24 @@ public enum StopReason
 public sealed record AgentStep(int Index, string Tool, string Detail, bool Ok);
 
 /// <summary>Everything one <c>RunAsync</c> produced — what the CLI prints and what the session file records.</summary>
+/// <param name="Streamed">
+/// How much of <paramref name="Text"/> was already shown as it was generated.
+/// The caller prints the remainder, so a streamed answer is not repeated and a
+/// provider that could not stream still prints in full.
+/// </param>
 public sealed record AgentRun(
     StopReason Reason,
     string Text,
     IReadOnlyList<AgentStep> Steps,
-    TimeSpan Elapsed)
+    TimeSpan Elapsed,
+    string Streamed = "")
 {
+    /// <summary>The part of the answer nobody has seen yet.</summary>
+    public string Unstreamed =>
+        Streamed.Length > 0 && Text.StartsWith(Streamed, StringComparison.Ordinal)
+            ? Text[Streamed.Length..]
+            : Text;
+
     public bool Succeeded => Reason == StopReason.Final;
 
     /// <summary>Process exit code: 0 only for a run that actually answered.</summary>

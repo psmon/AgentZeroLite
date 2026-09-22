@@ -24,7 +24,7 @@ public sealed class EchoChatProvider : IChatProvider, IModelCatalog
     public Task<ModelCatalogResult> ListModelsAsync(CancellationToken ct) =>
         Task.FromResult(ModelCatalogResult.Success(["echo"], "the echo provider runs locally — nothing to list"));
 
-    public Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct)
+    public Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct, Action<string>? onDelta = null)
     {
         var lastUser = "";
         for (int i = messages.Count - 1; i >= 0; i--)
@@ -41,6 +41,11 @@ public sealed class EchoChatProvider : IChatProvider, IModelCatalog
 
         var text = toolAlreadyRan ? SummarizeToolResults(messages) : lastUser;
         var envelope = Agent.ToolCall.Final(text).ToJson();
+
+        // Echo has nothing to stream, but it hands the whole envelope over as one
+        // delta so the display path is exercised offline like everything else.
+        onDelta?.Invoke(envelope);
+
         return Task.FromResult(envelope);
     }
 

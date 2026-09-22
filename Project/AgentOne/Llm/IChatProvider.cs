@@ -9,8 +9,15 @@ public interface IChatProvider
 {
     string Name { get; }
 
-    /// <summary>Returns the assistant's raw reply text for the given conversation.</summary>
-    Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct);
+    /// <summary>
+    /// Returns the assistant's raw reply text for the given conversation.
+    /// </summary>
+    /// <param name="onDelta">
+    /// When supplied, called with each fragment as it arrives. A provider that
+    /// cannot stream simply never calls it and returns the whole reply — callers
+    /// must treat the return value as the truth and the deltas as a preview.
+    /// </param>
+    Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct, Action<string>? onDelta = null);
 }
 
 /// <summary>A provider-side failure the CLI should report as a clean error, not a stack trace.</summary>

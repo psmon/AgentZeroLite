@@ -51,3 +51,25 @@ public sealed class ApiError
     [JsonPropertyName("code")]
     public string? Code { get; set; }
 }
+
+/// <summary>One server-sent chunk of a streamed completion.</summary>
+public sealed class ChatCompletionChunk
+{
+    [JsonPropertyName("choices")]
+    public List<ChunkChoice>? Choices { get; set; }
+}
+
+public sealed class ChunkChoice
+{
+    [JsonPropertyName("delta")]
+    public ChunkDelta? Delta { get; set; }
+
+    [JsonPropertyName("finish_reason")]
+    public string? FinishReason { get; set; }
+}
+
+public sealed class ChunkDelta
+{
+    [JsonPropertyName("content")]
+    public string? Content { get; set; }
+}

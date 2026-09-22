@@ -21,6 +21,19 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
     /// <summary>Raised once per turn — the CLI uses it for --verbose progress.</summary>
     public event Action<AgentStep>? StepCompleted;
 
+    /// <summary>Raised when a turn begins, with what the agent is about to do.</summary>
+    public event Action<string>? ActivityStarted;
+
+    /// <summary>
+    /// Raised with each fragment of the final answer as the model writes it.
+    /// Only ever the answer: a tool call streams nothing (see
+    /// <see cref="FinalAnswerStreamer"/>).
+    /// </summary>
+    public event Action<string>? AnswerDelta;
+
+    /// <summary>Whether to ask the provider to stream. Off unless somebody is watching.</summary>
+    public bool Streaming { get; set; }
+
     /// <summary>Starts a fresh conversation. Called once per chat session, or once per run.</summary>
     public void Reset()
     {
@@ -42,10 +55,24 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
             if (ct.IsCancellationRequested)
                 return Finish(StopReason.Cancelled, "cancelled", steps, sw);
 
+            ActivityStarted?.Invoke(step == 1 ? "thinking" : "thinking about what came back");
+
             string raw;
+            var streamer = new FinalAnswerStreamer();
+
             try
             {
-                raw = await provider.CompleteAsync(_messages, ct);
+                Action<string>? onDelta = null;
+                if (Streaming && AnswerDelta is not null)
+                {
+                    onDelta = fragment =>
+                    {
+                        var visible = streamer.Push(fragment);
+                        if (visible.Length > 0) AnswerDelta?.Invoke(visible);
+                    };
+                }
+
+                raw = await provider.CompleteAsync(_messages, ct, onDelta);
             }
             catch (OperationCanceledException)
             {
@@ -74,7 +101,12 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
                 var answer = call.Arg("text");
                 Emit(steps, step, ToolCall.FinalTool, answer, ok: true);
                 _messages.Add(ChatMessage.Assistant(raw));
-                return Finish(StopReason.Final, answer, steps, sw);
+
+                // The parsed answer is the truth; the stream was a preview. If the
+                // two disagree — a provider that did not stream, a truncated
+                // envelope — the caller is told what was already shown so it can
+                // print only the remainder rather than the whole thing twice.
+                return Finish(StopReason.Final, answer, steps, sw, streamer.Visible);
             }
 
             if (guards.IsRepeat(call))
@@ -90,6 +122,8 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
             }
 
             guards.Record(call);
+
+            ActivityStarted?.Invoke(Describe(call));
 
             ToolResult result;
             try
@@ -129,9 +163,21 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
         return result.Ok ? $"{head} -> {result.Text.Length} chars" : $"{head} -> {result.Text}";
     }
 
-    private static AgentRun Finish(StopReason reason, string text, List<AgentStep> steps, Stopwatch sw)
+    /// <summary>A tool call in words, for the progress line.</summary>
+    private static string Describe(ToolCall call) => call.Tool.ToLowerInvariant() switch
+    {
+        "web_search" => $"searching the web for \"{call.Arg("query")}\"",
+        "web_read" => $"reading {call.Arg("url")}",
+        "read_file" => $"reading {call.Arg("path")}",
+        "list_files" => $"listing {call.Arg("path", ".")}",
+        "find_files" => $"finding {call.Arg("pattern")}",
+        "grep" => $"searching files for \"{call.Arg("text")}\"",
+        _ => call.Tool
+    };
+
+    private static AgentRun Finish(StopReason reason, string text, List<AgentStep> steps, Stopwatch sw, string streamed = "")
     {
         sw.Stop();
-        return new AgentRun(reason, text, steps, sw.Elapsed);
+        return new AgentRun(reason, text, steps, sw.Elapsed, streamed);
     }
 }

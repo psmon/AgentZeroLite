@@ -64,15 +64,37 @@ public sealed class RunCommand
         SessionStore? session = options.Config.SaveSessions ? SessionStore.Create("run") : null;
         session?.Prompt(prompt);
 
+        // Progress goes to stderr and the answer to stdout, so a pipe still gets
+        // exactly the answer. --json and --quiet silence the display entirely.
+        var showProgress = !options.Json && !options.Quiet;
+        using var progress = ProgressDisplay.For(showProgress);
+
+        loop.Streaming = showProgress && !Console.IsOutputRedirected;
+
+        loop.ActivityStarted += what => progress.Activity(what);
+
         loop.StepCompleted += step =>
         {
             session?.Step(step);
             if (options.Verbose && !options.Json)
                 Console.Error.WriteLine($"  [{step.Index}] {step.Tool}: {step.Detail}");
+            else if (step.Tool != Agent.ToolCall.FinalTool)
+                progress.Done(step.Tool, step.Ok);
+        };
+
+        var wroteAnything = false;
+        loop.AnswerDelta += fragment =>
+        {
+            // The first fragment is the moment the spinner has to go: the answer
+            // is about to occupy the screen.
+            if (!wroteAnything) { progress.Stop(); wroteAnything = true; }
+            Console.Out.Write(fragment);
+            Console.Out.Flush();
         };
 
         var run = await loop.RunAsync(prompt, ct);
         session?.Result(run);
+        progress.Stop();
 
         if (options.Json)
         {
@@ -91,7 +113,9 @@ public sealed class RunCommand
         }
         else if (run.Succeeded)
         {
-            Console.WriteLine(run.Text);
+            // Whatever streamed is already on screen; print only the rest, then
+            // the newline the stream never wrote.
+            Console.WriteLine(wroteAnything ? run.Unstreamed : run.Text);
         }
         else
         {
@@ -117,6 +141,11 @@ public sealed class RunCommand
                   --no-session        Do not write a transcript to ~/.agent-one/sessions
                   --json              Print one JSON object instead of prose
               -v, --verbose           Trace each tool call on stderr
+              -q, --quiet             No progress display, no streaming
+
+            While it works, a live line on stderr says what it is doing, and the
+            answer streams to stdout as the model writes it. Redirect stdout and
+            you get exactly the answer; --json or --quiet silence the display.
 
             Exit codes: 0 answered, 1 stopped early, 2 usage error, 130 cancelled.
 

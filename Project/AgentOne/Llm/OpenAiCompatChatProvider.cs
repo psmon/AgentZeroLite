@@ -45,8 +45,13 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("agent-one");
     }
 
-    public async Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct)
+    public async Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct, Action<string>? onDelta = null)
     {
+        // Streaming is asked for only when someone is watching. It costs an extra
+        // parse per chunk and, on a provider that mishandles it, an extra way to
+        // fail — so a non-interactive run keeps the simpler request.
+        if (onDelta is not null) return await StreamAsync(messages, onDelta, ct);
+
         var request = new ChatCompletionRequest
         {
             Model = _model,
@@ -93,6 +98,93 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             throw new ChatProviderException($"provider returned no message content: {Trim(body)}");
 
         return content;
+    }
+
+    /// <summary>
+    /// The same completion over server-sent events. Each chunk is handed to
+    /// <paramref name="onDelta"/> as it lands and also accumulated, so the caller
+    /// still gets one whole reply to parse — the deltas are for showing progress,
+    /// never for deciding what the model said.
+    /// </summary>
+    private async Task<string> StreamAsync(IReadOnlyList<ChatMessage> messages, Action<string> onDelta, CancellationToken ct)
+    {
+        var request = new ChatCompletionRequest
+        {
+            Model = _model,
+            Messages = [.. messages],
+            Temperature = _temperature,
+            Stream = true
+        };
+
+        var message = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = JsonContent.Create(request, AgentOneWireJson.Default.ChatCompletionRequest)
+        };
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new ChatProviderException($"request to {_http.BaseAddress}chat/completions timed out");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ChatProviderException($"cannot reach {_http.BaseAddress}chat/completions: {ex.Message}", ex);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+                throw new ChatProviderException($"HTTP {(int)response.StatusCode} from provider: {Trim(body)}");
+            }
+
+            var whole = new System.Text.StringBuilder();
+
+            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+
+            while (await reader.ReadLineAsync(ct) is { } line)
+            {
+                if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+
+                var payload = line[5..].Trim();
+                if (payload.Length == 0 || payload == "[DONE]") continue;
+
+                var piece = ChunkContent(payload);
+                if (piece.Length == 0) continue;
+
+                whole.Append(piece);
+                onDelta(piece);
+            }
+
+            if (whole.Length == 0)
+                throw new ChatProviderException($"{_http.BaseAddress}chat/completions streamed no content");
+
+            return whole.ToString();
+        }
+    }
+
+    /// <summary>
+    /// The text in one SSE payload, or nothing. A chunk that does not parse is
+    /// skipped rather than fatal: providers interleave keep-alives and metadata
+    /// frames, and losing the run over one of those would be absurd.
+    /// </summary>
+    internal static string ChunkContent(string payload)
+    {
+        try
+        {
+            var chunk = JsonSerializer.Deserialize(payload, AgentOneWireJson.Default.ChatCompletionChunk);
+            return chunk?.Choices?.FirstOrDefault()?.Delta?.Content ?? "";
+        }
+        catch (JsonException)
+        {
+            return "";
+        }
     }
 
     /// <summary>

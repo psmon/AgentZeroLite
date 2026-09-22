@@ -13,6 +13,7 @@ public sealed class AgentOptions
     public string Root { get; private set; } = Directory.GetCurrentDirectory();
     public bool Json { get; private set; }
     public bool Verbose { get; private set; }
+    public bool Quiet { get; private set; }
     public bool Help { get; private set; }
 
     /// <summary>Non-flag arguments, in order (for `run`, the prompt words).</summary>
@@ -43,6 +44,10 @@ public sealed class AgentOptions
 
                 case "-v" or "--verbose":
                     options.Verbose = true;
+                    break;
+
+                case "-q" or "--quiet":
+                    options.Quiet = true;
                     break;
 
                 case "-r" or "--root":

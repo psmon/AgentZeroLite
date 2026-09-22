@@ -47,11 +47,27 @@ public sealed class ChatCommand
 
         SessionStore? session = options.Config.SaveSessions ? SessionStore.Create("chat") : null;
 
+        var showProgress = !options.Quiet;
+        using var progress = ProgressDisplay.For(showProgress);
+
+        loop.Streaming = showProgress;
+        loop.ActivityStarted += what => progress.Activity(what);
+
         loop.StepCompleted += step =>
         {
             session?.Step(step);
             if (options.Verbose)
                 Console.Error.WriteLine($"  [{step.Index}] {step.Tool}: {step.Detail}");
+            else if (step.Tool != Agent.ToolCall.FinalTool)
+                progress.Done(step.Tool, step.Ok);
+        };
+
+        var wroteAnything = false;
+        loop.AnswerDelta += fragment =>
+        {
+            if (!wroteAnything) { progress.Stop(); wroteAnything = true; }
+            Console.Out.Write(fragment);
+            Console.Out.Flush();
         };
 
         Console.WriteLine($"agent-one chat — provider {provider.Name}, model {options.Config.Model}");
@@ -78,11 +94,15 @@ public sealed class ChatCommand
             }
 
             session?.Prompt(line);
+            wroteAnything = false;
+            progress.Restart();
+
             var run = await loop.RunAsync(line, ct);
             session?.Result(run);
+            progress.Stop();
 
             Console.WriteLine(run.Succeeded
-                ? run.Text
+                ? (wroteAnything ? run.Unstreamed : run.Text)
                 : $"[stopped: {run.Reason}] {run.Text}");
             Console.WriteLine();
         }
