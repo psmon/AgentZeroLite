@@ -38,6 +38,21 @@ public sealed class AgentConfig
     [JsonPropertyName("timeoutSeconds")]
     public int TimeoutSeconds { get; set; } = 120;
 
+    /// <summary>
+    /// Plan first and let the decision engine choose the approach. Off by
+    /// default: it costs an extra LLM turn and an extra service.
+    /// </summary>
+    [JsonPropertyName("smartMode")]
+    public bool SmartMode { get; set; }
+
+    /// <summary>
+    /// Below this confidence the decision is not acted on unasked. Observed
+    /// range on real decisions: 0.19 when the options are indistinguishable,
+    /// 0.88–1.00 when they are not — so the middle is empty and 0.60 sits in it.
+    /// </summary>
+    [JsonPropertyName("jevConfidenceFloor")]
+    public double JevConfidenceFloor { get; set; } = 0.60;
+
     /// <summary>Base URL of the TypeSafe System One API used by smart mode.</summary>
     [JsonPropertyName("jevBaseUrl")]
     public string JevBaseUrl { get; set; } = "https://api.typesafe.ai/v1";
@@ -54,7 +69,7 @@ public sealed class AgentConfig
     [
         "provider", "baseUrl", "model", "apiKeyEnv",
         "maxSteps", "temperature", "timeoutSeconds", "saveSessions",
-        "jevBaseUrl", "jevModel"
+        "jevBaseUrl", "jevModel", "smartMode", "jevConfidenceFloor"
     ];
 
     public string? Get(string key) => key switch
@@ -69,6 +84,8 @@ public sealed class AgentConfig
         "saveSessions"   => SaveSessions ? "true" : "false",
         "jevBaseUrl"     => JevBaseUrl,
         "jevModel"       => JevModel,
+        "smartMode"      => SmartMode ? "on" : "off",
+        "jevConfidenceFloor" => JevConfidenceFloor.ToString("0.00"),
         _                => null
     };
 
@@ -128,6 +145,16 @@ public sealed class AgentConfig
             case "jevModel":
                 if (value.Length == 0) { error = "jevModel must not be empty"; return false; }
                 JevModel = value;
+                return true;
+            case "smartMode":
+                var on = value.ToLowerInvariant();
+                if (on is not ("on" or "off" or "true" or "false")) { error = "smartMode must be on or off"; return false; }
+                SmartMode = on is "on" or "true";
+                return true;
+            case "jevConfidenceFloor":
+                if (!double.TryParse(value, out var floor) || floor is < 0 or > 1)
+                { error = "jevConfidenceFloor must be 0..1"; return false; }
+                JevConfidenceFloor = floor;
                 return true;
             default:
                 error = $"unknown key '{key}' (known: {string.Join(", ", Keys)})";

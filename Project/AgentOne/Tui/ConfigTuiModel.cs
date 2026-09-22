@@ -51,7 +51,7 @@ public sealed class ConfigTuiModel
         ["provider", "baseUrl", "apiKey", "apiKeyEnv"],
         [],
         ["maxSteps", "temperature", "timeoutSeconds", "saveSessions"],
-        ["jevApiKey", "jevBaseUrl", "jevModel"]
+        ["smartMode", "jevApiKey", "jevBaseUrl", "jevModel", "jevConfidenceFloor"]
     ];
 
     /// <summary>
@@ -151,10 +151,16 @@ public sealed class ConfigTuiModel
     /// <summary>The pseudo-field for the TypeSafe key that smart mode will use.</summary>
     public const string JevApiKeyField = "jevApiKey";
 
-    public bool IsCyclable(string key) => key is "provider" or "saveSessions";
+    public bool IsCyclable(string key) => key is "provider" or "saveSessions" or "smartMode";
 
     public bool ApiKeyPresent =>
         !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Config.ApiKeyEnv));
+
+    /// <summary>Set while a health check is running because the operator asked to enable smart mode.</summary>
+    private bool _pendingSmartOn;
+
+    /// <summary>An effect the cycle handler needs the shell to run.</summary>
+    private TuiEffect _effectAfterCycle = TuiEffect.None;
 
     /// <summary>True when a TypeSafe key is stored, typed, or in the environment.</summary>
     public bool SmartKeyPresent =>
@@ -183,6 +189,8 @@ public sealed class ConfigTuiModel
         JevApiKeyField => "the TypeSafe (Jev) key for smart mode — a different service, stored the same way · h to check it",
         "jevBaseUrl" => "TypeSafe System One API root — https://api.typesafe.ai/v1",
         "jevModel" => "which System One model answers · jev-latest",
+        "smartMode" => "plan first, then decide · turning it on runs the health check first",
+        "jevConfidenceFloor" => "below this the decision is not acted on unasked · observed: 0.19 unsure, 0.88+ sure",
         "apiKeyEnv" => $"FALLBACK only — the NAME of a variable to read the key from, not the key. ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "not set")}",
         "model" => "set on the Model step",
         "maxSteps" => "tool-loop budget per run, 1..100",
@@ -280,12 +288,10 @@ public sealed class ConfigTuiModel
                 return TuiEffect.None;
 
             case ConsoleKey.LeftArrow:
-                Cycle(-1);
-                return TuiEffect.None;
+                return Cycled(-1);
 
             case ConsoleKey.RightArrow:
-                Cycle(+1);
-                return TuiEffect.None;
+                return Cycled(+1);
 
             case ConsoleKey.Enter:
                 BeginEdit();
@@ -470,6 +476,22 @@ public sealed class ConfigTuiModel
     public void CompleteTest(string message)
     {
         Busy = false;
+
+        if (_pendingSmartOn)
+        {
+            _pendingSmartOn = false;
+
+            if (message.StartsWith('✗'))
+            {
+                Status = message + " — smart mode stays off";
+                return;
+            }
+
+            Config.TrySet("smartMode", "on", out _);
+            Status = "✓ smart mode on — " + message;
+            return;
+        }
+
         Status = message;
     }
 
@@ -518,6 +540,17 @@ public sealed class ConfigTuiModel
         }
     }
 
+    /// <summary>Cycles, and passes on any request the cycle made of the shell.</summary>
+    private TuiEffect Cycled(int direction)
+    {
+        _effectAfterCycle = TuiEffect.None;
+        Cycle(direction);
+
+        var effect = _effectAfterCycle;
+        _effectAfterCycle = TuiEffect.None;
+        return effect;
+    }
+
     private void Cycle(int direction)
     {
         var key = SelectedKey;
@@ -525,6 +558,7 @@ public sealed class ConfigTuiModel
         {
             "provider" => ["echo", "openai"],
             "saveSessions" => ["true", "false"],
+            "smartMode" => ["off", "on"],
             _ => null
         };
 
@@ -536,6 +570,24 @@ public sealed class ConfigTuiModel
 
         var current = Array.IndexOf(options, Value(key));
         var next = options[((current < 0 ? 0 : current) + direction + options.Length) % options.Length];
+
+        // Smart mode is not a preference, it is a dependency: turning it on
+        // without a working key just fails on the first question instead. So the
+        // switch asks the service before it moves.
+        if (key == "smartMode" && next == "on")
+        {
+            if (!SmartKeyPresent)
+            {
+                Status = "✗ no TypeSafe key — paste one below, then press h";
+                return;
+            }
+
+            Busy = true;
+            _pendingSmartOn = true;
+            Status = "verifying the TypeSafe key before turning smart mode on …";
+            _effectAfterCycle = TuiEffect.CheckSmart;
+            return;
+        }
 
         if (Config.TrySet(key, next, out var error))
             Status = $"{key} = {Value(key)}" + (Dirty ? "  (unsaved)" : "");

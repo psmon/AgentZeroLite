@@ -66,6 +66,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
 | `agent-one auth` | `show` / `set` / `check` / `clear` / `import`. `--jev` addresses the TypeSafe key. |
 | `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
+| `--smart` / `--basic` | On `run` and `chat`: plan-then-decide, or straight to the loop. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
@@ -121,7 +122,7 @@ streams nothing: `grep` also has a `text` argument, and printing a search patter
 as though it were the answer would be a lie with a very plausible shape.
 
 Exit codes: `0` answered, `1` stopped early (budget, repeat, parse, provider),
-`2` usage error, `130` cancelled. `--json` makes the outcome machine-readable:
+`2` usage error, `3` smart mode decided a person has to look at it, `130` cancelled. `--json` makes the outcome machine-readable:
 
 ```console
 $ agent-one run "hi" -p echo --json
@@ -211,15 +212,17 @@ offline with no key at all.
 `maxSteps`, `temperature`, `timeoutSeconds`, `saveSessions`. All have working
 defaults, which is why they come last.
 
-### 4. Smart — the decision service (setup only, so far)
+### 4. Smart — plan first, then decide
 
 ```
 ╭─ agent-one config ──────────────────────────────────────────╮
 │ 1. Connection →  2. Model  →  3. Options  → [4. Smart]      │
 │                                                             │
-│› jevApiKey       ts-abc…w9k2                                │
-│  jevBaseUrl      https://api.typesafe.ai/v1                 │
-│  jevModel        jev-latest                                 │
+│› smartMode        off  ←→                                   │
+│  jevApiKey        ts-abc…w9k2                               │
+│  jevBaseUrl       https://api.typesafe.ai/v1                │
+│  jevModel         jev-latest                                │
+│  jevConfidenceFloor 0.60                                    │
 ╰─────────────────────────────────────────────────────────────╯
  the TypeSafe (Jev) key for smart mode — a different service · h to check it
  ✓ jev-1.13.0 · 184 ms, noul 0.97, 41+12 tokens
@@ -234,9 +237,63 @@ carries the served model, the round trip, and the token count.
 The TypeSafe key is a second key for a second service: it goes in the same
 `credentials.json`, in its own slot, and storing one never disturbs the other.
 
-**Smart mode itself is not built yet.** This step only stores and verifies what
-it will need, which is why there is no on/off switch here — a switch that does
-nothing is a lie. The design is in
+Turning `smartMode` on **runs the health check first** and stays off if it
+fails: it is not a preference, it is a dependency.
+
+## Smart mode
+
+Off by default. On, every turn plans before it acts:
+
+```
+prompt ──> LLM proposes 2-4 approaches ──> Jev picks one ──┐
+                                                           ├─> the loop, steered
+                        not confident ──> nobody is steered ┘
+                        needs a person ──> it stops and asks
+```
+
+The LLM proposes the approaches because a System One model cannot invent them;
+Jev chooses between them because it returns a calibrated confidence and an LLM
+does not. **"A person has to decide this" is always the last option**, added in
+code rather than left to the planner — the model would sometimes forget it, and
+a criterion that is worded differently every turn is one the decision engine
+cannot judge consistently.
+
+```console
+[smart] > 이 저장소의 파일들을 전부 정리해줘
+… planning the approach
+… deciding between 4 approaches
+⚠ this needs you (confidence 0.68)
+  None of the other approaches should be taken without a person deciding first:
+  the request is risky, irreversible, ambiguous about what is wanted, or needs approval.
+
+  the approaches that were considered:
+    analyze_local_structure  (0.22)  Read all files to understand the code base…
+    generate_documentation   (0.00)  Generate a README explaining the project…
+    identify_refactoring_tasks (0.01) Scan for anti-patterns and propose steps…
+
+  answer, approve or redirect on the next line — it continues from there.
+
+[smart] > 목록만 보여줘. 절대 삭제하지 마.
+… listing .
+✓ list_files  (0.0s)
+…
+```
+
+"정리해줘" is ambiguous between *summarise* and *delete*, which is exactly what
+the option is for. The turn is parked, the next line typed is the answer, and the
+run resumes from it carrying the original request.
+
+**Shift+Tab** switches basic ↔ smart, and the prompt says which you are in. With
+no TypeSafe key the toggle refuses and says why. `run` has the same modes via
+`--smart` / `--basic`, but it cannot ask anybody: a decision of "needs a person"
+makes it print the approaches and **exit 3 without running anything**.
+
+Only a confident decision steers. Below the floor, `run` says so and leaves the
+loop alone — measured, that matters: an unsure plan once turned a one-step
+answer into an exhausted step budget, because it pushed the agent down an
+approach the options had failed to separate.
+
+The design and the measurements behind the threshold are in
 [`docs/smart-mode-jev.md`](docs/smart-mode-jev.md).
 
 `agent-one jev choose` is the bench for it — a decision put to the service by

@@ -248,11 +248,116 @@ public class SmartStepTests : IDisposable
         Assert.NotEqual("", error);
     }
 
+    // --- the toggle, now that there is a loop behind it --------------------
+
     [Fact]
-    public void SmartModeItselfIsNotOfferedYet()
+    public void SmartModeIsOffByDefault()
     {
-        // There is no loop behind it, and a switch that does nothing is a lie.
-        Assert.DoesNotContain("smartMode", AgentConfig.Keys);
-        Assert.DoesNotContain("smartMode", ConfigTuiModel.StepFields[3]);
+        Assert.Equal("off", new AgentConfig().Get("smartMode"));
+    }
+
+    [Fact]
+    public void TurningItOnWithNoKeyIsRefusedOutright()
+    {
+        var model = OnSmartStep();
+        SelectField(model, "smartMode");
+
+        var effect = model.HandleKey(Key(ConsoleKey.RightArrow));
+
+        Assert.Equal(TuiEffect.None, effect);        // nothing to check
+        Assert.Equal("off", model.Value("smartMode"));
+        Assert.Contains("no TypeSafe key", model.Status);
+    }
+
+    [Fact]
+    public void TurningItOnWithAKeyRunsTheCheckFirst()
+    {
+        CredentialStore.Save("ts-a-key", CredentialStore.Slot.Jev);
+        var model = OnSmartStep();
+        SelectField(model, "smartMode");
+
+        var effect = model.HandleKey(Key(ConsoleKey.RightArrow));
+
+        Assert.Equal(TuiEffect.CheckSmart, effect);
+        Assert.True(model.Busy);
+        Assert.Equal("off", model.Value("smartMode"));   // not on until the check answers
+    }
+
+    [Fact]
+    public void AFailedCheckLeavesItOff()
+    {
+        CredentialStore.Save("ts-a-key", CredentialStore.Slot.Jev);
+        var model = OnSmartStep();
+        SelectField(model, "smartMode");
+        model.HandleKey(Key(ConsoleKey.RightArrow));
+
+        model.CompleteTest("✗ HTTP 401 — the TypeSafe key was rejected");
+
+        Assert.Equal("off", model.Value("smartMode"));
+        Assert.Contains("stays off", model.Status);
+        Assert.False(model.Busy);
+    }
+
+    [Fact]
+    public void APassedCheckTurnsItOn()
+    {
+        CredentialStore.Save("ts-a-key", CredentialStore.Slot.Jev);
+        var model = OnSmartStep();
+        SelectField(model, "smartMode");
+        model.HandleKey(Key(ConsoleKey.RightArrow));
+
+        model.CompleteTest("✓ jev-1.13.0 · 180 ms");
+
+        Assert.Equal("on", model.Value("smartMode"));
+        Assert.StartsWith("✓", model.Status);
+        Assert.True(model.Dirty);                        // still needs saving
+    }
+
+    [Fact]
+    public void TurningItOffNeedsNoCheck()
+    {
+        CredentialStore.Save("ts-a-key", CredentialStore.Slot.Jev);
+        var model = OnSmartStep();
+        SelectField(model, "smartMode");
+        model.HandleKey(Key(ConsoleKey.RightArrow));
+        model.CompleteTest("✓ fine");
+
+        var effect = model.HandleKey(Key(ConsoleKey.LeftArrow));
+
+        Assert.Equal(TuiEffect.None, effect);
+        Assert.Equal("off", model.Value("smartMode"));
+    }
+
+    [Fact]
+    public void AnOrdinaryCheckStillJustReportsItself()
+    {
+        CredentialStore.Save("ts-a-key", CredentialStore.Slot.Jev);
+        var model = OnSmartStep();
+
+        model.HandleKey(Key(ConsoleKey.H));
+        model.CompleteTest("✓ jev-1.13.0 · 180 ms");
+
+        Assert.Equal("off", model.Value("smartMode"));   // h alone does not enable it
+        Assert.Equal("✓ jev-1.13.0 · 180 ms", model.Status);
+    }
+
+    [Theory]
+    [InlineData("0.6", "0.60")]
+    [InlineData("0", "0.00")]
+    [InlineData("1", "1.00")]
+    public void TheConfidenceFloorAcceptsTheRange(string value, string expected)
+    {
+        var config = new AgentConfig();
+        Assert.True(config.TrySet("jevConfidenceFloor", value, out _));
+        Assert.Equal(expected, config.Get("jevConfidenceFloor"));
+    }
+
+    [Theory]
+    [InlineData("-0.1")]
+    [InlineData("1.5")]
+    [InlineData("high")]
+    public void AFloorOutsideZeroToOneIsRefused(string value)
+    {
+        Assert.False(new AgentConfig().TrySet("jevConfidenceFloor", value, out _));
     }
 }

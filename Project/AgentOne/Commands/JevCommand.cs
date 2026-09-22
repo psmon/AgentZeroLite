@@ -78,7 +78,7 @@ public sealed class JevCommand
 
         var state = string.Join(' ', positional).Trim();
         if (state.Length == 0 && Console.IsInputRedirected)
-            state = (await Console.In.ReadToEndAsync(ct)).Trim();
+            state = (await StandardInput.ReadToEndAsync(ct)).Trim();
 
         if (state.Length == 0) return Fail("no state given (pass it as an argument or on stdin)");
         if (options.Count == 0) return Fail("no options given — pass --option name=description at least twice");

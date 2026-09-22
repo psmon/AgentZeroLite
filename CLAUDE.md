@@ -268,6 +268,27 @@ in it, so the steps and the key map are unit tested; the Termina page only
 projects it. `agent-one tui --selftest` drives the real screen from a scripted
 key source, and the release workflow runs it on every RID.
 
+**Smart mode** (`--smart`, or Shift+Tab in chat) plans before it acts: the LLM
+proposes 2–4 approaches (`Agent/Planner`), `IDecisionEngine` picks one with a
+calibrated confidence, and only a decision above `jevConfidenceFloor` steers the
+loop. Measured, that last clause matters — an unsure plan once turned a one-step
+answer into an exhausted step budget by pushing the agent down an approach the
+options had failed to separate. **"A person has to decide this" is always the
+last option**, appended in `SmartTurn` rather than left to the planner, and
+choosing it is never "confident" however sure the engine is: `run` then exits 3
+without running anything, and `chat` parks the turn in `SessionState` so the next
+line typed resumes it.
+
+`SessionState` is actor-*shaped*, not Akka: one owner, serialised mutations,
+snapshot reads. An actor runtime is exactly the dependency a Native AOT single
+binary cannot afford — the same reason this project does not reference
+ZeroCommon.
+
+**Every stdin read goes through `Services/StandardInput`.** `Console.In` decodes
+a redirected stream with the console code page, which turns piped Korean into
+mojibake. That was fixed once in `run` and then reappeared in `chat`, which is
+why there is now one reader instead of a fix per call site.
+
 **The API key never goes in `config.json`.** It lives alone in
 `~/.agent-one/credentials.json` (`CredentialStore`), and `ApiKey.Resolve` is the
 single place that decides the order: stored key first, then `$apiKeyEnv`. The

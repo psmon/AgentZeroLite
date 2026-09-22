@@ -50,6 +50,14 @@ public sealed class AgentOptions
                     options.Quiet = true;
                     break;
 
+                case "--smart":
+                    config.SmartMode = true;
+                    break;
+
+                case "--basic":
+                    config.SmartMode = false;
+                    break;
+
                 case "-r" or "--root":
                     var root = Next();
                     if (root is null) { error = "--root needs a directory"; return false; }

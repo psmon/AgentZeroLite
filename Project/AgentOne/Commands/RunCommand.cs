@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using AgentOne.Agent;
 using AgentOne.Llm;
+using AgentOne.Llm.Decision;
 using AgentOne.Services;
 using AgentOne.Tools;
 
@@ -28,14 +29,8 @@ public sealed class RunCommand
         if (prompt.Length == 0)
         {
             // Allow `echo "question" | agent-one run` so the prompt can be piped.
-            // Read the pipe as UTF-8 explicitly: Console.In decodes redirected
-            // input with the console's code page, which mangles anything
-            // non-ASCII on a Windows box running a legacy ANSI page.
             if (Console.IsInputRedirected)
-            {
-                using var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
-                prompt = (await stdin.ReadToEndAsync(ct)).Trim();
-            }
+                prompt = (await StandardInput.ReadToEndAsync(ct)).Trim();
             if (prompt.Length == 0)
             {
                 Console.Error.WriteLine("agent-one run: no prompt given (pass it as an argument or on stdin)");
@@ -92,6 +87,79 @@ public sealed class RunCommand
             Console.Out.Flush();
         };
 
+        // Smart mode plans and decides before the loop starts. `run` cannot ask
+        // anybody, so a weak decision is taken anyway and said out loud on
+        // stderr rather than silently followed.
+        if (options.Config.SmartMode)
+        {
+            using var engine = new JevClient(options.Config);
+            var smart = new SmartTurn(provider, engine, options.Config.JevConfidenceFloor);
+            smart.ActivityStarted += what => progress.Activity(what);
+
+            var plan = await smart.PrepareAsync(prompt, toolbelt.Scope, ct);
+
+            // The decision was that a person has to settle it, and `run` has no
+            // person. Doing it anyway would be the one thing the option exists
+            // to prevent, so nothing is run and the exit code says so.
+            if (plan.NeedsReview)
+            {
+                var decision = plan.Decision!;
+                session?.Step(new AgentStep(0, "plan", $"needs_review ({decision.Confidence:0.00})", false));
+                session?.Result(new AgentRun(StopReason.NeedsReview, SmartTurn.ReviewDescription, [], TimeSpan.Zero));
+
+                if (options.Json)
+                {
+                    Console.WriteLine(JsonSerializer.Serialize(new RunReport
+                    {
+                        Ok = false,
+                        StopReason = nameof(StopReason.NeedsReview),
+                        Text = SmartTurn.ReviewDescription,
+                        Provider = provider.Name,
+                        Model = options.Config.Model,
+                        Session = session?.Path
+                    }, AgentOneWireJson.Default.RunReport));
+                }
+                else
+                {
+                    Console.Error.WriteLine($"agent-one: this needs a person (confidence {decision.Confidence:0.00})");
+                    Console.Error.WriteLine("  " + SmartTurn.ReviewDescription);
+                    foreach (var option in plan.Options.Where(o => o.Name != SmartTurn.ReviewOption))
+                        Console.Error.WriteLine($"    {option.Name}: {option.Description}");
+                    Console.Error.WriteLine("  run it in `agent-one chat`, where it can ask you, or use --basic.");
+                }
+
+                return 3;
+            }
+
+            if (plan.HasChoice)
+            {
+                var decision = plan.Decision!;
+
+                // Only a confident decision steers the loop. An unsure one means
+                // the approaches did not separate, and pushing the agent down one
+                // of them anyway is worse than letting it work the problem out —
+                // measured: an unsure plan turned a one-step answer into an
+                // exhausted step budget.
+                if (plan.Confident)
+                {
+                    prompt = plan.Guidance(prompt);
+                    if (!options.Json)
+                        Console.Error.WriteLine($"  plan: {decision.Choice} (confidence {decision.Confidence:0.00})");
+                }
+                else if (!options.Json)
+                {
+                    Console.Error.WriteLine(
+                        $"  plan: unsure ({decision.Confidence:0.00} < {options.Config.JevConfidenceFloor:0.00}) — not steering");
+                }
+
+                session?.Step(new AgentStep(0, "plan", $"{decision.Choice} ({decision.Confidence:0.00})", plan.Confident));
+            }
+            else if (plan.Decision is { Ok: false } failed && !options.Json)
+            {
+                Console.Error.WriteLine($"  plan: unavailable ({failed.Message}) — running without one");
+            }
+        }
+
         var run = await loop.RunAsync(prompt, ct);
         session?.Result(run);
         progress.Stop();
@@ -142,6 +210,8 @@ public sealed class RunCommand
                   --json              Print one JSON object instead of prose
               -v, --verbose           Trace each tool call on stderr
               -q, --quiet             No progress display, no streaming
+                  --smart             Plan first, then let the decision engine choose
+                  --basic             Straight to the tool loop (the default)
 
             While it works, a live line on stderr says what it is doing, and the
             answer streams to stdout as the model writes it. Redirect stdout and

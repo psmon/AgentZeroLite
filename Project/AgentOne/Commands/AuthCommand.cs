@@ -63,7 +63,7 @@ public sealed class AuthCommand
 
         if (Console.IsInputRedirected)
         {
-            key = (await Console.In.ReadToEndAsync(ct)).Trim();
+            key = (await StandardInput.ReadToEndAsync(ct)).Trim();
         }
         else
         {
