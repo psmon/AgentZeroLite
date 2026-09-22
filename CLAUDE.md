@@ -252,7 +252,7 @@ envelope per turn) so it stays extractable into its own repo. The intended
 integration is process-level: launch `agent-one --json` and read one object off
 stdout, the way the GUI launches `AgentZeroWearable.exe`.
 
-**Settings TUI** (`agent-one tui` / `agent-one config tui`) — a five-step stack
+**Settings TUI** (`agent-one setup`; `tui` and `config tui` are aliases) — a five-step stack
 over `~/.agent-one/config.json`: **1. Connection** (provider, baseUrl, apiKeyEnv)
 → **2. Model** → **3. Reasoning** (the slow, strong model hard questions are
 escalated to: `reasoningBaseUrl` / `reasoningApiKey` / `reasoningModel`, each
@@ -269,7 +269,7 @@ first one. Built on **Termina** (`Tui/`), the one TUI measured to survive Native
 AOT here — see `Docs/agent-netclaw/README.md`. The rules live in
 `Tui/ConfigTuiModel.cs`, a state machine over `ConsoleKeyInfo` with no terminal
 in it, so the steps and the key map are unit tested; the Termina page only
-projects it. `agent-one tui --selftest` drives the real screen from a scripted
+projects it. `agent-one setup --selftest` drives the real screen from a scripted
 key source, and the release workflow runs it on every RID.
 
 **Smart mode** (`--smart`, or Shift+Tab in chat) asks `IDecisionEngine` (Jev)
@@ -358,12 +358,27 @@ Three things that are easy to break here:
   (`.github/workflows/agent-one-release.yml`, tag `agent-one-v*`) handles both and
   smoke-tests each artifact before it reaches the release page.
 
-Tools are **all read-only**, in two families routed by `CompositeToolbelt` from
-each `ToolSpec`'s `Family`: **files** (`list_files`, `read_file`, `find_files`,
-`grep`) sandboxed to `--root` and resolved through symlinks before the
-containment check, and **web** (`web_search`, `web_read`) which only ever issues
-GETs. A test asserts no write/shell verb has appeared in the catalog — the day it
-fails is the day an approval gate has to exist first.
+Tools come in four families routed by `CompositeToolbelt` from each `ToolSpec`'s
+`Family`: **files** (`list_files`, `read_file`, `find_files`, `grep`) and
+**edit** (`write_file`, whole file, folders created) — both on
+`LocalFileToolbelt`, sandboxed to `--root` and resolved through symlinks before
+the containment check; **web** (`web_search`, `web_read`), GETs only; and
+**exec** (`run_command`, `ShellToolbelt`: PowerShell on Windows, bash/sh
+elsewhere, cwd = root, killed past `commandTimeoutSeconds`). The two families
+that change something are `ToolCatalog.GuardedFamilies`, and a test keeps every
+writing/running verb inside them. **Writes never leave the root**; a folder the
+user names by absolute path (`Tools/PathGrants`) is granted for *reading* only,
+for the session. **Commands go through a gate** (`ChatSession.GateAsync`):
+`Agent/CommandRisk` patterns (rm -rf /, sudo, format, piped installers,
+force-push…) always ask a person; otherwise Jev's safety question runs it only
+on a *confident* `safe`; everything else is put to `ChatSession.Approver` — the
+REPL reads a line, the window parks the turn on the input line, `run` refuses
+unless `--yes`. Smart mode also sizes workspace work (`scope`): `needs_design`
+sends the request to the reasoning model for a design (`ReasoningSubtask.
+DesignAsync`) that comes back as `[design:<model>]` for the everyday model to
+build. `/status` (F2 in the window) prints `SessionStats` — context size and
+token estimate, Jev calls and ms, escalations, designs, approvals, grants;
+`/new` starts a fresh session and log.
 
 `grep` is plain substring, not regex, on purpose: the pattern comes from a model,
 and a regex from an untrusted source hangs the process on backtracking. Search

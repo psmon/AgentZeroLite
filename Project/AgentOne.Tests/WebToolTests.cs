@@ -162,9 +162,15 @@ public class SearchParsingTests
 
 public class CompositeToolbeltTests
 {
-    private static CompositeToolbelt Build(string root) => new(
-        (ToolCatalog.FilesFamily, new LocalFileToolbelt(root)),
-        (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(5))));
+    private static CompositeToolbelt Build(string root)
+    {
+        var files = new LocalFileToolbelt(root);
+        return new CompositeToolbelt(
+            (ToolCatalog.FilesFamily, files),
+            (ToolCatalog.EditFamily, files),
+            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(5))),
+            (ToolCatalog.ExecFamily, new ShellToolbelt(root, TimeSpan.FromSeconds(5))));
+    }
 
     [Fact]
     public async Task EveryCatalogFamilyHasABelt()

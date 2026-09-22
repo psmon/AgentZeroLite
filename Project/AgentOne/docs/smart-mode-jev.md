@@ -449,6 +449,38 @@ escalate 를 골랐고, 2,600자짜리 그럴듯한 초안에는 0.10~0.25 에�
 찍혔다. `AgentLoop.TryDecodeBrokenFinal` — final 모양이면 스트림용 관대한 디코더로 `text` 를 꺼낸다.
 깨진 도구 호출은 여전히 nudge 를 받는다.
 
+## 8-E. 손이 생긴 에이전트: 파일 생성·명령 실행과 Jev 의 두 질문 추가 (2026-09-22)
+
+`write_file` 과 `run_command` 가 들어오면서 Jev 의 질문이 둘에서 넷이 됐다. 모두 고정 선택지, 모두 0.3초.
+
+| 질문 | 시점 | 선택지 | 어떻게 쓰나 |
+|---|---|---|---|
+| ① 라우팅 | 루프 전 | `search_web` · `work_in_workspace` · `answer_directly` | floor 이상이면 그 패밀리만 허용 (workspace = files+edit+exec) |
+| ② 규모 | workspace 작업일 때 | `small_task` · `needs_design` | choice 만 봄. `needs_design` → 추론 모델이 설계 → `[design:…]` 로 기본 모델이 구현 |
+| ③ 안전 | `run_command` 직전 | `safe` · `unsafe` | **허용 쪽에 floor**: `safe` 이고 확신할 때만 묻지 않고 실행. 나머지는 사람에게 |
+| ④ 에스컬레이션 | 초안 뒤 | `keep_draft` · `escalate` | choice 만 봄 (8-D) |
+
+③ 앞에는 Jev 가 뒤집을 수 없는 바닥이 있다 — `Agent/CommandRisk` 의 패턴 (`rm -rf /`, `sudo`, `format`,
+파이프 인스톨러, force-push, 레지스트리, 예약작업…) 은 무조건 사람에게 묻는다. Jev 가 아무리
+`safe` 라 해도 `rm -rf /` 는 판단 문제가 아니다.
+
+### 실측 (hello.py 만들고 실행)
+
+| 단계 | 결과 |
+|---|---|
+| ① 라우팅 | `work_in_workspace` 0.85 |
+| ② 규모 | `small_task` **1.00** |
+| write_file | hello.py 생성 (0.0s) |
+| ③ 안전 (`python hello.py`) | `safe` **0.37** → floor 미달 → **사람에게 물음** → y → 실행 1.2s |
+| ④ 에스컬레이션 | `keep_draft` 1.00 |
+
+세션 상태창: Jev 4회 1,345ms, 도구 2회, 승인 1/1, 문맥 ~948 토큰.
+
+③ 이 0.37 인 것이 눈에 띈다. `python hello.py` 는 누가 봐도 안전한데 두 선택지짜리 판단이라 확신이
+낮다(8-D 와 같은 현상). 허용 쪽에 floor 를 두는 설계라 결과는 "묻기" — 보수적이고 맞는 방향이지만,
+매번 물으면 피곤하다. 조정 손잡이는 둘: `jevConfidenceFloor` 를 낮추거나(라우팅에도 같이 걸림),
+안전 질문에 별도 floor 를 두는 것. 몇 번 더 써 보고 결정한다 — 지금은 안전한 쪽으로.
+
 ## 9. 단계별 제안
 
 | 단계 | 내용 | 가치 |

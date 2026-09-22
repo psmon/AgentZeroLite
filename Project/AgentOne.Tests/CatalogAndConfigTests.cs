@@ -57,15 +57,21 @@ public class ToolCatalogTests
         foreach (var spec in ToolCatalog.All)
             Assert.False(string.IsNullOrWhiteSpace(spec.Family), spec.Name);
 
-        Assert.Equal([ToolCatalog.FilesFamily, ToolCatalog.WebFamily], ToolCatalog.Families.ToArray());
+        Assert.Equal([ToolCatalog.FilesFamily, ToolCatalog.WebFamily, ToolCatalog.EditFamily, ToolCatalog.ExecFamily],
+                     ToolCatalog.Families.ToArray());
     }
 
     [Fact]
-    public void TheCatalogIsStillReadOnly()
+    public void EveryVerbThatChangesSomethingIsInAGuardedFamily()
     {
-        // The day this fails is the day an approval gate has to exist.
-        foreach (var spec in ToolCatalog.All)
-            Assert.DoesNotContain(spec.Name, new[] { "write_file", "run_shell", "delete_file", "edit_file" });
+        // The read-only days are over; what replaced them is a gate per family —
+        // the path sandbox for edits, the command gate for exec. A verb that
+        // writes or runs outside those families would bypass both.
+        var changing = ToolCatalog.All.Where(t => t.Name is "write_file" or "run_command").ToArray();
+
+        Assert.Equal(2, changing.Length);
+        Assert.All(changing, spec => Assert.Contains(spec.Family, ToolCatalog.GuardedFamilies));
+        Assert.DoesNotContain(ToolCatalog.All, t => t.Name is "delete_file" or "run_shell" or "edit_file");
     }
 
     [Fact]

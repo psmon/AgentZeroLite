@@ -13,6 +13,8 @@ public enum ChatEffect
     ScrollDown,
     /// <summary>Back to the live end of the transcript (Ctrl+End).</summary>
     ScrollToBottom,
+    /// <summary>Print the session's status block (F2).</summary>
+    ShowStatus,
     Quit
 }
 
@@ -31,8 +33,8 @@ public sealed class ChatTuiModel
         Smart = smart;
         SmartAvailable = smartAvailable;
         Status = smartAvailable
-            ? "Enter sends · Shift+Tab basic/smart · wheel or PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits"
-            : "Enter sends · wheel or PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits  (no TypeSafe key — smart unavailable)";
+            ? "Enter sends · Shift+Tab basic/smart · F2 status · wheel/PageUp/PageDown scroll · Esc clears, Ctrl+D quits"
+            : "Enter sends · F2 status · wheel/PageUp/PageDown scroll · Esc clears, Ctrl+D quits  (no TypeSafe key — smart unavailable)";
     }
 
     public string Input => _input.ToString();
@@ -120,6 +122,9 @@ public sealed class ChatTuiModel
 
             case ConsoleKey.End when key.Modifiers.HasFlag(ConsoleModifiers.Control):
                 return ChatEffect.ScrollToBottom;
+
+            case ConsoleKey.F2:
+                return ChatEffect.ShowStatus;
 
             case ConsoleKey.D when key.Modifiers.HasFlag(ConsoleModifiers.Control):
                 return ArmQuit();

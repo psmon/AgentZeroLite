@@ -142,6 +142,7 @@ public class ChatTuiModelTests
         Assert.Equal(ChatEffect.ScrollUp, model.HandleKey(Key(ConsoleKey.PageUp)));
         Assert.Equal(ChatEffect.ScrollDown, model.HandleKey(Key(ConsoleKey.PageDown)));
         Assert.Equal(ChatEffect.ScrollToBottom, model.HandleKey(Key(ConsoleKey.End, ctrl: true)));
+        Assert.Equal(ChatEffect.ShowStatus, model.HandleKey(Key(ConsoleKey.F2)));
 
         // Plain End still belongs to the line editor.
         model.HandleKey(Key(ConsoleKey.Home));
@@ -289,7 +290,7 @@ public class ChatSessionTests : IDisposable
             """{"tool":"web_search","args":{"query":"x"}}""",
             """{"tool":"read_file","args":{"path":"README.md"}}""",
             """{"tool":"final","args":{"text":"it says hello"}}""");
-        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.ReadWorkspace, 0.9));
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.WorkInWorkspace, 0.9));
         using var session = Session(provider, engine, smart: true);
 
         var notes = new List<SmartNote>();
@@ -298,11 +299,11 @@ public class ChatSessionTests : IDisposable
         var run = await session.SubmitAsync("what does the readme say?", CancellationToken.None);
 
         Assert.Equal("it says hello", run!.Text);
-        Assert.Contains(provider.Calls[0], m => m.Role == "user" && m.Content.Contains("[route: files]"));
+        Assert.Contains(provider.Calls[0], m => m.Role == "user" && m.Content.Contains("[route: workspace]"));
         Assert.Contains(provider.Calls[1], m => m.Content.Contains("not available on this turn"));
         Assert.Contains(provider.Calls[2], m => m.Content.StartsWith("[tool:read_file]"));
         Assert.Equal("route", notes[0].Kind);
-        Assert.Contains("files", notes[0].Verdict);
+        Assert.Contains("workspace", notes[0].Verdict);
         Assert.Equal(1, engine.Calls);                       // no reasoning model: no escalation question
     }
 
@@ -330,7 +331,8 @@ public class ChatSessionTests : IDisposable
             """{"tool":"final","args":{"text":"the refined answer"}}""");
         var strong = new ScriptedChatProvider("deep thoughts about hello");
         var engine = new ScriptedDecisionEngine(
-            Choose(SmartRouter.ReadWorkspace, 0.9),
+            Choose(SmartRouter.WorkInWorkspace, 0.9),
+            Choose(SmartRouter.SmallTask, 0.8),             // workspace work is sized first
             Choose(SmartRouter.EscalateOption, 0.85));
         using var session = Session(basic, engine, smart: true, reasoning: strong);
 
@@ -344,9 +346,9 @@ public class ChatSessionTests : IDisposable
         Assert.Equal("the refined answer", run!.Text);
 
         // The engine saw the tool result and the draft when judging.
-        Assert.Contains("[tool:read_file]", engine.States[1]);
-        Assert.Contains("a shallow draft", engine.States[1]);
-        Assert.Contains("big-model", engine.States[1]);
+        Assert.Contains("[tool:read_file]", engine.States[^1]);
+        Assert.Contains("a shallow draft", engine.States[^1]);
+        Assert.Contains("big-model", engine.States[^1]);
 
         // The strong model got the same material, and its answer went back as a tagged line.
         Assert.Single(strong.Calls);
@@ -354,8 +356,8 @@ public class ChatSessionTests : IDisposable
         Assert.Contains(basic.Calls[2], m => m.Content.StartsWith("[reasoning:big-model] deep thoughts about hello"));
 
         Assert.Contains(steps, s => s.Tool == ReasoningSubtask.Tag && s.Ok);
-        Assert.Equal(["route", "escalation"], notes.Select(n => n.Kind));
-        Assert.Contains("escalating to big-model", notes[1].Verdict);
+        Assert.Equal(["route", "scope", "escalation"], notes.Select(n => n.Kind));
+        Assert.Contains("escalating to big-model", notes[^1].Verdict);
     }
 
     [Fact]

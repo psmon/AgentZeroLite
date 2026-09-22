@@ -66,7 +66,7 @@ public class SmartRouterTests
         await Router(engine).RouteAsync("what is the weather in Seoul today?", "", CancellationToken.None);
 
         Assert.Equal(SmartRouter.RouteQuestion, engine.Questions[0]);
-        Assert.Equal([SmartRouter.SearchWeb, SmartRouter.ReadWorkspace, SmartRouter.AnswerDirectly],
+        Assert.Equal([SmartRouter.SearchWeb, SmartRouter.WorkInWorkspace, SmartRouter.AnswerDirectly],
                      engine.LastOptions!.Select(o => o.Name));
     }
 
@@ -86,7 +86,7 @@ public class SmartRouterTests
 
     [Theory]
     [InlineData(SmartRouter.SearchWeb, Route.Web, ToolCatalog.WebFamily)]
-    [InlineData(SmartRouter.ReadWorkspace, Route.Files, ToolCatalog.FilesFamily)]
+    [InlineData(SmartRouter.WorkInWorkspace, Route.Files, ToolCatalog.FilesFamily)]
     public async Task AConfidentRouteRestrictsTheLoopToOneFamily(string choice, Route expected, string family)
     {
         var route = await Router(new ScriptedDecisionEngine(Choose(choice, 0.9)))
@@ -94,8 +94,9 @@ public class SmartRouterTests
 
         Assert.True(route.Steers);
         Assert.Equal(expected, route.Route);
-        Assert.Equal([family], route.Families!);
-        Assert.Contains($"[route: {expected.ToString().ToLowerInvariant()}]", route.Guidance("a request long enough"));
+        Assert.Contains(family, route.Families!);
+        Assert.DoesNotContain(expected == Route.Web ? ToolCatalog.FilesFamily : ToolCatalog.WebFamily, route.Families!);
+        Assert.Contains(expected == Route.Web ? "[route: web]" : "[route: workspace]", route.Guidance("a request long enough"));
     }
 
     [Fact]

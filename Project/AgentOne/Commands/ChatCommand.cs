@@ -79,13 +79,30 @@ public sealed class ChatCommand
             Console.WriteLine($"({note.Kind}: {note.Verdict} · confidence {note.Decision.Confidence:0.00})");
         };
 
+        session.Noted += note => Console.WriteLine($"({note})");
+
+        // A command the gate will not run on its own: the REPL is the person.
+        // The turn is on this thread, so reading a line here is exactly right.
+        session.Approver = (request, _) =>
+        {
+            progress.Stop();
+            Console.WriteLine();
+            Console.WriteLine($"⚠ run this command?  {request.Command}");
+            Console.WriteLine($"  in {request.WorkingDirectory}");
+            Console.WriteLine($"  not run unasked because: {request.Reason}");
+            var answer = LineEditor.Read("  approve (y/n) › ");
+            var yes = answer.Kind == LineKind.Entered && IsYes(answer.Text);
+            progress.Restart();
+            return Task.FromResult(yes);
+        };
+
         Console.WriteLine($"agent-one chat — provider {session.ProviderName}, model {session.Model}" +
                           (session.ReasoningModel is { } strong ? $" (reasoning: {strong})" : ""));
         Console.WriteLine($"tools:     {session.ToolScope}");
         if (session.LogPath is { } log) Console.WriteLine($"session:   {log}");
         Console.WriteLine(session.SmartAvailable
-            ? "Shift+Tab switches basic ↔ smart · /reset clears the conversation · /exit quits."
-            : "/reset clears the conversation, /exit or Ctrl+C quits.  (no TypeSafe key — smart mode unavailable)");
+            ? "Shift+Tab switches basic ↔ smart · /status · /new starts over · /exit quits."
+            : "/status · /new starts over · /exit or Ctrl+C quits.  (no TypeSafe key — smart mode unavailable)");
         Console.WriteLine();
 
         while (!ct.IsCancellationRequested)
@@ -102,10 +119,16 @@ public sealed class ChatCommand
 
             var line = input.Text.Trim();
             if (line is "/exit" or "/quit") break;
-            if (line == "/reset")
+            if (line is "/reset" or "/new")
             {
-                session.Reset();
-                Console.WriteLine("(conversation cleared)");
+                if (line == "/new") session.NewSession(); else session.Reset();
+                Console.WriteLine(line == "/new" ? $"(new session: {session.LogPath ?? "not saved"})" : "(conversation cleared)");
+                continue;
+            }
+            if (line == "/status")
+            {
+                foreach (var row in session.Stats().Describe()) Console.WriteLine("  " + row);
+                Console.WriteLine();
                 continue;
             }
             if (line.Length == 0) continue;
@@ -126,6 +149,10 @@ public sealed class ChatCommand
         return 0;
     }
 
+    /// <summary>What counts as yes at an approval prompt, in the languages this tool is used in.</summary>
+    public static bool IsYes(string answer) =>
+        answer.Trim().ToLowerInvariant() is "y" or "yes" or "ok" or "approve" or "네" or "예" or "응" or "ㅇ" or "승인";
+
     public static void PrintHelp()
     {
         Console.WriteLine("""
@@ -138,9 +165,16 @@ public sealed class ChatCommand
             Options: the same as `agent-one run`, plus
               --plain      The line REPL even in a terminal
 
-            Keys (window):    Enter send · Shift+Tab basic/smart · wheel or PageUp/PageDown scroll
-                              Ctrl+End follow · Esc clear the line (twice: quit) · Ctrl+D quit
-            Commands (both):  /reset  start the conversation over · /exit  leave
+            Keys (window):    Enter send · Shift+Tab basic/smart · F2 status
+                              wheel or PageUp/PageDown scroll · Ctrl+End follow
+                              Esc clear the line (twice: quit) · Ctrl+D quit
+            Commands (both):  /status  context, counters, grants · /new  fresh session
+                              /reset  clear the conversation · /exit  leave
+
+            The agent can create files (workspace root only) and run commands
+            (PowerShell on Windows, bash elsewhere). A command the gate does not
+            trust is shown to you first: answer y to run it, anything else to skip.
+            A folder you name by its absolute path becomes readable for the session.
             """);
     }
 }

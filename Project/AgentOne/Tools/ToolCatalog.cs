@@ -21,6 +21,19 @@ public static class ToolCatalog
     public const string WebFamily = "web";
     public const string LoopFamily = "loop";
 
+    /// <summary>Creates and changes files — inside the workspace root, never anywhere else.</summary>
+    public const string EditFamily = "edit";
+
+    /// <summary>Runs a shell command in the workspace root, through the approval gate.</summary>
+    public const string ExecFamily = "exec";
+
+    /// <summary>
+    /// The families that change something. Every verb in one of these goes
+    /// through a gate — the path sandbox for edits, the command gate for exec —
+    /// and a test asserts that stays true.
+    /// </summary>
+    public static readonly string[] GuardedFamilies = [EditFamily, ExecFamily];
+
     /// <summary>The family a verb belongs to, or null for a verb the catalog does not know.</summary>
     public static string? FamilyOf(string tool)
     {
@@ -60,6 +73,17 @@ public static class ToolCatalog
             "Fetch one web page and return its readable text. Truncated at 24 000 characters.",
             ["url"],
             """{"tool":"web_read","args":{"url":"https://getakka.net/articles/concepts/actors.html"}}"""),
+
+        new("write_file", EditFamily,
+            "Create or overwrite a UTF-8 text file inside the workspace root, creating folders as needed. Always the whole file.",
+            ["path", "content"],
+            """{"tool":"write_file","args":{"path":"src/app.py","content":"print('hi')\n"}}"""),
+
+        new("run_command", ExecFamily,
+            "Run ONE shell command in the workspace root (PowerShell on Windows, bash elsewhere) and get its output and exit code. " +
+            "A risky command is put to the user first and may be declined.",
+            ["command"],
+            """{"tool":"run_command","args":{"command":"dotnet build"}}"""),
 
         new("final", LoopFamily,
             "Answer the user and end the run. Use it as soon as you can answer.",

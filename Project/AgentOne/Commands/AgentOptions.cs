@@ -17,6 +17,9 @@ public sealed class AgentOptions
 
     /// <summary>Chat only: the line REPL even in a terminal.</summary>
     public bool Plain { get; private set; }
+
+    /// <summary>`run` only: approve every command the gate would have asked about. There is nobody to ask.</summary>
+    public bool Yes { get; private set; }
     public bool Help { get; private set; }
 
     /// <summary>Non-flag arguments, in order (for `run`, the prompt words).</summary>
@@ -63,6 +66,10 @@ public sealed class AgentOptions
 
                 case "--plain":
                     options.Plain = true;
+                    break;
+
+                case "-y" or "--yes":
+                    options.Yes = true;
                     break;
 
                 case "-r" or "--root":

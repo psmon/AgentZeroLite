@@ -88,6 +88,19 @@ public sealed class RunCommand
                 Console.Error.WriteLine($"  {note.Kind}: {note.Verdict} (confidence {note.Decision.Confidence:0.00})");
             };
 
+            session.Noted += note => { if (!options.Json) Console.Error.WriteLine($"  {note}"); };
+
+            // `run` has nobody to ask. --yes stands in for the person; without it a
+            // command the gate does not trust is skipped, and stderr says which.
+            session.Approver = (request, _) =>
+            {
+                if (!options.Json)
+                    Console.Error.WriteLine(options.Yes
+                        ? $"  running (--yes): {request.Command}"
+                        : $"  skipped — needs approval, and nobody is here to give it (use --yes): {request.Command}\n    because: {request.Reason}");
+                return Task.FromResult(options.Yes);
+            };
+
             var run = (await session.SubmitAsync(prompt, ct))!;
             progress.Stop();
 
@@ -127,7 +140,7 @@ public sealed class RunCommand
             agent-one run <prompt>      Ask once, print the answer, exit.
 
             Options:
-              -r, --root <dir>        Workspace the tools may read (default: cwd)
+              -r, --root <dir>        Workspace the tools may read and write (default: cwd)
               -p, --provider <name>   echo | openai            (default: from config)
               -m, --model <name>      Model id                 (default: from config)
                   --base-url <url>    OpenAI-compatible endpoint base URL
@@ -138,8 +151,13 @@ public sealed class RunCommand
                   --json              Print one JSON object instead of prose
               -v, --verbose           Trace each tool call on stderr
               -q, --quiet             No progress display, no streaming
+              -y, --yes               Run commands the gate would have asked you about
                   --smart             Route through the decision engine, escalate hard questions
                   --basic             Straight to the tool loop (the default)
+
+            The agent can create files under the workspace root and run commands
+            there (PowerShell on Windows, bash elsewhere). A command the gate does
+            not trust is skipped — there is nobody to ask — unless --yes is given.
 
             While it works, a live line on stderr says what it is doing, and the
             answer streams to stdout as the model writes it. Redirect stdout and
@@ -150,6 +168,7 @@ public sealed class RunCommand
             Examples:
               agent-one run "what does this project do?" --provider echo
               agent-one run "summarize the README" -r ./src -v
+              agent-one run "scaffold a FastAPI hello service and run its tests" --smart --yes
               echo "list the top-level files" | agent-one run --json
             """);
     }

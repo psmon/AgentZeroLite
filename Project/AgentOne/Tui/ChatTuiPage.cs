@@ -135,20 +135,24 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
         var model = ViewModel.Model;
         var mode = model.Smart ? "[smart]" : "[basic]";
         var colour = model.Smart ? Color.BrightGreen : Color.BrightCyan;
-        var right = model.Busy ? "working…" : model.AwaitingPerson ? "waiting for you" : $"turn {model.Turns}";
+        var right = model.Busy ? "working…" : model.AwaitingPerson ? "approve? y/n" : $"turn {model.Turns}";
+
+        // The live numbers a person glances at; F2 prints the whole block.
+        var stats = ViewModel.Session.Stats();
+        var counters = $" · ctx ~{stats.EstimatedTokens / 1000.0:0.0}k · jev {stats.Counters.JevCalls}";
 
         // Say when the reader has scrolled away from the live end, and how to get back.
         var scrolled = model.ScrolledUp
             ? $"   ↑ {model.ScrollOffset} lines above the end · Ctrl+End to follow"
             : "";
 
-        return new TextNode($" {mode}  agent-one · {right}{scrolled}").WithForeground(colour).NoWrap();
+        return new TextNode($" {mode}  agent-one · {right}{counters}{scrolled}").WithForeground(colour).NoWrap();
     }
 
     private ILayoutNode InputLine()
     {
         var model = ViewModel.Model;
-        var prompt = model.AwaitingPerson ? "answer › " : model.Smart ? "smart › " : "› ";
+        var prompt = model.AwaitingPerson ? "approve (y/n) › " : model.Smart ? "smart › " : "› ";
 
         // The cursor is drawn as a block; the shell's own cursor is hidden by
         // the full-screen mode. A pasted paragraph is shown as a window around

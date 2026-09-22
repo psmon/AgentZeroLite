@@ -27,7 +27,7 @@ agent-one tools prompt          # exactly what the model is told
 Or set it up on a screen and test the connection without leaving it:
 
 ```bash
-agent-one tui
+agent-one setup
 ```
 
 With a real model:
@@ -62,7 +62,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
 | `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/reset`, `/exit`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
-| `agent-one tui` | Full-screen settings editor (`agent-one config tui` is the same screen). |
+| `agent-one setup` | Full-screen settings: connection, model, reasoning model, options, smart mode (`tui` still works as an alias). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
 | `agent-one auth` | `show` / `set` / `check` / `clear` / `import`. `--jev` addresses the TypeSafe key, `--reasoning` the strong model's. |
 | `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
@@ -74,7 +74,7 @@ Shared flags for `run` and `chat` — each one overrides the stored config for
 that invocation only:
 
 ```
--r, --root <dir>      Workspace the tools may read (default: cwd)
+-r, --root <dir>      Workspace the tools may read and write (default: cwd)
 -p, --provider <name> echo | openai
 -m, --model <name>    Model id
     --base-url <url>  OpenAI-compatible endpoint
@@ -85,6 +85,7 @@ that invocation only:
     --json            One JSON object on stdout instead of prose
 -v, --verbose         Trace each tool call on stderr
 -q, --quiet           No progress display, no streaming
+-y, --yes             run only: approve commands the gate would have asked about
 ```
 
 ### Watching it work
@@ -131,7 +132,7 @@ $ agent-one run "hi" -p echo --json
 
 ## Settings TUI
 
-`agent-one tui` (or `agent-one config tui`) walks the settings as a five-step
+`agent-one setup` (`agent-one tui` is the same screen) walks the settings as a five-step
 stack, in the order they actually depend on each other:
 
 ```
@@ -311,6 +312,46 @@ streaming node re-measures a line for every cell it draws, and one
 2,300-character answer line froze the window for nine seconds (measured with a
 stack dump). Short lines make the cost vanish.
 
+### Doing things, not just answering
+
+The agent can **create files** and **run commands**, so "scaffold a FastAPI
+service and run its tests" is a request it can carry out, not just describe:
+
+```
+› hello 라는 문구를 출력하는 파이썬 스크립트 hello.py 를 만들고 실행해서 결과를 확인해줘
+  route: → workspace  (confidence 0.85)
+  scope: small — going ahead  (confidence 1.00)
+  ✓ write_file  (0.0s)
+  safety: safe — asking you  (confidence 0.37)
+  ⚠ run this command?  python hello.py
+  in C:\work\scratch · not run unasked because: the decision engine judged it safe (confidence 0.37)
+approve (y/n) › y
+  ✓ run_command  (1.2s)
+◆ hello.py 를 만들고 실행했습니다. 출력: hello
+```
+
+Three rules hold whatever is asked:
+
+- **Files are only ever written under the workspace root** (`--root`, default:
+  the current directory). A folder you name by its absolute path — "compare
+  with D:\other\project" — becomes **readable** for the rest of the session
+  (the note says so), and never writable.
+- **A command runs unasked only when it is plainly safe.** A fixed list of
+  patterns (`rm -rf /`, `sudo`, `format`, a piped installer, `git push --force`
+  …) always asks you; for the rest the decision engine judges, and only a
+  *confident* "safe" runs on its own. Everything else lands on the input line
+  as a question — `y` runs it, anything else skips it and tells the model so.
+  Without a TypeSafe key every command asks.
+- **Large work is designed first.** In smart mode a workspace request is sized;
+  one the engine calls large goes to the reasoning model for a design — file
+  layout, responsibilities, order of steps — which the everyday model then
+  builds step by step.
+
+**F2** (or `/status`) prints the session's status block: context size and a
+token estimate, how many times the decision engine was called and for how
+long, escalations, designs, tool calls, commands approved, and which folders
+are readable. `/new` starts a fresh session with a new log file.
+
 When input or output is a pipe — or with `--plain` — the same conversation runs
 as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin
 renderers over one `ChatSession` — as is `run`, a single turn of the same
@@ -440,7 +481,7 @@ that takes `ConsoleKeyInfo` and holds no terminal, so the steps and the key map
 are unit tested; `ConfigTuiPage` only projects it. The framework is
 [Termina](https://github.com/Aaronontheweb/termina), chosen because it is the one
 TUI measured to survive Native AOT here (`Docs/agent-netclaw/README.md` records
-the measurement). `agent-one tui --selftest` drives the real screen from a
+the measurement). `agent-one setup --selftest` drives the real screen from a
 scripted key source and checks where it landed — that is what CI runs against
 every release artifact, since a machine with no terminal cannot press keys.
 
@@ -468,16 +509,17 @@ keystroke, so PageUp finds the answer already in the transcript.
               │  └──── [tool:<name>] result ──┘
               ▼
           CompositeToolbelt
-             ├── files  LocalFileToolbelt, sandboxed to --root
-             └── web    WebToolbelt, read-only GETs
+             ├── files  LocalFileToolbelt, sandboxed to --root (+ read grants)
+             ├── edit   the same belt: write_file, root only
+             ├── web    WebToolbelt, read-only GETs
+             └── exec   ShellToolbelt: PowerShell / bash in --root, behind the gate
 ```
 
 ### Tools
 
-All read-only. Nothing here writes a file or runs a command, which is why there
-is no approval gate yet — adding a verb that changes something is the point at
-which one has to exist first, and a test fails if such a verb appears in the
-catalog.
+Six read-only verbs, and two that change things — each of those behind its own
+gate: the path sandbox for `write_file`, the command gate for `run_command`. A
+test keeps every verb that writes or runs inside those two families.
 
 | Verb | Does |
 |---|---|
@@ -487,6 +529,8 @@ catalog.
 | `grep(text, path, glob)` | Which files contain a piece of text, with line numbers. Case-insensitive **plain text, not a regex** — the pattern comes from a model, and a regex from an untrusted source is a way to hang the process, not a feature. |
 | `web_search(query, count)` | Search the web. Titles, URLs and snippets. |
 | `web_read(url)` | Fetch one page and return its readable text, truncated at 24 000 characters. |
+| `write_file(path, content)` | Create or overwrite a file **under the root only**, folders created as needed. Always the whole file: a partial-edit verb needs the model to quote the old text exactly, which small models get wrong. |
+| `run_command(command)` | One shell command in the root — PowerShell on Windows, bash (or sh) elsewhere — output and exit code back, killed past `commandTimeoutSeconds`. Runs only when the gate says so. |
 
 The file verbs all resolve paths against `--root` and refuse anything that lands
 outside it. `grep` skips files over 2 MB and anything containing a NUL byte, and
@@ -577,12 +621,21 @@ thing you would paste into an issue, and a secret must not ride along.
 
 ## Safety boundary
 
-v0 ships **read-only** tools — `list_files` and `read_file` — scoped to
-`--root` (default: the current directory). Paths are resolved to their real
-target before the containment check, so `../`, an absolute path and a symlink
-pointing outside all get the same refusal. There is no shell verb and no write
-verb yet; widening the surface later is additive, and the sandbox is small
-enough to reason about while the rest is being proven.
+**Writes stay under `--root`.** Paths are resolved to their real target before
+the containment check, so `../`, an absolute path and a symlink pointing outside
+all get the same refusal. Reading is the one thing that can widen: a folder the
+user names by its absolute path is granted for reading (and only reading) until
+the session ends — naming it is the approval.
+
+**Commands go through a gate**, in this order: a static list of patterns that
+are dangerous whatever anyone says (`Agent/CommandRisk`: recursive deletes
+aimed outside the project, `sudo`, `format`, registry edits, piped installers,
+destructive git, scheduled tasks…) always asks a person; otherwise the decision
+engine's safety question runs the command only on a *confident* "safe"; unsafe,
+unsure, no engine and no key all ask. Who answers depends on the front: the
+REPL reads a line, the window takes the next line typed, `run` says no unless
+started with `--yes`. A declined command is reported to the model as declined,
+with the reason, so it does not try it again.
 
 File contents reach the model as `[tool:<name>] …` user messages, and the system
 prompt says in as many words that tool output is data, not instructions — a file

@@ -1,4 +1,5 @@
 using AgentOne.Agent;
+using AgentOne.Commands;
 using R3;
 using Termina.Input;
 using Termina.Reactive;
@@ -16,7 +17,7 @@ public enum LineKind
     Delta,
     /// <summary>The answer is complete.</summary>
     AnswerEnd,
-    /// <summary>A note from the agent about what it did — a tool step, a plan.</summary>
+    /// <summary>A note from the agent about what it did — a tool step, a decision.</summary>
     Note,
     /// <summary>Something that needs the person's attention.</summary>
     Alert
@@ -39,6 +40,9 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     private readonly Subject<ScrollRequest> _scroll = new();
     private bool _answering;
 
+    /// <summary>A command waiting for the person's yes or no; the next line typed answers it.</summary>
+    private TaskCompletionSource<bool>? _approval;
+
     public ChatTuiViewModel(ChatSession session, ChatTuiModel model)
     {
         Session = session;
@@ -58,7 +62,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             }
 
             var seconds = step.ElapsedMs > 0 ? $"  ({step.ElapsedMs / 1000.0:0.0}s)" : "";
-            var detail = step.Tool == ReasoningSubtask.Tag ? "  " + step.Detail : "";
+            var detail = step.Tool is ReasoningSubtask.Tag or ReasoningSubtask.DesignTag ? "  " + step.Detail : "";
             _lines.OnNext(new TranscriptLine(LineKind.Note, $"{(step.Ok ? "✓" : "✗")} {step.Tool}{detail}{seconds}"));
         };
         session.AnswerDelta += fragment =>
@@ -75,6 +79,23 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             }
             var confidence = note.Decision.Ok ? $"  (confidence {note.Decision.Confidence:0.00})" : "";
             _lines.OnNext(new TranscriptLine(LineKind.Note, $"{note.Kind}: {note.Verdict}{confidence}"));
+        };
+        session.Noted += note => _lines.OnNext(new TranscriptLine(LineKind.Note, note));
+
+        // A command the gate will not run on its own: park the turn, ask on the
+        // input line, and let the next line typed settle it.
+        session.Approver = (request, ct) =>
+        {
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _approval = tcs;
+            ct.Register(() => tcs.TrySetResult(false));
+
+            _lines.OnNext(new TranscriptLine(LineKind.Alert, $"⚠ run this command?  {request.Command}"));
+            _lines.OnNext(new TranscriptLine(LineKind.Note, $"in {request.WorkingDirectory} · not run unasked because: {request.Reason}"));
+            Model.SetAwaitingPerson(true);
+            Model.SetBusy(false, "approve? y runs it, anything else skips it");
+            Bump();
+            return tcs.Task;
         };
     }
 
@@ -147,7 +168,12 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
                 _scroll.OnNext(ScrollRequest.Bottom);
                 break;
 
+            case ChatEffect.ShowStatus:
+                ShowStatus();
+                break;
+
             case ChatEffect.Quit:
+                _approval?.TrySetResult(false);
                 _cts.Cancel();
                 Shutdown();
                 return;
@@ -156,20 +182,47 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         Bump();
     }
 
+    private void ShowStatus()
+    {
+        _lines.OnNext(new TranscriptLine(LineKind.Note, "── status ──"));
+        foreach (var row in Session.Stats().Describe())
+            _lines.OnNext(new TranscriptLine(LineKind.Note, row));
+    }
+
     private async Task SubmitAsync(string text)
     {
+        // A parked command takes the line as its answer; the turn goes on from there.
+        if (_approval is { } approval)
+        {
+            _approval = null;
+            var yes = ChatCommand.IsYes(text);
+            _lines.OnNext(new TranscriptLine(LineKind.User, yes ? "y — run it" : "n — skip it"));
+            Model.SetAwaitingPerson(false);
+            Model.SetBusy(true, "… continuing");
+            Bump();
+            approval.TrySetResult(yes);
+            return;
+        }
+
         if (text is "/exit" or "/quit") { _cts.Cancel(); Shutdown(); return; }
 
-        if (text == "/reset")
+        if (text is "/reset" or "/new")
         {
-            Session.Reset();
-            Model.SetAwaitingPerson(false);
-            _lines.OnNext(new TranscriptLine(LineKind.Note, "conversation cleared"));
+            if (text == "/new") Session.NewSession(); else Session.Reset();
+            _lines.OnNext(new TranscriptLine(LineKind.Note,
+                text == "/new" ? $"new session: {Session.LogPath ?? "not saved"}" : "conversation cleared"));
             Bump();
             return;
         }
 
-        _lines.OnNext(new TranscriptLine(LineKind.User, text.Length == 0 ? "(accepted)" : text));
+        if (text == "/status")
+        {
+            ShowStatus();
+            Bump();
+            return;
+        }
+
+        _lines.OnNext(new TranscriptLine(LineKind.User, text));
         Model.SetBusy(true, "… thinking");
         Model.CountTurn();
         _answering = false;
@@ -219,6 +272,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 
     public override void Dispose()
     {
+        _approval?.TrySetResult(false);
         _cts.Cancel();
         _cts.Dispose();
         _lines.Dispose();

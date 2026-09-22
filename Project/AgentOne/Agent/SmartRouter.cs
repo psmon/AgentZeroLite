@@ -8,7 +8,7 @@ public enum Route
 {
     /// <summary>Current or external information: search the web, read pages.</summary>
     Web,
-    /// <summary>The user's own files: list, find, grep, read.</summary>
+    /// <summary>The workspace: read, create, edit or run things in it.</summary>
     Files,
     /// <summary>No lookup at all: answer from knowledge and the conversation.</summary>
     Answer
@@ -31,18 +31,28 @@ public sealed record RouteDecision(Route? Route, Decision Decision, bool Confide
 /// <param name="Escalate">True when the stronger model should take the request.</param>
 public sealed record EscalationDecision(bool Escalate, Decision Decision);
 
+/// <param name="NeedsDesign">True when the stronger model should design before the everyday model builds.</param>
+public sealed record ScopeDecision(bool NeedsDesign, Decision Decision);
+
+/// <param name="Safe">True when the command may run without asking anyone.</param>
+public sealed record SafetyDecision(bool Safe, Decision Decision);
+
 /// <summary>
-/// Smart mode's two questions to the decision engine, both with fixed options
-/// so they cost one engine call (≈0.3 s) and no planning LLM call (12–15 s,
+/// Smart mode's questions to the decision engine, all with fixed options so
+/// each costs one engine call (≈0.3 s) and no planning LLM call (12–15 s,
 /// measured, for options that then did not separate).
 ///
-/// 1. <b>Route</b>, before the loop: does this need the web, the workspace, or
-///    nothing? The chosen family is the only one the loop may use that turn.
-/// 2. <b>Escalation</b>, after the everyday model has drafted an answer with
-///    whatever the tools found: is the draft good enough, or does the problem
-///    need the stronger, slower model? The engine is always told which model
-///    drafted and which one is on offer, and sees the gathered material — a
-///    judgement about the draft without the material would be a guess.
+/// 1. <b>Route</b>, before the loop: web, the workspace, or nothing? The
+///    chosen family is the only one the loop may use that turn.
+/// 2. <b>Scope</b>, for workspace work: a small task, or something large
+///    enough that the stronger model should design it first?
+/// 3. <b>Safety</b>, before any command runs: fine unattended, or ask?
+/// 4. <b>Escalation</b>, after the everyday model has drafted an answer with
+///    whatever the tools found: good enough, or hand it to the stronger model?
+///
+/// The engine is always told which model is answering and which one is on
+/// offer — "is this draft good enough?" is a different question for a 4B
+/// model than for a 27B one.
 /// </summary>
 public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, string basicModel, string? reasoningModel)
 {
@@ -50,11 +60,17 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const int MinRequestChars = 10;
 
     public const string SearchWeb = "search_web";
-    public const string ReadWorkspace = "read_workspace";
+    public const string WorkInWorkspace = "work_in_workspace";
     public const string AnswerDirectly = "answer_directly";
 
     public const string KeepDraft = "keep_draft";
     public const string EscalateOption = "escalate";
+
+    public const string SmallTask = "small_task";
+    public const string NeedsDesign = "needs_design";
+
+    public const string SafeOption = "safe";
+    public const string UnsafeOption = "unsafe";
 
     public const string RouteQuestion =
         "Which resource does answering this request need first? Choose the one that fits best.";
@@ -62,14 +78,20 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const string EscalationQuestion =
         "Is the draft answer good enough to give the user as it is, or does this request need the stronger model?";
 
+    public const string ScopeQuestion =
+        "Is this a small task the everyday model can simply do, or work large enough that it should be designed first?";
+
+    public const string SafetyQuestion =
+        "Is this command safe to run unattended inside the project folder, or should a person approve it first?";
+
     public static readonly DecisionOption[] RouteOptions =
     [
         new(SearchWeb,
             "The answer depends on current or external information — news, documentation on the web, " +
             "prices, weather, anything not in the user's own files. The agent should search the web and read pages before answering."),
-        new(ReadWorkspace,
-            "The answer depends on the files in the working directory — code, configuration, documents the user has locally. " +
-            "The agent should list, find, grep or read those files before answering."),
+        new(WorkInWorkspace,
+            "The request is about the project in the working directory: reading its files, creating or editing files, " +
+            "running a build, tests or a command there. The agent should use the file and command tools."),
         new(AnswerDirectly,
             "No lookup is needed: general knowledge, reasoning, writing, translation, or material already in the conversation. " +
             "The model should answer at once, without tools.")
@@ -85,6 +107,28 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
             "Hand the request and the gathered material to the stronger model.")
     ];
 
+    public static readonly DecisionOption[] ScopeOptions =
+    [
+        new(SmallTask,
+            "A small, well-defined piece of work or question: one or two files, a single command, a fix, an explanation. " +
+            "The everyday model can do it directly."),
+        new(NeedsDesign,
+            "A feature or a project large enough that doing it without a plan would go wrong: several new files, a structure " +
+            "to choose, dependencies between steps, a scaffold to create. Have the stronger model design the file layout " +
+            "and the steps first; then the everyday model implements it.")
+    ];
+
+    public static readonly DecisionOption[] SafetyOptions =
+    [
+        new(SafeOption,
+            "Ordinary development work confined to the project folder: building, testing, listing, formatting, " +
+            "installing the project's own dependencies, creating or running project files, git status/diff/add/commit."),
+        new(UnsafeOption,
+            "Could damage or expose something beyond the project: deletes or overwrites outside the folder, changes " +
+            "system or user settings, needs elevated rights, sends data or secrets somewhere, is irreversible " +
+            "(force-push, history rewrite, wiping data), or is not clearly understood.")
+    ];
+
     /// <summary>Raised as each question is asked, for the progress line.</summary>
     public event Action<string>? ActivityStarted;
 
@@ -92,17 +136,15 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
 
     public bool CanEscalate => !string.IsNullOrEmpty(reasoningModel);
 
-    /// <summary>
-    /// The engine is always told which models are involved. "Is this draft good
-    /// enough?" means something different from a 4B model than from a 27B one.
-    /// </summary>
     public string ModelsLine =>
         $"Everyday model (answering now): {basicModel} — small and fast, weak at multi-step reasoning. " +
         $"Stronger model available: {(CanEscalate ? reasoningModel : "none")} — strong at reasoning, slow.";
 
+    // ------------------------------------------------------------- route
+
     public async Task<RouteDecision> RouteAsync(string request, string context, CancellationToken ct)
     {
-        ActivityStarted?.Invoke("deciding what this needs: web, files, or neither");
+        ActivityStarted?.Invoke("deciding what this needs: web, the workspace, or neither");
 
         var state = ModelsLine + "\n\nRequest:\n" + request
                     + (context.Length == 0 ? "" : "\n\nAlready in the conversation:\n" + context);
@@ -113,7 +155,7 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
             ? decision.Choice switch
             {
                 SearchWeb => Route.Web,
-                ReadWorkspace => Route.Files,
+                WorkInWorkspace => Route.Files,
                 AnswerDirectly => Route.Answer,
                 _ => null
             }
@@ -121,6 +163,47 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
 
         return new RouteDecision(route, decision, route is not null && decision.Confidence >= confidenceFloor);
     }
+
+    // ------------------------------------------------------------- scope
+
+    /// <summary>
+    /// Follows the choice, not the floor: designing first costs a strong-model
+    /// call, not correctness, and a two-option judgement rarely clears 0.60.
+    /// </summary>
+    public async Task<ScopeDecision> ScopeAsync(string request, string context, CancellationToken ct)
+    {
+        if (!CanEscalate) return new ScopeDecision(false, Decision.Failed("no reasoning model configured"));
+
+        ActivityStarted?.Invoke("judging the size of the work");
+
+        var state = ModelsLine + "\n\nRequest:\n" + request
+                    + (context.Length == 0 ? "" : "\n\nWhat is already known about the project:\n" + context);
+
+        var decision = await engine.ChooseAsync(state, ScopeQuestion, ScopeOptions, ct);
+        return new ScopeDecision(decision.Ok && decision.Choice == NeedsDesign, decision);
+    }
+
+    // ------------------------------------------------------------ safety
+
+    /// <summary>
+    /// The one question where the floor applies to the <em>permissive</em>
+    /// answer: a command runs unasked only when the engine says safe and is
+    /// sure of it. Anything else — unsafe, unsure, failed — goes to a person.
+    /// </summary>
+    public async Task<SafetyDecision> SafetyAsync(string command, string workspaceRoot, string shell, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("judging whether the command is safe");
+
+        var state = $"A command-line agent wants to run this {shell} command in the project folder {workspaceRoot}:\n\n"
+                    + command
+                    + "\n\nThe agent may only change files inside that folder. Nothing outside it should be modified.";
+
+        var decision = await engine.ChooseAsync(state, SafetyQuestion, SafetyOptions, ct);
+        var safe = decision.Ok && decision.Choice == SafeOption && decision.Confidence >= confidenceFloor;
+        return new SafetyDecision(safe, decision);
+    }
+
+    // -------------------------------------------------------- escalation
 
     /// <param name="material">Everything the tools returned this turn, or empty.</param>
     /// <param name="draft">What the everyday model answered.</param>
@@ -156,7 +239,7 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public static IReadOnlySet<string> FamiliesFor(Route route) => route switch
     {
         Route.Web => new HashSet<string> { ToolCatalog.WebFamily },
-        Route.Files => new HashSet<string> { ToolCatalog.FilesFamily },
+        Route.Files => new HashSet<string> { ToolCatalog.FilesFamily, ToolCatalog.EditFamily, ToolCatalog.ExecFamily },
         _ => new HashSet<string>()
     };
 
@@ -164,10 +247,11 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     {
         Route.Web =>
             "[route: web] This needs current information from the web. Use web_search, then web_read the most relevant result, " +
-            "before answering. Workspace file tools are not available on this turn.",
+            "before answering. Workspace tools are not available on this turn.",
         Route.Files =>
-            "[route: files] This is about the files in the workspace. Use list_files, find_files, grep and read_file to look, " +
-            "then answer from what they contain. Web tools are not available on this turn.",
+            "[route: workspace] This is about the project in the workspace. Look with list_files, find_files, grep and read_file; " +
+            "create or change files with write_file; run builds, tests and commands with run_command. " +
+            "Web tools are not available on this turn.",
         _ =>
             "[route: answer] No lookup is needed. Answer directly from what you know and what is already in this conversation; " +
             "no tool is available on this turn, so reply with the final envelope."

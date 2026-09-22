@@ -5,17 +5,37 @@ using AgentOne.Agent;
 namespace AgentOne.Tools;
 
 /// <summary>
-/// Read-only view of one directory tree. v0 deliberately ships no write and no
-/// shell verb: the sandbox stays easy to reason about while the loop, the
-/// envelope and the packaging path are being proven, and widening it later is
-/// additive.
+/// One directory tree: read anywhere in it, write anywhere in it, and nothing
+/// outside it — with one exception. A folder the person names by its absolute
+/// path can be <em>granted</em> for reading for the rest of the session; it is
+/// never writable, whatever is asked. The root is the only place a file is
+/// ever created or changed.
 ///
-/// Every path the model supplies is resolved against <see cref="Root"/> and
-/// rejected if it lands outside — symlinks included, because the containment
-/// check is made on the fully resolved real path.
+/// Every path the model supplies is resolved and rejected if it lands outside
+/// — symlinks included, because the containment check is made on the fully
+/// resolved real path.
 /// </summary>
 public sealed class LocalFileToolbelt(string root) : IToolbelt
 {
+    public const int MaxWriteChars = 512 * 1024;
+
+    private readonly List<string> _readGrants = [];
+
+    /// <summary>Folders outside the root this belt may read, in the order they were granted.</summary>
+    public IReadOnlyList<string> ReadGrants => _readGrants;
+
+    /// <summary>Allows reading under <paramref name="directory"/> for the life of this belt. Reading only.</summary>
+    public void GrantRead(string directory)
+    {
+        var full = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (!_readGrants.Contains(full, GrantComparer)) _readGrants.Add(full);
+    }
+
+    public void ClearGrants() => _readGrants.Clear();
+
+    private static StringComparer GrantComparer =>
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
     public const int MaxReadBytes = 64 * 1024;
     public const int MaxListEntries = 300;
     public const int MaxFindResults = 200;
@@ -35,6 +55,7 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
             "read_file" => ReadFile(call.Arg("path")),
             "find_files" => FindFiles(call.Arg("pattern"), call.Arg("path", ".")),
             "grep" => Grep(call.Arg("text"), call.Arg("path", "."), call.Arg("glob", "*")),
+            "write_file" => WriteFile(call.Arg("path"), call.Arg("content")),
             _ => ToolResult.Failure(
                 $"unknown tool '{call.Tool}'. Available: {string.Join(", ", ToolCatalog.All.Select(t => t.Name))}")
         };
@@ -69,6 +90,32 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         else if (count > MaxListEntries) sb.Append($"  ... truncated at {MaxListEntries} entries\n");
 
         return ToolResult.Success(sb.ToString().TrimEnd('\n'));
+    }
+
+    /// <summary>
+    /// The whole file, every time. A partial edit verb would need the model to
+    /// quote the exact old text, which small models get wrong more often than
+    /// they get right; rewriting the file is dumber and works.
+    /// </summary>
+    private ToolResult WriteFile(string relative, string content)
+    {
+        if (relative.Length == 0) return ToolResult.Failure("write_file needs a 'path' argument");
+        if (content.Length > MaxWriteChars) return ToolResult.Failure($"write_file: content is {content.Length} chars; the limit is {MaxWriteChars}");
+        if (!TryResolve(relative, out var full, out var error, forWrite: true)) return ToolResult.Failure(error);
+        if (Directory.Exists(full)) return ToolResult.Failure($"write_file: {Display(full)} is a directory");
+
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+            var existed = File.Exists(full);
+            File.WriteAllText(full, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            var lines = content.Length == 0 ? 0 : content.Split('\n').Length;
+            return ToolResult.Success($"{(existed ? "overwrote" : "created")} {Display(full)} ({content.Length} chars, {lines} lines)");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return ToolResult.Failure($"write_file: {ex.Message}");
+        }
     }
 
     private ToolResult ReadFile(string relative)
@@ -209,7 +256,7 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         name.StartsWith('.') ||
         name is "bin" or "obj" or "node_modules" or "dist" or "build" or "__pycache__";
 
-    private bool TryResolve(string relative, out string full, out string error)
+    private bool TryResolve(string relative, out string full, out string error, bool forWrite = false)
     {
         full = "";
         error = "";
@@ -228,7 +275,17 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
 
             if (!IsInsideRoot(real))
             {
-                error = $"path escapes the workspace root ({Root}): {relative}";
+                // Reading a granted folder is fine; writing there never is. The
+                // message says which, so the model does not try a workaround.
+                if (!forWrite && _readGrants.Any(g => IsInside(real, g)))
+                {
+                    full = real;
+                    return true;
+                }
+
+                error = forWrite && _readGrants.Any(g => IsInside(real, g))
+                    ? $"{relative} is outside the workspace root and read-only: files are only ever written under {Root}"
+                    : $"path escapes the workspace root ({Root}): {relative}";
                 return false;
             }
 
@@ -255,9 +312,11 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         }
     }
 
-    private bool IsInsideRoot(string candidate)
+    private bool IsInsideRoot(string candidate) => IsInside(candidate, Root);
+
+    private static bool IsInside(string candidate, string directory)
     {
-        var root = Root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var root = directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         if (string.Equals(candidate, root, PathComparison)) return true;
         return candidate.StartsWith(root + Path.DirectorySeparatorChar, PathComparison);
     }

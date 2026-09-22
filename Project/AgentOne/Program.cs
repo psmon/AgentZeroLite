@@ -55,8 +55,9 @@ internal static class Program
             {
                 "run" or "ask" => await new RunCommand().ExecuteAsync(rest, cts.Token),
                 "chat" or "repl" => await new ChatCommand().ExecuteAsync(rest, cts.Token),
-                "tui" when rest.Length > 0 && rest[0] == "--selftest" => await Tui.ConfigTuiApp.SelfTestAsync(),
-                "tui" => await Tui.ConfigTuiApp.RunAsync(),
+                // `setup` is the name; `tui` stays as the alias the release smoke test and old notes use.
+                "setup" or "tui" when rest.Length > 0 && rest[0] == "--selftest" => await Tui.ConfigTuiApp.SelfTestAsync(),
+                "setup" or "tui" => await Tui.ConfigTuiApp.RunAsync(),
                 "config" when rest.Length > 0 && rest[0] == "tui" => await Tui.ConfigTuiApp.RunAsync(),
                 "config" => new ConfigCommand().Execute(rest),
                 "models" => await new ModelsCommand().ExecuteAsync(rest, cts.Token),
@@ -132,8 +133,8 @@ internal static class Program
             Commands:
               run <prompt>     Ask once and print the answer
               chat             Interactive session
-              config           Show or change settings (~/.agent-one/config.json)
-              tui              Edit settings in a full-screen terminal UI
+              setup            Set it up on a screen: connection, model, reasoning model, options, smart mode
+              config           Show or change settings from the command line (~/.agent-one/config.json)
               auth             Store or inspect the API keys
               jev              Put a decision to TypeSafe / Jev (smart-mode bench)
               models           List what the configured endpoint can run
@@ -143,7 +144,7 @@ internal static class Program
               help <command>   Detailed help for one command
 
             Quick start (no API key, fully offline):
-              agent-one tui                    ← set things up, then press t to test
+              agent-one setup                  ← set things up, then press t to test
               agent-one run "hello" --provider echo
               agent-one tools prompt
 
