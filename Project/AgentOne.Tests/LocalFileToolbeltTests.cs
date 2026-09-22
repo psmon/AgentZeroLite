@@ -104,6 +104,140 @@ public class LocalFileToolbeltTests : IDisposable
         Assert.Contains("read_file", result.Text);
     }
 
+    // --- find_files / grep ------------------------------------------------
+
+    [Fact]
+    public void FindFilesMatchesByNameAnywhereUnderThePath()
+    {
+        var belt = new LocalFileToolbelt(_root);
+        var call = new ToolCall { Tool = "find_files", Args = { ["pattern"] = "*.cs" } };
+
+        var result = belt.InvokeAsync(call, CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.True(result.Ok);
+        Assert.Contains("main.cs", result.Text);           // nested under src/
+        Assert.DoesNotContain("README.md", result.Text);
+    }
+
+    [Fact]
+    public void FindFilesSkipsTheNoiseFolders()
+    {
+        File.WriteAllText(Path.Combine(_root, "node_modules", "junk.cs"), "x");
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(
+            new ToolCall { Tool = "find_files", Args = { ["pattern"] = "*.cs" } },
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.DoesNotContain("junk.cs", result.Text);
+    }
+
+    [Fact]
+    public void FindFilesWithNoMatchSaysSoAndSucceeds()
+    {
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(
+            new ToolCall { Tool = "find_files", Args = { ["pattern"] = "*.nope" } },
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.True(result.Ok);
+        Assert.Contains("no files matching", result.Text);
+    }
+
+    [Fact]
+    public void FindFilesNeedsAPattern()
+    {
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(new ToolCall { Tool = "find_files" }, CancellationToken.None)
+                         .GetAwaiter().GetResult();
+
+        Assert.False(result.Ok);
+        Assert.Contains("pattern", result.Text);
+    }
+
+    [Fact]
+    public void GrepReportsFileAndLineNumber()
+    {
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(
+            new ToolCall { Tool = "grep", Args = { ["text"] = "class C" } },
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.True(result.Ok);
+        Assert.Contains("main.cs:1:", result.Text);
+    }
+
+    [Fact]
+    public void GrepIsCaseInsensitive()
+    {
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(
+            new ToolCall { Tool = "grep", Args = { ["text"] = "HELLO" } },
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.Contains("README.md", result.Text);
+    }
+
+    [Fact]
+    public void GrepCanBeNarrowedByGlob()
+    {
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(
+            new ToolCall { Tool = "grep", Args = { ["text"] = "hello", ["glob"] = "*.cs" } },
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.DoesNotContain("README.md", result.Text);
+    }
+
+    [Fact]
+    public void GrepWithNoHitsSaysHowManyFilesItLookedAt()
+    {
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(
+            new ToolCall { Tool = "grep", Args = { ["text"] = "zzz-not-present-zzz" } },
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.True(result.Ok);
+        Assert.Contains("not found", result.Text);
+    }
+
+    [Fact]
+    public void GrepSkipsBinaryFiles()
+    {
+        File.WriteAllBytes(Path.Combine(_root, "blob.bin"), [0x00, 0x01, 0x02, 0x00]);
+        var belt = new LocalFileToolbelt(_root);
+
+        var result = belt.InvokeAsync(
+            new ToolCall { Tool = "grep", Args = { ["text"] = "hello" } },
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.DoesNotContain("blob.bin", result.Text);
+    }
+
+    [Theory]
+    [InlineData("find_files")]
+    [InlineData("grep")]
+    public void TheNewVerbsRespectTheSandbox(string tool)
+    {
+        var belt = new LocalFileToolbelt(_root);
+        var call = new ToolCall
+        {
+            Tool = tool,
+            Args = { ["pattern"] = "*", ["text"] = "x", ["path"] = "../.." }
+        };
+
+        var result = belt.InvokeAsync(call, CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.False(result.Ok);
+        Assert.Contains("escapes the workspace root", result.Text);
+    }
+
     [Fact]
     public void TruncatesFilesOverTheReadCap()
     {

@@ -237,8 +237,42 @@ and fail at random rather than when something is broken.
               │  ▲                            │
               │  └──── [tool:<name>] result ──┘
               ▼
-          IToolbelt (LocalFileToolbelt, sandboxed to --root)
+          CompositeToolbelt
+             ├── files  LocalFileToolbelt, sandboxed to --root
+             └── web    WebToolbelt, read-only GETs
 ```
+
+### Tools
+
+All read-only. Nothing here writes a file or runs a command, which is why there
+is no approval gate yet — adding a verb that changes something is the point at
+which one has to exist first, and a test fails if such a verb appears in the
+catalog.
+
+| Verb | Does |
+|---|---|
+| `list_files(path)` | List a directory. Skips `.git`, `bin`, `obj`, `node_modules` and friends. |
+| `read_file(path)` | Read a UTF-8 file, truncated at 64 KB. |
+| `find_files(pattern, path)` | Find by name pattern (`*.cs`) anywhere below a path. |
+| `grep(text, path, glob)` | Which files contain a piece of text, with line numbers. Case-insensitive **plain text, not a regex** — the pattern comes from a model, and a regex from an untrusted source is a way to hang the process, not a feature. |
+| `web_search(query, count)` | Search the web. Titles, URLs and snippets. |
+| `web_read(url)` | Fetch one page and return its readable text, truncated at 24 000 characters. |
+
+The file verbs all resolve paths against `--root` and refuse anything that lands
+outside it. `grep` skips files over 2 MB and anything containing a NUL byte, and
+stops at 100 matches.
+
+`web_search` uses DuckDuckGo's HTML endpoint: no API key, no account, works the
+moment agent-one is installed. The cost is that it parses someone else's markup,
+so a layout change degrades to "no results parsed" — never to wrong results —
+and the message says so. Search returns a menu, not an answer; the prompt tells
+the model to `web_read` a page before claiming what it says.
+
+**Web text is the least trustworthy input in the system.** It is written by
+strangers and may carry instructions aimed at the model. It comes back as data
+under a header naming its source, and the system prompt says a web page is to be
+quoted and reasoned about, never obeyed. That is one defence, and it is the only
+one — which is exactly why no verb here can act on what a page says.
 
 The model answers with **one JSON envelope per turn** and nothing else:
 
@@ -265,15 +299,20 @@ nudge each). Every stop is reported with its reason rather than a silent hang.
 | `Commands/` | one class per verb, plus the shared flag parser (`AgentOptions`) |
 | `Agent/` | the loop, the envelope (`ToolCall`), the guards, the system prompt |
 | `Llm/` | `IChatProvider`, the echo provider, the OpenAI-compatible client |
-| `Tools/` | `ToolCatalog` (what the model is told) and `LocalFileToolbelt` (what actually runs) |
+| `Tools/` | `ToolCatalog` (what the model is told), the belts that run it, and `Tools/Web/` (fetch, search parsing, HTML→text) |
 | `Tui/` | the settings screen — testable model, Termina page/viewmodel, host wiring |
 | `Services/` | `~/.agent-one/` paths, config, session JSONL, JSON source-gen contexts |
 | `packaging/npm/` | the npm wrapper that downloads a release binary |
 
 `ToolCatalog` is the single source of truth: the system prompt is generated from
-it, `agent-one tools list` prints it, and a test asserts the toolbelt handles
-every verb in it. Adding a verb in one place and forgetting the others fails the
-build's tests rather than confusing the model at runtime.
+it, `agent-one tools list` prints it, each spec names the **family** that owns
+the verb, and `CompositeToolbelt` routes by that family. Tests assert every
+family has a belt and every verb is reachable — so adding a verb in one place and
+forgetting the others fails the build rather than confusing the model at runtime.
+
+Adding a capability is therefore: one `ToolSpec` in the catalog, one `case` in a
+belt (or a whole new `IToolbelt` for a new family), and the tests tell you if you
+stopped halfway.
 
 ## Where it keeps things
 

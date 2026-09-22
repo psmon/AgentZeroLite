@@ -39,7 +39,9 @@ public sealed class ChatCommand
 
         using var disposable = provider as IDisposable;
 
-        var toolbelt = new LocalFileToolbelt(options.Root);
+        using var toolbelt = new CompositeToolbelt(
+            (ToolCatalog.FilesFamily, new LocalFileToolbelt(options.Root)),
+            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(options.Config.TimeoutSeconds))));
         var loop = new AgentLoop(provider, toolbelt, options.Config.MaxSteps);
         loop.Reset();
 
@@ -53,7 +55,7 @@ public sealed class ChatCommand
         };
 
         Console.WriteLine($"agent-one chat — provider {provider.Name}, model {options.Config.Model}");
-        Console.WriteLine($"workspace: {toolbelt.Root}");
+        Console.WriteLine($"tools:     {toolbelt.Scope}");
         if (session is not null) Console.WriteLine($"session:   {session.Path}");
         Console.WriteLine("/reset clears the conversation, /exit or Ctrl+C quits.");
         Console.WriteLine();

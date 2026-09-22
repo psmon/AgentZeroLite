@@ -306,10 +306,23 @@ Three things that are easy to break here:
   (`.github/workflows/agent-one-release.yml`, tag `agent-one-v*`) handles both and
   smoke-tests each artifact before it reaches the release page.
 
-v0 tools are read-only (`list_files`, `read_file`) and sandboxed to `--root`,
-resolved through symlinks before the containment check. Tool output reaches the
-model as `[tool:<name>]` user messages and the system prompt states it is data,
-not instructions.
+Tools are **all read-only**, in two families routed by `CompositeToolbelt` from
+each `ToolSpec`'s `Family`: **files** (`list_files`, `read_file`, `find_files`,
+`grep`) sandboxed to `--root` and resolved through symlinks before the
+containment check, and **web** (`web_search`, `web_read`) which only ever issues
+GETs. A test asserts no write/shell verb has appeared in the catalog — the day it
+fails is the day an approval gate has to exist first.
+
+`grep` is plain substring, not regex, on purpose: the pattern comes from a model,
+and a regex from an untrusted source hangs the process on backtracking. Search
+uses DuckDuckGo's HTML endpoint (no key), so a markup change degrades to "no
+results parsed" rather than to wrong results. `Tools/Web/HtmlText` strips markup
+with source-generated regexes — block tags become newlines, inline tags vanish
+with no space, or `Akka<b>.NET</b>` reads back as `Akka .NET`.
+
+Tool output reaches the model as `[tool:<name>]` user messages and the system
+prompt states it is data, not instructions — naming web pages explicitly, since
+that is the one source written by strangers.
 
 ## Ancestor reference — AgentWin (Origin)
 

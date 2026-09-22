@@ -56,7 +56,9 @@ public sealed class RunCommand
 
         using var disposable = provider as IDisposable;
 
-        var toolbelt = new LocalFileToolbelt(options.Root);
+        using var toolbelt = new CompositeToolbelt(
+            (ToolCatalog.FilesFamily, new LocalFileToolbelt(options.Root)),
+            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(options.Config.TimeoutSeconds))));
         var loop = new AgentLoop(provider, toolbelt, options.Config.MaxSteps);
 
         SessionStore? session = options.Config.SaveSessions ? SessionStore.Create("run") : null;

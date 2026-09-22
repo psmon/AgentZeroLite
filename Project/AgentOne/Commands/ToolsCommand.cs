@@ -20,8 +20,12 @@ public sealed class ToolsCommand
         switch (sub)
         {
             case "list":
-                foreach (var tool in ToolCatalog.All)
-                    Console.WriteLine($"{tool.Name,-12} ({string.Join(", ", tool.Args)})  {tool.Summary}");
+                foreach (var group in ToolCatalog.All.GroupBy(t => t.Family))
+                {
+                    Console.WriteLine($"[{group.Key}]");
+                    foreach (var tool in group)
+                        Console.WriteLine($"  {tool.Name,-12} ({string.Join(", ", tool.Args)})  {tool.Summary}");
+                }
                 return 0;
 
             case "show":
@@ -37,6 +41,7 @@ public sealed class ToolsCommand
                     return 2;
                 }
                 Console.WriteLine($"name:    {found.Name}");
+                Console.WriteLine($"family:  {found.Family}");
                 Console.WriteLine($"args:    {string.Join(", ", found.Args)}");
                 Console.WriteLine($"summary: {found.Summary}");
                 Console.WriteLine($"example: {found.Example}");

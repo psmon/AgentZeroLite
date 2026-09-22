@@ -1,3 +1,4 @@
+using System.IO.Enumeration;
 using System.Text;
 using AgentOne.Agent;
 
@@ -17,6 +18,10 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
 {
     public const int MaxReadBytes = 64 * 1024;
     public const int MaxListEntries = 300;
+    public const int MaxFindResults = 200;
+    public const int MaxGrepHits = 100;
+    public const int MaxGrepLineChars = 200;
+    public const int MaxGrepFileBytes = 2 * 1024 * 1024;
 
     public string Root { get; } = Path.GetFullPath(root);
 
@@ -28,6 +33,8 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         {
             "list_files" => ListFiles(call.Arg("path", ".")),
             "read_file" => ReadFile(call.Arg("path")),
+            "find_files" => FindFiles(call.Arg("pattern"), call.Arg("path", ".")),
+            "grep" => Grep(call.Arg("text"), call.Arg("path", "."), call.Arg("glob", "*")),
             _ => ToolResult.Failure(
                 $"unknown tool '{call.Tool}'. Available: {string.Join(", ", ToolCatalog.All.Select(t => t.Name))}")
         };
@@ -80,6 +87,121 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
             text += $"\n... truncated ({info.Length} bytes total, {MaxReadBytes} shown)";
 
         return ToolResult.Success(text);
+    }
+
+    private ToolResult FindFiles(string pattern, string relative)
+    {
+        if (pattern.Length == 0) return ToolResult.Failure("find_files needs a 'pattern' argument, e.g. *.cs");
+        if (!TryResolve(relative, out var full, out var error)) return ToolResult.Failure(error);
+        if (!Directory.Exists(full)) return ToolResult.Failure($"not a directory: {Display(full)}");
+
+        var matches = Walk(full)
+            .Where(f => FileSystemName.MatchesSimpleExpression(pattern, Path.GetFileName(f), ignoreCase: true))
+            .Take(MaxFindResults + 1)
+            .ToList();
+
+        if (matches.Count == 0)
+            return ToolResult.Success($"no files matching '{pattern}' under {Display(full)}");
+
+        var sb = new StringBuilder();
+        sb.Append(Math.Min(matches.Count, MaxFindResults)).Append(" file(s) matching '")
+          .Append(pattern).Append("' under ").Append(Display(full)).Append(":\n");
+
+        foreach (var file in matches.Take(MaxFindResults))
+            sb.Append("  ").Append(Display(file)).Append('\n');
+
+        if (matches.Count > MaxFindResults) sb.Append($"  … truncated at {MaxFindResults}\n");
+
+        return ToolResult.Success(sb.ToString().TrimEnd('\n'));
+    }
+
+    /// <summary>
+    /// Plain case-insensitive substring search, deliberately not a regex: the
+    /// pattern comes from a model, and a regex from an untrusted source is a way
+    /// to hang the process on backtracking rather than a feature.
+    /// </summary>
+    private ToolResult Grep(string needle, string relative, string glob)
+    {
+        if (needle.Length == 0) return ToolResult.Failure("grep needs a 'text' argument");
+        if (!TryResolve(relative, out var full, out var error)) return ToolResult.Failure(error);
+
+        var files = Directory.Exists(full)
+            ? Walk(full).Where(f => FileSystemName.MatchesSimpleExpression(glob, Path.GetFileName(f), ignoreCase: true))
+            : File.Exists(full) ? [full] : Enumerable.Empty<string>();
+
+        var sb = new StringBuilder();
+        int hits = 0, scanned = 0;
+
+        foreach (var file in files)
+        {
+            if (hits >= MaxGrepHits) break;
+            scanned++;
+
+            foreach (var (line, number) in ReadLinesSafely(file))
+            {
+                if (!line.Contains(needle, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var trimmed = line.Trim();
+                if (trimmed.Length > MaxGrepLineChars) trimmed = trimmed[..MaxGrepLineChars] + "…";
+
+                sb.Append(Display(file)).Append(':').Append(number).Append(": ").Append(trimmed).Append('\n');
+
+                if (++hits >= MaxGrepHits) break;
+            }
+        }
+
+        if (hits == 0)
+            return ToolResult.Success($"'{needle}' not found in {scanned} file(s) under {Display(full)}");
+
+        var header = hits >= MaxGrepHits
+            ? $"first {hits} matches for '{needle}' (more may exist):\n"
+            : $"{hits} match(es) for '{needle}':\n";
+
+        return ToolResult.Success(header + sb.ToString().TrimEnd('\n'));
+    }
+
+    /// <summary>Every file under a directory, minus the folders nobody wants searched.</summary>
+    private static IEnumerable<string> Walk(string root)
+    {
+        var stack = new Stack<string>([root]);
+
+        while (stack.Count > 0)
+        {
+            var dir = stack.Pop();
+
+            string[] entries;
+            try { entries = Directory.GetFiles(dir); }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException) { continue; }
+
+            foreach (var file in entries.OrderBy(f => f, StringComparer.Ordinal))
+                yield return file;
+
+            try
+            {
+                foreach (var sub in Directory.GetDirectories(dir).OrderBy(d => d, StringComparer.Ordinal))
+                    if (!IsExcluded(Path.GetFileName(sub)))
+                        stack.Push(sub);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException) { /* skip */ }
+        }
+    }
+
+    /// <summary>Lines of a text file, or nothing at all — a binary blob is not an error worth reporting.</summary>
+    private static IEnumerable<(string Line, int Number)> ReadLinesSafely(string path)
+    {
+        var info = new FileInfo(path);
+        if (info.Length > MaxGrepFileBytes) yield break;
+
+        string[] lines;
+        try { lines = File.ReadAllLines(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { yield break; }
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            // A NUL byte means binary; searching it produces noise, not matches.
+            if (lines[i].Contains('\0')) yield break;
+            yield return (lines[i], i + 1);
+        }
     }
 
     /// <summary>Directories that are noise for an agent and expensive to walk.</summary>
