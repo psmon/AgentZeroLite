@@ -541,3 +541,63 @@ public class SoftWrapTests
         Assert.Equal(2, buffer.GetWrappedLineCount(80));
     }
 }
+
+/// <summary>The input line shows a window around the cursor once the text is wider than it.</summary>
+public class InputViewportTests
+{
+    private static int Columns(string s) => Termina.Terminal.DisplayWidth.GetColumnCount(s);
+
+    [Fact]
+    public void ShortTextIsShownWholeWithTheCursorInPlace()
+    {
+        Assert.Equal("ab▌cd", InputViewport.Render("abcd", 2, 40));
+    }
+
+    [Fact]
+    public void TypingAtTheEndOfALongLineKeepsTheEndVisible()
+    {
+        var text = string.Concat(Enumerable.Repeat("0123456789", 10));
+
+        var shown = InputViewport.Render(text, text.Length, 30);
+
+        Assert.StartsWith("…", shown);
+        Assert.EndsWith("89▌", shown);
+        Assert.True(Columns(shown) <= 30, shown);
+    }
+
+    [Fact]
+    public void ACursorAtTheStartShowsTheStartAndCutsTheEnd()
+    {
+        var text = string.Concat(Enumerable.Repeat("0123456789", 10));
+
+        var shown = InputViewport.Render(text, 0, 30);
+
+        Assert.StartsWith("▌0123", shown);
+        Assert.EndsWith("…", shown);
+        Assert.True(Columns(shown) <= 30, shown);
+    }
+
+    [Fact]
+    public void ACursorInTheMiddleShowsBothSides()
+    {
+        var text = string.Concat(Enumerable.Repeat("0123456789", 10));
+
+        var shown = InputViewport.Render(text, 50, 30);
+
+        Assert.StartsWith("…", shown);
+        Assert.EndsWith("…", shown);
+        Assert.Contains("9▌0", shown);
+        Assert.True(Columns(shown) <= 30, shown);
+    }
+
+    [Fact]
+    public void WideCharactersAreMeasuredInColumnsNotChars()
+    {
+        var text = string.Concat(Enumerable.Repeat("가나다라마", 10));   // 100 columns
+
+        var shown = InputViewport.Render(text, text.Length, 30);
+
+        Assert.True(Columns(shown) <= 30, shown);
+        Assert.EndsWith("마▌", shown);
+    }
+}

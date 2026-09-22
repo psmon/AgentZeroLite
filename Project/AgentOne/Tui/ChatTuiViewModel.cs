@@ -24,8 +24,8 @@ public enum LineKind
 
 public readonly record struct TranscriptLine(LineKind Kind, string Text);
 
-/// <summary>What the person asked the transcript to do.</summary>
-public enum ScrollRequest { Up, Down, Bottom }
+/// <summary>What the person asked the transcript to do: a page by key, a few lines by wheel.</summary>
+public enum ScrollRequest { Up, Down, Bottom, WheelUp, WheelDown }
 
 /// <summary>
 /// Glue between the chat screen and the conversation. Keys go to the model,
@@ -87,6 +87,25 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         Input.OfType<IInputEvent, KeyPressed>()
             .Subscribe(HandleKey)
             .DisposeWith(Subscriptions);
+
+        // The wheel scrolls the transcript wherever the pointer is: there is
+        // nothing else on this screen that could want it. A tick arrives as a
+        // MouseScrollEvent from SGR mouse reporting, or as a MouseEvent with
+        // EventType Scroll (the virtual source, and some terminals) — take both.
+        Input.OfType<IInputEvent, MouseScrollEvent>()
+            .Subscribe(wheel => Wheel(up: wheel.Delta > 0))
+            .DisposeWith(Subscriptions);
+
+        Input.OfType<IInputEvent, MouseEvent>()
+            .Where(mouse => mouse.EventType == MouseEventType.Scroll)
+            .Subscribe(mouse => Wheel(up: mouse.Button == MouseButton.WheelUp))
+            .DisposeWith(Subscriptions);
+    }
+
+    private void Wheel(bool up)
+    {
+        _scroll.OnNext(up ? ScrollRequest.WheelUp : ScrollRequest.WheelDown);
+        Bump();
     }
 
     private void HandleKey(KeyPressed key)

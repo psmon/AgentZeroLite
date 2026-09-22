@@ -24,6 +24,9 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
     /// <summary>Columns the scrollbar takes on the right of the transcript.</summary>
     private const int ScrollbarColumns = 1;
 
+    /// <summary>Lines one wheel tick moves — what terminals themselves do.</summary>
+    private const int WheelLines = 3;
+
     private readonly SoftWrap _wrap = new();
     private PersistedStreamBuffer _buffer = null!;
     private StreamingTextNode _transcript = null!;
@@ -49,6 +52,8 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
             {
                 case ScrollRequest.Up: _transcript.ScrollUp(PageLines(), width); break;
                 case ScrollRequest.Down: _transcript.ScrollDown(PageLines()); break;
+                case ScrollRequest.WheelUp: _transcript.ScrollUp(WheelLines, width); break;
+                case ScrollRequest.WheelDown: _transcript.ScrollDown(WheelLines); break;
                 case ScrollRequest.Bottom: _transcript.ScrollToBottom(); break;
             }
             ReportScroll();
@@ -146,9 +151,9 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
         var prompt = model.AwaitingPerson ? "answer › " : model.Smart ? "smart › " : "› ";
 
         // The cursor is drawn as a block; the shell's own cursor is hidden by
-        // the full-screen mode.
-        var text = model.Input;
-        var shown = text[..model.Cursor] + "▌" + text[model.Cursor..];
+        // the full-screen mode. A pasted paragraph is shown as a window around
+        // the cursor rather than wrapped into the transcript.
+        var shown = InputViewport.Render(model.Input, model.Cursor, WrapWidth() + ScrollbarColumns - prompt.Length);
 
         return new TextNode(prompt + shown)
             .WithForeground(model.Busy ? NoteColor : Color.BrightWhite)

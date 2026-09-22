@@ -31,8 +31,8 @@ public sealed class ChatTuiModel
         Smart = smart;
         SmartAvailable = smartAvailable;
         Status = smartAvailable
-            ? "Enter sends · Shift+Tab basic/smart · PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits"
-            : "Enter sends · PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits  (no TypeSafe key — smart unavailable)";
+            ? "Enter sends · Shift+Tab basic/smart · wheel or PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits"
+            : "Enter sends · wheel or PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits  (no TypeSafe key — smart unavailable)";
     }
 
     public string Input => _input.ToString();

@@ -266,8 +266,10 @@ answer › ▌
 ```
 
 The answer streams into the transcript as the model writes, and the transcript
-scrolls: **PageUp/PageDown** move a page, **Ctrl+End** returns to the live
-end, and a scrollbar on the right shows where you are. New text does not pull
+scrolls: the **mouse wheel** moves three lines, **PageUp/PageDown** a page,
+**Ctrl+End** returns to the live end, and a scrollbar on the right shows where
+you are. A pasted paragraph stays on the one input line as a window around the
+cursor (`…` marks a cut end) instead of wrapping into the transcript. New text does not pull
 you back down while you are reading — the header says `↑ N lines above the
 end · Ctrl+End to follow` until you do. The header also says which mode you
 are in and whether a turn is running; the bottom line is yours. Shift+Tab

@@ -68,6 +68,7 @@ public static class ChatTuiApp
         scripted.EnqueueString(string.Join(" ", Enumerable.Range(1, 300).Select(i => $"word{i}")));
         scripted.EnqueueKey(ConsoleKey.Enter);
         scripted.EnqueueKey(ConsoleKey.PageUp);
+        scripted.EnqueueScroll(10, 5, up: false);             // one wheel tick back down: a few lines, not a page
         scripted.EnqueueKey(ConsoleKey.Escape);               // arms quit
         scripted.EnqueueKey(ConsoleKey.Escape);               // quits
         scripted.Complete();
@@ -84,8 +85,12 @@ public static class ChatTuiApp
         if (model.Input.Length != 0) failures.Add($"chat input should be empty after Esc, was '{model.Input}'");
         if (model.Smart) failures.Add("chat should be back in basic mode");
         if (model.Turns != 1 || model.Busy) failures.Add("the echo turn did not finish");
+        // PageUp moved a page (20 lines in the 24-row headless window); the wheel
+        // tick brought a few back, so the offset must be above zero and below a page.
         if (!model.ScrolledUp || model.ScrollOffset <= 0)
             failures.Add($"PageUp should leave the transcript above the live end (offset {model.ScrollOffset})");
+        else if (model.ScrollOffset >= 20)
+            failures.Add($"the wheel tick should have scrolled a few lines back down (offset {model.ScrollOffset})");
         if (!model.QuitArmed) failures.Add("the last Esc should have quit through the armed path");
         return failures;
     }
