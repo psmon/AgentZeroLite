@@ -32,10 +32,12 @@ public class ModelPickerTests : IDisposable
 
     private static ConsoleKeyInfo Key(ConsoleKey key) => new('\0', key, false, false, false);
 
-    private static ConfigTuiModel OnModelRow()
+    /// <summary>On the Model step, with the automatic fetch already consumed.</summary>
+    private static ConfigTuiModel OnModelStep()
     {
         var model = new ConfigTuiModel(new AgentConfig());
-        while (model.SelectedKey != "model") model.HandleKey(Key(ConsoleKey.DownArrow));
+        model.JumpToStep(ConfigStep.Model);
+        model.CompleteModelFetch(ModelCatalogResult.Failure("not fetched in this test"));
         return model;
     }
 
@@ -43,13 +45,33 @@ public class ModelPickerTests : IDisposable
         ModelCatalogResult.Success(models, $"{models.Length} models from http://test/v1/models");
 
     [Fact]
-    public void EnterOnTheModelRowAsksTheEndpointInsteadOfOpeningAnEditor()
+    public void ArrivingAtTheModelStepAsksTheEndpoint()
     {
-        var model = OnModelRow();
+        var model = new ConfigTuiModel(new AgentConfig());
 
-        Assert.Equal(TuiEffect.FetchModels, model.HandleKey(Key(ConsoleKey.Enter)));
+        Assert.Equal(TuiEffect.FetchModels, model.JumpToStep(ConfigStep.Model));
         Assert.True(model.Busy);
-        Assert.False(model.Editing);
+        Assert.Equal(ConfigStep.Model, model.Step);
+    }
+
+    [Fact]
+    public void TabFromTheConnectionStepIsWhatTriggersIt()
+    {
+        var model = new ConfigTuiModel(new AgentConfig());
+
+        Assert.Equal(TuiEffect.FetchModels, model.HandleKey(Key(ConsoleKey.Tab)));
+        Assert.Equal(ConfigStep.Model, model.Step);
+    }
+
+    [Fact]
+    public void EnterOnTheModelStepTypesAnIdByHand()
+    {
+        var model = OnModelStep();
+
+        model.HandleKey(Key(ConsoleKey.Enter));
+
+        Assert.True(model.Editing);
+        Assert.Equal("gpt-4o-mini", model.EditBuffer);
     }
 
     [Fact]
@@ -63,7 +85,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void AListingOpensThePickerWithTheCurrentModelHighlighted()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.HandleKey(Key(ConsoleKey.Enter));
         model.CompleteModelFetch(Listing("a-model", "gpt-4o-mini", "z-model"));
 
@@ -76,7 +98,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void TheManualEntryIsAlwaysOfferedLast()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing("only-one"));
 
         Assert.Equal(ConfigTuiModel.PickManualEntry, model.PickOptions[^1]);
@@ -84,44 +106,53 @@ public class ModelPickerTests : IDisposable
     }
 
     [Fact]
-    public void ChoosingAModelSetsItAndLeavesThePicker()
+    public void ChoosingAModelSetsItAndKeepsTheListUp()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing("a-model", "gpt-4o-mini", "z-model"));
 
         model.HandleKey(Key(ConsoleKey.UpArrow));      // gpt-4o-mini -> a-model
         model.HandleKey(Key(ConsoleKey.Enter));
 
-        Assert.False(model.Picking);
         Assert.Equal("a-model", model.Value("model"));
         Assert.True(model.Dirty);
-        Assert.Empty(model.PickOptions);
+
+        // The list is this step's body — it stays, with the choice now current,
+        // so a mis-pick costs one keystroke rather than another round trip.
+        Assert.True(model.Picking);
+        Assert.Equal("a-model", model.PickOptions[model.PickIndex]);
     }
 
     [Fact]
-    public void EscapeKeepsTheCurrentModel()
+    public void EscapeGoesBackAStepWithoutTouchingTheModel()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing("a-model", "gpt-4o-mini"));
 
-        model.HandleKey(Key(ConsoleKey.UpArrow));
+        model.HandleKey(Key(ConsoleKey.UpArrow));       // move, but do not choose
         model.HandleKey(Key(ConsoleKey.Escape));
 
-        Assert.False(model.Picking);
+        Assert.Equal(ConfigStep.Connection, model.Step);
         Assert.Equal("gpt-4o-mini", model.Value("model"));
         Assert.False(model.Dirty);
     }
 
     [Fact]
+    public void EscapeOnTheFirstStepStillQuits()
+    {
+        var model = new ConfigTuiModel(new AgentConfig());
+        Assert.Equal(TuiEffect.Quit, model.HandleKey(Key(ConsoleKey.Escape)));
+    }
+
+    [Fact]
     public void ChoosingManualEntryFallsThroughToTheTextEditor()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing("a-model"));
 
         model.HandleKey(Key(ConsoleKey.End));          // the manual entry
         model.HandleKey(Key(ConsoleKey.Enter));
 
-        Assert.False(model.Picking);
         Assert.True(model.Editing);
         Assert.Equal("gpt-4o-mini", model.EditBuffer); // prefilled with the current value
     }
@@ -129,7 +160,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void PickerSelectionWrapsAround()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing("a", "b"));   // 3 rows with the manual entry
 
         model.HandleKey(Key(ConsoleKey.Home));
@@ -145,7 +176,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void AShortListIsShownWhole()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing("a", "b"));    // 3 rows with the manual entry
 
         Assert.Equal((0, 3), model.PickWindow(8));
@@ -154,7 +185,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void ALongListIsWindowedAroundTheSelection()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing(Enumerable.Range(1, 40).Select(i => $"m{i:00}").ToArray()));
 
         // At the top the window starts at the top.
@@ -172,7 +203,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void TheWindowAlwaysContainsTheSelection()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing(Enumerable.Range(1, 40).Select(i => $"m{i:00}").ToArray()));
 
         for (int step = 0; step < model.PickOptions.Count + 3; step++)
@@ -188,7 +219,7 @@ public class ModelPickerTests : IDisposable
     [InlineData(-1)]
     public void ARidiculousHeightYieldsAnEmptyWindowRatherThanThrowing(int height)
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(Listing("a", "b"));
 
         Assert.Equal((0, 0), model.PickWindow(height));
@@ -197,7 +228,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void TheWindowIsEmptyWhenNothingIsBeingPicked()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         Assert.Equal((0, 0), model.PickWindow(8));
     }
 
@@ -206,7 +237,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void ARejectedKeyIsReportedAsSuchAndOpensNoPicker()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.HandleKey(Key(ConsoleKey.Enter));
         model.CompleteModelFetch(ModelCatalogResult.Failure(
             "HTTP 401 — the endpoint rejected the key in $OPENAI_API_KEY"));
@@ -221,7 +252,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void AnEmptyListIsAFailureNotAnEmptyPicker()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(ModelCatalogResult.Success([], "answered, but listed no models"));
 
         Assert.False(model.Picking);
@@ -231,7 +262,7 @@ public class ModelPickerTests : IDisposable
     [Fact]
     public void EveryFailureNamesBothSuspects()
     {
-        var model = OnModelRow();
+        var model = OnModelStep();
         model.CompleteModelFetch(ModelCatalogResult.Failure("cannot reach http://nope/v1/models"));
 
         Assert.Contains("baseUrl", model.Status);
@@ -239,15 +270,21 @@ public class ModelPickerTests : IDisposable
     }
 
     [Fact]
-    public void TheScreenIsUsableAgainAfterAFailedListing()
+    public void AFailedListingLeavesTheStepUsable()
     {
-        var model = OnModelRow();
-        model.HandleKey(Key(ConsoleKey.Enter));
+        var model = OnModelStep();
         model.CompleteModelFetch(ModelCatalogResult.Failure("boom"));
 
-        // Not busy, not picking: ordinary keys work again.
-        model.HandleKey(Key(ConsoleKey.DownArrow));
-        Assert.Equal("apiKeyEnv", model.SelectedKey);
+        Assert.False(model.Busy);
+        Assert.False(model.Picking);
+
+        // Typing an id by hand still works, and so does stepping back.
+        model.HandleKey(Key(ConsoleKey.E));
+        Assert.True(model.Editing);
+        model.HandleKey(Key(ConsoleKey.Escape));
+
+        model.HandleKey(Key(ConsoleKey.B));
+        Assert.Equal(ConfigStep.Connection, model.Step);
     }
 
     [Fact]

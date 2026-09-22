@@ -69,11 +69,15 @@ public static class ConfigTuiApp
         var failures = new List<string>();
         if (model.Value("provider") != "openai") failures.Add($"provider is '{model.Value("provider")}', expected 'openai'");
         if (!model.Dirty) failures.Add("model should be dirty after cycling provider");
+        if (model.Step != ConfigStep.Connection) failures.Add($"ended on step {model.Step}, expected Connection");
         if (model.SelectedKey != "provider") failures.Add($"selection is '{model.SelectedKey}', expected 'provider'");
 
-        // The model picker is checked without the UI on purpose: the listing is
-        // asynchronous, and a scripted key racing an in-flight request would make
-        // this fail at random in CI rather than when something is actually broken.
+        // Step navigation and the picker are checked without the UI on purpose.
+        // Arriving at the Model step starts an asynchronous listing, and while it
+        // is in flight the screen ignores keys — so a scripted key sequence that
+        // walked the steps would race the request and fail at random in CI rather
+        // than when something is actually broken.
+        CheckStepNavigation(failures);
         await CheckModelPickerAsync(failures);
 
         if (failures.Count > 0)
@@ -83,16 +87,32 @@ public static class ConfigTuiApp
             return 1;
         }
 
-        Console.WriteLine("agent-one tui selftest: ok (render + key routing + state + model picker)");
+        Console.WriteLine("agent-one tui selftest: ok (render + step navigation + key routing + model picker)");
         return 0;
+    }
+
+    private static void CheckStepNavigation(List<string> failures)
+    {
+        var walker = new ConfigTuiModel(new AgentConfig());
+
+        if (walker.Step != ConfigStep.Connection) failures.Add("did not start on the Connection step");
+
+        walker.JumpToStep(ConfigStep.Options);
+        if (walker.Step != ConfigStep.Options) failures.Add("could not reach the Options step");
+        if (walker.SelectedKey != ConfigTuiModel.StepFields[2][0])
+            failures.Add($"Options opened on '{walker.SelectedKey}', expected '{ConfigTuiModel.StepFields[2][0]}'");
+
+        walker.JumpToStep(ConfigStep.Connection);
+        if (walker.Step != ConfigStep.Connection) failures.Add("could not get back to the Connection step");
     }
 
     private static async Task CheckModelPickerAsync(List<string> failures)
     {
-        // Happy path, offline: the echo provider lists itself.
+        // Happy path, offline: arriving at the Model step asks, and the echo
+        // provider lists itself.
         var picker = new ConfigTuiModel(new AgentConfig());
-        if (picker.HandleKey(new ConsoleKeyInfo('\0', ConsoleKey.L, false, false, false)) != TuiEffect.FetchModels)
-            failures.Add("`l` did not request a model listing");
+        if (picker.JumpToStep(ConfigStep.Model) != TuiEffect.FetchModels)
+            failures.Add("arriving at the Model step did not request a listing");
 
         picker.CompleteModelFetch(await picker.ModelCatalog(picker.Config, CancellationToken.None));
 
@@ -102,7 +122,7 @@ public static class ConfigTuiApp
             picker.HandleKey(new ConsoleKeyInfo('\0', ConsoleKey.Home, false, false, false));
             picker.HandleKey(new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false));
             if (picker.Value("model") != "echo") failures.Add($"picking left model as '{picker.Value("model")}', expected 'echo'");
-            if (picker.Picking) failures.Add("the picker stayed open after a choice");
+            if (!picker.Picking) failures.Add("the list should stay up after a choice");
         }
 
         // Failure path: a port nothing listens on refuses immediately, so this
@@ -113,6 +133,7 @@ public static class ConfigTuiApp
         dead.TrySet("timeoutSeconds", "5", out _);
 
         var unreachable = new ConfigTuiModel(dead);
+        unreachable.JumpToStep(ConfigStep.Model);
         unreachable.CompleteModelFetch(await unreachable.ModelCatalog(dead, CancellationToken.None));
 
         if (unreachable.Picking) failures.Add("an unreachable endpoint still opened the picker");

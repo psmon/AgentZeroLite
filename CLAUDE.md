@@ -252,19 +252,28 @@ envelope per turn) so it stays extractable into its own repo. The intended
 integration is process-level: launch `agent-one --json` and read one object off
 stdout, the way the GUI launches `AgentZeroWearable.exe`.
 
-**Settings TUI** (`agent-one tui` / `agent-one config tui`) — a full-screen editor
-for `~/.agent-one/config.json` with a `t` key that sends one request through the
-settings as they stand, and `Enter` on the `model` row (or `l` anywhere) that
-lists `GET {baseUrl}/models` and lets you pick. That listing is deliberately
-also the health check — one request covers base URL, network and API key — so an
-empty or rejected list is reported as a failure naming both suspects rather than
-as an empty picker. Built on **Termina** (`Tui/`), the one TUI measured to
-survive Native AOT here — see `Docs/agent-netclaw/README.md`. The rules live in
+**Settings TUI** (`agent-one tui` / `agent-one config tui`) — a three-step stack
+over `~/.agent-one/config.json`: **1. Connection** (provider, baseUrl, apiKeyEnv)
+→ **2. Model** → **3. Options**. The order is the dependency: you cannot pick a
+model until the endpoint and key are right, and the endpoint is what knows which
+models exist. **Arriving at step 2 calls `GET {baseUrl}/models`**, which is
+deliberately also the health check for step 1 — one request covers base URL,
+network and key — so an empty or rejected list is reported as a failure naming
+both suspects rather than as an empty picker. `t` sends one real request through
+the settings as they stand. `Esc` means "back a step" and only quits from the
+first one. Built on **Termina** (`Tui/`), the one TUI measured to survive Native
+AOT here — see `Docs/agent-netclaw/README.md`. The rules live in
 `Tui/ConfigTuiModel.cs`, a state machine over `ConsoleKeyInfo` with no terminal
-in it, so the key map itself is unit tested; the Termina page only projects it.
-`agent-one tui --selftest` drives the real screen from a scripted key source and
-checks where it landed — that is how a release artifact proves its TUI on a
-runner with no terminal, and the release workflow runs it on every RID.
+in it, so the steps and the key map are unit tested; the Termina page only
+projects it. `agent-one tui --selftest` drives the real screen from a scripted
+key source, and the release workflow runs it on every RID.
+
+Two things about that selftest: step navigation and the picker are verified
+**below** the UI, because arriving at step 2 starts an async listing during which
+the screen ignores keys — a scripted walk would race it and fail at random. And
+`ConfigTuiModel.StepFields` is the single source of truth for which key belongs
+to which step; a test asserts every `AgentConfig.Keys` entry is owned by exactly
+one step (with `model` being the Model step itself).
 
 Three things that are easy to break here:
 

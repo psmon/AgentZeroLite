@@ -87,74 +87,99 @@ $ agent-one run "hi" -p echo --json
 
 ## Settings TUI
 
-`agent-one tui` (or `agent-one config tui`) opens the settings as a screen:
+`agent-one tui` (or `agent-one config tui`) walks the settings as a three-step
+stack, in the order they actually depend on each other:
 
 ```
-╭ agent-one config ──────────────────────────────────────────╮
-│› provider        openai  ←→                                │
-│  baseUrl         http://localhost:11434/v1                 │
-│  model           qwen2.5-coder:7b                          │
-│  apiKeyEnv       OPENAI_API_KEY                            │
-│  maxSteps        8                                         │
-│  temperature     0.2                                       │
-│  timeoutSeconds  120                                       │
-│  saveSessions    true                                      │
-╰────────────────────────────────────────────────────────────╯
- echo runs offline and exercises the real loop · openai talks to any…
- ✓ openai · qwen2.5-coder:7b · 412 ms · replied: ok
- ↑↓ move · Enter edit · ←→ cycle · s save · r reload · d defaults · t test · q quit
+1. Connection  →  2. Model  →  3. Options
 ```
 
-| Key | Does |
-|---|---|
-| `↑` `↓` (`k` `j`), `Home` `End` | Move. The list wraps. |
-| `Enter` | Edit the selected value, prefilled. `Enter` accepts, `Esc` cancels. A rejected value keeps you in edit mode with what you typed, so you fix it instead of retyping. |
-| `Enter` **on `model`** | **Ask the endpoint what it can run and pick from the list** — see below. |
-| `←` `→` | Cycle a value that has a fixed set (`provider`, `saveSessions`). |
-| `l` | The same listing, from any row. |
-| `s` | Save to `~/.agent-one/config.json`. |
-| `r` | Reload from disk, discarding edits. |
-| `d` | Restore defaults in memory — still needs `s`. |
-| **`t`** | **Send one tiny request through the settings as they stand** and report what came back: latency and reply, or the exact failure. |
-| `q` / `Esc` | Quit. With unsaved changes it asks once; any other key disarms the confirmation. |
+You cannot sensibly pick a model before the endpoint and key are right, and the
+endpoint is the thing that knows which models exist — so step 2 asks it.
 
-`t` is the reason the screen exists: changing an endpoint and finding out whether
-it answers should not need a second command.
-
-### Picking a model, and why that is the health check
-
-Set `provider`, `baseUrl` and the API key, then press `Enter` on the `model`
-row. agent-one calls `GET {baseUrl}/models` and offers what came back:
+### 1. Connection — where and who
 
 ```
-╭ agent-one config ──────────────────────────────────────────╮
-│› google/gemma-4-e4b                                        │
-│  text-embedding-nomic-embed-text-v1.5                      │
-│  · type a model id myself ·                                │
-╰────────────────────────────────────────────────────────────╯
- ✓ 2 models from http://localhost:1234/v1/models · ↑↓ to choose, Enter to take it, Esc to keep gpt-4o-mini
+╭─ agent-one config ──────────────────────────────────────────╮
+│[1. Connection] →  2. Model     →  3. Options                │
+│                                                             │
+│› provider        openai  ←→                                 │
+│  baseUrl         http://localhost:1234/v1                   │
+│  apiKeyEnv       OPENAI_API_KEY  (set)                      │
+│                                                             │
+╰─────────────────────────────────────────────────────────────╯
+ the environment variable holding the key — $OPENAI_API_KEY is set
+ ↑↓ move · Enter edit · ←→ cycle · Tab next · s save · t test · q quit
 ```
 
-The list starts on the model you already have configured, `Esc` keeps it, and
-the last row always falls through to typing an id by hand — a listing that is
-stale or incomplete is never a dead end.
+The key itself is never typed here or stored: `apiKeyEnv` names the environment
+variable to read it from, and the row says whether that variable is set.
 
-**One request exercises the base URL, the network path and the API key at
-once**, so the listing doubles as the health check: if models appear, those
-three are right, and you picked from values the endpoint itself vouched for
-rather than a guess. If nothing appears, the status line says which one failed:
+### 2. Model — asked, not typed
+
+`Tab` moves on, and **arriving at this step calls `GET {baseUrl}/models`**:
 
 ```
-✗ HTTP 401 — no API key: $OPENAI_API_KEY is not set — check baseUrl and $OPENAI_API_KEY
-✗ HTTP 401 — the endpoint rejected the key in $OPENAI_API_KEY — check baseUrl and $OPENAI_API_KEY
-✗ cannot reach http://localhost:11434/v1/models — … — check baseUrl and $OPENAI_API_KEY
+╭─ agent-one config ──────────────────────────────────────────╮
+│ 1. Connection → [2. Model]     →  3. Options                │
+│                                                             │
+│  google/gemma-4-e4b                                         │
+│› text-embedding-nomic-embed-text-v1.5                       │
+│  · type a model id myself ·                                 │
+│                                                             │
+╰─────────────────────────────────────────────────────────────╯
+ the list came from the endpoint itself — picking from it cannot be a typo
+ ✓ 2 models from http://localhost:1234/v1/models
+ ↑↓ pick · Enter take · e type · b back · Tab next · s save · t test · q quit
+```
+
+The list starts on the model already configured and stays up after a choice, so
+a mis-pick costs one keystroke. The last row always falls through to typing an
+id by hand, and `e` does the same — a listing that is stale or incomplete is
+never a dead end.
+
+**That one request is also the health check for step 1.** It exercises the base
+URL, the network path and the API key at once, so a list appearing means all
+three are right. Nothing appearing names what failed and sends you back:
+
+```
+✗ HTTP 401 — no API key: $OPENAI_API_KEY is not set — check baseUrl and $OPENAI_API_KEY · b to go back, e to type an id
+✗ HTTP 401 — the endpoint rejected the key in $OPENAI_API_KEY — …
+✗ cannot reach http://localhost:11434/v1/models — …
 ✗ http://localhost:1234/v1/models answered, but listed no models — …
 ```
 
 An empty list is treated as a failure, not as an empty picker: an endpoint that
 answers but offers nothing is a misconfiguration, and saying so is more use than
-an empty box. The `echo` provider lists itself, so the whole flow is walkable
+a blank box. The `echo` provider lists itself, so the whole flow is walkable
 offline with no key at all.
+
+### 3. Options — how the loop behaves
+
+`maxSteps`, `temperature`, `timeoutSeconds`, `saveSessions`. All have working
+defaults, which is why they come last.
+
+### Keys
+
+| Key | Does |
+|---|---|
+| `Tab` / `n` / `PageDown` | Next step · `Shift+Tab` / `b` / `PageUp` / `Esc` — previous step |
+| `↑` `↓` (`k` `j`), `Home` `End` | Move within the step. The list wraps. |
+| `Enter` | Edit the selected value, prefilled. On step 2, take the highlighted model. |
+| `←` `→` | Cycle a value with a fixed set (`provider`, `saveSessions`). |
+| `e` | Step 2 only: type a model id by hand. |
+| `l` | Ask the endpoint for its models again, from any step. |
+| **`t`** | **Send one tiny request through the settings as they stand** and report latency and reply, or the exact failure. |
+| `s` | Save to `~/.agent-one/config.json` · `r` reload from disk · `d` restore defaults |
+| `q` | Quit. With unsaved changes it asks once; any other key disarms the confirmation. |
+
+`Esc` goes back a step and only quits from the first one — it is a stack, so
+`Esc` means "back", not "lose my work".
+
+A rejected value keeps you in edit mode with what you typed, so you fix it
+instead of retyping. The TUI refuses to start when stdin or stdout is
+redirected — a full-screen UI in a pipe renders escape sequences into a log file
+and then waits for a key that cannot arrive. Scripts use `agent-one config set`.
 
 The same listing is on the command line, for scripts and for a health check
 without opening a screen:
@@ -175,18 +200,19 @@ $ echo $?
 The count goes to stderr so the list pipes cleanly:
 `agent-one models | fzf | xargs agent-one config set model`.
 
-The TUI refuses to start when stdin or stdout is redirected — a full-screen UI in
-a pipe renders escape sequences into a log file and then waits for a key that
-cannot arrive. Scripts use `agent-one config set` instead.
-
 **Implementation** — the rules live in `Tui/ConfigTuiModel.cs`, a state machine
-that takes `ConsoleKeyInfo` and holds no terminal, so the key map itself is unit
-tested; `ConfigTuiPage` only projects it. The framework is
+that takes `ConsoleKeyInfo` and holds no terminal, so the steps and the key map
+are unit tested; `ConfigTuiPage` only projects it. The framework is
 [Termina](https://github.com/Aaronontheweb/termina), chosen because it is the one
 TUI measured to survive Native AOT here (`Docs/agent-netclaw/README.md` records
 the measurement). `agent-one tui --selftest` drives the real screen from a
 scripted key source and checks where it landed — that is what CI runs against
 every release artifact, since a machine with no terminal cannot press keys.
+
+Step navigation and the picker are checked below the UI in that selftest, on
+purpose: arriving at step 2 starts an asynchronous listing and the screen
+ignores keys while it is in flight, so a scripted walk would race the request
+and fail at random rather than when something is broken.
 
 ## How it works
 

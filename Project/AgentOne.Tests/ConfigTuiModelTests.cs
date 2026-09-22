@@ -39,42 +39,58 @@ public class ConfigTuiModelTests : IDisposable
         foreach (var c in text) model.HandleKey(Ch(c));
     }
 
+    /// <summary>
+    /// Jump to whichever step owns the key, then walk to it. Fields live on
+    /// steps now, so a key is only reachable from its own step.
+    /// </summary>
     private static void SelectKey(ConfigTuiModel model, string key)
     {
-        while (model.SelectedKey != key) model.HandleKey(Key(ConsoleKey.DownArrow));
+        for (int step = 0; step < ConfigTuiModel.StepFields.Length; step++)
+        {
+            if (!ConfigTuiModel.StepFields[step].Contains(key)) continue;
+
+            model.JumpToStep((ConfigStep)step);
+            while (model.SelectedKey != key) model.HandleKey(Key(ConsoleKey.DownArrow));
+            return;
+        }
+
+        throw new InvalidOperationException($"'{key}' belongs to no step");
     }
 
     [Fact]
-    public void StartsOnTheFirstKeyAndIsClean()
+    public void StartsOnTheFirstFieldOfTheFirstStepAndIsClean()
     {
         var model = New();
-        Assert.Equal(AgentConfig.Keys[0], model.SelectedKey);
+        Assert.Equal(ConfigStep.Connection, model.Step);
+        Assert.Equal(ConfigTuiModel.StepFields[0][0], model.SelectedKey);
         Assert.False(model.Dirty);
         Assert.False(model.Editing);
     }
 
     [Fact]
-    public void ArrowsMoveAndWrapAround()
+    public void ArrowsMoveAndWrapWithinTheStep()
     {
         var model = New();
-        var last = AgentConfig.Keys[^1];
+        var fields = ConfigTuiModel.StepFields[0];
 
         model.HandleKey(Key(ConsoleKey.UpArrow));
-        Assert.Equal(last, model.SelectedKey);
+        Assert.Equal(fields[^1], model.SelectedKey);
 
         model.HandleKey(Key(ConsoleKey.DownArrow));
-        Assert.Equal(AgentConfig.Keys[0], model.SelectedKey);
+        Assert.Equal(fields[0], model.SelectedKey);
     }
 
     [Fact]
-    public void HomeAndEndJumpToTheEnds()
+    public void HomeAndEndJumpToTheEndsOfTheStep()
     {
         var model = New();
+        var fields = ConfigTuiModel.StepFields[0];
+
         model.HandleKey(Key(ConsoleKey.End));
-        Assert.Equal(AgentConfig.Keys[^1], model.SelectedKey);
+        Assert.Equal(fields[^1], model.SelectedKey);
 
         model.HandleKey(Key(ConsoleKey.Home));
-        Assert.Equal(AgentConfig.Keys[0], model.SelectedKey);
+        Assert.Equal(fields[0], model.SelectedKey);
     }
 
     [Fact]
@@ -170,10 +186,12 @@ public class ConfigTuiModelTests : IDisposable
     public void CyclingAFreeTextKeySaysSoInsteadOfChangingIt()
     {
         var model = New();
-        SelectKey(model, "model");
+        SelectKey(model, "baseUrl");
+        var before = model.Value("baseUrl");
+
         model.HandleKey(Key(ConsoleKey.RightArrow));
 
-        Assert.Equal("gpt-4o-mini", model.Value("model"));
+        Assert.Equal(before, model.Value("baseUrl"));
         Assert.Contains("free text", model.Status);
     }
 
@@ -286,7 +304,7 @@ public class ConfigTuiModelTests : IDisposable
 
         var selected = model.SelectedKey;
         model.HandleKey(Key(ConsoleKey.DownArrow));
-        Assert.Equal(selected, model.SelectedKey);
+        Assert.Equal(selected, model.SelectedKey);   // ignored while busy
 
         Assert.Equal(TuiEffect.Quit, model.HandleKey(Key(ConsoleKey.Q)));
     }
@@ -305,14 +323,26 @@ public class ConfigTuiModelTests : IDisposable
     }
 
     [Fact]
-    public void EveryKeyHasAHint()
+    public void EveryFieldOnEveryStepHasAHint()
     {
         var model = New();
-        foreach (var key in AgentConfig.Keys)
-        {
-            SelectKey(model, key);
-            Assert.False(string.IsNullOrWhiteSpace(model.Hint()), key);
-        }
+        foreach (var step in ConfigTuiModel.StepFields)
+            foreach (var key in step)
+            {
+                SelectKey(model, key);
+                Assert.False(string.IsNullOrWhiteSpace(model.Hint()), key);
+            }
+    }
+
+    [Fact]
+    public void EveryConfigKeyIsOwnedByExactlyOneStep()
+    {
+        // `model` is the Model step itself, which owns no field list.
+        var owned = ConfigTuiModel.StepFields.SelectMany(f => f).Append("model").ToArray();
+
+        Assert.Equal(AgentConfig.Keys.Length, owned.Length);
+        Assert.Equal(owned.Length, owned.Distinct().Count());
+        foreach (var key in AgentConfig.Keys) Assert.Contains(key, owned);
     }
 
     [Fact]

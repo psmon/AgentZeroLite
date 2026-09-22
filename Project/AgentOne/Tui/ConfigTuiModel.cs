@@ -14,21 +14,48 @@ public enum TuiEffect
     FetchModels
 }
 
+/// <summary>The settings, in the order you have to know them.</summary>
+public enum ConfigStep
+{
+    /// <summary>Where to talk to and how to authenticate. Nothing else is knowable until this is right.</summary>
+    Connection = 0,
+    /// <summary>What that endpoint can run — asked, not typed.</summary>
+    Model = 1,
+    /// <summary>How the loop behaves. Safe defaults, so it comes last.</summary>
+    Options = 2
+}
+
 /// <summary>
 /// The whole settings screen as a state machine, with no Termina and no console
 /// in sight. Keeping it here means the key map itself is unit-tested — feed it
 /// a <see cref="ConsoleKeyInfo"/>, assert on the state — while the Termina page
 /// stays a thin renderer over these properties.
+///
+/// The screen is a three-step stack rather than one flat list because the
+/// settings genuinely depend on each other: you cannot pick a model until the
+/// endpoint and key are right, and the endpoint is the thing that knows which
+/// models exist. Entering the Model step therefore asks it — which is also the
+/// health check for the step before.
 /// </summary>
 public sealed class ConfigTuiModel
 {
+    public static readonly string[] StepTitles = ["Connection", "Model", "Options"];
+
+    /// <summary>The config keys each step owns. The Model step is the picker, so it has none.</summary>
+    public static readonly string[][] StepFields =
+    [
+        ["provider", "baseUrl", "apiKeyEnv"],
+        [],
+        ["maxSteps", "temperature", "timeoutSeconds", "saveSessions"]
+    ];
+
     private Dictionary<string, string> _saved;
 
     public ConfigTuiModel(AgentConfig config)
     {
         Config = config;
         _saved = Snapshot(config);
-        Status = "↑↓ to move · Enter to edit · s to save";
+        Status = "↑↓ to move · Enter to edit · Tab for the model step";
     }
 
     public static ConfigTuiModel Load()
@@ -41,11 +68,15 @@ public sealed class ConfigTuiModel
 
     public AgentConfig Config { get; private set; }
 
-    public IReadOnlyList<string> Keys => AgentConfig.Keys;
+    public ConfigStep Step { get; private set; } = ConfigStep.Connection;
+
+    /// <summary>The fields of the current step. Empty on the Model step.</summary>
+    public IReadOnlyList<string> Fields => StepFields[(int)Step];
 
     public int Selected { get; private set; }
 
-    public string SelectedKey => Keys[Selected];
+    /// <summary>The config key the cursor is on — "model" while the Model step is showing.</summary>
+    public string SelectedKey => Fields.Count == 0 ? "model" : Fields[Math.Clamp(Selected, 0, Fields.Count - 1)];
 
     public bool Editing { get; private set; }
 
@@ -54,7 +85,7 @@ public sealed class ConfigTuiModel
     /// <summary>True while a request is in flight; keys other than quit are ignored.</summary>
     public bool Busy { get; private set; }
 
-    /// <summary>True while the model list is on screen.</summary>
+    /// <summary>True while a model list is on screen.</summary>
     public bool Picking { get; private set; }
 
     /// <summary>Model ids offered by the endpoint, plus a final "type it myself" entry.</summary>
@@ -67,8 +98,8 @@ public sealed class ConfigTuiModel
 
     public string Status { get; private set; }
 
-    /// <summary>Set when a keystroke changed something the renderer must show.</summary>
-    public bool Dirty => Keys.Any(k => _saved[k] != Config.Get(k));
+    /// <summary>Set when any field differs from what is on disk.</summary>
+    public bool Dirty => AgentConfig.Keys.Any(k => _saved[k] != Config.Get(k));
 
     /// <summary>Armed by the first quit attempt while dirty; a second quit then discards.</summary>
     public bool QuitArmed { get; private set; }
@@ -88,13 +119,25 @@ public sealed class ConfigTuiModel
 
     public bool IsCyclable(string key) => key is "provider" or "saveSessions";
 
-    /// <summary>Extra context for the selected row — where the API key comes from, what a value means.</summary>
-    public string Hint() => SelectedKey switch
+    public bool ApiKeyPresent =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Config.ApiKeyEnv));
+
+    /// <summary>Extra context for whatever the cursor is on.</summary>
+    public string Hint() => Step switch
+    {
+        ConfigStep.Model when Picking =>
+            "the list came from the endpoint itself — picking from it cannot be a typo",
+        ConfigStep.Model =>
+            "no list yet · b to go back and fix the connection · l to ask again · e to type an id by hand",
+        _ => FieldHint(SelectedKey)
+    };
+
+    private string FieldHint(string key) => key switch
     {
         "provider" => "echo runs offline and exercises the real loop · openai talks to any OpenAI-compatible endpoint",
-        "baseUrl" => "e.g. https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama) · http://localhost:1234/v1 (LM Studio)",
-        "model" => "Enter lists what the endpoint actually offers and lets you pick — an empty list means the key or the URL is wrong",
-        "apiKeyEnv" => $"environment variable to read the key from — ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "NOT set")}",
+        "baseUrl" => "https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama) · http://localhost:1234/v1 (LM Studio)",
+        "apiKeyEnv" => $"the environment variable holding the key — ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "NOT set")}",
+        "model" => "set on the Model step",
         "maxSteps" => "tool-loop budget per run, 1..100",
         "temperature" => "0..2 · lower is steadier, which suits a tool-calling loop",
         "timeoutSeconds" => "per-request timeout, 1..3600",
@@ -102,8 +145,7 @@ public sealed class ConfigTuiModel
         _ => ""
     };
 
-    public bool ApiKeyPresent =>
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Config.ApiKeyEnv));
+    // ---------------------------------------------------------------- keys
 
     public TuiEffect HandleKey(ConsoleKeyInfo key)
     {
@@ -115,49 +157,23 @@ public sealed class ConfigTuiModel
         }
 
         if (Editing) return HandleEditKey(key);
-        if (Picking) return HandlePickKey(key);
 
         // Any non-quit key disarms a pending discard, so `q` then `j` then `q`
         // cannot silently throw work away.
         if (key.Key is not (ConsoleKey.Q or ConsoleKey.Escape)) QuitArmed = false;
 
+        // Step navigation works the same on every step.
         switch (key.Key)
         {
-            case ConsoleKey.UpArrow or ConsoleKey.K:
-                Selected = Selected == 0 ? Keys.Count - 1 : Selected - 1;
-                return TuiEffect.None;
+            case ConsoleKey.Tab when key.Modifiers.HasFlag(ConsoleModifiers.Shift):
+            case ConsoleKey.B:
+            case ConsoleKey.PageUp:
+                return GoToStep((int)Step - 1);
 
-            case ConsoleKey.DownArrow or ConsoleKey.J:
-                Selected = (Selected + 1) % Keys.Count;
-                return TuiEffect.None;
-
-            case ConsoleKey.Home:
-                Selected = 0;
-                return TuiEffect.None;
-
-            case ConsoleKey.End:
-                Selected = Keys.Count - 1;
-                return TuiEffect.None;
-
-            case ConsoleKey.LeftArrow:
-                Cycle(-1);
-                return TuiEffect.None;
-
-            case ConsoleKey.RightArrow:
-                Cycle(+1);
-                return TuiEffect.None;
-
-            case ConsoleKey.Enter:
-                // The model row is the one place where the endpoint knows better
-                // than the operator what the valid values are — so ask it.
-                if (SelectedKey == "model")
-                {
-                    Busy = true;
-                    Status = $"asking {Config.BaseUrl}/models …";
-                    return TuiEffect.FetchModels;
-                }
-                BeginEdit();
-                return TuiEffect.None;
+            case ConsoleKey.Tab:
+            case ConsoleKey.N:
+            case ConsoleKey.PageDown:
+                return GoToStep((int)Step + 1);
 
             case ConsoleKey.S:
                 Save();
@@ -165,10 +181,6 @@ public sealed class ConfigTuiModel
 
             case ConsoleKey.R:
                 Reload();
-                return TuiEffect.None;
-
-            case ConsoleKey.D:
-                RestoreDefaults();
                 return TuiEffect.None;
 
             case ConsoleKey.T:
@@ -181,10 +193,89 @@ public sealed class ConfigTuiModel
                 Status = $"asking {Config.BaseUrl}/models …";
                 return TuiEffect.FetchModels;
 
+            // Esc means "back" on a stack, so it only leaves from the first step.
+            case ConsoleKey.Escape when Step != ConfigStep.Connection:
+                return GoToStep((int)Step - 1);
+
             case ConsoleKey.Q or ConsoleKey.Escape:
                 if (!Dirty || QuitArmed) return TuiEffect.Quit;
                 QuitArmed = true;
                 Status = "unsaved changes — q again to discard, or s to save";
+                return TuiEffect.None;
+        }
+
+        return Step == ConfigStep.Model ? HandleModelStepKey(key) : HandleFieldKey(key);
+    }
+
+    private TuiEffect HandleFieldKey(ConsoleKeyInfo key)
+    {
+        switch (key.Key)
+        {
+            case ConsoleKey.UpArrow or ConsoleKey.K:
+                Selected = Selected == 0 ? Fields.Count - 1 : Selected - 1;
+                return TuiEffect.None;
+
+            case ConsoleKey.DownArrow or ConsoleKey.J:
+                Selected = (Selected + 1) % Fields.Count;
+                return TuiEffect.None;
+
+            case ConsoleKey.Home:
+                Selected = 0;
+                return TuiEffect.None;
+
+            case ConsoleKey.End:
+                Selected = Fields.Count - 1;
+                return TuiEffect.None;
+
+            case ConsoleKey.LeftArrow:
+                Cycle(-1);
+                return TuiEffect.None;
+
+            case ConsoleKey.RightArrow:
+                Cycle(+1);
+                return TuiEffect.None;
+
+            case ConsoleKey.Enter:
+                BeginEdit();
+                return TuiEffect.None;
+
+            case ConsoleKey.D:
+                RestoreDefaults();
+                return TuiEffect.None;
+
+            default:
+                return TuiEffect.None;
+        }
+    }
+
+    private TuiEffect HandleModelStepKey(ConsoleKeyInfo key)
+    {
+        switch (key.Key)
+        {
+            case ConsoleKey.UpArrow or ConsoleKey.K when Picking:
+                PickIndex = PickIndex == 0 ? PickOptions.Count - 1 : PickIndex - 1;
+                return TuiEffect.None;
+
+            case ConsoleKey.DownArrow or ConsoleKey.J when Picking:
+                PickIndex = (PickIndex + 1) % PickOptions.Count;
+                return TuiEffect.None;
+
+            case ConsoleKey.Home when Picking:
+                PickIndex = 0;
+                return TuiEffect.None;
+
+            case ConsoleKey.End when Picking:
+                PickIndex = PickOptions.Count - 1;
+                return TuiEffect.None;
+
+            case ConsoleKey.Enter when Picking:
+                ChoosePicked();
+                return TuiEffect.None;
+
+            // Always available: the list can be wrong, stale, or missing entirely.
+            case ConsoleKey.E:
+            case ConsoleKey.Enter:
+                BeginEdit();
                 return TuiEffect.None;
 
             default:
@@ -218,6 +309,48 @@ public sealed class ConfigTuiModel
         }
     }
 
+    // ---------------------------------------------------------------- steps
+
+    /// <summary>
+    /// Moves between steps, clamped at both ends. Arriving at the Model step
+    /// asks the endpoint for its list — that request is the step, and it is also
+    /// what proves the Connection step was filled in correctly.
+    /// </summary>
+    private TuiEffect GoToStep(int index)
+    {
+        var target = (ConfigStep)Math.Clamp(index, 0, StepTitles.Length - 1);
+
+        if (target == Step)
+        {
+            Status = index < 0 ? "already on the first step" : "last step — s to save, q to quit";
+            return TuiEffect.None;
+        }
+
+        Step = target;
+        Selected = 0;
+        Editing = false;
+        EditBuffer = "";
+
+        if (target != ConfigStep.Model)
+        {
+            Picking = false;
+            PickOptions = [];
+            Status = $"step {(int)Step + 1}/{StepTitles.Length} — {StepTitles[(int)Step]}";
+            return TuiEffect.None;
+        }
+
+        Busy = true;
+        Picking = false;
+        PickOptions = [];
+        Status = $"asking {Config.BaseUrl}/models …";
+        return TuiEffect.FetchModels;
+    }
+
+    /// <summary>Test seam: enter a step directly, as a key press would.</summary>
+    public TuiEffect JumpToStep(ConfigStep step) => GoToStep((int)step);
+
+    // ---------------------------------------------------------------- picker
+
     /// <summary>
     /// Which slice of <see cref="PickOptions"/> a picker <paramref name="height"/>
     /// rows tall should show, keeping the highlighted row inside it. The maths
@@ -229,51 +362,13 @@ public sealed class ConfigTuiModel
         if (height <= 0 || PickOptions.Count == 0) return (0, 0);
         if (PickOptions.Count <= height) return (0, PickOptions.Count);
 
-        var first = PickIndex - height / 2;
-        first = Math.Clamp(first, 0, PickOptions.Count - height);
+        var first = Math.Clamp(PickIndex - height / 2, 0, PickOptions.Count - height);
         return (first, height);
-    }
-
-    private TuiEffect HandlePickKey(ConsoleKeyInfo key)
-    {
-        switch (key.Key)
-        {
-            case ConsoleKey.UpArrow or ConsoleKey.K:
-                PickIndex = PickIndex == 0 ? PickOptions.Count - 1 : PickIndex - 1;
-                return TuiEffect.None;
-
-            case ConsoleKey.DownArrow or ConsoleKey.J:
-                PickIndex = (PickIndex + 1) % PickOptions.Count;
-                return TuiEffect.None;
-
-            case ConsoleKey.Home:
-                PickIndex = 0;
-                return TuiEffect.None;
-
-            case ConsoleKey.End:
-                PickIndex = PickOptions.Count - 1;
-                return TuiEffect.None;
-
-            case ConsoleKey.Enter:
-                ChoosePicked();
-                return TuiEffect.None;
-
-            case ConsoleKey.Escape or ConsoleKey.Q:
-                Picking = false;
-                PickOptions = [];
-                Status = "model unchanged";
-                return TuiEffect.None;
-
-            default:
-                return TuiEffect.None;
-        }
     }
 
     private void ChoosePicked()
     {
         var chosen = PickOptions[PickIndex];
-        Picking = false;
-        PickOptions = [];
 
         // The endpoint offered nothing that fits, or the list is stale — fall
         // through to the ordinary text editor rather than a dead end.
@@ -283,8 +378,10 @@ public sealed class ConfigTuiModel
             return;
         }
 
+        // The picker stays open — it is this step's body, and the choice is now
+        // marked (current), so a mis-pick is one keystroke to undo.
         if (Config.TrySet("model", chosen, out var error))
-            Status = $"model = {chosen}" + (Dirty ? "  (unsaved — press s)" : "");
+            Status = $"model = {chosen}" + (Dirty ? "  (unsaved)" : "") + " · Tab for options";
         else
             Status = "✗ " + error;
     }
@@ -302,7 +399,7 @@ public sealed class ConfigTuiModel
         {
             Picking = false;
             PickOptions = [];
-            Status = "✗ " + result.Message + " — check baseUrl and $" + Config.ApiKeyEnv;
+            Status = $"✗ {result.Message} — check baseUrl and ${Config.ApiKeyEnv} · b to go back, e to type an id";
             return;
         }
 
@@ -315,8 +412,16 @@ public sealed class ConfigTuiModel
         PickIndex = current >= 0 ? current : 0;
 
         Picking = true;
-        Status = $"✓ {result.Message} · ↑↓ to choose, Enter to take it, Esc to keep {Value("model")}";
+        Status = $"✓ {result.Message}";
     }
+
+    public void CompleteTest(string message)
+    {
+        Busy = false;
+        Status = message;
+    }
+
+    // ---------------------------------------------------------------- editing
 
     private void BeginEdit()
     {
@@ -367,6 +472,8 @@ public sealed class ConfigTuiModel
             Status = "✗ " + error;
     }
 
+    // ---------------------------------------------------------------- store
+
     public void Save()
     {
         try
@@ -394,12 +501,6 @@ public sealed class ConfigTuiModel
     {
         Config = new AgentConfig();
         Status = "defaults restored in memory — press s to write them";
-    }
-
-    public void CompleteTest(string message)
-    {
-        Busy = false;
-        Status = message;
     }
 
     private static Dictionary<string, string> Snapshot(AgentConfig config) =>

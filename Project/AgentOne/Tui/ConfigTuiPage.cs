@@ -16,6 +16,9 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
 {
     private const int KeyColumn = 16;
 
+    /// <summary>Rows of panel body below the step bar. Fixed so the frame never jumps between steps.</summary>
+    private const int BodyRows = 6;
+
     public override ILayoutNode BuildLayout()
     {
         return Layouts.Vertical()
@@ -26,9 +29,9 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
                     .WithBorderColor(Color.Cyan)
                     .WithContent(
                         ViewModel.Revision
-                            .Select<int, ILayoutNode>(_ => BuildRows())
+                            .Select<int, ILayoutNode>(_ => BuildBody())
                             .AsLayout())
-                    .Height(AgentOne.Services.AgentConfig.Keys.Length + 2))
+                    .Height(BodyRows + 4))          // step bar + blank + body + borders
             .WithChild(
                 ViewModel.Revision
                     .Select<int, ILayoutNode>(_ => new TextNode(" " + ViewModel.Model.Hint())
@@ -48,45 +51,108 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
                     .Height(1));
     }
 
-    private ILayoutNode BuildRows()
+    private ILayoutNode BuildBody()
+    {
+        var rows = Layouts.Vertical()
+            .WithChild(BuildStepBar())
+            .WithChild(new TextNode("").Height(1));
+
+        var body = ViewModel.Model.Step == ConfigStep.Model ? BuildModelStep() : BuildFieldRows();
+
+        foreach (var row in body) rows = rows.WithChild(row);
+
+        // Pad to a fixed height so a short step cannot leave the previous one's
+        // rows on screen — the renderer only repaints what it is given.
+        for (int i = body.Count; i < BodyRows; i++)
+            rows = rows.WithChild(new TextNode("").Height(1));
+
+        return rows;
+    }
+
+    /// <summary>① Connection → ② Model → ③ Options, with the current step lit.</summary>
+    private ILayoutNode BuildStepBar()
     {
         var model = ViewModel.Model;
-        if (model.Picking) return BuildPicker();
+        var bar = Layouts.Horizontal();
 
-        var rows = Layouts.Vertical();
+        // One width for every step, so the arrows between them line up whichever
+        // step is bracketed.
+        var width = ConfigTuiModel.StepTitles.Max(t => t.Length) + 5;
 
-        for (int i = 0; i < model.Keys.Count; i++)
+        for (int i = 0; i < ConfigTuiModel.StepTitles.Length; i++)
         {
-            var key = model.Keys[i];
+            var current = i == (int)model.Step;
+            var name = $"{i + 1}. {ConfigTuiModel.StepTitles[i]}";
+
+            bar = bar.WithChild(
+                new TextNode(current ? $"[{name}]" : $" {name} ")
+                    .WithForeground(current ? Color.BrightCyan : Color.BrightBlack)
+                    .Width(width));
+
+            if (i < ConfigTuiModel.StepTitles.Length - 1)
+                bar = bar.WithChild(new TextNode("→ ").WithForeground(Color.BrightBlack).Width(2));
+        }
+
+        return bar;
+    }
+
+    private List<LayoutNode> BuildFieldRows()
+    {
+        var model = ViewModel.Model;
+        var rows = new List<LayoutNode>();
+
+        for (int i = 0; i < model.Fields.Count; i++)
+        {
+            var key = model.Fields[i];
             var selected = i == model.Selected;
             var editing = selected && model.Editing;
 
             var value = editing ? model.EditBuffer + "▌" : model.Value(key);
             var marker = selected ? "›" : " ";
-            var cycle = model.IsCyclable(key) && selected && !editing ? "  ←→" : "";
+            var tail = model.IsCyclable(key) && selected && !editing ? "  ←→" : "";
 
-            var line = $"{marker} {key.PadRight(KeyColumn)}{value}{cycle}";
+            // The key row is the one place a value is not the whole story.
+            if (key == "apiKeyEnv" && !editing)
+                tail = model.ApiKeyPresent ? "  (set)" : "  (NOT set)";
 
             var colour = editing ? Color.BrightYellow
                 : selected ? Color.BrightCyan
                 : Color.White;
 
-            rows = rows.WithChild(new TextNode(line).WithForeground(colour).Height(1));
+            rows.Add(new TextNode($"{marker} {key.PadRight(KeyColumn)}{value}{tail}").WithForeground(colour).Height(1));
         }
 
         return rows;
     }
 
-    /// <summary>
-    /// The model list, windowed to the panel's height so a provider offering
-    /// eighty models does not push the screen apart.
-    /// </summary>
-    private ILayoutNode BuildPicker()
+    private List<LayoutNode> BuildModelStep()
     {
         var model = ViewModel.Model;
-        var rows = Layouts.Vertical();
-        var height = AgentOne.Services.AgentConfig.Keys.Length;
-        var (first, count) = model.PickWindow(height);
+        var rows = new List<LayoutNode>();
+
+        if (model.Editing)
+        {
+            rows.Add(new TextNode($"› {"model".PadRight(KeyColumn)}{model.EditBuffer}▌")
+                .WithForeground(Color.BrightYellow).Height(1));
+            return rows;
+        }
+
+        if (model.Busy)
+        {
+            rows.Add(new TextNode("  asking the endpoint…").WithForeground(Color.BrightBlack).Height(1));
+            return rows;
+        }
+
+        if (!model.Picking)
+        {
+            rows.Add(new TextNode($"  model            {model.Value("model")}").WithForeground(Color.White).Height(1));
+            rows.Add(new TextNode("").Height(1));
+            rows.Add(new TextNode("  no list from the endpoint — see the line below")
+                .WithForeground(Color.BrightRed).Height(1));
+            return rows;
+        }
+
+        var (first, count) = model.PickWindow(BodyRows - 1);
 
         for (int i = first; i < first + count; i++)
         {
@@ -94,23 +160,17 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
             var selected = i == model.PickIndex;
             var inUse = option == model.Value("model");
 
-            var marker = selected ? "›" : " ";
-            var tail = inUse ? "  (current)" : "";
-            var line = $"{marker} {option}{tail}";
-
             var colour = selected ? Color.BrightCyan
                 : option == ConfigTuiModel.PickManualEntry ? Color.BrightBlack
                 : Color.White;
 
-            rows = rows.WithChild(new TextNode(line).WithForeground(colour).Height(1));
+            rows.Add(new TextNode($"{(selected ? "›" : " ")} {option}{(inUse ? "  (current)" : "")}")
+                .WithForeground(colour).Height(1));
         }
 
-        if (model.PickOptions.Count > height)
-        {
-            rows = rows.WithChild(
-                new TextNode($"  {model.PickIndex + 1}/{model.PickOptions.Count}")
-                    .WithForeground(Color.BrightBlack).Height(1));
-        }
+        if (model.PickOptions.Count > count)
+            rows.Add(new TextNode($"  {model.PickIndex + 1}/{model.PickOptions.Count}")
+                .WithForeground(Color.BrightBlack).Height(1));
 
         return rows;
     }
@@ -133,13 +193,25 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
         if (model.Editing)
             return "Enter accept · Esc cancel · Backspace delete";
 
-        if (model.Picking)
-            return "↑↓ choose · Enter take it · Esc keep the current one";
+        // Kept under 80 columns: a key bar that wraps or truncates teaches the
+        // wrong keys. The rest of the bindings live in the hint line above.
+        var sb = new StringBuilder();
 
-        var sb = new StringBuilder("↑↓ move · Enter ");
-        sb.Append(model.SelectedKey == "model" ? "list models" : "edit");
-        if (model.IsCyclable(model.SelectedKey)) sb.Append(" · ←→ cycle");
-        sb.Append(" · s save · r reload · d defaults · l models · t test · q quit");
+        if (model.Step == ConfigStep.Model)
+        {
+            if (model.Picking) sb.Append("↑↓ pick · Enter take · ");
+            sb.Append("e type · ");
+        }
+        else
+        {
+            sb.Append("↑↓ move · Enter edit · ");
+            if (model.IsCyclable(model.SelectedKey)) sb.Append("←→ cycle · ");
+        }
+
+        if (model.Step != ConfigStep.Connection) sb.Append("b back · ");
+        if (model.Step != ConfigStep.Options) sb.Append("Tab next · ");
+
+        sb.Append("s save · t test · q quit");
         return sb.ToString();
     }
 }
