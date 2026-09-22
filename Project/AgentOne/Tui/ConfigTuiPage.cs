@@ -14,7 +14,13 @@ namespace AgentOne.Tui;
 /// </summary>
 public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
 {
-    private const int KeyColumn = 16;
+    /// <summary>
+    /// Width of the key column: the longest key plus a gap, computed rather
+    /// than typed — a constant of 16 once sat exactly on `reasoningBaseUrl`
+    /// and glued the value to the name.
+    /// </summary>
+    private static readonly int KeyColumn =
+        ConfigTuiModel.StepFields.SelectMany(f => f).Append("model").Max(k => k.Length) + 2;
 
     /// <summary>Rows of panel body below the step bar. Fixed so the frame never jumps between steps.</summary>
     private const int BodyRows = 6;

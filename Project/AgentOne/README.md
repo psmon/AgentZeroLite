@@ -220,9 +220,9 @@ escalation itself is smart mode's job; this is only where it points.
 ╭─ agent-one config ──────────────────────────────────────────╮
 │ 1. Connection →  2. Model  → [3. Reasoning] →  4. Options → │
 │                                                             │
-│  reasoningBaseUrl (same as the connection)                  │
-│  reasoningApiKey  (same as provider key)                    │
-│› reasoningModel   (none — Enter to pick, e to type)         │
+│  reasoningBaseUrl       (same as the connection)            │
+│  reasoningApiKey        (same as provider key)              │
+│› reasoningModel         (none — Enter to pick, e to type)   │
 ╰─────────────────────────────────────────────────────────────╯
  the slow, strong model hard questions escalate to · Enter lists the endpoint's models, e types an id · empty = never escalate
  ↑↓ move · Enter list · e type · b back · Tab next · s save · t test · q quit
@@ -255,7 +255,7 @@ defaults, which is why they come late.
 │  jevApiKey        ts-abc…w9k2                               │
 │  jevBaseUrl       https://api.typesafe.ai/v1                │
 │  jevModel         jev-latest                                │
-│  jevConfidenceFloor 0.60                                    │
+│  jevConfidenceFloor     0.60                                │
 ╰─────────────────────────────────────────────────────────────╯
  the TypeSafe (Jev) key for smart mode — a different service · h to check it
  ✓ jev-1.13.0 · 184 ms, noul 0.97, 41+12 tokens
