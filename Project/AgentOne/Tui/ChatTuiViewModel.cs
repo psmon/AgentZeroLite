@@ -44,6 +44,9 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     /// <summary>A command waiting for the person's yes or no; the next line typed answers it.</summary>
     private TaskCompletionSource<bool>? _approval;
 
+    /// <summary>A design waiting for the person's pick; the next line typed answers it.</summary>
+    private TaskCompletionSource<string>? _choice;
+
     /// <summary>The list /resume last printed, so "/resume 2" means the same row the person saw.</summary>
     private IReadOnlyList<SessionSummary> _resumable = [];
 
@@ -89,6 +92,30 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             Model.SetTitle(title);
             _lines.OnNext(new TranscriptLine(LineKind.Note, $"task: {title}"));
             Bump();
+        };
+        session.DesignMade += lines =>
+        {
+            _lines.OnNext(new TranscriptLine(LineKind.Note, "── design ──"));
+            foreach (var l in lines) _lines.OnNext(new TranscriptLine(LineKind.Note, l));
+            _lines.OnNext(new TranscriptLine(LineKind.Note, "────────────"));
+            Bump();
+        };
+
+        // A design that hinges on a choice: park the turn, list the options on
+        // screen, and let the next line typed settle it.
+        session.Chooser = (choice, ct) =>
+        {
+            var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _choice = tcs;
+            ct.Register(() => tcs.TrySetResult(""));
+
+            _lines.OnNext(new TranscriptLine(LineKind.Alert, $"? {choice.Question}"));
+            for (var i = 0; i < choice.Options.Count; i++)
+                _lines.OnNext(new TranscriptLine(LineKind.Note, $"  {i + 1}. {choice.Options[i]}{(i == choice.Recommended ? "  (recommended)" : "")}"));
+            Model.SetAwaitingPerson(true);
+            Model.SetBusy(false, "pick a number, Enter for the recommendation, or type your own");
+            Bump();
+            return tcs.Task;
         };
 
         // A command the gate will not run on its own: park the turn, ask on the
@@ -190,6 +217,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 
             case ChatEffect.Quit:
                 _approval?.TrySetResult(false);
+                _choice?.TrySetResult("");
                 _cts.Cancel();
                 Shutdown();
                 return;
@@ -285,6 +313,18 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 
     private async Task SubmitAsync(string text)
     {
+        // A parked choice takes the line as the pick; the turn goes on from there.
+        if (_choice is { } choice)
+        {
+            _choice = null;
+            _lines.OnNext(new TranscriptLine(LineKind.User, text.Length == 0 ? "(the recommendation)" : text));
+            Model.SetAwaitingPerson(false);
+            Model.SetBusy(true, "… building");
+            Bump();
+            choice.TrySetResult(text);
+            return;
+        }
+
         // A parked command takes the line as its answer; the turn goes on from there.
         if (_approval is { } approval)
         {
@@ -354,16 +394,15 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             return;
         }
 
-        if (run.Succeeded)
+        // The text is shown as the answer whether the turn finished or was
+        // stopped and summarized; a stop is named after it, on its own line.
+        if (run.Succeeded || run.Text.Length > 0)
         {
             if (!_answering) _lines.OnNext(new TranscriptLine(LineKind.AnswerStart, ""));
             if (run.Unstreamed.Length > 0) _lines.OnNext(new TranscriptLine(LineKind.Delta, run.Unstreamed));
             _lines.OnNext(new TranscriptLine(LineKind.AnswerEnd, ""));
         }
-        else
-        {
-            _lines.OnNext(new TranscriptLine(LineKind.Alert, $"stopped ({run.Reason}): {run.Text}"));
-        }
+        if (!run.Succeeded) _lines.OnNext(new TranscriptLine(LineKind.Alert, $"stopped ({run.Reason})"));
 
         Model.SetAwaitingPerson(false);
         Model.SetBusy(false, $"done in {run.Elapsed.TotalSeconds:0.0}s · {run.Steps.Count} steps");
@@ -375,6 +414,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     public override void Dispose()
     {
         _approval?.TrySetResult(false);
+        _choice?.TrySetResult("");
         _cts.Cancel();
         _cts.Dispose();
         _lines.Dispose();

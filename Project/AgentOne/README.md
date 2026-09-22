@@ -345,7 +345,18 @@ Three rules hold whatever is asked:
 - **Large work is designed first.** In smart mode a workspace request is sized;
   one the engine calls large goes to the reasoning model for a design — file
   layout, responsibilities, order of steps — which the everyday model then
-  builds step by step.
+  builds step by step. The design's first lines are shown as it comes back, so
+  you can follow what is being built. **When the design hinges on a choice**
+  (storage engine, framework, structure) the strong model says so up front,
+  and the turn stops to ask you — pick a number, press Enter for its
+  recommendation, or type your own — before anything is written.
+- **A turn always ends with an account of itself.** The model is told to close
+  a piece of work with what was done, what is left, and 1–3 next steps. A turn
+  that runs out of step budget mid-build gets one more call, without tools, to
+  say the same — the stop is still named after it, but the last thing on
+  screen is a summary, not `[stopped: MaxSteps]`. The budget itself is 50
+  steps by default (`maxSteps`): a scaffold is many `write_file` steps before
+  its first build, and eight was one file short.
 
 **F2** (or `/status`) prints the session's status block: the task's name,
 context size and a token estimate, how many times the decision engine was

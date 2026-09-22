@@ -150,7 +150,7 @@ public class ConfigTuiModelTests : IDisposable
         Assert.True(model.Editing);            // still editing — fix it, don't retype
         Assert.Equal("999", model.EditBuffer);
         Assert.StartsWith("✗", model.Status);
-        Assert.Equal("8", model.Value("maxSteps"));
+        Assert.Equal("50", model.Value("maxSteps"));
     }
 
     [Fact]

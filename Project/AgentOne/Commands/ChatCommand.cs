@@ -81,6 +81,27 @@ public sealed class ChatCommand
 
         session.Noted += note => Console.WriteLine($"({note})");
         session.TitleChanged += title => Console.WriteLine($"(task: {title})");
+        session.DesignMade += lines =>
+        {
+            progress.Stop();
+            Console.WriteLine("── design ──");
+            foreach (var l in lines) Console.WriteLine("  " + l);
+            Console.WriteLine("────────────");
+            progress.Restart();
+        };
+
+        // A design that hinges on a choice: the person picks before anything is built.
+        session.Chooser = (choice, _) =>
+        {
+            progress.Stop();
+            Console.WriteLine();
+            Console.WriteLine($"? {choice.Question}");
+            for (var i = 0; i < choice.Options.Count; i++)
+                Console.WriteLine($"  {i + 1}. {choice.Options[i]}{(i == choice.Recommended ? "  (recommended)" : "")}");
+            var answer = LineEditor.Read("  pick a number, Enter for the recommendation, or type your own › ");
+            progress.Restart();
+            return Task.FromResult(answer.Kind == LineKind.Entered ? answer.Text : "");
+        };
 
         // A command the gate will not run on its own: the REPL is the person.
         // The turn is on this thread, so reading a line here is exactly right.
@@ -175,9 +196,10 @@ public sealed class ChatCommand
             progress.Stop();
             if (run is null) continue;
 
-            Console.WriteLine(run.Succeeded
-                ? (wroteAnything ? run.Unstreamed : run.Text)
-                : $"[stopped: {run.Reason}] {run.Text}");
+            // A stopped turn that was summarized reads like an answer, with the
+            // reason after it; one that was not still says what stopped it.
+            Console.WriteLine(wroteAnything ? run.Unstreamed : run.Text);
+            if (!run.Succeeded) Console.WriteLine($"[stopped: {run.Reason}]");
             Console.WriteLine();
         }
 

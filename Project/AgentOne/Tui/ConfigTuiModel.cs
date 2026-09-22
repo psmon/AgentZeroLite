@@ -230,7 +230,7 @@ public sealed class ConfigTuiModel
         "jevConfidenceFloor" => "below this the decision is not acted on unasked · observed: 0.19 unsure, 0.88+ sure",
         "apiKeyEnv" => $"FALLBACK only — the NAME of a variable to read the key from, not the key. ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "not set")}",
         "model" => "set on the Model step",
-        "maxSteps" => "tool-loop budget per run, 1..100",
+        "maxSteps" => "tool-loop budget per turn, 1..100 · 50 by default: a scaffold is many write_file steps before its first build",
         "temperature" => "0..2 · lower is steadier, which suits a tool-calling loop",
         "timeoutSeconds" => "per model request, 1..3600",
         "webTimeoutSeconds" => "per web page, 1..600 · a slow site should cost seconds, not the whole turn",

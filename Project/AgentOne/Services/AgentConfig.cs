@@ -27,9 +27,13 @@ public sealed class AgentConfig
     [JsonPropertyName("apiKeyEnv")]
     public string ApiKeyEnv { get; set; } = "OPENAI_API_KEY";
 
-    /// <summary>Hard stop for the tool loop: how many model turns one run may take.</summary>
+    /// <summary>
+    /// Hard stop for the tool loop: how many model turns one run may take.
+    /// Fifty, not eight: building a small API took eight steps of writing files
+    /// before the first build — and stopped there, one file short.
+    /// </summary>
     [JsonPropertyName("maxSteps")]
-    public int MaxSteps { get; set; } = 8;
+    public int MaxSteps { get; set; } = 50;
 
     [JsonPropertyName("temperature")]
     public double Temperature { get; set; } = 0.2;

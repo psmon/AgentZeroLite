@@ -255,6 +255,11 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
     {
         var text = raw.Trim();
         if (text.Length == 0) return false;
+
+        // A broken tool call is a broken tool call, never an answer: measured,
+        // a write_file whose content had raw newlines was shown to the user as
+        // "the answer" — braces, code and all — and the file was never written.
+        if (ToolCall.LooksLikeEnvelope(text)) return false;
         if (ToolStepsSoFar(steps) > 0) return true;
         return text.Length >= ProseAnswerMinChars;
     }

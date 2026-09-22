@@ -89,6 +89,20 @@ public sealed class RunCommand
             };
 
             session.Noted += note => { if (!options.Json) Console.Error.WriteLine($"  {note}"); };
+            session.DesignMade += lines =>
+            {
+                if (options.Json) return;
+                Console.Error.WriteLine("  design:");
+                foreach (var l in lines) Console.Error.WriteLine("    " + l);
+            };
+
+            // Nobody to ask: the design's own recommendation stands, and stderr says so.
+            session.Chooser = (choice, _) =>
+            {
+                if (!options.Json)
+                    Console.Error.WriteLine($"  decision: {choice.Options[choice.Recommended]} (the recommendation — run cannot ask)");
+                return Task.FromResult("");
+            };
 
             // `run` has nobody to ask. --yes stands in for the person; without it a
             // command the gate does not trust is skipped, and stderr says which.
@@ -119,15 +133,13 @@ public sealed class RunCommand
                 };
                 Console.WriteLine(JsonSerializer.Serialize(report, AgentOneWireJson.Default.RunReport));
             }
-            else if (run.Succeeded)
-            {
-                // Whatever streamed is already on screen; print only the rest, then
-                // the newline the stream never wrote.
-                Console.WriteLine(wroteAnything ? run.Unstreamed : run.Text);
-            }
             else
             {
-                Console.Error.WriteLine($"agent-one: stopped ({run.Reason}) — {run.Text}");
+                // Whatever streamed is already on screen; print only the rest, then
+                // the newline the stream never wrote. A stopped turn still prints
+                // its summary — that is the useful part — and names the stop on stderr.
+                Console.WriteLine(wroteAnything ? run.Unstreamed : run.Text);
+                if (!run.Succeeded) Console.Error.WriteLine($"agent-one: stopped ({run.Reason})");
             }
 
             return run.ExitCode;

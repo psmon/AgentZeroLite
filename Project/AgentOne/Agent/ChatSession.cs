@@ -16,6 +16,20 @@ public sealed record SmartNote(string Kind, Decision Decision, string Verdict);
 /// <param name="Reason">Why it was not run unasked — what the risk check or the engine said.</param>
 public sealed record ApprovalRequest(string Command, string Reason, string WorkingDirectory);
 
+/// <summary>A choice the strong model's design hinges on; a person picks before anything is built.</summary>
+/// <param name="Recommended">Index of the option the design recommends.</param>
+public sealed record ChoiceRequest(string Question, IReadOnlyList<string> Options, int Recommended)
+{
+    /// <summary>What an answer means: a number picks, an empty line takes the recommendation, anything else is the choice itself.</summary>
+    public string Resolve(string answer)
+    {
+        answer = answer.Trim();
+        if (answer.Length == 0) return Options[Recommended];
+        if (int.TryParse(answer, out var n)) return n >= 1 && n <= Options.Count ? Options[n - 1] : Options[Recommended];
+        return answer;
+    }
+}
+
 /// <summary>Everything the status view shows, taken at one moment.</summary>
 public sealed record SessionStats(
     bool Smart,
@@ -103,6 +117,16 @@ public sealed class ChatSession : IDisposable
 
     /// <summary>The session's task got a (new) name. Raised off the turn, when the model has named it.</summary>
     public event Action<string>? TitleChanged;
+
+    /// <summary>The strong model's design came back: its first lines, for a person following along.</summary>
+    public event Action<IReadOnlyList<string>>? DesignMade;
+
+    /// <summary>
+    /// Who picks when a design hinges on a choice. The REPL reads a line, the
+    /// window parks the turn and takes the next line typed, `run` takes the
+    /// recommendation. Null takes the recommendation too.
+    /// </summary>
+    public Func<ChoiceRequest, CancellationToken, Task<string>>? Chooser { get; set; }
 
     /// <summary>
     /// Who answers when a command needs approval. The REPL reads a line, the
@@ -350,9 +374,38 @@ public sealed class ChatSession : IDisposable
         if (smart && run.Succeeded && _reasoning is not null && !designed)
             run = await MaybeEscalateAsync(line, before, run, ct);
 
+        // A turn that ran out of budget mid-work must not end on "[stopped: MaxSteps]"
+        // and nothing else: the person needs to know what got done and what is next.
+        if (!run.Succeeded && run.Reason is StopReason.MaxSteps or StopReason.Repeat && ToolSteps(run) > 0)
+            run = await WrapUpAsync(run, ct);
+
         _log?.Result(run);
         Remember(line, run);
         return run;
+    }
+
+    private static int ToolSteps(AgentRun run) =>
+        run.Steps.Count(s => s.Ok && s.Tool is not ("final" or "unwrapped" or "(unparsed)"));
+
+    /// <summary>
+    /// One more model call, no tools: what was done this turn, what is left,
+    /// what to do next. The stop reason stays on the run — `run` still exits
+    /// non-zero — but the text a person reads is a summary, not a guard's name.
+    /// </summary>
+    private async Task<AgentRun> WrapUpAsync(AgentRun stopped, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("summarizing what was done");
+        Noted?.Invoke($"stopped early ({stopped.Reason}) — summarizing this turn");
+
+        var summary = await _loop.RunAsync(
+            "[wrap-up] This turn's step budget is used up. Do NOT call any tool now. In the user's language, " +
+            "say: what was done this turn (files, commands, results), what is left or unverified, and the next " +
+            "steps as a numbered list. Reply with the final envelope.",
+            ct, SmartRouter.FamiliesFor(Route.Answer));
+
+        return summary.Succeeded
+            ? stopped with { Text = summary.Text, Streamed = summary.Streamed }
+            : stopped;
     }
 
     private static string RouteName(Route route) => route switch
@@ -466,7 +519,23 @@ public sealed class ChatSession : IDisposable
         _log?.Step(step);
         StepCompleted?.Invoke(step);
 
-        return ReasoningSubtask.DesignFeedBack(strong, design);
+        // The person follows along: the design's first lines, and — when it
+        // hinges on a choice — the choice itself, before anything is built.
+        var decision = ReasoningSubtask.ExtractDecision(design, out var body);
+        DesignMade?.Invoke(ReasoningSubtask.Summary(body));
+
+        string? chosen = null;
+        if (decision is not null)
+        {
+            var ask = new ChoiceRequest($"the design needs a decision ({strong} recommends {decision.Recommended + 1})", decision.Options, decision.Recommended);
+            chosen = Chooser is null
+                ? decision.Options[decision.Recommended]
+                : ask.Resolve(await Chooser(ask, ct));
+            Noted?.Invoke($"decided: {chosen}");
+            _log?.Step(new AgentStep(0, "decision", chosen, true));
+        }
+
+        return ReasoningSubtask.DesignFeedBack(strong, body, chosen);
     }
 
     private async Task<AgentRun> MaybeEscalateAsync(string request, int messagesBefore, AgentRun draft, CancellationToken ct)

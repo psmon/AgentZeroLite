@@ -378,7 +378,18 @@ workspace route and for an unsure one): a *confident* `needs_design` — it is a
 steer, so the floor applies; "run the build" once got needs_design at 0.55 —
 sends the request to the reasoning model for a design (`ReasoningSubtask.
 DesignAsync`) that comes back as `[design:<model>]` for the everyday model to
-build. `/status` (F2 in the window) prints `SessionStats` — task name, context size and
+build. The design's head is raised as `DesignMade` for the renderers; a design
+that opens with `DECISION NEEDED:` + a numbered list (`ExtractDecision`) is put
+to `ChatSession.Chooser` — REPL reads a line, the window parks the turn, `run`
+takes the recommendation — and the pick rides into the feedback line. A turn
+stopped by MaxSteps/Repeat after tool work gets `WrapUpAsync`: one no-tools
+call for "done / left / next steps", the stop reason kept on the run. `maxSteps`
+defaults to 50. **A broken tool envelope is never an answer**: `ToolCall.Repair`
+escapes raw newlines/tabs and unknown backslash escapes inside JSON strings and
+retries the parse (gemma's `write_file` with real newlines, a grep with `\.`);
+what still fails gets the nudge, because `LooksLikeAnAnswer` refuses anything
+shaped like an envelope — measured, a 2,564-char write_file was once shown to
+the user as the answer and the file never written. `/status` (F2 in the window) prints `SessionStats` — task name, context size and
 token estimate, Jev calls and ms, escalations, designs, approvals, memory size,
 grants; `/new` starts a fresh session and log.
 

@@ -111,18 +111,36 @@ public class ProseAnswerTests : IDisposable
         Assert.Equal(StopReason.Final, run.Reason);
         Assert.Equal("line one\nline two", run.Text);
         Assert.DoesNotContain("{\"tool\"", run.Text);
-        Assert.Contains(run.Steps, s => s.Tool == "unwrapped" && s.Detail.Contains("not valid JSON"));
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "(unparsed)");     // repaired, not nudged
     }
 
     [Fact]
-    public async Task ABrokenToolCallStillGetsTheNudge()
+    public async Task ABrokenToolCallIsRepairedAndRunNotShownAsTheAnswer()
     {
+        // Raw newlines inside the string and a regex escape JSON does not know:
+        // both repaired, the file written — and never shown to the user as prose.
         var run = await Loop(
-            "{\"tool\":\"grep\",\"args\":{\"text\":\"a\nb\"}}",
-            """{"tool":"final","args":{"text":"ok"}}""").RunAsync("find it");
+            "{\"tool\":\"write_file\",\"args\":{\"path\":\"a.txt\",\"content\":\"line one\nline two \\. end\"}}",
+            """{"tool":"final","args":{"text":"written"}}""").RunAsync("write it");
+
+        Assert.Equal("written", run.Text);
+        Assert.Contains(run.Steps, s => s.Tool == "write_file" && s.Ok);
+        Assert.Equal("line one\nline two \\. end", File.ReadAllText(Path.Combine(_root, "a.txt")));
+    }
+
+    [Fact]
+    public async Task AnUnrepairableToolCallGetsTheNudgeNeverTheAnswerSlot()
+    {
+        // Truncated mid-envelope: nothing to repair. After a tool step this used
+        // to be accepted as prose and shown, braces and all.
+        var run = await Loop(
+            """{"tool":"read_file","args":{"path":"README.md"}}""",
+            "{\"tool\":\"write_file\",\"args\":{\"path\":\"b.txt\",\"content\":\"cut off",
+            """{"tool":"final","args":{"text":"ok"}}""").RunAsync("do it");
 
         Assert.Equal("ok", run.Text);
         Assert.Contains(run.Steps, s => s.Tool == "(unparsed)");
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "unwrapped");
     }
 
     [Fact]

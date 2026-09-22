@@ -52,6 +52,84 @@ public sealed class ToolCall
         var json = ExtractFirstJsonObject(raw);
         if (json is null) { error = "no JSON object found in model reply"; return false; }
 
+        if (TryParseJson(json, call, out error)) return true;
+
+        // Small models write file contents with real newlines inside the JSON
+        // string, and regexes with escapes JSON does not know (\.). Both are
+        // one repair away from a perfectly good call — and a call that fails
+        // to parse used to be taken for prose and shown as the answer.
+        var repaired = Repair(json);
+        if (repaired != json && TryParseJson(repaired, call, out _)) return true;
+
+        return false;
+    }
+
+    /// <summary>True for text shaped like an envelope, whether or not it parses.</summary>
+    public static bool LooksLikeEnvelope(string raw)
+    {
+        var text = raw.TrimStart();
+        return text.StartsWith('{') && text.Contains("\"tool\"", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Makes the two mistakes models make inside JSON strings legal again:
+    /// raw control characters (newline, tab, CR) become escapes, and a
+    /// backslash before a character JSON does not escape is doubled. Nothing
+    /// outside strings is touched.
+    /// </summary>
+    internal static string Repair(string json)
+    {
+        var sb = new System.Text.StringBuilder(json.Length + 32);
+        bool inString = false;
+
+        for (int i = 0; i < json.Length; i++)
+        {
+            char c = json[i];
+
+            if (!inString)
+            {
+                if (c == '"') inString = true;
+                sb.Append(c);
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"':
+                    inString = false;
+                    sb.Append(c);
+                    break;
+                case '\\':
+                    var next = i + 1 < json.Length ? json[i + 1] : '\0';
+                    if (next is '"' or '\\' or '/' or 'b' or 'f' or 'n' or 'r' or 't' or 'u')
+                    {
+                        sb.Append(c).Append(next);
+                        i++;
+                    }
+                    else
+                    {
+                        sb.Append("\\\\");          // \. → \\.  (a regex, a Windows path)
+                    }
+                    break;
+                case '\n': sb.Append("\\n"); break;
+                case '\r': sb.Append("\\r"); break;
+                case '\t': sb.Append("\\t"); break;
+                default:
+                    if (c < ' ') sb.Append("\\u").Append(((int)c).ToString("x4"));
+                    else sb.Append(c);
+                    break;
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static bool TryParseJson(string json, ToolCall call, out string error)
+    {
+        error = "";
+        call.Tool = "";
+        call.Args.Clear();
+
         try
         {
             using var doc = JsonDocument.Parse(json);
