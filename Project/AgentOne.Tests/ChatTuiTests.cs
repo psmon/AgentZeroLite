@@ -136,11 +136,30 @@ public class ChatTuiModelTests
     }
 
     [Fact]
-    public void PageKeysScroll()
+    public void PageKeysScrollAndCtrlEndFollowsAgain()
     {
-        var model = new ChatTuiModel(false, true);
+        var model = Type(new ChatTuiModel(false, true), "abc");
         Assert.Equal(ChatEffect.ScrollUp, model.HandleKey(Key(ConsoleKey.PageUp)));
         Assert.Equal(ChatEffect.ScrollDown, model.HandleKey(Key(ConsoleKey.PageDown)));
+        Assert.Equal(ChatEffect.ScrollToBottom, model.HandleKey(Key(ConsoleKey.End, ctrl: true)));
+
+        // Plain End still belongs to the line editor.
+        model.HandleKey(Key(ConsoleKey.Home));
+        Assert.Equal(ChatEffect.None, model.HandleKey(Key(ConsoleKey.End)));
+        Assert.Equal(3, model.Cursor);
+    }
+
+    [Fact]
+    public void ThePageReportsWhereTheTranscriptIsAndOnlyChangesCount()
+    {
+        var model = new ChatTuiModel(false, true);
+
+        Assert.True(model.SetScrolled(true, 20));
+        Assert.True(model.ScrolledUp);
+        Assert.Equal(20, model.ScrollOffset);
+        Assert.False(model.SetScrolled(true, 20));     // nothing moved: no repaint needed
+        Assert.True(model.SetScrolled(false, 0));
+        Assert.False(model.ScrolledUp);
     }
 
     [Fact]
@@ -361,5 +380,164 @@ public class ChatSessionTests : IDisposable
 
         Assert.Contains(activities, a => a.Contains("reading README.md"));
         Assert.Contains(steps, s => s.Tool == "read_file" && s.Ok);
+    }
+}
+
+/// <summary>
+/// The transcript's scrolling rests on Termina's buffer behaving in three
+/// specific ways; the first chat window got two of them wrong (see
+/// ChatTuiPage). Pin them here so an upgrade that changes them shows up.
+/// </summary>
+public class TranscriptScrollTests
+{
+    private const int Width = 80;
+
+    private static Termina.Components.Streaming.PersistedStreamBuffer Filled(int lines)
+    {
+        var buffer = new Termina.Components.Streaming.PersistedStreamBuffer { AutoScroll = true };
+        for (var i = 0; i < lines; i++) buffer.AppendLine($"line {i}");
+        return buffer;
+    }
+
+    [Fact]
+    public void PageUpMovesAwayFromTheLiveEnd()
+    {
+        var buffer = Filled(100);
+
+        buffer.ScrollUp(20, Width);
+
+        Assert.True(buffer.IsScrolledUp);
+        Assert.Equal(20, buffer.ScrollOffset);
+    }
+
+    [Fact]
+    public void NewTextDoesNotPullAScrolledReaderBackDown()
+    {
+        var buffer = Filled(100);
+        buffer.ScrollUp(20, Width);
+
+        buffer.AppendLine("more");
+        buffer.Append("and a fragment");
+
+        Assert.True(buffer.IsScrolledUp);
+    }
+
+    [Fact]
+    public void ScrollToBottomFollowsAgain()
+    {
+        var buffer = Filled(100);
+        buffer.ScrollUp(20, Width);
+
+        buffer.ScrollToBottom();
+        buffer.AppendLine("live");
+
+        Assert.False(buffer.IsScrolledUp);
+        Assert.Equal(0, buffer.ScrollOffset);
+    }
+
+    [Fact]
+    public void ScrollingDownPastTheEndStopsAtTheEnd()
+    {
+        var buffer = Filled(100);
+        buffer.ScrollUp(5, Width);
+
+        buffer.ScrollDown(50);
+
+        Assert.False(buffer.IsScrolledUp);
+    }
+}
+
+/// <summary>Folding streamed text to the window width before the buffer sees it.</summary>
+public class SoftWrapTests
+{
+    [Fact]
+    public void BreaksBeforeTheWordThatWouldOverflow()
+    {
+        var wrap = new SoftWrap();
+
+        var folded = wrap.Fold("aaaa bbbb cccc dddd", 10);
+
+        Assert.Equal("aaaa bbbb\ncccc dddd", folded);
+        Assert.Equal(9, wrap.Column);
+    }
+
+    [Fact]
+    public void TheColumnCarriesAcrossFragments()
+    {
+        var wrap = new SoftWrap();
+
+        var first = wrap.Fold("aaaa bbbb", 10);
+        var second = wrap.Fold(" cccc", 10);
+
+        Assert.Equal("aaaa bbbb", first);
+        Assert.Equal("\ncccc", second);     // the space at the fold is dropped
+        Assert.Equal(4, wrap.Column);
+    }
+
+    [Fact]
+    public void ANewlineInTheTextResetsTheColumn()
+    {
+        var wrap = new SoftWrap();
+
+        wrap.Fold("aaaa\nbb", 10);
+
+        Assert.Equal(2, wrap.Column);
+    }
+
+    [Fact]
+    public void NewLineStartsTheNextFragmentAtColumnZero()
+    {
+        var wrap = new SoftWrap();
+        wrap.Fold("aaaaaaaa", 10);
+
+        wrap.NewLine();
+
+        Assert.Equal(0, wrap.Column);
+        Assert.Equal("bbbbbbbb", wrap.Fold("bbbbbbbb", 10));
+    }
+
+    [Fact]
+    public void WideCharactersCountTwoColumns()
+    {
+        var wrap = new SoftWrap();
+
+        // Five Hangul syllables are ten columns: the sixth must fold.
+        var folded = wrap.Fold("가나다라마 바사", 11);
+
+        Assert.Equal("가나다라마\n바사", folded);
+    }
+
+    [Fact]
+    public void AWordWiderThanTheLineIsBrokenByColumns()
+    {
+        var wrap = new SoftWrap();
+
+        var folded = wrap.Fold("https://example.com/a/very/long/path", 10);
+
+        Assert.All(folded.Split('\n'), part => Assert.True(part.Length <= 10));
+        Assert.Equal("https://example.com/a/very/long/path", folded.Replace("\n", ""));
+    }
+
+    [Fact]
+    public void ALongAnswerNeverProducesALineWiderThanTheWindow()
+    {
+        var wrap = new SoftWrap();
+        var text = string.Join(" ", Enumerable.Range(1, 300).Select(i => $"word{i}"));
+
+        var folded = wrap.Fold(text, 79);
+
+        Assert.All(folded.Split('\n'), line => Assert.True(line.Length <= 79));
+        Assert.Equal(text.Replace(" ", ""), folded.Replace("\n", "").Replace(" ", ""));
+    }
+
+    [Fact]
+    public void TheBufferTreatsAnEmbeddedNewlineAsALineBreak()
+    {
+        var buffer = new Termina.Components.Streaming.PersistedStreamBuffer();
+
+        buffer.Append("aaaa\nbbbb");
+
+        // The fold relies on this: a newline inside Append() must start a new buffer line.
+        Assert.Equal(2, buffer.GetWrappedLineCount(80));
     }
 }

@@ -24,6 +24,9 @@ public enum LineKind
 
 public readonly record struct TranscriptLine(LineKind Kind, string Text);
 
+/// <summary>What the person asked the transcript to do.</summary>
+public enum ScrollRequest { Up, Down, Bottom }
+
 /// <summary>
 /// Glue between the chat screen and the conversation. Keys go to the model,
 /// turns go to the session, and everything the session reports comes back out
@@ -33,7 +36,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 {
     private readonly CancellationTokenSource _cts = new();
     private readonly Subject<TranscriptLine> _lines = new();
-    private readonly Subject<int> _scroll = new();
+    private readonly Subject<ScrollRequest> _scroll = new();
     private bool _answering;
 
     public ChatTuiViewModel(ChatSession session, ChatTuiModel model)
@@ -70,8 +73,14 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     /// <summary>Lines for the page to append to the transcript, in order.</summary>
     public Observable<TranscriptLine> Lines => _lines;
 
-    /// <summary>Scroll requests: negative up, positive down.</summary>
-    public Observable<int> Scroll => _scroll;
+    /// <summary>Scroll requests from the keyboard, for the page that owns the transcript.</summary>
+    public Observable<ScrollRequest> Scroll => _scroll;
+
+    /// <summary>The page reports where the transcript is; the header shows it.</summary>
+    public void SetScrolled(bool scrolledUp, int offset)
+    {
+        if (Model.SetScrolled(scrolledUp, offset)) Bump();
+    }
 
     public override void OnActivated()
     {
@@ -94,11 +103,15 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
                 break;
 
             case ChatEffect.ScrollUp:
-                _scroll.OnNext(-5);
+                _scroll.OnNext(ScrollRequest.Up);
                 break;
 
             case ChatEffect.ScrollDown:
-                _scroll.OnNext(+5);
+                _scroll.OnNext(ScrollRequest.Down);
+                break;
+
+            case ChatEffect.ScrollToBottom:
+                _scroll.OnNext(ScrollRequest.Bottom);
                 break;
 
             case ChatEffect.Quit:

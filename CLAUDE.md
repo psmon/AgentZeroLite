@@ -285,9 +285,16 @@ the bottom, mode in the header); piped or with `--plain` it is the line REPL in
 `ChatCommand.RunPlainAsync`. Both are renderers over `Agent/ChatSession`, which
 owns the loop, smart mode, the pause-for-a-person and the resume. Put a turn
 rule in ChatSession, never in a renderer, or the two will drift. The window's
-selftest boots it with scripted keys but submits no turn — a turn is async and
-a scripted key racing it fails at random; ChatSession has its own deterministic
-tests for pause/resume.
+selftest boots it with scripted keys, runs one echo turn, then PageUp, with
+**every key queued before the window starts**. Two Termina facts it encodes: a
+key pushed into an *idle* `VirtualInputSource` is, under Native AOT, delivered
+only when the loop next wakes for something else (2–9 s measured; real console
+keys arrive in <100 ms, so only the selftest cares — hence never let the queue
+go idle, which works because the echo turn completes inside the Enter
+keystroke); and `StreamingTextNode` re-measures a line per cell it draws, so
+`Tui/SoftWrap` folds every transcript line to the window width first (one
+2,300-char answer line used to freeze the window for 9 s). ChatSession has its
+own deterministic tests for pause/resume.
 
 `SessionState` is actor-*shaped*, not Akka: one owner, serialised mutations,
 snapshot reads. An actor runtime is exactly the dependency a Native AOT single

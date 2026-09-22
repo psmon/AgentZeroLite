@@ -1,4 +1,5 @@
 using R3;
+using Termina.Components.Streaming;
 using Termina.Extensions;
 using Termina.Layout;
 using Termina.Reactive;
@@ -9,9 +10,9 @@ namespace AgentOne.Tui;
 
 /// <summary>
 /// The chat window: transcript above, one input line at the bottom, a header
-/// that says which mode you are in. The transcript is a StreamingTextNode the
-/// page owns — Termina's own answer to "text that keeps arriving" — and the
-/// page only ever appends to it.
+/// that says which mode you are in. The transcript is a StreamingTextNode over
+/// a buffer the page also holds, so the page can tell whether the person has
+/// scrolled away from the live end and leave them there while new text lands.
 /// </summary>
 public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
 {
@@ -20,18 +21,37 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
     private static readonly Color NoteColor = Color.BrightBlack;
     private static readonly Color AlertColor = Color.BrightYellow;
 
+    /// <summary>Columns the scrollbar takes on the right of the transcript.</summary>
+    private const int ScrollbarColumns = 1;
+
+    private readonly SoftWrap _wrap = new();
+    private PersistedStreamBuffer _buffer = null!;
     private StreamingTextNode _transcript = null!;
 
     protected override void OnBound()
     {
-        _transcript = StreamingTextNode.Create().WithScrollbar();
+        // The buffer's own auto-scroll follows new text only while the view is
+        // at the bottom — exactly what a chat wants. Calling ScrollToBottom on
+        // every append, as the first version did, yanked the reader back down
+        // while they were trying to read what had scrolled past.
+        _buffer = new PersistedStreamBuffer { AutoScroll = true };
+        _transcript = new StreamingTextNode(_buffer).WithScrollbar();
 
         ViewModel.Lines.Subscribe(Append).AddTo(Subscriptions);
-        ViewModel.Scroll.Subscribe(delta =>
+
+        ViewModel.Scroll.Subscribe(request =>
         {
-            var viewport = Math.Max(5, SafeWindowHeight() - 5);
-            if (delta < 0) _transcript.ScrollUp(-delta, viewport);
-            else _transcript.ScrollDown(delta);
+            // ScrollUp's second argument is the wrap WIDTH, not the height: the
+            // buffer needs it to count wrapped lines. Passing the height there
+            // is why PageUp did nothing in the first version.
+            var width = WrapWidth();
+            switch (request)
+            {
+                case ScrollRequest.Up: _transcript.ScrollUp(PageLines(), width); break;
+                case ScrollRequest.Down: _transcript.ScrollDown(PageLines()); break;
+                case ScrollRequest.Bottom: _transcript.ScrollToBottom(); break;
+            }
+            ReportScroll();
         }).AddTo(Subscriptions);
 
         Append(new TranscriptLine(LineKind.Note,
@@ -44,31 +64,45 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
 
     private void Append(TranscriptLine line)
     {
+        // Everything is folded to the window width first — see SoftWrap for
+        // why a long line must never reach the buffer.
+        var width = WrapWidth();
         switch (line.Kind)
         {
             case LineKind.User:
-                _transcript.AppendLine("");
-                _transcript.AppendLine("› " + line.Text, UserColor);
+                Line("");
+                Line("› " + line.Text, UserColor);
                 break;
             case LineKind.AnswerStart:
-                _transcript.Append("◆ ", AnswerColor);
+                _transcript.Append(_wrap.Fold("◆ ", width), AnswerColor);
                 break;
             case LineKind.Delta:
-                _transcript.Append(line.Text, AnswerColor);
+                _transcript.Append(_wrap.Fold(line.Text, width), AnswerColor);
                 break;
             case LineKind.AnswerEnd:
-                _transcript.AppendLine("");
+                Line("");
                 break;
             case LineKind.Note:
-                _transcript.AppendLine("  " + line.Text, NoteColor);
+                Line("  " + line.Text, NoteColor);
                 break;
             case LineKind.Alert:
-                _transcript.AppendLine("  " + line.Text, AlertColor);
+                Line("  " + line.Text, AlertColor);
                 break;
         }
 
-        _transcript.ScrollToBottom();
+        ReportScroll();
+
+        void Line(string text, Color? colour = null)
+        {
+            var folded = _wrap.Fold(text, width);
+            if (colour is { } c) _transcript.AppendLine(folded, c); else _transcript.AppendLine(folded);
+            _wrap.NewLine();
+        }
     }
+
+    /// <summary>Tells the view model whether the reader is away from the live end, for the header.</summary>
+    private void ReportScroll() =>
+        ViewModel.SetScrolled(_buffer.IsScrolledUp, _buffer.ScrollOffset);
 
     public override ILayoutNode BuildLayout()
     {
@@ -98,7 +132,12 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
         var colour = model.Smart ? Color.BrightGreen : Color.BrightCyan;
         var right = model.Busy ? "working…" : model.AwaitingPerson ? "waiting for you" : $"turn {model.Turns}";
 
-        return new TextNode($" {mode}  agent-one · {right}").WithForeground(colour).NoWrap();
+        // Say when the reader has scrolled away from the live end, and how to get back.
+        var scrolled = model.ScrolledUp
+            ? $"   ↑ {model.ScrollOffset} lines above the end · Ctrl+End to follow"
+            : "";
+
+        return new TextNode($" {mode}  agent-one · {right}{scrolled}").WithForeground(colour).NoWrap();
     }
 
     private ILayoutNode InputLine()
@@ -116,9 +155,16 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
             .NoWrap();
     }
 
-    private static int SafeWindowHeight()
+    private static int WrapWidth()
     {
-        try { return Console.WindowHeight; }
-        catch (IOException) { return 24; }
+        try { return Math.Max(20, Console.WindowWidth - ScrollbarColumns); }
+        catch (IOException) { return 80 - ScrollbarColumns; }
+    }
+
+    /// <summary>A page is the transcript's height minus the three fixed rows, less one for context.</summary>
+    private static int PageLines()
+    {
+        try { return Math.Max(3, Console.WindowHeight - 3 - 1); }
+        catch (IOException) { return 20; }
     }
 }

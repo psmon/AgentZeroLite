@@ -265,10 +265,19 @@ fails: it is not a preference, it is a dependency.
 answer › ▌
 ```
 
-The transcript scrolls (PageUp/PageDown) and the answer streams into it as the
-model writes. The header says which mode you are in and whether a turn is
-running; the bottom line is yours. Shift+Tab switches basic ↔ smart, Esc clears
-the line (twice: quit), Ctrl+D quits.
+The answer streams into the transcript as the model writes, and the transcript
+scrolls: **PageUp/PageDown** move a page, **Ctrl+End** returns to the live
+end, and a scrollbar on the right shows where you are. New text does not pull
+you back down while you are reading — the header says `↑ N lines above the
+end · Ctrl+End to follow` until you do. The header also says which mode you
+are in and whether a turn is running; the bottom line is yours. Shift+Tab
+switches basic ↔ smart, Esc clears the line (twice: quit), Ctrl+D quits.
+
+Long answers are folded to the window width *before* they reach the transcript
+(`Tui/SoftWrap`). That is a performance fix, not a cosmetic one: Termina's
+streaming node re-measures a line for every cell it draws, and one
+2,300-character answer line froze the window for nine seconds (measured with a
+stack dump). Short lines make the cost vanish.
 
 When input or output is a pipe — or with `--plain` — the same conversation runs
 as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin
@@ -408,6 +417,17 @@ Step navigation and the picker are checked below the UI in that selftest, on
 purpose: arriving at step 2 starts an asynchronous listing and the screen
 ignores keys while it is in flight, so a scripted walk would race the request
 and fail at random rather than when something is broken.
+
+The same selftest then boots the chat window against the echo provider, types
+a 300-word line, submits it and presses PageUp — checking that the window ends
+up reporting "scrolled up". Every key is queued before the window starts. That
+is deliberate: a key pushed into an *idle* virtual queue is forwarded by a
+continuation that, under Native AOT, runs only when the loop next wakes for
+something else — 2–9 seconds of nothing, measured. Real console keys take a
+different path and arrive in under 100 ms (also measured, with SendKeys against
+the published binary), so users never see it; the selftest simply never lets
+the queue go idle. It works because the echo turn completes inside the Enter
+keystroke, so PageUp finds the answer already in the transcript.
 
 ## How it works
 

@@ -38,8 +38,9 @@ public sealed class Planner(IChatProvider provider, int maxOptions = 4)
         - Names are short snake_case identifiers, e.g. read_local, search_web, answer_now.
         - Each description is one plain sentence saying what that approach does.
         - Do not propose anything the agent cannot do.
-        - If the agent can already answer from what it knows, say so as one approach
-          ("answer_now") rather than inventing work for it.
+        - If the agent can already answer from what it knows — including anything listed under
+          "Already in the conversation" — say so as one approach ("answer_now") rather than
+          inventing work for it.
 
         Reply with the JSON object only.
         """;
@@ -51,12 +52,23 @@ public sealed class Planner(IChatProvider provider, int maxOptions = 4)
     /// The approaches the model proposed, strongest-effort first. An empty list
     /// means planning failed — the caller then runs as it always would.
     /// </summary>
-    public async Task<IReadOnlyList<DecisionOption>> PlanAsync(string request, string toolScope, CancellationToken ct)
+    /// <param name="context">
+    /// What the conversation already holds — pages read, files opened, answers
+    /// given. Without it the planner proposes rediscovering things the agent
+    /// has in front of it; measured, that cost a follow-up turn 15 seconds of
+    /// planning for a steer the model then rightly ignored.
+    /// </param>
+    public async Task<IReadOnlyList<DecisionOption>> PlanAsync(
+        string request, string toolScope, string context, CancellationToken ct)
     {
+        var user = context.Length == 0
+            ? request
+            : $"{request}{Environment.NewLine}{Environment.NewLine}Already in the conversation:{Environment.NewLine}{context}";
+
         var messages = new List<ChatMessage>
         {
             ChatMessage.System(Prompt(toolScope)),
-            ChatMessage.User(request)
+            ChatMessage.User(user)
         };
 
         string raw;

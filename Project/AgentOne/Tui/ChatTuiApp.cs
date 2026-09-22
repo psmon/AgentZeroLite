@@ -36,9 +36,17 @@ public static class ChatTuiApp
     }
 
     /// <summary>
-    /// Boots the real window against scripted keys and checks the input state it
-    /// left behind. No turn is submitted: a turn is asynchronous and a scripted
-    /// key racing it would fail at random. The turn pipeline has its own tests.
+    /// Boots the real window against scripted keys and checks what it left
+    /// behind: the line editor, the mode toggle, and — after one echo turn —
+    /// that PageUp left the reader above the live end.
+    ///
+    /// Every key is queued before the window starts, on purpose. A key pushed
+    /// into an <em>idle</em> virtual queue is forwarded by a continuation that,
+    /// under Native AOT, runs only once the loop wakes for something else
+    /// (2–9 s measured; real console keys arrive in under 100 ms, so users never
+    /// see it). Keeping the queue non-empty sidesteps that entirely. It works
+    /// because the echo turn completes inside the Enter keystroke — the provider
+    /// answers synchronously — so PageUp finds the answer already in the buffer.
     /// </summary>
     public static async Task<List<string>> SelfTestAsync()
     {
@@ -50,8 +58,16 @@ public static class ChatTuiApp
         scripted.EnqueueString("hello");
         scripted.EnqueueKey(ConsoleKey.LeftArrow);
         scripted.EnqueueKey(ConsoleKey.Backspace);            // "helo"
-        scripted.EnqueueKey(ConsoleKey.Tab, true, false, false);  // Shift+Tab: no key, must refuse
+        scripted.EnqueueKey(ConsoleKey.Tab, true, false, false);  // Shift+Tab: flips smart only when a key is stored
         scripted.EnqueueKey(ConsoleKey.Escape);               // clears the line
+
+        // Back to basic if the toggle took, so the turn calls no decision engine.
+        if (session.SmartAvailable) scripted.EnqueueKey(ConsoleKey.Tab, true, false, false);
+
+        // Enough text (≈30 wrapped lines, echoed back once more) to overflow the 24-row headless window.
+        scripted.EnqueueString(string.Join(" ", Enumerable.Range(1, 300).Select(i => $"word{i}")));
+        scripted.EnqueueKey(ConsoleKey.Enter);
+        scripted.EnqueueKey(ConsoleKey.PageUp);
         scripted.EnqueueKey(ConsoleKey.Escape);               // arms quit
         scripted.EnqueueKey(ConsoleKey.Escape);               // quits
         scripted.Complete();
@@ -60,14 +76,16 @@ public static class ChatTuiApp
         builder.Logging.ClearProviders();
         builder.Services.AddSingleton(session);
         builder.Services.AddSingleton(model);
-        builder.Services.AddTransient<ChatTuiViewModel>();
         builder.Services.AddTermina("/chat", t => t.RegisterRoute<ChatTuiPage, ChatTuiViewModel>("/chat"));
         builder.Services.AddTerminaVirtualInput(scripted);
         await builder.Build().RunAsync();
 
         var failures = new List<string>();
         if (model.Input.Length != 0) failures.Add($"chat input should be empty after Esc, was '{model.Input}'");
-        if (model.Smart) failures.Add("chat switched to smart with no TypeSafe key");
+        if (model.Smart) failures.Add("chat should be back in basic mode");
+        if (model.Turns != 1 || model.Busy) failures.Add("the echo turn did not finish");
+        if (!model.ScrolledUp || model.ScrollOffset <= 0)
+            failures.Add($"PageUp should leave the transcript above the live end (offset {model.ScrollOffset})");
         if (!model.QuitArmed) failures.Add("the last Esc should have quit through the armed path");
         return failures;
     }

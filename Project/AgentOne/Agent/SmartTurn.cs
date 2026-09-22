@@ -6,10 +6,12 @@ namespace AgentOne.Agent;
 /// <param name="Options">What the planner proposed. Empty when planning did not produce a plan.</param>
 /// <param name="Decision">Null when there was nothing to decide.</param>
 /// <param name="Confident">True when the decision cleared the floor and can be acted on unasked.</param>
+/// <param name="PlanningMs">How long the planner's model call took. Zero when there was none.</param>
 public sealed record SmartPlan(
     IReadOnlyList<DecisionOption> Options,
     Decision? Decision,
-    bool Confident)
+    bool Confident,
+    long PlanningMs = 0)
 {
     public static readonly SmartPlan None = new([], null, false);
 
@@ -66,14 +68,20 @@ public sealed class SmartTurn(IChatProvider provider, IDecisionEngine engine, do
     /// <summary>Raised as each stage begins, for the progress line.</summary>
     public event Action<string>? ActivityStarted;
 
-    public async Task<SmartPlan> PrepareAsync(string request, string toolScope, CancellationToken ct)
+    public Task<SmartPlan> PrepareAsync(string request, string toolScope, CancellationToken ct) =>
+        PrepareAsync(request, toolScope, "", ct);
+
+    /// <param name="context">What the conversation already holds; see <see cref="Planner.PlanAsync"/>.</param>
+    public async Task<SmartPlan> PrepareAsync(string request, string toolScope, string context, CancellationToken ct)
     {
         ActivityStarted?.Invoke("planning the approach");
 
-        var planned = await new Planner(provider).PlanAsync(request, toolScope, ct);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var planned = await new Planner(provider).PlanAsync(request, toolScope, context, ct);
+        clock.Stop();
 
         // Nothing planned at all: run as the basic mode would.
-        if (planned.Count == 0) return new SmartPlan(planned, null, Confident: false);
+        if (planned.Count == 0) return new SmartPlan(planned, null, Confident: false, clock.ElapsedMilliseconds);
 
         // "Ask a person" is always on the ballot, and always last. Adding it in
         // code rather than asking the planner for it means it is always there
@@ -87,7 +95,11 @@ public sealed class SmartTurn(IChatProvider provider, IDecisionEngine engine, do
         // making — it is exactly the "should a person look at this?" question.
         ActivityStarted?.Invoke($"deciding between {options.Count} approaches");
 
-        var decision = await engine.ChooseAsync(request, Planner.DecisionQuestion, options, ct);
+        // The engine judges the same state the planner saw: the request plus what
+        // is already known. Deciding on the bare request would pick "search" for
+        // a page that was read one turn ago.
+        var state = context.Length == 0 ? request : $"{request}\n\nAlready in the conversation:\n{context}";
+        var decision = await engine.ChooseAsync(state, Planner.DecisionQuestion, options, ct);
 
         // Confident means "act on this unasked". Choosing review is the opposite
         // of that however sure the engine is, so it never counts as confident.
@@ -95,6 +107,6 @@ public sealed class SmartTurn(IChatProvider provider, IDecisionEngine engine, do
                         && decision.Confidence >= confidenceFloor
                         && decision.Choice != ReviewOption;
 
-        return new SmartPlan(options, decision, confident);
+        return new SmartPlan(options, decision, confident, clock.ElapsedMilliseconds);
     }
 }

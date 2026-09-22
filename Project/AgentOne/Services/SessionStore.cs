@@ -61,7 +61,8 @@ public sealed class SessionStore
             ? $"{(plan.NeedsReview ? "needs a person" : plan.Confident ? "steering" : "unsure, not steering")} "
               + $"· confidence {d.Confidence:0.00} · options: {string.Join(", ", plan.Options.Select(o => o.Name))}"
             : plan.Options.Count == 0 ? "no plan produced" : "one approach, nothing to decide",
-        ElapsedMs = plan.Decision?.ElapsedMs
+        // Planning (the model) plus deciding (the engine): the whole cost of smart mode this turn.
+        ElapsedMs = plan.PlanningMs + (plan.Decision?.ElapsedMs ?? 0)
     });
 
     public void Result(AgentRun run) => Append(new SessionEntry

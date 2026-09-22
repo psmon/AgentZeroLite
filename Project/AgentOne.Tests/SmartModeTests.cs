@@ -153,6 +153,27 @@ public class SmartTurnTests
     }
 
     [Fact]
+    public async Task ContextReachesBothThePlannerAndTheEngine()
+    {
+        var provider = new ScriptedChatProvider(TwoApproaches);
+        var engine = new ScriptedDecisionEngine(Confident("search_web"));
+
+        await Turn(provider, engine).PrepareAsync("and now?", "files, web", "[tool:web_read] MSA guide", CancellationToken.None);
+
+        Assert.Contains(provider.Calls[0], m => m.Role == "user" && m.Content.Contains("Already in the conversation"));
+        Assert.Contains("[tool:web_read] MSA guide", engine.LastState);
+    }
+
+    [Fact]
+    public async Task PlanningTimeIsMeasured()
+    {
+        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), new ScriptedDecisionEngine(Confident("search_web")))
+            .PrepareAsync("hi", "files, web", CancellationToken.None);
+
+        Assert.True(plan.PlanningMs >= 0);
+    }
+
+    [Fact]
     public async Task TheOptionsAndTheRequestAreWhatTheEngineIsAskedAbout()
     {
         var engine = new ScriptedDecisionEngine(Confident("search_web"));

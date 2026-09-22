@@ -11,6 +11,8 @@ public enum ChatEffect
     ToggleMode,
     ScrollUp,
     ScrollDown,
+    /// <summary>Back to the live end of the transcript (Ctrl+End).</summary>
+    ScrollToBottom,
     Quit
 }
 
@@ -29,8 +31,8 @@ public sealed class ChatTuiModel
         Smart = smart;
         SmartAvailable = smartAvailable;
         Status = smartAvailable
-            ? "Enter sends · Shift+Tab switches basic/smart · PageUp/PageDown scroll · Esc clears, Ctrl+D quits"
-            : "Enter sends · PageUp/PageDown scroll · Esc clears, Ctrl+D quits  (no TypeSafe key — smart unavailable)";
+            ? "Enter sends · Shift+Tab basic/smart · PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits"
+            : "Enter sends · PageUp/PageDown scroll, Ctrl+End follows · Esc clears, Ctrl+D quits  (no TypeSafe key — smart unavailable)";
     }
 
     public string Input => _input.ToString();
@@ -49,6 +51,21 @@ public sealed class ChatTuiModel
 
     /// <summary>Armed by Ctrl+D or Esc-on-empty; a second one quits.</summary>
     public bool QuitArmed { get; private set; }
+
+    /// <summary>True while the reader is away from the live end of the transcript.</summary>
+    public bool ScrolledUp { get; private set; }
+
+    /// <summary>How many lines above the live end the view is.</summary>
+    public int ScrollOffset { get; private set; }
+
+    /// <summary>The page reports where the transcript is. True when it moved.</summary>
+    public bool SetScrolled(bool scrolledUp, int offset)
+    {
+        if (scrolledUp == ScrolledUp && offset == ScrollOffset) return false;
+        ScrolledUp = scrolledUp;
+        ScrollOffset = offset;
+        return true;
+    }
 
     public void SetBusy(bool busy, string? status = null)
     {
@@ -100,6 +117,9 @@ public sealed class ChatTuiModel
 
             case ConsoleKey.PageDown:
                 return ChatEffect.ScrollDown;
+
+            case ConsoleKey.End when key.Modifiers.HasFlag(ConsoleModifiers.Control):
+                return ChatEffect.ScrollToBottom;
 
             case ConsoleKey.D when key.Modifiers.HasFlag(ConsoleModifiers.Control):
                 return ArmQuit();

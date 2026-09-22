@@ -140,7 +140,7 @@ public sealed class ChatSession : IDisposable
 
         if (snapshot.Smart)
         {
-            var plan = await _smart.PrepareAsync(line, _toolbelt.Scope, ct);
+            var plan = await _smart.PrepareAsync(line, _toolbelt.Scope, Digest(), ct);
             _log?.Plan(plan);
             PlanMade?.Invoke(plan);
 
@@ -165,6 +165,41 @@ public sealed class ChatSession : IDisposable
         var run = await _loop.RunAsync(prompt, ct);
         _log?.Result(run);
         return run;
+    }
+
+    /// <summary>
+    /// What this conversation already holds, in a few lines: every tool result
+    /// so far by what it was, and each earlier question. Handed to the planner
+    /// and the decision engine so a follow-up does not get a plan to go and fetch
+    /// what is already in context.
+    /// </summary>
+    internal string Digest()
+    {
+        var lines = new List<string>();
+
+        foreach (var message in _loop.Messages)
+        {
+            if (message.Role == "user" && message.Content.StartsWith("[tool:", StringComparison.Ordinal))
+            {
+                // "[tool:web_read] Title\nhttps://…" — keep the tool and its first line.
+                var end = message.Content.IndexOf('\n');
+                var head = end < 0 ? message.Content : message.Content[..end];
+                lines.Add(head.Length > 120 ? head[..120] + "…" : head);
+            }
+            else if (message.Role == "user" && !message.Content.StartsWith('['))
+            {
+                var first = message.Content.Split('\n')[0];
+                lines.Add("- asked earlier: " + (first.Length > 80 ? first[..80] + "…" : first));
+            }
+        }
+
+        // The current request is the last user line and is not "already there".
+        if (lines.Count > 0 && lines[^1].StartsWith("- asked earlier:", StringComparison.Ordinal)) lines.RemoveAt(lines.Count - 1);
+
+        // Newest first, and only the last few: the planner needs to know the
+        // material exists, not to be handed the whole conversation again.
+        lines.Reverse();
+        return string.Join('\n', lines.Take(8));
     }
 
     /// <summary>
