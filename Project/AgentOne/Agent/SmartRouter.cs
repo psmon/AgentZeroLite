@@ -72,6 +72,9 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const string SafeOption = "safe";
     public const string UnsafeOption = "unsafe";
 
+    public const string SameTask = "same_task";
+    public const string NewTask = "new_task";
+
     public const string RouteQuestion =
         "Which resource does answering this request need first? Choose the one that fits best.";
 
@@ -83,6 +86,9 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
 
     public const string SafetyQuestion =
         "Is this command safe to run unattended inside the project folder, or should a person approve it first?";
+
+    public const string TaskSwitchQuestion =
+        "Does the new request continue the task the session is on, or start a different one?";
 
     public static readonly DecisionOption[] RouteOptions =
     [
@@ -117,6 +123,14 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
             "The request asks for something new and large: a project or a feature from scratch, several new files, a " +
             "structure to choose, dependencies between steps, a scaffold to create. Doing it without a plan would go wrong. " +
             "Have the stronger model design the file layout and the steps first; then the everyday model implements it.")
+    ];
+
+    public static readonly DecisionOption[] TaskSwitchOptions =
+    [
+        new(SameTask,
+            "The new request continues, refines, fixes or asks about the same piece of work the session is already on."),
+        new(NewTask,
+            "The new request starts a different piece of work — another feature, another problem, another subject.")
     ];
 
     public static readonly DecisionOption[] SafetyOptions =
@@ -208,6 +222,21 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         var decision = await engine.ChooseAsync(state, SafetyQuestion, SafetyOptions, ct);
         var safe = decision.Ok && decision.Choice == SafeOption && decision.Confidence >= confidenceFloor;
         return new SafetyDecision(safe, decision);
+    }
+
+    // ------------------------------------------------------- task switch
+
+    /// <summary>
+    /// Whether the session's title still fits. Cheap (one engine call) where
+    /// re-naming the task with the LLM after every turn is not; the LLM is
+    /// only asked for a new name when this says the task changed. Follows
+    /// the choice: a stale title is a cosmetic cost, not a wrong action.
+    /// </summary>
+    public async Task<bool> TaskSwitchedAsync(string currentTitle, string request, CancellationToken ct)
+    {
+        var state = $"The session's task so far: {currentTitle}" + "\n\nNew request:\n" + request;
+        var decision = await engine.ChooseAsync(state, TaskSwitchQuestion, TaskSwitchOptions, ct);
+        return decision.Ok && decision.Choice == NewTask;
     }
 
     // -------------------------------------------------------- escalation

@@ -378,9 +378,26 @@ workspace route and for an unsure one): a *confident* `needs_design` — it is a
 steer, so the floor applies; "run the build" once got needs_design at 0.55 —
 sends the request to the reasoning model for a design (`ReasoningSubtask.
 DesignAsync`) that comes back as `[design:<model>]` for the everyday model to
-build. `/status` (F2 in the window) prints `SessionStats` — context size and
-token estimate, Jev calls and ms, escalations, designs, approvals, grants;
-`/new` starts a fresh session and log.
+build. `/status` (F2 in the window) prints `SessionStats` — task name, context size and
+token estimate, Jev calls and ms, escalations, designs, approvals, memory size,
+grants; `/new` starts a fresh session and log.
+
+**A session belongs to its workspace** (`Services/WorkspaceStore`, under
+`~/.agent-one/workspaces/<name>-<sha1[10]>/`): `memory.md` gets one entry per
+turn (asked / did / outcome; `MemoryCapChars` 50 000, oldest entries dropped
+at an entry boundary) and its newest `MemoryPromptChars` (6 000) open every
+session's system prompt (`SystemPrompt.Build(root, memory)`); `sessions/` holds
+the workspace's JSONL logs. `/resume` lists them (`SessionSummary`: title,
+turns, first prompt) and `/resume <n>` calls `ChatSession.Resume(path)`, which
+rebuilds the loop's context from prompt/result pairs (`AgentLoop.Restore`),
+restores the last `title` entry, and keeps appending to the same file
+(`SessionStore.Open`); the renderers replay the entries on screen. **Task
+titles** (`Agent/TaskTitler`) are made by the everyday model *off the turn*
+(`RetitleAsync`, fire-and-forget on `_background`): with an engine,
+`SmartRouter.TaskSwitchedAsync` (same_task / new_task, choice only) gates the
+naming call; without one the task is named once. `ChatSession.NamesTasks` is
+the test switch — a naming call racing a test's assertions on provider calls
+is the flake it prevents.
 
 `grep` is plain substring, not regex, on purpose: the pattern comes from a model,
 and a regex from an untrusted source hangs the process on backtracking. Search

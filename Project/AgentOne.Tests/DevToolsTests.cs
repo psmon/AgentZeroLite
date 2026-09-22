@@ -385,7 +385,7 @@ public class DevSessionTests : IDisposable
         config.TrySet("smartMode", smart ? "on" : "off", out _);
         config.TrySet("saveSessions", "false", out _);
         if (reasoning is not null) config.TrySet("reasoningModel", "big-model", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine, available, reasoning);
+        return new ChatSession(config, _root, streaming: false, provider, engine, available, reasoning) { NamesTasks = false };
     }
 
     private const string RunEcho = """{"tool":"run_command","args":{"command":"echo approved-run"}}""";

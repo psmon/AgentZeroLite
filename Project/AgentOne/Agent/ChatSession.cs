@@ -24,9 +24,12 @@ public sealed record SessionStats(
     string Model,
     string? ReasoningModel,
     string Shell,
+    string? Title,
     int ContextMessages,
     int ContextChars,
     int EstimatedTokens,
+    int MemoryChars,
+    string MemoryPath,
     SessionCounters Counters,
     IReadOnlyList<string> ReadGrants)
 {
@@ -36,9 +39,11 @@ public sealed record SessionStats(
         var c = Counters;
         var lines = new List<string>
         {
+            $"task      {Title ?? "(not named yet)"}",
             $"session   {(LogPath ?? "(not saved)")}",
             $"mode      {(Smart ? "smart" : "basic")} · turns {c.Turns}",
             $"context   {ContextMessages} messages · {ContextChars:N0} chars · ~{EstimatedTokens:N0} tokens (estimate)",
+            $"memory    {MemoryChars:N0} / {WorkspaceStore.MemoryCapChars:N0} chars · {MemoryPath}",
             $"models    {Model} · reasoning {ReasoningModel ?? "none"} · shell {Shell}",
             $"jev       {c.JevCalls} calls · {c.JevMs:N0} ms · escalations {c.Escalations} · designs {c.Designs}",
             $"tools     {c.ToolCalls} calls · commands approved {c.ApprovalsGranted}/{c.ApprovalsAsked} asked",
@@ -57,6 +62,11 @@ public sealed record SessionStats(
 /// all thin renderers over this, so a turn routes, runs, judges its draft and
 /// escalates identically whichever one is in front of it. Three copies of that
 /// logic would drift within a week.
+///
+/// A session belongs to a workspace (<see cref="WorkspaceStore"/>): it opens
+/// with the workspace's memory of earlier sessions, writes what each turn did
+/// back into that memory, logs under the workspace, and can resume any of the
+/// workspace's saved sessions.
 /// </summary>
 public sealed class ChatSession : IDisposable
 {
@@ -73,6 +83,7 @@ public sealed class ChatSession : IDisposable
     private readonly AgentConfig _config;
     private readonly string _root;
     private readonly string _logKind;
+    private readonly CancellationTokenSource _background = new();
     private SessionStore? _log;
 
     /// <summary>What the agent is doing right now, for a status line.</summary>
@@ -89,6 +100,9 @@ public sealed class ChatSession : IDisposable
 
     /// <summary>Something the person should see once: a read grant, an approval outcome.</summary>
     public event Action<string>? Noted;
+
+    /// <summary>The session's task got a (new) name. Raised off the turn, when the model has named it.</summary>
+    public event Action<string>? TitleChanged;
 
     /// <summary>
     /// Who answers when a command needs approval. The REPL reads a line, the
@@ -125,6 +139,8 @@ public sealed class ChatSession : IDisposable
         _smartAvailable = smartAvailable;
         _logKind = logKind;
 
+        Workspace = new WorkspaceStore(_root).Ensure();
+
         // Smart starts where the config left it, but only with a key to make it
         // work. Starting "on" with no key would fail on the first turn.
         _state = new SessionState(config.SmartMode && _smartAvailable);
@@ -140,7 +156,7 @@ public sealed class ChatSession : IDisposable
             (ToolCatalog.ExecFamily, _shell));
 
         _loop = new AgentLoop(_provider, _toolbelt, config.MaxSteps) { Streaming = streaming };
-        _loop.Reset();
+        _loop.Reset(Workspace.MemoryForPrompt());
         _loop.ActivityStarted += what => ActivityStarted?.Invoke(what);
         _loop.StepCompleted += step =>
         {
@@ -154,9 +170,10 @@ public sealed class ChatSession : IDisposable
             reasoning is null ? null : config.ReasoningModel);
         _router.ActivityStarted += what => ActivityStarted?.Invoke(what);
 
-        _log = config.SaveSessions ? SessionStore.Create(logKind) : null;
+        _log = config.SaveSessions ? SessionStore.Create(logKind, Workspace.SessionsDir) : null;
     }
 
+    public WorkspaceStore Workspace { get; }
     public string Root => _root;
     public string ProviderName => _provider.Name;
     public string Model => _config.Model;
@@ -166,6 +183,9 @@ public sealed class ChatSession : IDisposable
     public string? LogPath => _log?.Path;
     public bool SmartAvailable => _smartAvailable;
     public double ConfidenceFloor => _config.JevConfidenceFloor;
+
+    /// <summary>The task this session is on, as the model named it. Null until the first turn is named.</summary>
+    public string? Title { get; private set; }
 
     public bool Smart => _state.Read().Smart;
 
@@ -185,19 +205,61 @@ public sealed class ChatSession : IDisposable
         return true;
     }
 
-    /// <summary>Forgets the conversation, the counters and the read grants; keeps the mode and the log.</summary>
+    /// <summary>Forgets the conversation, the counters, the grants and the title; keeps the mode, the log and the memory.</summary>
     public void Reset()
     {
-        _loop.Reset();
+        _loop.Reset(Workspace.MemoryForPrompt());
         _state.Reset();
         _files.ClearGrants();
+        Title = null;
     }
 
     /// <summary>A fresh session: everything Reset forgets, plus a new log file.</summary>
     public void NewSession()
     {
         Reset();
-        if (_config.SaveSessions) _log = SessionStore.Create(_logKind);
+        if (_config.SaveSessions) _log = SessionStore.Create(_logKind, Workspace.SessionsDir);
+    }
+
+    /// <summary>This workspace's saved sessions, newest first.</summary>
+    public IReadOnlyList<SessionSummary> ListSessions() => Workspace.ListSessions();
+
+    /// <summary>
+    /// Picks a saved session back up: the model's context is rebuilt from its
+    /// questions and answers (the tool traffic between them stays in the file;
+    /// the memory says what was done), its title is restored, and the same
+    /// file keeps being appended to. Returns the transcript, for a renderer to
+    /// replay on screen.
+    /// </summary>
+    public IReadOnlyList<SessionEntry> Resume(string path)
+    {
+        var entries = WorkspaceStore.ReadEntries(path);
+
+        Reset();
+
+        string? pending = null;
+        foreach (var entry in entries)
+        {
+            switch (entry.Kind)
+            {
+                case "prompt":
+                    pending = entry.Text;
+                    _state.CountTurn();
+                    break;
+                case "result":
+                    if (pending is not null && entry.Ok == true) _loop.Restore(pending, entry.Text);
+                    pending = null;
+                    break;
+                case "title":
+                    Title = entry.Text;
+                    break;
+            }
+        }
+
+        _log = SessionStore.Open(path);
+        _log.Resumed();
+        if (Title is { } title) TitleChanged?.Invoke(title);
+        return entries;
     }
 
     /// <summary>The status view's numbers, taken now.</summary>
@@ -208,8 +270,9 @@ public sealed class ChatSession : IDisposable
         foreach (var message in _loop.Messages) chars += message.Content.Length;
 
         return new SessionStats(
-            snapshot.Smart, LogPath, _root, Model, ReasoningModel, Shell,
+            snapshot.Smart, LogPath, _root, Model, ReasoningModel, Shell, Title,
             _loop.Messages.Count, chars, Tokens.Estimate(_loop.Messages),
+            Workspace.MemoryChars, Workspace.MemoryPath,
             snapshot.Counters, snapshot.ReadGrants);
     }
 
@@ -222,7 +285,9 @@ public sealed class ChatSession : IDisposable
     /// draft against the gathered material → if it needs more, the stronger
     /// model reasons over the same material and the everyday model writes the
     /// final answer from that. A folder named by its absolute path becomes
-    /// readable for the session before any of it starts.
+    /// readable for the session before any of it starts; what the turn did is
+    /// written to the workspace memory after, and the task is (re)named off
+    /// the turn.
     /// </summary>
     public async Task<AgentRun?> SubmitAsync(string line, CancellationToken ct)
     {
@@ -281,6 +346,8 @@ public sealed class ChatSession : IDisposable
             run = await MaybeEscalateAsync(line, before, run, ct);
 
         _log?.Result(run);
+        Remember(line, run);
+        _ = RetitleAsync(line, run);
         return run;
     }
 
@@ -290,6 +357,71 @@ public sealed class ChatSession : IDisposable
         Route.Files => "workspace",
         _ => "answer"
     };
+
+    // ------------------------------------------------------------ memory
+
+    /// <summary>One entry per turn: what was asked, what was done, how it ended.</summary>
+    private void Remember(string request, AgentRun run)
+    {
+        var did = run.Steps
+            .Where(s => s.Tool is not ("final" or "unwrapped" or "(unparsed)"))
+            .Select(s => $"{s.Tool}{(s.Ok ? "" : "(failed)")}: {WorkspaceStore.FirstLine(s.Detail, 80)}")
+            .ToList();
+
+        var outcome = run.Succeeded
+            ? Clip(run.Text.Replace("\r", "").Replace('\n', ' '), 300)
+            : $"stopped ({run.Reason}): {Clip(run.Text.Replace('\n', ' '), 200)}";
+
+        var sb = new StringBuilder();
+        sb.Append("## ").Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm")).Append(" · ")
+          .AppendLine(Title ?? WorkspaceStore.FirstLine(request, 60));
+        sb.Append("- asked: ").AppendLine(WorkspaceStore.FirstLine(request, 200));
+        sb.Append("- did: ").AppendLine(did.Count == 0 ? "(no tools)" : string.Join("; ", did));
+        sb.Append("- outcome: ").Append(outcome);
+
+        Workspace.Remember(sb.ToString());
+    }
+
+    private static string Clip(string text, int max) => text.Length <= max ? text : text[..max] + "…";
+
+    // ------------------------------------------------------------- title
+
+    /// <summary>
+    /// Names the task, off the turn — the answer is already on screen. With an
+    /// engine, its task-switch question (0.3 s) decides whether the name still
+    /// fits, and the LLM is only asked for a new one when it does not; without
+    /// an engine the LLM names the task once and the name stays. `run` and the
+    /// echo provider never name anything.
+    /// </summary>
+    /// <summary>Off for tests that count provider calls; the naming call runs off the turn and would race them.</summary>
+    internal bool NamesTasks { get; set; } = true;
+
+    private async Task RetitleAsync(string request, AgentRun run)
+    {
+        if (!NamesTasks || _logKind != "chat" || _provider.Name == "echo") return;
+        var ct = _background.Token;
+
+        try
+        {
+            if (Title is { } current)
+            {
+                if (!_smartAvailable) return;
+                if (!await _router.TaskSwitchedAsync(current, request, ct)) return;
+            }
+
+            var outcome = run.Succeeded ? run.Text : $"stopped: {run.Reason}";
+            var title = await TaskTitler.NameAsync(_provider, request, outcome, Title, ct);
+            if (title.Length == 0 || title == Title) return;
+
+            Title = title;
+            _log?.Title(title);
+            TitleChanged?.Invoke(title);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ChatProviderException)
+        {
+            // A name is a nicety; a failed naming call is not worth a line.
+        }
+    }
 
     /// <summary>The scope question, and the design pass when it says so. Null when the everyday model just goes ahead.</summary>
     private async Task<string?> MaybeDesignAsync(string request, CancellationToken ct)
@@ -493,11 +625,16 @@ public sealed class ChatSession : IDisposable
         // The current request is not in the loop yet, so everything here is
         // genuinely "already there". Newest first, and only the last few.
         lines.Reverse();
-        return string.Join('\n', lines.Take(8));
+        var digest = string.Join('\n', lines.Take(8));
+
+        if (Title is { } title) digest = $"- the session's task: {title}\n" + digest;
+        return digest;
     }
 
     public void Dispose()
     {
+        _background.Cancel();
+        _background.Dispose();
         _engine.Dispose();
         _toolbelt.Dispose();
         (_reasoning as IDisposable)?.Dispose();

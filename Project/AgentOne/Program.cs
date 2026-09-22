@@ -87,7 +87,9 @@ internal static class Program
     {
         Console.WriteLine(AppPaths.BaseDir);
         Console.WriteLine($"  config:   {AppPaths.ConfigPath}");
-        Console.WriteLine($"  sessions: {AppPaths.SessionDir}");
+        Console.WriteLine($"  workspaces: {AppPaths.WorkspacesDir}   (per-root memory.md + sessions/)");
+        Console.WriteLine($"  this one:   {AppPaths.WorkspaceDir(Directory.GetCurrentDirectory())}");
+        Console.WriteLine($"  sessions: {AppPaths.SessionDir}   (legacy, before workspaces)");
         Console.WriteLine($"  logs:     {AppPaths.LogDir}");
         return 0;
     }

@@ -20,6 +20,7 @@ namespace AgentOne.Services;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(AgentConfig))]
 [JsonSerializable(typeof(Credentials))]
+[JsonSerializable(typeof(WorkspaceMeta))]
 public partial class AgentOneJson : JsonSerializerContext;
 
 /// <summary>

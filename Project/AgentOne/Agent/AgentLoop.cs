@@ -15,6 +15,7 @@ namespace AgentOne.Agent;
 public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int maxSteps = 8)
 {
     private readonly List<ChatMessage> _messages = [];
+    private string? _memory;
 
     public IReadOnlyList<ChatMessage> Messages => _messages;
 
@@ -35,10 +36,25 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
     public bool Streaming { get; set; }
 
     /// <summary>Starts a fresh conversation. Called once per chat session, or once per run.</summary>
-    public void Reset()
+    /// <param name="memory">The workspace's memory to open with; null keeps whatever the last Reset used.</param>
+    public void Reset(string? memory = null)
     {
+        if (memory is not null) _memory = memory;
         _messages.Clear();
-        _messages.Add(ChatMessage.System(SystemPrompt.Build(toolbelt.Scope)));
+        _messages.Add(ChatMessage.System(SystemPrompt.Build(toolbelt.Scope, _memory)));
+    }
+
+    /// <summary>
+    /// Puts an earlier exchange back into the conversation, for a resumed
+    /// session: the question and the answer, not the tool traffic between them
+    /// — the answer is what the model needs to continue from, and the memory
+    /// says what was done.
+    /// </summary>
+    public void Restore(string prompt, string answer)
+    {
+        if (_messages.Count == 0) Reset();
+        _messages.Add(ChatMessage.User(prompt));
+        _messages.Add(ChatMessage.Assistant(ToolCall.Final(answer).ToJson()));
     }
 
     /// <param name="families">

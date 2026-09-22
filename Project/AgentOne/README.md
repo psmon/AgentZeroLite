@@ -347,10 +347,46 @@ Three rules hold whatever is asked:
   layout, responsibilities, order of steps — which the everyday model then
   builds step by step.
 
-**F2** (or `/status`) prints the session's status block: context size and a
-token estimate, how many times the decision engine was called and for how
-long, escalations, designs, tool calls, commands approved, and which folders
-are readable. `/new` starts a fresh session with a new log file.
+**F2** (or `/status`) prints the session's status block: the task's name,
+context size and a token estimate, how many times the decision engine was
+called and for how long, escalations, designs, tool calls, commands approved,
+the workspace memory's size, and which folders are readable. `/new` starts a
+fresh session with a new log file.
+
+### The workspace remembers
+
+A session belongs to its workspace (`--root`, default: the current directory),
+and the workspace keeps two things under `~/.agent-one/workspaces/<name>-<hash>/`:
+
+- **`memory.md`** — one entry per turn: what was asked, which tools ran, how it
+  ended. Capped at 50 000 characters, oldest entries falling off. The newest
+  part of it opens every session's system prompt, so a new chat in the same
+  folder knows what was built there a minute — or a week — ago.
+- **`sessions/`** — this workspace's transcripts. `/resume` lists them, newest
+  first, each with its task name and turn count; `/resume 2` picks one up: the
+  screen replays it as it was, the model gets its questions and answers back
+  as context, and the same file keeps being appended to.
+
+```
+› /resume
+  ── sessions in this workspace (newest first) · /resume <n> to pick one ──
+   1. 09-22 22:55 · 3 turns · 게시판 API 빌드 오류 수정  (this one)
+   2. 09-22 22:19 · 6 turns · 게시판 API 만들기
+› /resume 2
+  ── resumed 20260922-221944-chat · 게시판 API 만들기 ──
+› 보드 api를 만들어죠
+  route: unsure (answer_directly), all tools stay available · confidence 0.58
+  ✓ write_file  (24.3s)
+  …
+  ── continuing from here ──
+```
+
+**The task's name** is made by the model, off the turn — never on the way to
+an answer — and shown in the header, the status block, the resume list and the
+memory. With a TypeSafe key, each new request is first put to the decision
+engine as "same task or a new one?" (0.3 s), and the model is only asked for a
+new name when the task changed; without one, the task is named once per
+session. `run` and the echo provider never name anything.
 
 When input or output is a pipe — or with `--plain` — the same conversation runs
 as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin

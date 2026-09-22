@@ -10,7 +10,28 @@ namespace AgentOne.Agent;
 /// </summary>
 public static class SystemPrompt
 {
-    public static string Build(string workspaceRoot)
+    /// <param name="memory">
+    /// The workspace's memory — what earlier sessions did here, newest last —
+    /// or null. Without it a new chat in the same folder knew nothing of the
+    /// project it had been building a minute earlier.
+    /// </param>
+    public static string Build(string workspaceRoot, string? memory = null)
+    {
+        var sb = new StringBuilder(Core(workspaceRoot));
+
+        if (!string.IsNullOrWhiteSpace(memory))
+        {
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.AppendLine("Earlier work in this workspace (from previous sessions, newest last). Use it to continue where");
+            sb.AppendLine("things were left; check the files before assuming they still match:");
+            sb.AppendLine(memory.Trim());
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string Core(string workspaceRoot)
     {
         var sb = new StringBuilder();
 

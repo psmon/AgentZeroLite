@@ -146,7 +146,9 @@ public sealed class ChatTuiPage : ReactivePage<ChatTuiViewModel>
             ? $"   ↑ {model.ScrollOffset} lines above the end · Ctrl+End to follow"
             : "";
 
-        return new TextNode($" {mode}  agent-one · {right}{counters}{scrolled}").WithForeground(colour).NoWrap();
+        var title = model.Title.Length > 0 ? $" · {model.Title}" : "";
+
+        return new TextNode($" {mode}  agent-one · {right}{counters}{title}{scrolled}").WithForeground(colour).NoWrap();
     }
 
     private ILayoutNode InputLine()

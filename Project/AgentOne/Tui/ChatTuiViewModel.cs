@@ -1,5 +1,6 @@
 using AgentOne.Agent;
 using AgentOne.Commands;
+using AgentOne.Services;
 using R3;
 using Termina.Input;
 using Termina.Reactive;
@@ -43,10 +44,14 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     /// <summary>A command waiting for the person's yes or no; the next line typed answers it.</summary>
     private TaskCompletionSource<bool>? _approval;
 
+    /// <summary>The list /resume last printed, so "/resume 2" means the same row the person saw.</summary>
+    private IReadOnlyList<SessionSummary> _resumable = [];
+
     public ChatTuiViewModel(ChatSession session, ChatTuiModel model)
     {
         Session = session;
         Model = model;
+        if (session.Title is { } title) model.SetTitle(title);
 
         session.ActivityStarted += what => { Model.SetStatus("… " + what); Bump(); };
         session.StepCompleted += step =>
@@ -61,9 +66,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
                 _answering = false;
             }
 
-            var seconds = step.ElapsedMs > 0 ? $"  ({step.ElapsedMs / 1000.0:0.0}s)" : "";
-            var detail = step.Tool is ReasoningSubtask.Tag or ReasoningSubtask.DesignTag ? "  " + step.Detail : "";
-            _lines.OnNext(new TranscriptLine(LineKind.Note, $"{(step.Ok ? "✓" : "✗")} {step.Tool}{detail}{seconds}"));
+            _lines.OnNext(new TranscriptLine(LineKind.Note, StepLine(step)));
         };
         session.AnswerDelta += fragment =>
         {
@@ -81,6 +84,12 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             _lines.OnNext(new TranscriptLine(LineKind.Note, $"{note.Kind}: {note.Verdict}{confidence}"));
         };
         session.Noted += note => _lines.OnNext(new TranscriptLine(LineKind.Note, note));
+        session.TitleChanged += title =>
+        {
+            Model.SetTitle(title);
+            _lines.OnNext(new TranscriptLine(LineKind.Note, $"task: {title}"));
+            Bump();
+        };
 
         // A command the gate will not run on its own: park the turn, ask on the
         // input line, and let the next line typed settle it.
@@ -97,6 +106,13 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             Bump();
             return tcs.Task;
         };
+    }
+
+    private static string StepLine(AgentStep step)
+    {
+        var seconds = step.ElapsedMs > 0 ? $"  ({step.ElapsedMs / 1000.0:0.0}s)" : "";
+        var detail = step.Tool is ReasoningSubtask.Tag or ReasoningSubtask.DesignTag ? "  " + step.Detail : "";
+        return $"{(step.Ok ? "✓" : "✗")} {step.Tool}{detail}{seconds}";
     }
 
     public ChatSession Session { get; }
@@ -189,6 +205,84 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             _lines.OnNext(new TranscriptLine(LineKind.Note, row));
     }
 
+    /// <summary>/resume alone lists; /resume N loads that row and replays it on screen.</summary>
+    private void Resume(string argument)
+    {
+        if (argument.Length == 0)
+        {
+            _resumable = Session.ListSessions();
+            if (_resumable.Count == 0)
+            {
+                _lines.OnNext(new TranscriptLine(LineKind.Note, "no saved sessions for this workspace yet"));
+                return;
+            }
+
+            _lines.OnNext(new TranscriptLine(LineKind.Note, "── sessions in this workspace (newest first) · /resume <n> to pick one ──"));
+            var i = 0;
+            foreach (var s in _resumable)
+            {
+                var current = s.Path == Session.LogPath ? "  (this one)" : "";
+                _lines.OnNext(new TranscriptLine(LineKind.Note, $"{++i,2}. {s.Started:MM-dd HH:mm} · {s.Turns} turns · {s.Title}{current}"));
+            }
+            return;
+        }
+
+        if (_resumable.Count == 0) _resumable = Session.ListSessions();
+        if (!int.TryParse(argument, out var n) || n < 1 || n > _resumable.Count)
+        {
+            _lines.OnNext(new TranscriptLine(LineKind.Alert, $"/resume needs a number from the list (1..{_resumable.Count}); /resume alone lists"));
+            return;
+        }
+
+        var chosen = _resumable[n - 1];
+        var entries = Session.Resume(chosen.Path);
+        Model.SetTitle(Session.Title ?? "");
+
+        _lines.OnNext(new TranscriptLine(LineKind.Note, $"── resumed {chosen.Id} · {chosen.Title} ──"));
+        Replay(entries);
+        _lines.OnNext(new TranscriptLine(LineKind.Note, "── continuing from here ──"));
+    }
+
+    /// <summary>The saved transcript, drawn the way it was drawn the first time.</summary>
+    private void Replay(IReadOnlyList<SessionEntry> entries)
+    {
+        foreach (var e in entries)
+        {
+            switch (e.Kind)
+            {
+                case "prompt":
+                    _lines.OnNext(new TranscriptLine(LineKind.User, e.Text));
+                    break;
+                case "step":
+                    if (e.Tool is "final" or "unwrapped") break;
+                    _lines.OnNext(new TranscriptLine(LineKind.Note,
+                        StepLine(new AgentStep(0, e.Tool ?? "?", e.Text, e.Ok ?? true, e.ElapsedMs ?? 0))));
+                    break;
+                case "route" or "scope" or "safety" or "escalation":
+                    _lines.OnNext(new TranscriptLine(LineKind.Note, $"{e.Kind}: {e.Text}"));
+                    break;
+                case "result":
+                    if (e.Ok == true)
+                    {
+                        _lines.OnNext(new TranscriptLine(LineKind.AnswerStart, ""));
+                        _lines.OnNext(new TranscriptLine(LineKind.Delta, e.Text));
+                        _lines.OnNext(new TranscriptLine(LineKind.AnswerEnd, ""));
+                    }
+                    else
+                    {
+                        _lines.OnNext(new TranscriptLine(LineKind.Alert, $"stopped ({e.Tool}): {e.Text}"));
+                    }
+                    break;
+                case "title":
+                    _lines.OnNext(new TranscriptLine(LineKind.Note, $"task: {e.Text}"));
+                    break;
+                case "resumed":
+                    _lines.OnNext(new TranscriptLine(LineKind.Note, "(resumed earlier)"));
+                    break;
+            }
+        }
+    }
+
     private async Task SubmitAsync(string text)
     {
         // A parked command takes the line as its answer; the turn goes on from there.
@@ -209,6 +303,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         if (text is "/reset" or "/new")
         {
             if (text == "/new") Session.NewSession(); else Session.Reset();
+            Model.SetTitle("");
             _lines.OnNext(new TranscriptLine(LineKind.Note,
                 text == "/new" ? $"new session: {Session.LogPath ?? "not saved"}" : "conversation cleared"));
             Bump();
@@ -218,6 +313,13 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         if (text == "/status")
         {
             ShowStatus();
+            Bump();
+            return;
+        }
+
+        if (text == "/resume" || text.StartsWith("/resume ", StringComparison.Ordinal))
+        {
+            Resume(text.Length > 7 ? text[7..].Trim() : "");
             Bump();
             return;
         }

@@ -79,6 +79,11 @@ public sealed class ChatTuiModel
 
     public void SetSmart(bool smart) => Smart = smart;
 
+    /// <summary>The task the session is on, as the model named it; empty until then.</summary>
+    public string Title { get; private set; } = "";
+
+    public void SetTitle(string title) => Title = title;
+
     public void SetStatus(string status) => Status = status;
 
     public void CountTurn() => Turns++;

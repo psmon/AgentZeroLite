@@ -20,6 +20,28 @@ public static class AppPaths
 
     public static string SessionDir => Path.Combine(BaseDir, "sessions");
 
+    /// <summary>Per-workspace memory and sessions live here, one folder per root.</summary>
+    public static string WorkspacesDir => Path.Combine(BaseDir, "workspaces");
+
+    /// <summary>
+    /// The folder for one workspace root: its last path segment for a person
+    /// reading the directory, plus a short hash of the full path so two
+    /// folders called "api" do not share a memory.
+    /// </summary>
+    public static string WorkspaceDir(string root)
+    {
+        var full = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var key = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? full.ToLowerInvariant() : full;
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(key)))[..10].ToLowerInvariant();
+
+        var name = Path.GetFileName(full);
+        if (name.Length == 0) name = "root";
+        var slug = new string(name.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '-').ToArray());
+        if (slug.Length > 32) slug = slug[..32];
+
+        return Path.Combine(WorkspacesDir, $"{slug}-{hash}");
+    }
+
     public static string LogDir => Path.Combine(BaseDir, "logs");
 
     public static string EnsureBaseDir()

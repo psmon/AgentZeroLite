@@ -80,6 +80,7 @@ public sealed class ChatCommand
         };
 
         session.Noted += note => Console.WriteLine($"({note})");
+        session.TitleChanged += title => Console.WriteLine($"(task: {title})");
 
         // A command the gate will not run on its own: the REPL is the person.
         // The turn is on this thread, so reading a line here is exactly right.
@@ -99,11 +100,15 @@ public sealed class ChatCommand
         Console.WriteLine($"agent-one chat — provider {session.ProviderName}, model {session.Model}" +
                           (session.ReasoningModel is { } strong ? $" (reasoning: {strong})" : ""));
         Console.WriteLine($"tools:     {session.ToolScope}");
+        Console.WriteLine($"workspace: {session.Root}" +
+                          (session.Workspace.MemoryChars > 0 ? $"  (memory: {session.Workspace.MemoryChars:N0} chars from earlier sessions)" : ""));
         if (session.LogPath is { } log) Console.WriteLine($"session:   {log}");
         Console.WriteLine(session.SmartAvailable
-            ? "Shift+Tab switches basic ↔ smart · /status · /new starts over · /exit quits."
-            : "/status · /new starts over · /exit or Ctrl+C quits.  (no TypeSafe key — smart mode unavailable)");
+            ? "Shift+Tab switches basic ↔ smart · /status · /resume · /new starts over · /exit quits."
+            : "/status · /resume · /new starts over · /exit or Ctrl+C quits.  (no TypeSafe key — smart mode unavailable)");
         Console.WriteLine();
+
+        IReadOnlyList<SessionSummary> resumable = [];
 
         while (!ct.IsCancellationRequested)
         {
@@ -131,6 +136,36 @@ public sealed class ChatCommand
                 Console.WriteLine();
                 continue;
             }
+            if (line == "/resume" || line.StartsWith("/resume ", StringComparison.Ordinal))
+            {
+                var argument = line.Length > 7 ? line[7..].Trim() : "";
+                if (argument.Length == 0)
+                {
+                    resumable = session.ListSessions();
+                    if (resumable.Count == 0) { Console.WriteLine("(no saved sessions for this workspace yet)"); continue; }
+                    Console.WriteLine("sessions in this workspace (newest first) · /resume <n> to pick one:");
+                    var i = 0;
+                    foreach (var s in resumable)
+                        Console.WriteLine($"  {++i,2}. {s.Started:MM-dd HH:mm} · {s.Turns} turns · {s.Title}{(s.Path == session.LogPath ? "  (this one)" : "")}");
+                    Console.WriteLine();
+                    continue;
+                }
+
+                if (resumable.Count == 0) resumable = session.ListSessions();
+                if (!int.TryParse(argument, out var n) || n < 1 || n > resumable.Count)
+                {
+                    Console.WriteLine($"(/resume needs a number from the list, 1..{resumable.Count})");
+                    continue;
+                }
+
+                var chosen = resumable[n - 1];
+                var entries = session.Resume(chosen.Path);
+                Console.WriteLine($"── resumed {chosen.Id} · {chosen.Title} ──");
+                Replay(entries);
+                Console.WriteLine("── continuing from here ──");
+                Console.WriteLine();
+                continue;
+            }
             if (line.Length == 0) continue;
 
             wroteAnything = false;
@@ -147,6 +182,34 @@ public sealed class ChatCommand
         }
 
         return 0;
+    }
+
+    /// <summary>The saved transcript, printed the way the REPL printed it the first time.</summary>
+    private static void Replay(IReadOnlyList<SessionEntry> entries)
+    {
+        foreach (var e in entries)
+        {
+            switch (e.Kind)
+            {
+                case "prompt":
+                    Console.WriteLine($"[{e.Mode ?? "basic"}] > {e.Text}");
+                    break;
+                case "step":
+                    if (e.Tool is "final" or "unwrapped") break;
+                    Console.WriteLine($"{(e.Ok == false ? "✗" : "✓")} {e.Tool}{(e.ElapsedMs is { } ms ? $"  ({ms / 1000.0:0.0}s)" : "")}");
+                    break;
+                case "route" or "scope" or "safety" or "escalation":
+                    Console.WriteLine($"({e.Kind}: {e.Text})");
+                    break;
+                case "result":
+                    Console.WriteLine(e.Ok == true ? e.Text : $"[stopped: {e.Tool}] {e.Text}");
+                    Console.WriteLine();
+                    break;
+                case "title":
+                    Console.WriteLine($"(task: {e.Text})");
+                    break;
+            }
+        }
     }
 
     /// <summary>What counts as yes at an approval prompt, in the languages this tool is used in.</summary>
@@ -168,13 +231,16 @@ public sealed class ChatCommand
             Keys (window):    Enter send · Shift+Tab basic/smart · F2 status
                               wheel or PageUp/PageDown scroll · Ctrl+End follow
                               Esc clear the line (twice: quit) · Ctrl+D quit
-            Commands (both):  /status  context, counters, grants · /new  fresh session
-                              /reset  clear the conversation · /exit  leave
+            Commands (both):  /status  context, counters, memory, grants
+                              /resume  list this workspace's sessions · /resume <n>  pick one up again
+                              /new  fresh session · /reset  clear the conversation · /exit  leave
 
-            The agent can create files (workspace root only) and run commands
-            (PowerShell on Windows, bash elsewhere). A command the gate does not
-            trust is shown to you first: answer y to run it, anything else to skip.
-            A folder you name by its absolute path becomes readable for the session.
+            A session belongs to the workspace (--root, default: cwd). It opens with
+            the workspace's memory of earlier sessions, and what each turn did is
+            written back to it. The agent can create files (workspace root only)
+            and run commands (PowerShell on Windows, bash elsewhere); a command the
+            gate does not trust is shown to you first — y runs it, anything else
+            skips it. A folder you name by its absolute path becomes readable.
             """);
     }
 }
