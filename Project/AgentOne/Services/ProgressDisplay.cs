@@ -37,7 +37,9 @@ public sealed class ProgressDisplay : IDisposable
 
     /// <summary>The display the current terminal can support, or a silent one.</summary>
     public static ProgressDisplay For(bool enabled) =>
-        new(Console.Error, animate: enabled && !Console.IsErrorRedirected);
+        enabled
+            ? new ProgressDisplay(Console.Error, animate: !Console.IsErrorRedirected)
+            : new ProgressDisplay(TextWriter.Null, animate: false);
 
     /// <summary>What the agent is doing now. Replaces whatever was showing.</summary>
     public void Activity(string what)

@@ -50,7 +50,7 @@ public sealed class ConfigTuiModel
     [
         ["provider", "baseUrl", "apiKey", "apiKeyEnv"],
         [],
-        ["maxSteps", "temperature", "timeoutSeconds", "saveSessions"],
+        ["maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "saveSessions"],
         ["smartMode", "jevApiKey", "jevBaseUrl", "jevModel", "jevConfidenceFloor"]
     ];
 
@@ -195,7 +195,8 @@ public sealed class ConfigTuiModel
         "model" => "set on the Model step",
         "maxSteps" => "tool-loop budget per run, 1..100",
         "temperature" => "0..2 · lower is steadier, which suits a tool-calling loop",
-        "timeoutSeconds" => "per-request timeout, 1..3600",
+        "timeoutSeconds" => "per model request, 1..3600",
+        "webTimeoutSeconds" => "per web page, 1..600 · a slow site should cost seconds, not the whole turn",
         "saveSessions" => "write a JSONL transcript per run under ~/.agent-one/sessions",
         _ => ""
     };

@@ -42,7 +42,7 @@ public sealed class ChatCommand
 
         using var toolbelt = new CompositeToolbelt(
             (ToolCatalog.FilesFamily, new LocalFileToolbelt(options.Root)),
-            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(options.Config.TimeoutSeconds))));
+            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(options.Config.WebTimeoutSeconds))));
         var loop = new AgentLoop(provider, toolbelt, options.Config.MaxSteps);
         loop.Reset();
 
@@ -141,7 +141,7 @@ public sealed class ChatCommand
                 continue;
             }
 
-            session?.Prompt(line);
+            session?.Prompt(line, session_.Smart);
             state.CountTurn();
             wroteAnything = false;
             progress.Restart();
@@ -152,6 +152,7 @@ public sealed class ChatCommand
             {
                 var plan = await smart.PrepareAsync(line, toolbelt.Scope, ct);
                 progress.Stop();
+                session?.Plan(plan);
 
                 // The decision was that a person has to settle it: park the turn
                 // and let the next line typed be the answer.

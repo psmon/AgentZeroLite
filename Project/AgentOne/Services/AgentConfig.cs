@@ -39,6 +39,14 @@ public sealed class AgentConfig
     public int TimeoutSeconds { get; set; } = 120;
 
     /// <summary>
+    /// Seconds to wait on one web page. Its own number because a page is not a
+    /// model call: a slow site once held a turn for two full minutes on the
+    /// provider timeout, for a page that was never going to load.
+    /// </summary>
+    [JsonPropertyName("webTimeoutSeconds")]
+    public int WebTimeoutSeconds { get; set; } = 20;
+
+    /// <summary>
     /// Plan first and let the decision engine choose the approach. Off by
     /// default: it costs an extra LLM turn and an extra service.
     /// </summary>
@@ -68,7 +76,7 @@ public sealed class AgentConfig
     public static readonly string[] Keys =
     [
         "provider", "baseUrl", "model", "apiKeyEnv",
-        "maxSteps", "temperature", "timeoutSeconds", "saveSessions",
+        "maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "saveSessions",
         "jevBaseUrl", "jevModel", "smartMode", "jevConfidenceFloor"
     ];
 
@@ -81,6 +89,7 @@ public sealed class AgentConfig
         "maxSteps"       => MaxSteps.ToString(),
         "temperature"    => Temperature.ToString("0.###"),
         "timeoutSeconds" => TimeoutSeconds.ToString(),
+        "webTimeoutSeconds" => WebTimeoutSeconds.ToString(),
         "saveSessions"   => SaveSessions ? "true" : "false",
         "jevBaseUrl"     => JevBaseUrl,
         "jevModel"       => JevModel,
@@ -133,6 +142,10 @@ public sealed class AgentConfig
             case "timeoutSeconds":
                 if (!int.TryParse(value, out var secs) || secs is < 1 or > 3600) { error = "timeoutSeconds must be 1..3600"; return false; }
                 TimeoutSeconds = secs;
+                return true;
+            case "webTimeoutSeconds":
+                if (!int.TryParse(value, out var webSecs) || webSecs is < 1 or > 600) { error = "webTimeoutSeconds must be 1..600"; return false; }
+                WebTimeoutSeconds = webSecs;
                 return true;
             case "saveSessions":
                 if (!bool.TryParse(value, out var save)) { error = "saveSessions must be true or false"; return false; }

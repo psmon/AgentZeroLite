@@ -60,6 +60,14 @@ public sealed class SessionEntry
 
     [JsonPropertyName("text")]
     public string Text { get; set; } = "";
+
+    /// <summary>How long a step took. Absent on entries that are not steps.</summary>
+    [JsonPropertyName("elapsedMs")]
+    public long? ElapsedMs { get; set; }
+
+    /// <summary>"basic" or "smart", on prompt entries, so a transcript says which mode it ran in.</summary>
+    [JsonPropertyName("mode")]
+    public string? Mode { get; set; }
 }
 
 /// <summary>What <c>agent-one run --json</c> prints: one object, machine-readable, on stdout.</summary>

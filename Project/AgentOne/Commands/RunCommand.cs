@@ -53,11 +53,11 @@ public sealed class RunCommand
 
         using var toolbelt = new CompositeToolbelt(
             (ToolCatalog.FilesFamily, new LocalFileToolbelt(options.Root)),
-            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(options.Config.TimeoutSeconds))));
+            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(options.Config.WebTimeoutSeconds))));
         var loop = new AgentLoop(provider, toolbelt, options.Config.MaxSteps);
 
         SessionStore? session = options.Config.SaveSessions ? SessionStore.Create("run") : null;
-        session?.Prompt(prompt);
+        session?.Prompt(prompt, options.Config.SmartMode);
 
         // Progress goes to stderr and the answer to stdout, so a pipe still gets
         // exactly the answer. --json and --quiet silence the display entirely.
@@ -97,6 +97,7 @@ public sealed class RunCommand
             smart.ActivityStarted += what => progress.Activity(what);
 
             var plan = await smart.PrepareAsync(prompt, toolbelt.Scope, ct);
+            session?.Plan(plan);
 
             // The decision was that a person has to settle it, and `run` has no
             // person. Doing it anyway would be the one thing the option exists
@@ -104,7 +105,6 @@ public sealed class RunCommand
             if (plan.NeedsReview)
             {
                 var decision = plan.Decision!;
-                session?.Step(new AgentStep(0, "plan", $"needs_review ({decision.Confidence:0.00})", false));
                 session?.Result(new AgentRun(StopReason.NeedsReview, SmartTurn.ReviewDescription, [], TimeSpan.Zero));
 
                 if (options.Json)
@@ -152,7 +152,6 @@ public sealed class RunCommand
                         $"  plan: unsure ({decision.Confidence:0.00} < {options.Config.JevConfidenceFloor:0.00}) — not steering");
                 }
 
-                session?.Step(new AgentStep(0, "plan", $"{decision.Choice} ({decision.Confidence:0.00})", plan.Confident));
             }
             else if (plan.Decision is { Ok: false } failed && !options.Json)
             {

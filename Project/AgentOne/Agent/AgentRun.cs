@@ -18,7 +18,8 @@ public enum StopReason
 }
 
 /// <param name="Index">1-based turn number within the run.</param>
-public sealed record AgentStep(int Index, string Tool, string Detail, bool Ok);
+/// <param name="ElapsedMs">Model call plus tool call for this step. Zero when not measured.</param>
+public sealed record AgentStep(int Index, string Tool, string Detail, bool Ok, long ElapsedMs = 0);
 
 /// <summary>Everything one <c>RunAsync</c> produced — what the CLI prints and what the session file records.</summary>
 /// <param name="Streamed">

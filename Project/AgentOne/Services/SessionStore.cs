@@ -32,10 +32,11 @@ public sealed class SessionStore
         return new SessionStore(id, path);
     }
 
-    public void Prompt(string text) => Append(new SessionEntry
+    public void Prompt(string text, bool smart = false) => Append(new SessionEntry
     {
         Timestamp = Now(),
         Kind = "prompt",
+        Mode = smart ? "smart" : "basic",
         Text = text
     });
 
@@ -45,7 +46,22 @@ public sealed class SessionStore
         Kind = "step",
         Tool = step.Tool,
         Ok = step.Ok,
-        Text = step.Detail
+        Text = step.Detail,
+        ElapsedMs = step.ElapsedMs > 0 ? step.ElapsedMs : null
+    });
+
+    /// <summary>What smart mode decided before the loop ran, and whether it was acted on.</summary>
+    public void Plan(Agent.SmartPlan plan) => Append(new SessionEntry
+    {
+        Timestamp = Now(),
+        Kind = "plan",
+        Tool = plan.Decision?.Choice,
+        Ok = plan.Confident,
+        Text = plan.Decision is { } d
+            ? $"{(plan.NeedsReview ? "needs a person" : plan.Confident ? "steering" : "unsure, not steering")} "
+              + $"· confidence {d.Confidence:0.00} · options: {string.Join(", ", plan.Options.Select(o => o.Name))}"
+            : plan.Options.Count == 0 ? "no plan produced" : "one approach, nothing to decide",
+        ElapsedMs = plan.Decision?.ElapsedMs
     });
 
     public void Result(AgentRun run) => Append(new SessionEntry

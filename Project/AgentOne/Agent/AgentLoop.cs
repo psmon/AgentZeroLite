@@ -56,6 +56,7 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
                 return Finish(StopReason.Cancelled, "cancelled", steps, sw);
 
             ActivityStarted?.Invoke(step == 1 ? "thinking" : "thinking about what came back");
+            var stepClock = Stopwatch.StartNew();
 
             string raw;
             var streamer = new FinalAnswerStreamer();
@@ -85,21 +86,37 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
 
             if (!ToolCall.TryParse(raw, out var call, out var parseError))
             {
-                var stepInfo = Emit(steps, step, "(unparsed)", parseError, ok: false);
+                // A reply with no envelope is usually the answer, not a mistake:
+                // a model that has just read 18 KB and written a page of
+                // markdown drops the JSON wrapper more often than not, and two
+                // rounds of "reply with ONE JSON object" cost a minute for the
+                // same text. So substantive prose is taken as final, and only a
+                // short, ambiguous reply gets the nudge.
+                if (LooksLikeAnAnswer(raw, steps))
+                {
+                    var prose = raw.Trim();
+                    Emit(steps, step, "unwrapped",
+                        $"prose accepted as the answer ({prose.Length} chars, after {ToolStepsSoFar(steps)} tool steps)",
+                        ok: true, stepClock.ElapsedMilliseconds);
+                    Emit(steps, step, ToolCall.FinalTool, prose, ok: true);
+                    _messages.Add(ChatMessage.Assistant(raw));
+                    return Finish(StopReason.Final, prose, steps, sw, streamer.Visible);
+                }
+
+                Emit(steps, step, "(unparsed)", parseError, ok: false, stepClock.ElapsedMilliseconds);
                 if (!guards.TryConsumeParseNudge())
                     return Finish(StopReason.ParseFailure, $"model never produced a valid envelope ({parseError})", steps, sw);
 
                 _messages.Add(ChatMessage.Assistant(raw));
                 _messages.Add(ChatMessage.User(
                     $"[error] {parseError}. Reply with ONE JSON object only, e.g. {ToolCall.Final("your answer").ToJson()}"));
-                _ = stepInfo;
                 continue;
             }
 
             if (call.IsFinal)
             {
                 var answer = call.Arg("text");
-                Emit(steps, step, ToolCall.FinalTool, answer, ok: true);
+                Emit(steps, step, ToolCall.FinalTool, answer, ok: true, stepClock.ElapsedMilliseconds);
                 _messages.Add(ChatMessage.Assistant(raw));
 
                 // The parsed answer is the truth; the stream was a preview. If the
@@ -111,7 +128,7 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
 
             if (guards.IsRepeat(call))
             {
-                Emit(steps, step, call.Tool, "repeated call", ok: false);
+                Emit(steps, step, call.Tool, "repeated call", ok: false, stepClock.ElapsedMilliseconds);
                 if (!guards.TryConsumeRepeatNudge())
                     return Finish(StopReason.Repeat, $"model repeated {call.Signature()} with nothing new to add", steps, sw);
 
@@ -139,7 +156,7 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
                 result = ToolResult.Failure($"tool '{call.Tool}' threw: {ex.Message}");
             }
 
-            Emit(steps, step, call.Tool, Summarize(call, result), result.Ok);
+            Emit(steps, step, call.Tool, Summarize(call, result), result.Ok, stepClock.ElapsedMilliseconds);
 
             _messages.Add(ChatMessage.Assistant(raw));
             _messages.Add(ChatMessage.User($"[tool:{call.Tool}] {result.Text}"));
@@ -148,12 +165,33 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
         return Finish(StopReason.MaxSteps, $"step budget ({maxSteps}) exhausted before the model answered", steps, sw);
     }
 
-    private AgentStep Emit(List<AgentStep> steps, int index, string tool, string detail, bool ok)
+    private AgentStep Emit(List<AgentStep> steps, int index, string tool, string detail, bool ok, long elapsedMs = 0)
     {
-        var step = new AgentStep(index, tool, detail, ok);
+        var step = new AgentStep(index, tool, detail, ok, elapsedMs);
         steps.Add(step);
         StepCompleted?.Invoke(step);
         return step;
+    }
+
+    /// <summary>Real tool calls so far — nudges, parse failures and the final do not count.</summary>
+    private static int ToolStepsSoFar(List<AgentStep> steps) =>
+        steps.Count(s => s.Ok && s.Tool is not ("(unparsed)" or "unwrapped") && s.Tool != ToolCall.FinalTool);
+
+    /// <summary>Below this a bare reply is too short to trust as an answer.</summary>
+    public const int ProseAnswerMinChars = 120;
+
+    /// <summary>
+    /// Whether an envelope-less reply should be taken as the answer. Once a tool
+    /// has run, the model has done its work and prose is what it has to say.
+    /// Before that, only a reply long enough to be an answer rather than an
+    /// announcement ("Let me search for that") qualifies.
+    /// </summary>
+    internal static bool LooksLikeAnAnswer(string raw, List<AgentStep> steps)
+    {
+        var text = raw.Trim();
+        if (text.Length == 0) return false;
+        if (ToolStepsSoFar(steps) > 0) return true;
+        return text.Length >= ProseAnswerMinChars;
     }
 
     private static string Summarize(ToolCall call, ToolResult result)
