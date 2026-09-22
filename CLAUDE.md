@@ -213,6 +213,230 @@ What differs from the WPF host, and why:
 - **Local LLM is Windows-only** (LLamaSharp DLLs); macOS uses External providers. Gemma 4's native tool-call syntax is converted to the JSON envelope by `GemmaNativeToolCall` (ZeroCommon, benefits both hosts).
 - CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-14, `.app` bundle via `macos/build-app.sh`); `release.yml` is untouched. macOS GUI checks need a person: `Docs/avalonia-v2/macos-smoke.md`.
 
+### `Project/AgentOne` — a standalone CLI agent (`agent-one`), npm-bound
+
+A second, **independent** product in this repo: a cross-platform CLI agent that
+publishes as a Native AOT single binary (win-x64 / linux-x64 / osx-arm64 /
+osx-x64, ~6 MB, no runtime to install) and ships through npm as
+`@webnori/agent-one`. Skeleton borrowed from `C:\code\psmon\CodeScan` — argv
+switch in `Program.cs` → `Commands/`, all state under `~/.agent-one/`
+(`Services/AppPaths`), `version.txt` MSBuild auto-bump, `packaging/npm/` wrapper
+that downloads a release asset and verifies its SHA256. Full guide:
+`Project/AgentOne/README.md`.
+
+```bash
+dotnet build Project/AgentOne/AgentOne.csproj -c Debug
+dotnet test  Project/AgentOne.Tests/AgentOne.Tests.csproj     # headless, cross-platform
+Project/AgentOne/bin/Debug/net10.0/agent-one run "hello" --provider echo
+dotnet publish Project/AgentOne/AgentOne.csproj -c Release -r win-x64 -o out/win-x64
+
+# Dev shortcut: builds if missing/stale, then runs. Works from any directory.
+Project/AgentOne/agent-one.ps1 run "hello" --provider echo
+Project/AgentOne/agent-one.ps1 tui
+```
+
+`agent-one.ps1` declares **no** PowerShell parameters on purpose — agent-one's
+own flags include `-r`, `-p`, `-m` and `-v`, and PowerShell would bind those to
+any parameter whose name starts with the same letter (`-r` → `-Rebuild`) before
+the binary saw them. It reads `$args` raw and lifts out only `-Rebuild` /
+`-NoBuild`. It also pins the version from `version.txt` so the wrapper never
+dirties that tracked file, and calls the exe directly (not `Start-Process`)
+because the TUI needs the real console.
+
+**It references nothing else in this solution, and nothing references it.** That
+is the point, not an oversight: ZeroCommon's agent loop is bound to Akka, EF
+Core, LLamaSharp and ONNX with `runtimes/win-x64-*` natives — none of which
+survives Native AOT or a non-Windows target. agent-one reimplements the small
+part it needs (`Agent/AgentLoop` over `IChatProvider` + `IToolbelt`, one JSON
+envelope per turn) so it stays extractable into its own repo. The intended
+integration is process-level: launch `agent-one --json` and read one object off
+stdout, the way the GUI launches `AgentZeroWearable.exe`.
+
+**Settings TUI** (`agent-one setup`; `tui` and `config tui` are aliases) — a five-step stack
+over `~/.agent-one/config.json`: **1. Connection** (provider, baseUrl, apiKeyEnv)
+→ **2. Model** → **3. Reasoning** (the slow, strong model hard questions are
+escalated to: `reasoningBaseUrl` / `reasoningApiKey` / `reasoningModel`, each
+empty meaning "same as the step before"; `AgentConfig.ForReasoning()` derives
+the config a provider needs, and `ApiKey.Resolve` honours its `KeySlot`) →
+**4. Options** → **5. Smart**. The order is the dependency: you cannot pick a
+model until the endpoint and key are right, and the endpoint is what knows which
+models exist. **Arriving at step 2 calls `GET {baseUrl}/models`**, which is
+deliberately also the health check for step 1 — one request covers base URL,
+network and key — so an empty or rejected list is reported as a failure naming
+both suspects rather than as an empty picker. `t` sends one real request through
+the settings as they stand. `Esc` means "back a step" and only quits from the
+first one. Built on **Termina** (`Tui/`), the one TUI measured to survive Native
+AOT here — see `Docs/agent-netclaw/README.md`. The rules live in
+`Tui/ConfigTuiModel.cs`, a state machine over `ConsoleKeyInfo` with no terminal
+in it, so the steps and the key map are unit tested; the Termina page only
+projects it. `agent-one setup --selftest` drives the real screen from a scripted
+key source, and the release workflow runs it on every RID.
+
+**Smart mode** (`--smart`, or Shift+Tab in chat) asks `IDecisionEngine` (Jev)
+two fixed-option questions per turn, in `Agent/SmartRouter` — no planning LLM
+call (a planner-generated option set cost 12–15 s and rarely separated; a fixed
+one costs 0.3 s). **① Route**, before the loop: web / files / answer directly;
+a confident choice is *enforced* — `AgentLoop.RunAsync(…, families)` refuses a
+call outside the family rather than merely suggesting, because a small model
+treats a suggestion as one option among many. **② Escalate**, after the
+everyday model's draft: the engine sees the request, every tool result, the
+draft and *both model names*, and if it says the problem needs more,
+`Agent/ReasoningSubtask` hands the same material to the reasoning model (TUI
+step 3, `AgentConfig.ForReasoning()`) and its answer goes back into the
+everyday model's conversation as `[reasoning:<model>]` for that model to write
+the final answer. Requests under `SmartRouter.MinRequestChars` (10) skip the
+engine; a route steers only at or above `jevConfidenceFloor`, but escalation
+follows the engine's choice alone (a two-option judgement call sat at 0.25 for
+a plainly shallow draft — the strong model costs time, not correctness); a
+failed engine or unreachable strong model leaves the turn as basic mode would
+have run it.
+`run` is one turn of the same `ChatSession`, so there is exactly one copy of
+this flow.
+
+**Chat has two faces over one pipeline.** `agent-one chat` in a terminal opens a
+Termina window (`Tui/ChatTui*`: transcript in a `StreamingTextNode`, input line at
+the bottom, mode in the header); piped or with `--plain` it is the line REPL in
+`ChatCommand.RunPlainAsync`. Both are renderers over `Agent/ChatSession`, which
+owns the loop, smart mode, the pause-for-a-person and the resume. Put a turn
+rule in ChatSession, never in a renderer, or the two will drift. The window's
+selftest boots it with scripted keys, runs one echo turn, then PageUp, with
+**every key queued before the window starts**. Two Termina facts it encodes: a
+key pushed into an *idle* `VirtualInputSource` is, under Native AOT, delivered
+only when the loop next wakes for something else (2–9 s measured; real console
+keys arrive in <100 ms, so only the selftest cares — hence never let the queue
+go idle, which works because the echo turn completes inside the Enter
+keystroke); and `StreamingTextNode` re-measures a line per cell it draws, so
+`Tui/SoftWrap` folds every transcript line to the window width first (one
+2,300-char answer line used to freeze the window for 9 s). ChatSession has its
+own deterministic tests for pause/resume.
+
+`SessionState` is actor-*shaped*, not Akka: one owner, serialised mutations,
+snapshot reads. An actor runtime is exactly the dependency a Native AOT single
+binary cannot afford — the same reason this project does not reference
+ZeroCommon.
+
+**Every stdin read goes through `Services/StandardInput`.** `Console.In` decodes
+a redirected stream with the console code page, which turns piped Korean into
+mojibake. That was fixed once in `run` and then reappeared in `chat`, which is
+why there is now one reader instead of a fix per call site.
+
+**The API key never goes in `config.json`.** It lives alone in
+`~/.agent-one/credentials.json` (`CredentialStore`), and `ApiKey.Resolve` is the
+single place that decides the order: stored key first, then `$apiKeyEnv`. The
+`apiKeyEnv` field holds the NAME of a variable and now refuses anything that is
+not one — a real incident had a key pasted there, where it silently did nothing
+and surfaced only as an unexplained 401. `ConfigStore.Load` flags such a file and
+`agent-one auth import` repairs it. `agent-one auth set` reads the key from a
+hidden prompt or stdin, never from argv, so it stays out of shell history.
+
+Two things about that selftest: step navigation and the picker are verified
+**below** the UI, because arriving at step 2 starts an async listing during which
+the screen ignores keys — a scripted walk would race it and fail at random. And
+`ConfigTuiModel.StepFields` is the single source of truth for which key belongs
+to which step; a test asserts every `AgentConfig.Keys` entry is owned by exactly
+one step (with `model` being the Model step itself).
+
+Three things that are easy to break here:
+
+- **AOT means no reflection-based JSON.** Every serialized type is declared in
+  `AgentOneJson` (config, indented) or `AgentOneWireJson` (wire / JSONL /
+  `--json`, compact), and the csproj sets
+  `JsonSerializerIsReflectionEnabledByDefault=false` so a stray
+  `JsonSerializer.Serialize(obj, type, options)` is an IL2026/IL3050 **warning at
+  build time** instead of a crash that only appears in the published binary.
+- **`ToolCatalog` is the single source of truth** for the verbs — the system
+  prompt is generated from it, `agent-one tools list` prints it, and
+  `ToolCatalogTests` asserts the toolbelt answers every verb in it. Add a verb in
+  one place only and the tests fail rather than the model getting confused.
+- **`AGENT_ONE_HOME` is a process-wide environment variable**, so every test class
+  that relocates it joins the `AgentOneHomeCollection` xUnit collection and they
+  run one at a time. Add a class that sets it without joining, and unrelated
+  config tests start failing in parallel runs for no visible reason.
+- **The Windows AOT link step needs `vswhere.exe` on `PATH`** (
+  `C:\Program Files (x86)\Microsoft Visual Studio\Installer`) or a Developer
+  prompt; Linux needs `clang` + `zlib1g-dev`. The release workflow
+  (`.github/workflows/agent-one-release.yml`, tag `agent-one-v*`) handles both and
+  smoke-tests each artifact before it reaches the release page.
+
+Tools come in four families routed by `CompositeToolbelt` from each `ToolSpec`'s
+`Family`: **files** (`list_files`, `read_file`, `find_files`, `grep`) and
+**edit** (`write_file`, whole file, folders created) — both on
+`LocalFileToolbelt`, sandboxed to `--root` and resolved through symlinks before
+the containment check; **web** (`web_search`, `web_read`), GETs only; and
+**exec** (`run_command`, `ShellToolbelt`: PowerShell on Windows, bash/sh
+elsewhere, cwd = root, killed past `commandTimeoutSeconds`). The two families
+that change something are `ToolCatalog.GuardedFamilies`, and a test keeps every
+writing/running verb inside them. **Writes never leave the root**; a folder the
+user names by absolute path (`Tools/PathGrants`) is granted for *reading* only,
+for the session. **Commands go through a gate** (`ChatSession.GateAsync`):
+`Agent/CommandRisk` patterns (rm -rf /, sudo, format, piped installers,
+force-push…) always ask a person; otherwise Jev's safety question runs it only
+on a *confident* `safe`; everything else is put to `ChatSession.Approver` — the
+REPL reads a line, the window parks the turn on the input line, `run` refuses
+unless `--yes`. Smart mode also sizes workspace work (`scope`, asked for a
+workspace route and for an unsure one): a *confident* `needs_design` — it is a
+steer, so the floor applies; "run the build" once got needs_design at 0.55 —
+sends the request to the reasoning model for a design (`ReasoningSubtask.
+DesignAsync`) that comes back as `[design:<model>]` for the everyday model to
+build. The design's head is raised as `DesignMade` for the renderers; a design
+that opens with `DECISION NEEDED:` + a numbered list (`ExtractDecision`) is put
+to `ChatSession.Chooser` — REPL reads a line, the window parks the turn, `run`
+takes the recommendation — and the pick rides into the feedback line. A turn
+stopped by MaxSteps/Repeat after tool work gets `WrapUpAsync`: one no-tools
+call for "done / left / next steps", the stop reason kept on the run. `maxSteps`
+defaults to 50. **A broken tool envelope is never an answer**: `ToolCall.Repair`
+escapes raw newlines/tabs and unknown backslash escapes inside JSON strings and
+retries the parse (gemma's `write_file` with real newlines, a grep with `\.`);
+what still fails gets the nudge, because `LooksLikeAnAnswer` refuses anything
+shaped like an envelope — measured, a 2,564-char write_file was once shown to
+the user as the answer and the file never written. `/status` (F2 in the window) prints `SessionStats` — task name, context size and
+token estimate, Jev calls and ms, escalations, designs, approvals, memory size,
+grants; `/new` starts a fresh session and log.
+
+**A session belongs to its workspace** (`Services/WorkspaceStore`, under
+`~/.agent-one/workspaces/<name>-<sha1[10]>/`): `memory.md` gets one entry per
+turn (asked / did / outcome; `MemoryCapChars` 50 000, oldest entries dropped
+at an entry boundary) and its newest `MemoryPromptChars` (6 000) open every
+session's system prompt (`SystemPrompt.Build(root, memory)`); `sessions/` holds
+the workspace's JSONL logs. `/resume` lists them (`SessionSummary`: title,
+turns, first prompt) and `/resume <n>` calls `ChatSession.Resume(path)`, which
+rebuilds the loop's context from prompt/result pairs (`AgentLoop.Restore`),
+restores the last `title` entry, and keeps appending to the same file
+(`SessionStore.Open`); the renderers replay the entries on screen. **Task
+titles** (`Agent/TaskTitler`) are made by the everyday model from the request,
+*beside* the turn (`RetitleAsync`, fire-and-forget on `_background` as the
+turn starts — a greeting got "상담 시작 및 문의 응대" and a long build turn
+left the header stale until it ended, so now only requests that pass
+`SmartRouter.Applies` are named, and at the start): with an engine,
+`SmartRouter.TaskSwitchedAsync` (same_task / new_task, choice only) gates the
+naming call; without one the task is named once. `ChatSession.NamesTasks` is
+the test switch — a naming call racing a test's assertions on provider calls
+is the flake it prevents; `ScriptedChatProvider.TitleReplies` answers naming
+calls (recognised by `TaskTitler.SystemPrompt`) so they never eat the turn's
+scripted replies.
+
+`grep` is plain substring, not regex, on purpose: the pattern comes from a model,
+and a regex from an untrusted source hangs the process on backtracking. Search
+uses DuckDuckGo's HTML endpoint (no key), so a markup change degrades to "no
+results parsed" rather than to wrong results. `Tools/Web/HtmlText` strips markup
+with source-generated regexes — block tags become newlines, inline tags vanish
+with no space, or `Akka<b>.NET</b>` reads back as `Akka .NET`.
+
+Tool output reaches the model as `[tool:<name>]` user messages and the system
+prompt states it is data, not instructions — naming web pages explicitly, since
+that is the one source written by strangers.
+
+**Progress and streaming**: `AgentLoop` raises `ActivityStarted` per turn and
+`AnswerDelta` per fragment; `ProgressDisplay` renders a live line on **stderr**
+(rewritten in place on a TTY, one plain line per step when redirected) and the
+answer streams to **stdout**, so pipes and `--json` are unaffected. Providers
+take an optional `onDelta` — the OpenAI one then switches to SSE, and the
+accumulated return value stays the truth while deltas are only a preview
+(`AgentRun.Unstreamed` is what is left to print). `FinalAnswerStreamer` decodes
+the `text` field out of the JSON envelope as it arrives, and deliberately streams
+**nothing** for a tool call, because `grep` also has a `text` argument and
+printing a search pattern as the answer would be a plausible-looking lie.
+
 ## Ancestor reference — AgentWin (Origin)
 
 AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). When the user mentions *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"the ancestor"*, or asks to *"compare with origin"* / *"오리진이랑 비교"* / *"오리진 참고"*, **read `Docs/agent-origin/` first** instead of crawling the Origin codebase from scratch:
@@ -223,3 +447,26 @@ AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). Wh
 - `Docs/agent-origin/03-adoption-recommendations.md` — Adoption roadmap with cost & trade-offs
 
 These docs are a 2026-04-27 snapshot. If they look stale (e.g. > 6 months) or the user asks about a topic not covered, re-survey `D:\Code\AI\AgentWin` directly and **update the relevant `Docs/agent-origin/*.md` file** so the snapshot stays useful for future sessions.
+
+## Reference projects — read the analysis doc before crawling the clone
+
+External codebases surveyed for adoption. Each has a `Docs/agent-<name>/` doc set;
+**read it first**, and re-survey the clone only when the snapshot looks stale or the
+topic is not covered — then update the doc so the next session inherits the answer.
+
+| Mentioned as | Doc set | Clone (read-only, never copied into the repo) |
+|---|---|---|
+| orca, ADE, 병렬 에이전틱 IDE | `Docs/agent-orca/` | `E:\git-other\orca` |
+| herdr | `Docs/agent-herdr/` | — |
+| netclaw, Termina, TUI, AOT TUI | `Docs/agent-netclaw/` | `C:\code\psmon\research\netclaw` |
+| CodeScan (agent-one's skeleton) | — (see `Project/AgentOne/README.md`) | `C:\code\psmon\CodeScan` |
+| Jev, TypeSafe, smart mode, System One | `Project/AgentOne/docs/smart-mode-jev.md` | — (hosted API, docs only) |
+
+`C:\code\psmon\research\` is where reference clones for analysis live.
+
+**One finding worth not re-deriving**: `Docs/agent-netclaw/README.md` records a
+*measured* result — **Termina 0.16.2 publishes under Native AOT with zero trim
+warnings and the published binary actually runs** (5.19 MB probe, headless via
+`VirtualInputSource`). Terminal.Gui was not shown to do this: CodeScan ships it
+with `-p:TrimMode=""` and a 112 MB non-trimmed binary. So a TUI added to
+`Project/AgentOne` uses Termina, not Terminal.Gui. Only win-x64 was measured.

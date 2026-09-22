@@ -1,0 +1,48 @@
+{
+  "name": "@webnori/agent-one",
+  "version": "0.0.0",
+  "description": "A standalone CLI agent: ask a question, it reads your workspace and answers. (npm wrapper around the prebuilt agent-one binary.)",
+  "keywords": [
+    "agent",
+    "cli",
+    "llm",
+    "openai-compatible",
+    "ollama",
+    "tool-use"
+  ],
+  "homepage": "https://github.com/psmon/AgentZeroLite/tree/main/Project/AgentOne",
+  "bugs": {
+    "url": "https://github.com/psmon/AgentZeroLite/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/psmon/AgentZeroLite.git",
+    "directory": "Project/AgentOne/packaging/npm/agent-one"
+  },
+  "license": "MIT",
+  "author": "psmon",
+  "bin": {
+    "agent-one": "bin/agent-one.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install.js",
+    "preuninstall": "node scripts/uninstall.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
