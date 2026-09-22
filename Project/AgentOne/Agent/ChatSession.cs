@@ -107,6 +107,11 @@ public sealed class ChatSession : IAgentSession
     private readonly GraphMemory? _graph;
     private SessionStore? _log;
 
+    /// <summary>The running turn's own cancellation — Stop, from a pause, cancels this.</summary>
+    private CancellationTokenSource? _turnCts;
+    private string _turnRequest = "";
+    private readonly List<string> _turnProgress = [];
+
     /// <summary>What the agent is doing right now, for a status line.</summary>
     public event Action<string>? ActivityStarted;
 
@@ -199,6 +204,7 @@ public sealed class ChatSession : IAgentSession
         _loop.ActivityStarted += what => ActivityStarted?.Invoke(what);
         _loop.StepCompleted += step =>
         {
+            if (step.Tool is not ("final" or "unwrapped")) _turnProgress.Add($"{step.Tool}{(step.Ok ? "" : " (failed)")}");
             if (ToolCatalog.FamilyOf(step.Tool) is { } family && family != ToolCatalog.LoopFamily) _state.CountToolCall();
             _log?.Step(step);
             StepCompleted?.Invoke(step);
@@ -334,6 +340,105 @@ public sealed class ChatSession : IAgentSession
         line = line.Trim();
         if (line.Length == 0) return null;
 
+        // The turn runs on its own token, linked to the caller's, so a Stop
+        // typed during a pause ends this turn and nothing else.
+        using var turn = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _turnCts = turn;
+        _turnRequest = line;
+        _turnProgress.Clear();
+        try
+        {
+            return await SubmitCoreAsync(line, turn.Token);
+        }
+        finally
+        {
+            _turnCts = null;
+            _loop.Pause.Clear();
+        }
+    }
+
+    // ------------------------------------------------------------- pause
+
+    /// <summary>True while the turn is held between steps.</summary>
+    public bool Paused => _loop.Pause.IsPaused;
+
+    /// <summary>
+    /// Holds the turn at its next step — the request in flight finishes first;
+    /// nothing can interrupt a model mid-sentence. Harmless when nothing runs:
+    /// the next turn would pause at its first step, so it is cleared then.
+    /// </summary>
+    public void Pause()
+    {
+        if (_turnCts is null) return;
+        _loop.Pause.Pause();
+        Noted?.Invoke("⏸ pausing at the next step — type to go on, 'stop' to abandon, or say what to change");
+    }
+
+    /// <summary>
+    /// The line typed during a pause, read for what it means — resume, stop,
+    /// or refine — by the decision engine when there is one, by a short word
+    /// list otherwise; then applied. Refining puts the line in front of the
+    /// model as the next thing it reads.
+    /// </summary>
+    public async Task<PauseOutcome> ResumeAsync(string line, CancellationToken ct)
+    {
+        line = line.Trim();
+        if (_turnCts is null || !_loop.Pause.IsPaused)
+            return new PauseOutcome(PauseVerdict.Resume, null, "nothing is paused");
+
+        Decision? decision = null;
+        PauseVerdict verdict;
+        if (line.Length == 0 || !_smartAvailable)
+        {
+            verdict = JudgePauseLine(line);
+        }
+        else
+        {
+            decision = await _router.PauseVerdictAsync(_turnRequest, string.Join("; ", _turnProgress), line, ct);
+            verdict = decision.Ok ? decision.Choice switch
+            {
+                SmartRouter.StopOption => PauseVerdict.Stop,
+                SmartRouter.RefineOption => PauseVerdict.Refine,
+                _ => PauseVerdict.Resume
+            } : JudgePauseLine(line);
+        }
+
+        string message;
+        switch (verdict)
+        {
+            case PauseVerdict.Stop:
+                message = "stopped — the turn is abandoned";
+                _turnCts.Cancel();
+                _loop.Pause.Resume();
+                break;
+            case PauseVerdict.Refine:
+                message = "refining: " + WorkspaceStore.FirstLine(line, 120);
+                _loop.Pause.Resume(line);
+                break;
+            default:
+                message = "resuming";
+                _loop.Pause.Resume();
+                break;
+        }
+
+        _log?.Decision("pause", decision ?? new Decision(true, verdict.ToString().ToLowerInvariant(), 1.0, new Dictionary<string, double>(), "rule", 0), message);
+        Decided?.Invoke(new SmartNote("pause", decision ?? new Decision(true, verdict.ToString().ToLowerInvariant(), 1.0, new Dictionary<string, double>(), "rule", 0), message));
+        return new PauseOutcome(verdict, decision, message);
+    }
+
+    /// <summary>The plain rule, for no engine or an empty line: a few words mean go on or stop; anything else is a refinement.</summary>
+    internal static PauseVerdict JudgePauseLine(string line)
+    {
+        var l = line.Trim().ToLowerInvariant().TrimEnd('.', '!');
+        if (l.Length == 0 || l is "continue" or "go on" or "go" or "ok" or "resume" or "y" or "yes" or "계속" or "재개" or "진행" or "고" or "ㅇㅋ")
+            return PauseVerdict.Resume;
+        if (l is "stop" or "cancel" or "abort" or "quit" or "never mind" or "forget it" or "n" or "no" or "중단" or "그만" or "취소" or "멈춰" or "스톱")
+            return PauseVerdict.Stop;
+        return PauseVerdict.Refine;
+    }
+
+    private async Task<AgentRun?> SubmitCoreAsync(string line, CancellationToken ct)
+    {
         GrantNamedFolders(line);
 
         var snapshot = _state.Read();

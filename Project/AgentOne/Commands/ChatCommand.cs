@@ -254,6 +254,8 @@ public sealed class ChatCommand
 
             Keys (window):    Enter send · Shift+Tab basic/smart · F2 status
                               wheel or PageUp/PageDown scroll · Ctrl+End follow
+                              Esc while a turn runs: pause it at its next step — then
+                                  Enter goes on, "stop" abandons it, anything else refines it
                               Esc clear the line (twice: quit) · Ctrl+D quit
             Commands (both):  /status  context, counters, memory, grants
                               /resume  list this workspace's sessions · /resume <n>  pick one up again

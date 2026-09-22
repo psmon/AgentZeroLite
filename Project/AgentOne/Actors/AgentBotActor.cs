@@ -53,6 +53,8 @@ public sealed class AgentBotActor : ReceiveActor
 
         Receive<CancelAgentLoop>(msg => _loop?.Tell(msg));
         Receive<ResolvePause>(msg => _loop?.Tell(msg));
+        Receive<PauseAgentLoop>(msg => EnsureLoop().Forward(msg));
+        Receive<ResumeAgentLoop>(msg => EnsureLoop().Forward(msg));
         Receive<IAgentSessionCommand>(msg => EnsureLoop().Forward(msg));
 
         // From the loop, out to the renderer.

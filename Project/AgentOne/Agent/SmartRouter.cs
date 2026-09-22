@@ -72,6 +72,10 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const string SafeOption = "safe";
     public const string UnsafeOption = "unsafe";
 
+    public const string ResumeOption = "resume";
+    public const string StopOption = "stop";
+    public const string RefineOption = "refine";
+
     public const string SameTask = "same_task";
     public const string NewTask = "new_task";
 
@@ -235,6 +239,16 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const string RecentFirst = "recent";
     public const string MostHelpful = "most_helpful";
 
+    public const string PauseQuestion =
+        "The person paused the agent mid-task and then typed this line. What do they mean by it?";
+
+    public static readonly DecisionOption[] PauseOptions =
+    [
+        new(ResumeOption, "Go on exactly as before: an empty line, 'continue', 'go on', 'ok', 'resume', or a remark that changes nothing."),
+        new(StopOption, "Abandon the task: 'stop', 'cancel', 'never mind', 'forget it', or a new request unrelated to the task."),
+        new(RefineOption, "Go on, but with this instruction taken into account: a correction, a constraint, a detail, a change of direction within the same task.")
+    ];
+
     public const string WorthSavingQuestion =
         "Did this turn produce knowledge a future session in this project would be glad to have — something not obvious " +
         "from the files themselves, and not a passing detail?";
@@ -293,6 +307,14 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     /// </summary>
     public bool KeepsKnowledge(Decision verdict) =>
         verdict.Ok && (verdict.Choice == SaveKnowledge || verdict.Confidence < confidenceFloor);
+
+    /// <summary>A line typed during a pause: resume, stop, or refine. Follows the choice — three options rarely clear a floor.</summary>
+    public async Task<Decision> PauseVerdictAsync(string request, string progress, string line, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("reading what the pause line means");
+        var state = "Task in progress:\n" + request + "\n\nDone so far:\n" + Clip(progress, 1500) + "\n\nTyped while paused:\n" + line;
+        return await engine.ChooseAsync(state, PauseQuestion, PauseOptions, ct);
+    }
 
     /// <summary>Before a turn: is the graph worth a look? Follows the choice.</summary>
     public async Task<Decision> GraphHelpsAsync(string request, string graphSummary, CancellationToken ct)

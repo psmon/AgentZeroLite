@@ -183,6 +183,27 @@ public sealed class AgentLoopActor : ReceiveActor
             if (_pauses.Remove(r.PauseId, out var answer)) answer.TrySetResult(r.Answer);
         });
 
+        // The person's pause. Both states: pausing with nothing running is a
+        // no-op the session already handles, and resuming judges the line on
+        // the pool (the engine may be asked) and answers the asker from there.
+        Receive<PauseAgentLoop>(_ =>
+        {
+            if (!EnsureSession()) { Sender.Tell(new AgentSessionFailed(_failure!)); return; }
+            _session!.Pause();
+            Sender.Tell(new AgentLoopPaused(_session.Paused));
+        });
+        Receive<ResumeAgentLoop>(m =>
+        {
+            if (!EnsureSession()) { Sender.Tell(new AgentSessionFailed(_failure!)); return; }
+            var session = _session!;
+            var asker = Sender;
+            Task.Run(async () =>
+            {
+                try { return (object)new AgentLoopResumed(await session.ResumeAsync(m.Line, CancellationToken.None)); }
+                catch (Exception ex) when (ex is ChatProviderException or InvalidOperationException) { return new AgentSessionFailed(ex.Message); }
+            }).PipeTo(asker);
+        });
+
         Receive<QueryAgentInfo>(_ => Sender.Tell(EnsureSession() ? Info() : new AgentSessionFailed(_failure!)));
         Receive<QueryAgentStats>(_ => Reply(s => s.Stats()));
         Receive<QueryAgentSessions>(_ => Reply(s => new AgentSessionList(s.ListSessions())));

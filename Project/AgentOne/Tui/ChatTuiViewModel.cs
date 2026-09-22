@@ -40,6 +40,20 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     private readonly Subject<TranscriptLine> _lines = new();
     private readonly Subject<ScrollRequest> _scroll = new();
     private bool _answering;
+    private volatile bool _wired;
+
+    /// <summary>
+    /// Everything the session reports is applied on Termina's own loop, the
+    /// way AgentZero's window dispatches the bot's callbacks: the events
+    /// arrive on other threads, and the transcript, the model and the layout
+    /// are only ever touched from the loop. Before the page is wired up there
+    /// is no loop to post to, so the work runs inline.
+    /// </summary>
+    private void Ui(Action work)
+    {
+        if (_wired) Post(work);
+        else work();
+    }
 
     /// <summary>A command waiting for the person's yes or no; the next line typed answers it.</summary>
     private TaskCompletionSource<bool>? _approval;
@@ -56,8 +70,8 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         Model = model;
         if (session.Title is { } title) model.SetTitle(title);
 
-        session.ActivityStarted += what => { Model.SetStatus("… " + what); Bump(); };
-        session.StepCompleted += step =>
+        session.ActivityStarted += what => Ui(() => { Model.SetStatus("… " + what); Bump(); });
+        session.StepCompleted += step => Ui(() =>
         {
             if (step.Tool is "final" or "unwrapped") return;
 
@@ -70,13 +84,13 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             }
 
             _lines.OnNext(new TranscriptLine(LineKind.Note, StepLine(step)));
-        };
-        session.AnswerDelta += fragment =>
+        });
+        session.AnswerDelta += fragment => Ui(() =>
         {
             if (!_answering) { _answering = true; _lines.OnNext(new TranscriptLine(LineKind.AnswerStart, "")); }
             _lines.OnNext(new TranscriptLine(LineKind.Delta, fragment));
-        };
-        session.Decided += note =>
+        });
+        session.Decided += note => Ui(() =>
         {
             if (note.Kind == "escalation" && _answering && note.Verdict.StartsWith("escalating", StringComparison.Ordinal))
             {
@@ -85,21 +99,21 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             }
             var confidence = note.Decision.Ok ? $"  (confidence {note.Decision.Confidence:0.00})" : "";
             _lines.OnNext(new TranscriptLine(LineKind.Note, $"{note.Kind}: {note.Verdict}{confidence}"));
-        };
-        session.Noted += note => _lines.OnNext(new TranscriptLine(LineKind.Note, note));
-        session.TitleChanged += title =>
+        });
+        session.Noted += note => Ui(() => _lines.OnNext(new TranscriptLine(LineKind.Note, note)));
+        session.TitleChanged += title => Ui(() =>
         {
             Model.SetTitle(title);
             _lines.OnNext(new TranscriptLine(LineKind.Note, $"task: {title}"));
             Bump();
-        };
-        session.DesignMade += lines =>
+        });
+        session.DesignMade += lines => Ui(() =>
         {
             _lines.OnNext(new TranscriptLine(LineKind.Note, "── design ──"));
             foreach (var l in lines) _lines.OnNext(new TranscriptLine(LineKind.Note, l));
             _lines.OnNext(new TranscriptLine(LineKind.Note, "────────────"));
             Bump();
-        };
+        });
 
         // A design that hinges on a choice: park the turn, list the options on
         // screen, and let the next line typed settle it.
@@ -109,12 +123,15 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             _choice = tcs;
             ct.Register(() => tcs.TrySetResult(""));
 
-            _lines.OnNext(new TranscriptLine(LineKind.Alert, $"? {choice.Question}"));
-            for (var i = 0; i < choice.Options.Count; i++)
-                _lines.OnNext(new TranscriptLine(LineKind.Note, $"  {i + 1}. {choice.Options[i]}{(i == choice.Recommended ? "  (recommended)" : "")}"));
-            Model.SetAwaitingPerson(true);
-            Model.SetBusy(false, "pick a number, Enter for the recommendation, or type your own");
-            Bump();
+            Ui(() =>
+            {
+                _lines.OnNext(new TranscriptLine(LineKind.Alert, $"? {choice.Question}"));
+                for (var i = 0; i < choice.Options.Count; i++)
+                    _lines.OnNext(new TranscriptLine(LineKind.Note, $"  {i + 1}. {choice.Options[i]}{(i == choice.Recommended ? "  (recommended)" : "")}"));
+                Model.SetAwaitingPerson(true);
+                Model.SetBusy(false, "pick a number, Enter for the recommendation, or type your own");
+                Bump();
+            });
             return tcs.Task;
         };
 
@@ -126,11 +143,14 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
             _approval = tcs;
             ct.Register(() => tcs.TrySetResult(false));
 
-            _lines.OnNext(new TranscriptLine(LineKind.Alert, $"⚠ run this command?  {request.Command}"));
-            _lines.OnNext(new TranscriptLine(LineKind.Note, $"in {request.WorkingDirectory} · not run unasked because: {request.Reason}"));
-            Model.SetAwaitingPerson(true);
-            Model.SetBusy(false, "approve? y runs it, anything else skips it");
-            Bump();
+            Ui(() =>
+            {
+                _lines.OnNext(new TranscriptLine(LineKind.Alert, $"⚠ run this command?  {request.Command}"));
+                _lines.OnNext(new TranscriptLine(LineKind.Note, $"in {request.WorkingDirectory} · not run unasked because: {request.Reason}"));
+                Model.SetAwaitingPerson(true);
+                Model.SetBusy(false, "approve? y runs it, anything else skips it");
+                Bump();
+            });
             return tcs.Task;
         };
     }
@@ -162,6 +182,8 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 
     public override void OnActivated()
     {
+        _wired = true;
+
         Input.OfType<IInputEvent, KeyPressed>()
             .Subscribe(HandleKey)
             .DisposeWith(Subscriptions);
@@ -213,6 +235,11 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 
             case ChatEffect.ShowStatus:
                 ShowStatus();
+                break;
+
+            case ChatEffect.Pause:
+                Session.Pause();
+                Model.SetPaused(true);
                 break;
 
             case ChatEffect.Quit:
@@ -313,6 +340,30 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 
     private async Task SubmitAsync(string text)
     {
+        // A paused turn takes the line as resume / stop / refine.
+        if (Model.Paused)
+        {
+            _lines.OnNext(new TranscriptLine(LineKind.User, text.Length == 0 ? "(go on)" : text));
+            Model.SetPaused(false);
+            Model.SetStatus("… reading that");
+            Bump();
+            try
+            {
+                var outcome = await Session.ResumeAsync(text, _cts.Token);
+                Ui(() =>
+                {
+                    _lines.OnNext(new TranscriptLine(LineKind.Note, "pause: " + outcome.Message));
+                    Model.SetStatus(outcome.Verdict == PauseVerdict.Stop ? "… stopping" : "… continuing");
+                    Bump();
+                });
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Ui(() => { _lines.OnNext(new TranscriptLine(LineKind.Alert, "✗ " + ex.Message)); Bump(); });
+            }
+            return;
+        }
+
         // A parked choice takes the line as the pick; the turn goes on from there.
         if (_choice is { } choice)
         {
@@ -377,16 +428,26 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         }
         catch (OperationCanceledException)
         {
+            Ui(() => { Model.SetBusy(false, "cancelled"); Bump(); });
             return;
         }
         catch (Exception ex)
         {
-            _lines.OnNext(new TranscriptLine(LineKind.Alert, "✗ " + ex.Message));
-            Model.SetBusy(false, "failed");
-            Bump();
+            Ui(() =>
+            {
+                _lines.OnNext(new TranscriptLine(LineKind.Alert, "✗ " + ex.Message));
+                Model.SetBusy(false, "failed");
+                Bump();
+            });
             return;
         }
 
+        Ui(() => ShowRun(run));
+    }
+
+    /// <summary>The turn's end, on the loop: the answer (or what is left of it), the stop reason, the status line.</summary>
+    private void ShowRun(AgentRun? run)
+    {
         if (run is null)
         {
             Model.SetBusy(false);

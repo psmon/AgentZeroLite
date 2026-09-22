@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Akka.Actor;
 using AgentOne.Agent;
 using AgentOne.Llm;
@@ -15,8 +16,12 @@ namespace AgentOne.Actors;
 /// A turn is a Tell of <see cref="StartAgentLoop"/> and a wait for the one
 /// <see cref="AgentLoopResult"/>; everything in between arrives through the
 /// bot's callbacks and is re-raised as events. Session commands are Asks.
-/// The callbacks run on the bot's thread, so an event handler must never
-/// block on this gateway — the bot would be waiting on itself.
+///
+/// The bot's callbacks only enqueue: one pump task raises the events, in
+/// order, on its own thread. That is AgentZero's rule — the UI registers
+/// delegates that marshal, the actor never runs UI code — learned here the
+/// hard way: raised on the bot's thread, the window's first repaint
+/// deadlocked against Termina's own loop and the turn never came back.
 /// </summary>
 public sealed class AgentGateway : IAgentSession
 {
@@ -28,6 +33,8 @@ public sealed class AgentGateway : IAgentSession
     private AgentSessionInfo _info;
     private TaskCompletionSource<AgentLoopResult>? _turn;
     private bool _disposed;
+    private readonly Channel<Action> _events = Channel.CreateUnbounded<Action>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Task _pump;
 
     public event Action<string>? ActivityStarted;
     public event Action<AgentStep>? StepCompleted;
@@ -47,7 +54,20 @@ public sealed class AgentGateway : IAgentSession
         _bot = bot;
         _info = info;
         Workspace = new WorkspaceStore(info.Root);
+        _pump = Task.Run(PumpAsync);
     }
+
+    /// <summary>Raises the queued events one at a time; a handler that throws loses only its own event.</summary>
+    private async Task PumpAsync()
+    {
+        await foreach (var raise in _events.Reader.ReadAllAsync())
+        {
+            try { raise(); }
+            catch (Exception ex) { Console.Error.WriteLine("[agent-one] an event handler threw: " + ex.Message); }
+        }
+    }
+
+    private void Enqueue(Action raise) => _events.Writer.TryWrite(raise);
 
     /// <summary>The CLI's entry: a real session from the config. Throws ChatProviderException the way the session's constructor would.</summary>
     public static AgentGateway Start(AgentConfig config, string root, bool streaming, string logKind = "chat") =>
@@ -68,7 +88,11 @@ public sealed class AgentGateway : IAgentSession
             var info = (AgentSessionInfo)reply;
 
             var gateway = new AgentGateway(system, bot, info);
-            bot.Tell(new SetAgentLoopCallbacks(gateway.OnProgress, gateway.OnResult, gateway.OnNotice, gateway.OnPause));
+            bot.Tell(new SetAgentLoopCallbacks(
+                p => gateway.Enqueue(() => gateway.OnProgress(p)),
+                r => gateway.Enqueue(() => gateway.OnResult(r)),
+                n => gateway.Enqueue(() => gateway.OnNotice(n)),
+                q => gateway.Enqueue(() => gateway.OnPause(q))));
             return gateway;
         }
         catch
@@ -123,6 +147,18 @@ public sealed class AgentGateway : IAgentSession
 
     public SessionStats Stats() => Command<SessionStats>(QueryAgentStats.Instance);
 
+    public bool Paused { get; private set; }
+
+    public void Pause() => Paused = Command<AgentLoopPaused>(PauseAgentLoop.Instance).Paused;
+
+    public async Task<PauseOutcome> ResumeAsync(string line, CancellationToken ct)
+    {
+        var reply = await _bot.Ask<object>(new ResumeAgentLoop(line), CommandTimeout);
+        if (reply is AgentSessionFailed failed) throw new InvalidOperationException(failed.Message);
+        Paused = false;
+        return ((AgentLoopResumed)reply).Outcome;
+    }
+
     public bool TryToggleSmart(out string message)
     {
         var reply = Command<SmartModeToggled>(ToggleSmartMode.Instance);
@@ -153,7 +189,7 @@ public sealed class AgentGateway : IAgentSession
     }
 
     /// <summary>One round trip to the loop, with the loop's failure surfaced as an exception.</summary>
-    private T Command<T>(IAgentSessionCommand command)
+    private T Command<T>(object command)
     {
         var reply = _bot.Ask<object>(command, CommandTimeout).GetAwaiter().GetResult();
         if (reply is AgentSessionFailed failed) throw new InvalidOperationException(failed.Message);
@@ -188,7 +224,11 @@ public sealed class AgentGateway : IAgentSession
         }
     }
 
-    private void OnResult(AgentLoopResult result) => _turn?.TrySetResult(result);
+    private void OnResult(AgentLoopResult result)
+    {
+        Paused = false;
+        _turn?.TrySetResult(result);
+    }
 
     /// <summary>The person is asked off the bot's thread; the answer goes back as ResolvePause.</summary>
     private void OnPause(PersonNeeded pause) => _ = AnswerAsync(pause);
@@ -217,6 +257,7 @@ public sealed class AgentGateway : IAgentSession
         if (_disposed) return;
         _disposed = true;
         _closing.Cancel();
+        _events.Writer.TryComplete();
         _turn?.TrySetResult(new AgentLoopResult(false, "", 0, 0, AgentLoopResult.Cancelled));
         try { _system.Terminate().Wait(TimeSpan.FromSeconds(10)); }
         catch (AggregateException) { /* a system that would not stop in time is left to the process exit */ }

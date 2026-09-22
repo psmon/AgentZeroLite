@@ -309,6 +309,27 @@ end · Ctrl+End to follow` until you do. The header also says which mode you
 are in and whether a turn is running; the bottom line is yours. Shift+Tab
 switches basic ↔ smart, Esc clears the line (twice: quit), Ctrl+D quits.
 
+**Esc while a turn runs pauses it.** Nothing can interrupt a model
+mid-sentence or a command mid-run, so the turn finishes the step it is on
+and then waits — the status line says so — and the line you type next is
+read for what it means: an empty line or "continue" resumes, "stop" abandons
+the turn (it ends as cancelled), and anything else is a *refinement* — put in
+front of the model as `[the user, mid-turn] …` before it thinks again, so
+"use tabs, not spaces" mid-build changes the build. With a TypeSafe key the
+decision engine reads the line (resume / stop / refine, one fixed question);
+without one a short word list does, in English and Korean.
+
+```
+› 보드 API 만들어줘
+  ✓ write_file  (0.0s)
+  … thinking about what came back            ← Esc
+  ⏸ pausing at the next step — type to go on, 'stop' to abandon, or say what to change
+› 테스트도 같이 만들어
+  pause: refining: 테스트도 같이 만들어  (confidence 0.81)
+  … thinking about what came back
+  ✓ write_file  (0.0s)
+```
+
 Long answers are folded to the window width *before* they reach the transcript
 (`Tui/SoftWrap`). That is a performance fix, not a cosmetic one: Termina's
 streaming node re-measures a line for every cell it draws, and one

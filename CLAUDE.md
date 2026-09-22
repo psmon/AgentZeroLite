@@ -333,10 +333,28 @@ run, carrying the `AgentRun`) are never reused for each other; agent-one adds
 mailbox from the pool thread and await a TCS). `Actors/AgentGateway` is what
 the commands hold: `IAgentSession` — the same events / delegates / commands
 as `ChatSession` — implemented as a Tell of `StartAgentLoop` plus a wait for
-the one result, and blocking Asks for the session commands; a callback must
-never block on the gateway (the bot would wait on itself). `ChatSession`
-implements `IAgentSession` too, so the TUI selftest and the tests drive it
-directly. `AgentActorSystem` is the HOCON: Akka's own log lines go to
+the one result, and blocking Asks for the session commands. **The bot's
+callbacks only enqueue**: one pump task raises the gateway's events in order
+on its own thread, and `ChatTuiViewModel` posts every handler to Termina's
+loop (`ReactiveViewModel.Post`, once `OnActivated` has wired it) — AgentZero's
+rule (the UI registers delegates that marshal; the actor never runs UI code),
+learned here the hard way: raised on the bot's thread, the window's first
+repaint deadlocked against Termina's loop, the turn never came back and no
+key was read again, which the person saw as "blocked during a request".
+`ChatTuiOverActorsTests` boots the real headless window over the gateway and
+asserts the turn ends with no further key. `ChatSession` implements
+`IAgentSession` too, so the TUI selftest and the tests drive it directly.
+**Esc pauses a running turn** (`Agent/PauseGate`, asked by `AgentLoop` before
+every step — a model mid-answer or a command mid-run cannot be interrupted):
+`IAgentSession.Pause()` holds it, and `ResumeAsync(line)` reads the next line
+as resume / stop / refine — `SmartRouter.PauseVerdictAsync` (one fixed
+question, choice only) with a key, `ChatSession.JudgePauseLine`'s word list
+without — then resumes, cancels the turn's own linked token (`_turnCts`, so
+a stop ends that turn only), or resumes with the line put in front of the
+model as `[the user, mid-turn] …`. Actor messages `PauseAgentLoop` /
+`ResumeAgentLoop` → `AgentLoopPaused` / `AgentLoopResumed`; in the window
+`ChatEffect.Pause` (Esc while busy) and `ChatTuiModel.Paused` let Enter
+through while held. `AgentActorSystem` is the HOCON: Akka's own log lines go to
 **stderr** (`StderrLogger`, kept for reflection with `DynamicDependency`),
 `exit-clr = off` — the command owns the exit code. **AOT needs
 `TrimmerRootAssembly Include="Akka"`**: Akka resolves its provider,

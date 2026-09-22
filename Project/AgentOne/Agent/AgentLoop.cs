@@ -37,6 +37,9 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
 
     /// <summary>Starts a fresh conversation. Called once per chat session, or once per run.</summary>
     /// <param name="memory">The workspace's memory to open with; null keeps whatever the last Reset used.</param>
+    /// <summary>The pause between steps: the person holds the loop here, and may hand it a refinement on resume.</summary>
+    public PauseGate Pause { get; } = new();
+
     public void Reset(string? memory = null)
     {
         if (memory is not null) _memory = memory;
@@ -76,6 +79,17 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
         {
             if (ct.IsCancellationRequested)
                 return Finish(StopReason.Cancelled, "cancelled", steps, sw);
+
+            // The person may have paused; the step waits here, and what they
+            // said meanwhile goes in front of the model before it thinks again.
+            if (Pause.IsPaused)
+            {
+                ActivityStarted?.Invoke("paused");
+                try { await Pause.WaitAsync(ct); }
+                catch (OperationCanceledException) { return Finish(StopReason.Cancelled, "cancelled", steps, sw); }
+            }
+            if (Pause.TakeRefinement() is { } refinement)
+                _messages.Add(ChatMessage.User("[the user, mid-turn] " + refinement));
 
             ActivityStarted?.Invoke(step == 1 ? "thinking" : "thinking about what came back");
             var stepClock = Stopwatch.StartNew();

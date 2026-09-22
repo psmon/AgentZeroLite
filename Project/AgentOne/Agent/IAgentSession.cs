@@ -44,6 +44,15 @@ public interface IAgentSession : IDisposable
     /// <summary>One turn. Null only for an empty line. Throws OperationCanceledException when the token cancels it.</summary>
     Task<AgentRun?> SubmitAsync(string line, CancellationToken ct);
 
+    /// <summary>True while the running turn is held between steps.</summary>
+    bool Paused { get; }
+
+    /// <summary>Holds the running turn at its next step. Nothing happens when no turn runs.</summary>
+    void Pause();
+
+    /// <summary>What the person typed during the pause: judged as resume / stop / refine, and applied.</summary>
+    Task<PauseOutcome> ResumeAsync(string line, CancellationToken ct);
+
     SessionStats Stats();
     bool TryToggleSmart(out string message);
     void Reset();

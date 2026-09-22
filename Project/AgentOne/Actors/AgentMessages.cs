@@ -30,6 +30,19 @@ public sealed record CancelAgentLoop
 /// <summary>The person answered a pause: "y"/"n" for a command, a pick or free text for a design choice.</summary>
 public sealed record ResolvePause(int PauseId, string Answer);
 
+/// <summary>Hold the running turn at its next step (Esc in the window). Reply: AgentLoopPaused.</summary>
+public sealed record PauseAgentLoop
+{
+    public static readonly PauseAgentLoop Instance = new();
+}
+
+/// <summary>What the person typed during the pause. The loop judges it — resume, stop, refine — and applies it. Reply: AgentLoopResumed.</summary>
+public sealed record ResumeAgentLoop(string Line);
+
+public sealed record AgentLoopPaused(bool Paused);
+
+public sealed record AgentLoopResumed(PauseOutcome Outcome);
+
 /// <summary>
 /// How the bot reaches whoever is rendering: the REPL, the window, `run`, the
 /// pipe server. Invoked on the bot's thread, in order; a renderer that needs a
