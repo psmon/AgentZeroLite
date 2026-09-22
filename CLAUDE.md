@@ -279,6 +279,16 @@ choosing it is never "confident" however sure the engine is: `run` then exits 3
 without running anything, and `chat` parks the turn in `SessionState` so the next
 line typed resumes it.
 
+**Chat has two faces over one pipeline.** `agent-one chat` in a terminal opens a
+Termina window (`Tui/ChatTui*`: transcript in a `StreamingTextNode`, input line at
+the bottom, mode in the header); piped or with `--plain` it is the line REPL in
+`ChatCommand.RunPlainAsync`. Both are renderers over `Agent/ChatSession`, which
+owns the loop, smart mode, the pause-for-a-person and the resume. Put a turn
+rule in ChatSession, never in a renderer, or the two will drift. The window's
+selftest boots it with scripted keys but submits no turn — a turn is async and
+a scripted key racing it fails at random; ChatSession has its own deterministic
+tests for pause/resume.
+
 `SessionState` is actor-*shaped*, not Akka: one owner, serialised mutations,
 snapshot reads. An actor runtime is exactly the dependency a Native AOT single
 binary cannot afford — the same reason this project does not reference

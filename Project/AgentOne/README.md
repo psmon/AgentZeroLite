@@ -60,7 +60,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | Command | What it does |
 |---|---|
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
-| `agent-one chat` | Interactive session; the conversation carries over. `/reset`, `/exit`. |
+| `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/reset`, `/exit`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one tui` | Full-screen settings editor (`agent-one config tui` is the same screen). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
@@ -240,6 +240,42 @@ The TypeSafe key is a second key for a second service: it goes in the same
 Turning `smartMode` on **runs the health check first** and stays off if it
 fails: it is not a preference, it is a dependency.
 
+## The chat window
+
+`agent-one chat` in a terminal opens a window rather than a prompt:
+
+```
+ [smart]  agent-one · turn 3
+  agent-one chat · openai · google/gemma-4-e4b
+  tools: files: C:\work\repo · web: the web (read-only: search and fetch)
+
+› 이 저장소의 파일들을 전부 정리해줘
+  plan: needs you  (confidence 0.68)
+  ⚠ this needs you (confidence 0.68)
+  None of the other approaches should be taken without a person deciding first: …
+    1. analyze_local_structure  (0.22)  Read all files to understand the code base…
+    2. generate_documentation   (0.00)  Generate a README explaining the project…
+
+› 목록만 보여줘. 절대 삭제하지 마.
+  ✓ list_files  (0.1s)
+  ✓ read_file  (0.2s)
+◆ 이 저장소는 AgentZero Lite라는 이름의 …
+
+ done in 41.2s · 3 steps
+answer › ▌
+```
+
+The transcript scrolls (PageUp/PageDown) and the answer streams into it as the
+model writes. The header says which mode you are in and whether a turn is
+running; the bottom line is yours. Shift+Tab switches basic ↔ smart, Esc clears
+the line (twice: quit), Ctrl+D quits.
+
+When input or output is a pipe — or with `--plain` — the same conversation runs
+as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin
+renderers over one `ChatSession`, so a turn plans, decides, pauses for a person
+and resumes identically in either. That is not an aesthetic choice: two copies
+of that logic would drift within a week.
+
 ## Smart mode
 
 Off by default. On, every turn plans before it acts:
@@ -283,8 +319,12 @@ cannot judge consistently.
 the option is for. The turn is parked, the next line typed is the answer, and the
 run resumes from it carrying the original request.
 
-**Shift+Tab** switches basic ↔ smart, and the prompt says which you are in. With
-no TypeSafe key the toggle refuses and says why. `run` has the same modes via
+**Shift+Tab** switches basic ↔ smart, and the header (or, in the REPL, the
+prompt) says which you are in. With no TypeSafe key the toggle refuses and says
+why. When a decision is merely **unsure** — below the floor — the turn pauses
+the same way a review does: the approaches are listed, a number picks one, and
+an empty line accepts the engine's own pick. Silence is never taken as approval
+when a person was actually asked for. `run` has the same modes via
 `--smart` / `--basic`, but it cannot ask anybody: a decision of "needs a person"
 makes it print the approaches and **exit 3 without running anything**.
 

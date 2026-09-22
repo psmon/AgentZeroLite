@@ -80,6 +80,10 @@ public static class ConfigTuiApp
         CheckStepNavigation(failures);
         await CheckModelPickerAsync(failures);
 
+        // The chat window boots the same host with its own page; it is checked
+        // the same way, keys only, no turn submitted.
+        failures.AddRange(await ChatTuiApp.SelfTestAsync());
+
         if (failures.Count > 0)
         {
             Console.Error.WriteLine("agent-one tui selftest: FAILED");

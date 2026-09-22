@@ -2,10 +2,6 @@ using AgentOne.Llm.Decision;
 
 namespace AgentOne.Agent;
 
-/// <param name="Request">What the user asked, before any plan was applied.</param>
-/// <param name="Plan">The plan whose decision asked for a person.</param>
-public sealed record PendingReview(string Request, SmartPlan Plan);
-
 /// <summary>
 /// One chat session's mutable state, owned in one place.
 ///

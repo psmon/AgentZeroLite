@@ -331,7 +331,7 @@ public class SessionStateTests
     public void AParkedTurnComesBackExactlyOnce()
     {
         var state = new SessionState(true);
-        var review = new PendingReview("the request", SmartPlan.None);
+        var review = new PendingReview("the request", SmartPlan.None, PauseReason.NeedsPerson);
 
         state.AwaitReview(review);
 
@@ -350,7 +350,7 @@ public class SessionStateTests
     {
         var state = new SessionState(smart: true);
         state.CountTurn();
-        state.AwaitReview(new PendingReview("x", SmartPlan.None));
+        state.AwaitReview(new PendingReview("x", SmartPlan.None, PauseReason.Unsure));
 
         state.Reset();
 

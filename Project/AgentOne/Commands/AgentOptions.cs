@@ -14,6 +14,9 @@ public sealed class AgentOptions
     public bool Json { get; private set; }
     public bool Verbose { get; private set; }
     public bool Quiet { get; private set; }
+
+    /// <summary>Chat only: the line REPL even in a terminal.</summary>
+    public bool Plain { get; private set; }
     public bool Help { get; private set; }
 
     /// <summary>Non-flag arguments, in order (for `run`, the prompt words).</summary>
@@ -56,6 +59,10 @@ public sealed class AgentOptions
 
                 case "--basic":
                     config.SmartMode = false;
+                    break;
+
+                case "--plain":
+                    options.Plain = true;
                     break;
 
                 case "-r" or "--root":
