@@ -61,6 +61,7 @@ internal static class Program
                 "config" => new ConfigCommand().Execute(rest),
                 "models" => await new ModelsCommand().ExecuteAsync(rest, cts.Token),
                 "auth" => await new AuthCommand().ExecuteAsync(rest, cts.Token),
+                "jev" => await new JevCommand().ExecuteAsync(rest, cts.Token),
                 "tools" => new ToolsCommand().Execute(rest),
                 "version" => PrintVersion(),
                 "home" => PrintHome(),
@@ -105,6 +106,7 @@ internal static class Program
             case "config": ConfigCommand.PrintHelp(); return 0;
             case "models": ModelsCommand.PrintHelp(); return 0;
             case "auth": AuthCommand.PrintHelp(); return 0;
+            case "jev": JevCommand.PrintHelp(); return 0;
             case "tools": ToolsCommand.PrintHelp(); return 0;
             default:
                 Console.Error.WriteLine($"agent-one help: no such command '{args[0]}'");
@@ -132,7 +134,8 @@ internal static class Program
               chat             Interactive session
               config           Show or change settings (~/.agent-one/config.json)
               tui              Edit settings in a full-screen terminal UI
-              auth             Store or inspect the API key
+              auth             Store or inspect the API keys
+              jev              Put a decision to TypeSafe / Jev (smart-mode bench)
               models           List what the configured endpoint can run
               tools            List the verbs the agent can call
               home             Print where agent-one keeps its files

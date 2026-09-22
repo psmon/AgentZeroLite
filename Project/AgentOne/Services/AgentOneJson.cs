@@ -37,6 +37,7 @@ public partial class AgentOneJson : JsonSerializerContext;
 [JsonSerializable(typeof(ModelListResponse))]
 [JsonSerializable(typeof(JevRequest))]
 [JsonSerializable(typeof(JevResponse))]
+[JsonSerializable(typeof(Decision))]
 [JsonSerializable(typeof(SessionEntry))]
 [JsonSerializable(typeof(RunReport))]
 public partial class AgentOneWireJson : JsonSerializerContext;

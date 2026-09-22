@@ -65,6 +65,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one tui` | Full-screen settings editor (`agent-one config tui` is the same screen). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
 | `agent-one auth` | `show` / `set` / `check` / `clear` / `import`. `--jev` addresses the TypeSafe key. |
+| `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
@@ -237,6 +238,24 @@ The TypeSafe key is a second key for a second service: it goes in the same
 it will need, which is why there is no on/off switch here — a switch that does
 nothing is a lie. The design is in
 [`docs/smart-mode-jev.md`](docs/smart-mode-jev.md).
+
+`agent-one jev choose` is the bench for it — a decision put to the service by
+hand, with the whole distribution shown:
+
+```console
+$ agent-one jev choose "The user asked how to build this repository."     -q "How should the agent answer?"     -o read_local="The answer is in files here; read them."     -o search_web="It needs outside information; search the web."     -o answer_now="Enough is already known; just answer."
+choice      read_local
+confidence  0.910
+distribution
+  [###################·] 0.940  read_local
+  [#···················] 0.060  answer_now
+  [····················] 0.000  search_web
+(jev-1.13.0 · 306 ms · 376+42 tokens)
+```
+
+`--repeat n` reports min/median/max latency, because one measurement includes
+connection setup and says almost nothing. Fewer than two options never reaches
+the network: there is nothing to decide.
 
 ### Keys
 

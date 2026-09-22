@@ -97,8 +97,11 @@ public readonly record struct JevCheck(bool Ok, string Message);
 /// Jev is not an LLM: it returns typed judgments, not text. It never replaces
 /// <see cref="IChatProvider"/>; it answers questions the code asks about a state.
 /// </summary>
-public sealed class JevClient : IDisposable
+public sealed class JevClient : IDecisionEngine, IDisposable
 {
+    /// <summary>The question id used for the decision. Never seen by the model.</summary>
+    private const string DecisionId = "decision";
+
     private readonly HttpClient _http;
     private readonly string _model;
     private readonly bool _hasKey;
@@ -123,6 +126,112 @@ public sealed class JevClient : IDisposable
 
     /// <summary>True when a key was found in the store or the environment.</summary>
     public bool HasKey => _hasKey;
+
+    public string Name => "jev";
+
+    /// <summary>
+    /// Asks Jev to pick one of the options and reports how sure it is.
+    ///
+    /// Fewer than two options never reaches the network: there is nothing to
+    /// decide, and spending a call — and a second of the user's time — to be
+    /// told what we already knew would be silly.
+    /// </summary>
+    public async Task<Decision> ChooseAsync(
+        string state, string question, IReadOnlyList<DecisionOption> options, CancellationToken ct)
+    {
+        if (options.Count == 0)
+            return Decision.Failed("no options to choose from");
+
+        if (options.Count == 1)
+            return new Decision(true, options[0].Name, 1.0,
+                new Dictionary<string, double> { [options[0].Name] = 1.0 },
+                "only one option — nothing to decide", 0, Called: false);
+
+        if (!_hasKey)
+            return Decision.Failed("no TypeSafe key — set it on the Smart step, or `agent-one auth set --jev`");
+
+        var request = new JevRequest
+        {
+            State = state,
+            Model = _model,
+            Questions = new Dictionary<string, JevQuestion>
+            {
+                [DecisionId] = new()
+                {
+                    Type = "choice",
+                    Instructions = question,
+                    Criteria = options.ToDictionary(o => o.Name, o => o.Description, StringComparer.Ordinal)
+                }
+            }
+        };
+
+        var sw = Stopwatch.StartNew();
+        var (body, failure) = await PostAsync(request, ct);
+        sw.Stop();
+
+        if (failure is not null) return Decision.Failed(failure, sw.ElapsedMilliseconds);
+
+        JevResponse? parsed;
+        try
+        {
+            parsed = JsonSerializer.Deserialize(body!, AgentOneWireJson.Default.JevResponse);
+        }
+        catch (JsonException)
+        {
+            return Decision.Failed($"did not return JSON: {Trim(body!)}", sw.ElapsedMilliseconds);
+        }
+
+        if (parsed?.Error is { } error)
+            return Decision.Failed("TypeSafe error: " + (error.Message ?? error.Type ?? "unknown"), sw.ElapsedMilliseconds);
+
+        if (parsed?.Answers is null || !parsed.Answers.TryGetValue(DecisionId, out var answer))
+            return Decision.Failed($"answered without the question that was asked: {Trim(body!)}", sw.ElapsedMilliseconds);
+
+        if (string.IsNullOrWhiteSpace(answer.Choice))
+            return Decision.Failed($"answer carried no choice: {Trim(body!)}", sw.ElapsedMilliseconds);
+
+        // An option we never offered would mean the request and the answer have
+        // drifted apart — better to refuse than to route on it.
+        if (!options.Any(o => string.Equals(o.Name, answer.Choice, StringComparison.Ordinal)))
+            return Decision.Failed($"chose '{answer.Choice}', which was not one of the options", sw.ElapsedMilliseconds);
+
+        return new Decision(
+            true,
+            answer.Choice!,
+            answer.Confidence ?? 0,
+            answer.Probabilities ?? new Dictionary<string, double>(),
+            $"{parsed.Model ?? _model} · {sw.ElapsedMilliseconds} ms" +
+                (parsed.Usage is { } u ? $" · {u.InputTokens}+{u.OutputTokens} tokens" : ""),
+            sw.ElapsedMilliseconds);
+    }
+
+    /// <summary>One POST, with every transport failure already turned into a sentence.</summary>
+    private async Task<(string? Body, string? Failure)> PostAsync(JevRequest request, CancellationToken ct)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.PostAsJsonAsync("systemone", request, AgentOneWireJson.Default.JevRequest, ct);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return (null, $"timed out calling {_http.BaseAddress}systemone");
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, $"cannot reach {_http.BaseAddress}systemone — {ex.Message}");
+        }
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            return (null, $"HTTP {(int)response.StatusCode} — the TypeSafe key was rejected");
+
+        if (!response.IsSuccessStatusCode)
+            return (null, $"HTTP {(int)response.StatusCode} from {_http.BaseAddress}systemone: {Trim(body)}");
+
+        return (body, null);
+    }
 
     /// <summary>
     /// Sends the smallest real question there is and reports what came back.
