@@ -21,7 +21,15 @@ public static class ConfigStore
         try
         {
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize(json, AgentOneJson.Default.AgentConfig) ?? new AgentConfig();
+            var config = JsonSerializer.Deserialize(json, AgentOneJson.Default.AgentConfig) ?? new AgentConfig();
+
+            // A file written before apiKeyEnv was validated can hold the key
+            // itself. Say so rather than letting it fail later as a bare 401.
+            if (!ApiKey.LooksLikeVariableName(config.ApiKeyEnv))
+                warning = "apiKeyEnv holds something that is not a variable name — if you pasted your API key there, " +
+                          "run `agent-one auth import` to move it somewhere it will actually be used";
+
+            return config;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {

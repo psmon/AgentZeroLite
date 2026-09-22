@@ -107,13 +107,17 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
             var selected = i == model.Selected;
             var editing = selected && model.Editing;
 
-            var value = editing ? model.EditBuffer + "▌" : model.Value(key);
+            // A key being typed is echoed as dots: shoulder-surfing a settings
+            // screen should not be enough to take it.
+            var value = editing
+                ? (key == ConfigTuiModel.ApiKeyField ? new string('•', model.EditBuffer.Length) : model.EditBuffer) + "▌"
+                : model.Value(key);
+
             var marker = selected ? "›" : " ";
             var tail = model.IsCyclable(key) && selected && !editing ? "  ←→" : "";
 
-            // The key row is the one place a value is not the whole story.
             if (key == "apiKeyEnv" && !editing)
-                tail = model.ApiKeyPresent ? "  (set)" : "  (NOT set)";
+                tail = model.ApiKeyPresent ? "  (set)" : "  (not set)";
 
             var colour = editing ? Color.BrightYellow
                 : selected ? Color.BrightCyan

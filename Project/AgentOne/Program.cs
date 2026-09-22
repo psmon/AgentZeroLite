@@ -60,6 +60,7 @@ internal static class Program
                 "config" when rest.Length > 0 && rest[0] == "tui" => await Tui.ConfigTuiApp.RunAsync(),
                 "config" => new ConfigCommand().Execute(rest),
                 "models" => await new ModelsCommand().ExecuteAsync(rest, cts.Token),
+                "auth" => await new AuthCommand().ExecuteAsync(rest, cts.Token),
                 "tools" => new ToolsCommand().Execute(rest),
                 "version" => PrintVersion(),
                 "home" => PrintHome(),
@@ -103,6 +104,7 @@ internal static class Program
             case "chat" or "repl": ChatCommand.PrintHelp(); return 0;
             case "config": ConfigCommand.PrintHelp(); return 0;
             case "models": ModelsCommand.PrintHelp(); return 0;
+            case "auth": AuthCommand.PrintHelp(); return 0;
             case "tools": ToolsCommand.PrintHelp(); return 0;
             default:
                 Console.Error.WriteLine($"agent-one help: no such command '{args[0]}'");
@@ -130,6 +132,7 @@ internal static class Program
               chat             Interactive session
               config           Show or change settings (~/.agent-one/config.json)
               tui              Edit settings in a full-screen terminal UI
+              auth             Store or inspect the API key
               models           List what the configured endpoint can run
               tools            List the verbs the agent can call
               home             Print where agent-one keeps its files
@@ -144,7 +147,7 @@ internal static class Program
             With a real model:
               agent-one config set provider openai
               agent-one config set model gpt-4o-mini
-              export OPENAI_API_KEY=...        # or: setx OPENAI_API_KEY ... on Windows
+              agent-one auth set               # paste the key; it is never echoed
               agent-one run "what does this project do?" -v
             """);
     }

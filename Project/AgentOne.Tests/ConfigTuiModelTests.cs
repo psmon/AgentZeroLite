@@ -337,8 +337,12 @@ public class ConfigTuiModelTests : IDisposable
     [Fact]
     public void EveryConfigKeyIsOwnedByExactlyOneStep()
     {
-        // `model` is the Model step itself, which owns no field list.
-        var owned = ConfigTuiModel.StepFields.SelectMany(f => f).Append("model").ToArray();
+        // `model` is the Model step itself, which owns no field list; `apiKey` is
+        // a row backed by the credential store rather than by a config key.
+        var owned = ConfigTuiModel.StepFields.SelectMany(f => f)
+            .Where(f => f != ConfigTuiModel.ApiKeyField)
+            .Append("model")
+            .ToArray();
 
         Assert.Equal(AgentConfig.Keys.Length, owned.Length);
         Assert.Equal(owned.Length, owned.Distinct().Count());

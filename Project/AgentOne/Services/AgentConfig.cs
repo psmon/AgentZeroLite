@@ -82,6 +82,16 @@ public sealed class AgentConfig
                 return true;
             case "apiKeyEnv":
                 if (value.Length == 0) { error = "apiKeyEnv must not be empty"; return false; }
+                // This field holds the NAME of a variable, never a key. Pasting the
+                // key here used to be accepted silently and then surface as an
+                // unexplained 401, so it is refused where the mistake is made.
+                if (!ApiKey.LooksLikeVariableName(value))
+                {
+                    error = "apiKeyEnv is the NAME of an environment variable (letters, digits, underscore) — " +
+                            "it looks like you pasted the key itself. Put the key on the Connection step of " +
+                            "`agent-one tui`, or run `agent-one auth set`.";
+                    return false;
+                }
                 ApiKeyEnv = value;
                 return true;
             case "maxSteps":

@@ -44,10 +44,13 @@ public sealed class ConfigTuiModel
     /// <summary>The config keys each step owns. The Model step is the picker, so it has none.</summary>
     public static readonly string[][] StepFields =
     [
-        ["provider", "baseUrl", "apiKeyEnv"],
+        ["provider", "baseUrl", "apiKey", "apiKeyEnv"],
         [],
         ["maxSteps", "temperature", "timeoutSeconds", "saveSessions"]
     ];
+
+    /// <summary>The key typed on this screen, held until save. Null means untouched.</summary>
+    private string? _pendingKey;
 
     private Dictionary<string, string> _saved;
 
@@ -98,8 +101,8 @@ public sealed class ConfigTuiModel
 
     public string Status { get; private set; }
 
-    /// <summary>Set when any field differs from what is on disk.</summary>
-    public bool Dirty => AgentConfig.Keys.Any(k => _saved[k] != Config.Get(k));
+    /// <summary>Set when any field, or the key, differs from what is on disk.</summary>
+    public bool Dirty => _pendingKey is not null || AgentConfig.Keys.Any(k => _saved[k] != Config.Get(k));
 
     /// <summary>Armed by the first quit attempt while dirty; a second quit then discards.</summary>
     public bool QuitArmed { get; private set; }
@@ -115,7 +118,16 @@ public sealed class ConfigTuiModel
     public Func<AgentConfig, CancellationToken, Task<ModelCatalogResult>> ModelCatalog { get; set; } =
         ConfigTuiProbe.ListModelsAsync;
 
-    public string Value(string key) => Config.Get(key) ?? "";
+    /// <summary>
+    /// The apiKey row is not a config field — it is the credential store, shown
+    /// masked. Everything else comes straight from the config.
+    /// </summary>
+    public string Value(string key) => key == ApiKeyField
+        ? CredentialStore.Mask(_pendingKey ?? CredentialStore.Load())
+        : Config.Get(key) ?? "";
+
+    /// <summary>The pseudo-field name for the key itself.</summary>
+    public const string ApiKeyField = "apiKey";
 
     public bool IsCyclable(string key) => key is "provider" or "saveSessions";
 
@@ -136,7 +148,8 @@ public sealed class ConfigTuiModel
     {
         "provider" => "echo runs offline and exercises the real loop · openai talks to any OpenAI-compatible endpoint",
         "baseUrl" => "https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama) · http://localhost:1234/v1 (LM Studio)",
-        "apiKeyEnv" => $"the environment variable holding the key — ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "NOT set")}",
+        ApiKeyField => "paste the key itself here — it is stored in ~/.agent-one/credentials.json, never in config.json",
+        "apiKeyEnv" => $"FALLBACK only — the NAME of a variable to read the key from, not the key. ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "not set")}",
         "model" => "set on the Model step",
         "maxSteps" => "tool-loop budget per run, 1..100",
         "temperature" => "0..2 · lower is steadier, which suits a tool-calling loop",
@@ -426,13 +439,32 @@ public sealed class ConfigTuiModel
     private void BeginEdit()
     {
         Editing = true;
-        EditBuffer = Value(SelectedKey);
+        // The key row shows a mask, which would be nonsense to edit in place.
+        EditBuffer = SelectedKey == ApiKeyField ? "" : Value(SelectedKey);
         Status = $"editing {SelectedKey} — Enter to accept, Esc to cancel";
     }
 
     private void CommitEdit()
     {
         var key = SelectedKey;
+
+        if (key == ApiKeyField)
+        {
+            var typed = EditBuffer.Trim();
+            Editing = false;
+            EditBuffer = "";
+
+            if (typed.Length == 0)
+            {
+                Status = "key unchanged";
+                return;
+            }
+
+            _pendingKey = typed;
+            Status = $"key set to {CredentialStore.Mask(typed)} — press s to store it";
+            return;
+        }
+
         if (Config.TrySet(key, EditBuffer.Trim(), out var error))
         {
             Editing = false;
@@ -478,6 +510,12 @@ public sealed class ConfigTuiModel
     {
         try
         {
+            if (_pendingKey is not null)
+            {
+                CredentialStore.Save(_pendingKey);
+                _pendingKey = null;
+            }
+
             ConfigStore.Save(Config);
             _saved = Snapshot(Config);
             QuitArmed = false;
@@ -491,6 +529,7 @@ public sealed class ConfigTuiModel
 
     public void Reload()
     {
+        _pendingKey = null;
         Config = ConfigStore.Load(out var warning);
         _saved = Snapshot(Config);
         QuitArmed = false;

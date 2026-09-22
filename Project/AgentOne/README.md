@@ -34,10 +34,16 @@ With a real model:
 
 ```bash
 agent-one config set provider openai
+agent-one config set baseUrl https://api.openai.com/v1
+agent-one auth set                      # paste the key; nothing is echoed
+agent-one models                        # proves the key and URL, and lists models
 agent-one config set model gpt-4o-mini
-export OPENAI_API_KEY=sk-...            # Windows: setx OPENAI_API_KEY sk-...
 agent-one run "summarize the README" -v
 ```
+
+The key goes in `~/.agent-one/credentials.json`, never in `config.json`, and
+`auth set` reads it from a hidden prompt or stdin so it stays out of your shell
+history. Exporting `$OPENAI_API_KEY` still works as a fallback.
 
 Against a local server (Ollama, LM Studio, vLLM, llama.cpp — all speak the same
 wire format, which is why there is only one provider):
@@ -58,6 +64,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one tui` | Full-screen settings editor (`agent-one config tui` is the same screen). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
+| `agent-one auth` | `show` / `set` / `clear` / `import` for the API key. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
@@ -104,16 +111,25 @@ endpoint is the thing that knows which models exist — so step 2 asks it.
 │[1. Connection] →  2. Model     →  3. Options                │
 │                                                             │
 │› provider        openai  ←→                                 │
-│  baseUrl         http://localhost:1234/v1                   │
-│  apiKeyEnv       OPENAI_API_KEY  (set)                      │
-│                                                             │
+│  baseUrl         https://a1.example.com/v1                  │
+│  apiKey          sk-lm-…Kpvc                                │
+│  apiKeyEnv       OPENAI_API_KEY  (not set)                  │
 ╰─────────────────────────────────────────────────────────────╯
- the environment variable holding the key — $OPENAI_API_KEY is set
+ paste the key itself here — stored in ~/.agent-one/credentials.json, never in config.json
  ↑↓ move · Enter edit · ←→ cycle · Tab next · s save · t test · q quit
 ```
 
-The key itself is never typed here or stored: `apiKeyEnv` names the environment
-variable to read it from, and the row says whether that variable is set.
+**`apiKey` takes the key itself.** It is echoed as dots while you type, shown
+masked afterwards, and written to `~/.agent-one/credentials.json` — never to
+`config.json`, so the config file stays safe to paste into an issue or copy
+between machines.
+
+**`apiKeyEnv` is a fallback, and it holds the NAME of an environment variable,
+not a key.** Pasting a key there is now refused with a message saying where the
+key goes; a config file that already contains one is flagged on load, and
+`agent-one auth import` moves it into the store.
+
+Lookup order: the stored key first, then `$apiKeyEnv`.
 
 ### 2. Model — asked, not typed
 
@@ -170,7 +186,7 @@ defaults, which is why they come last.
 | `e` | Step 2 only: type a model id by hand. |
 | `l` | Ask the endpoint for its models again, from any step. |
 | **`t`** | **Send one tiny request through the settings as they stand** and report latency and reply, or the exact failure. |
-| `s` | Save to `~/.agent-one/config.json` · `r` reload from disk · `d` restore defaults |
+| `s` | Save — config to `config.json`, a newly typed key to `credentials.json` · `r` reload from disk · `d` restore defaults |
 | `q` | Quit. With unsaved changes it asks once; any other key disarms the confirmation. |
 
 `Esc` goes back a step and only quits from the first one — it is a stack, so
@@ -265,15 +281,16 @@ All under `~/.agent-one/` — never in the working directory:
 
 ```
 ~/.agent-one/
-  config.json              settings (the API key is NOT here)
+  config.json              settings — no secrets, safe to share
+  credentials.json         the API key, alone, user-only where the OS allows it
   sessions/*.jsonl         one line per prompt / tool step / result
   logs/
 ```
 
 `AGENT_ONE_HOME` relocates the whole tree (tests and CI use it).
 
-The API key is never written to disk: `apiKeyEnv` names the environment variable
-to read it from (default `OPENAI_API_KEY`).
+Two files rather than one because they have different risk: `config.json` is the
+thing you would paste into an issue, and a secret must not ride along.
 
 ## Safety boundary
 

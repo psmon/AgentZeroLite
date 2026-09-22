@@ -18,6 +18,7 @@ namespace AgentOne.Services;
     WriteIndented = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(AgentConfig))]
+[JsonSerializable(typeof(Credentials))]
 public partial class AgentOneJson : JsonSerializerContext;
 
 /// <summary>

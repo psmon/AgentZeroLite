@@ -18,7 +18,8 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
     private readonly HttpClient _http;
     private readonly string _model;
     private readonly double _temperature;
-    private readonly string _apiKeyEnv;
+    private readonly string _keySource;
+    private readonly string _keyAdvice;
     private readonly bool _hasKey;
 
     public string Name => "openai";
@@ -32,11 +33,14 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         _http.BaseAddress = new Uri(config.BaseUrl.TrimEnd('/') + "/");
         _http.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
 
-        _apiKeyEnv = config.ApiKeyEnv;
-        var key = Environment.GetEnvironmentVariable(config.ApiKeyEnv);
-        _hasKey = !string.IsNullOrWhiteSpace(key);
+        // One resolver decides where the key comes from — stored first, then the
+        // environment — so every message here can name the same places.
+        var resolved = ApiKey.Resolve(config);
+        _keySource = resolved.Source;
+        _keyAdvice = ApiKey.WhereToPutIt(config);
+        _hasKey = resolved.Found;
         if (_hasKey)
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key!.Trim());
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", resolved.Value!);
 
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("agent-one");
     }
@@ -117,8 +121,8 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {
             return ModelCatalogResult.Failure(_hasKey
-                ? $"HTTP {(int)response.StatusCode} — the endpoint rejected the key in ${_apiKeyEnv}"
-                : $"HTTP {(int)response.StatusCode} — no API key: ${_apiKeyEnv} is not set");
+                ? $"HTTP {(int)response.StatusCode} — the endpoint rejected the key from {_keySource}"
+                : $"HTTP {(int)response.StatusCode} — no API key found · {_keyAdvice}");
         }
 
         if (!response.IsSuccessStatusCode)

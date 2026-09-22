@@ -268,6 +268,15 @@ in it, so the steps and the key map are unit tested; the Termina page only
 projects it. `agent-one tui --selftest` drives the real screen from a scripted
 key source, and the release workflow runs it on every RID.
 
+**The API key never goes in `config.json`.** It lives alone in
+`~/.agent-one/credentials.json` (`CredentialStore`), and `ApiKey.Resolve` is the
+single place that decides the order: stored key first, then `$apiKeyEnv`. The
+`apiKeyEnv` field holds the NAME of a variable and now refuses anything that is
+not one — a real incident had a key pasted there, where it silently did nothing
+and surfaced only as an unexplained 401. `ConfigStore.Load` flags such a file and
+`agent-one auth import` repairs it. `agent-one auth set` reads the key from a
+hidden prompt or stdin, never from argv, so it stays out of shell history.
+
 Two things about that selftest: step navigation and the picker are verified
 **below** the UI, because arriving at step 2 starts an async listing during which
 the screen ignores keys — a scripted walk would race it and fail at random. And
