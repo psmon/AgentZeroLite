@@ -64,7 +64,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one tui` | Full-screen settings editor (`agent-one config tui` is the same screen). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
-| `agent-one auth` | `show` / `set` / `clear` / `import` for the API key. |
+| `agent-one auth` | `show` / `set` / `check` / `clear` / `import`. `--jev` addresses the TypeSafe key. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
@@ -209,6 +209,34 @@ offline with no key at all.
 
 `maxSteps`, `temperature`, `timeoutSeconds`, `saveSessions`. All have working
 defaults, which is why they come last.
+
+### 4. Smart — the decision service (setup only, so far)
+
+```
+╭─ agent-one config ──────────────────────────────────────────╮
+│ 1. Connection →  2. Model  →  3. Options  → [4. Smart]      │
+│                                                             │
+│› jevApiKey       ts-abc…w9k2                                │
+│  jevBaseUrl      https://api.typesafe.ai/v1                 │
+│  jevModel        jev-latest                                 │
+╰─────────────────────────────────────────────────────────────╯
+ the TypeSafe (Jev) key for smart mode — a different service · h to check it
+ ✓ jev-1.13.0 · 184 ms, noul 0.97, 41+12 tokens
+ ↑↓ move · Enter edit · h check · b back · s save · t test · q quit
+```
+
+`h` makes **one real question** to TypeSafe rather than checking that a file
+exists — a key that is present but wrong would otherwise pass the check and fail
+later, which is the mistake this screen already exists to prevent. The reply
+carries the served model, the round trip, and the token count.
+
+The TypeSafe key is a second key for a second service: it goes in the same
+`credentials.json`, in its own slot, and storing one never disturbs the other.
+
+**Smart mode itself is not built yet.** This step only stores and verifies what
+it will need, which is why there is no on/off switch here — a switch that does
+nothing is a lie. The design is in
+[`docs/smart-mode-jev.md`](docs/smart-mode-jev.md).
 
 ### Keys
 

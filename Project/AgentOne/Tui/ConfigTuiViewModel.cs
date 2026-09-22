@@ -49,7 +49,27 @@ public sealed class ConfigTuiViewModel : ReactiveViewModel
             case TuiEffect.FetchModels:
                 _ = FetchModelsAsync();
                 break;
+
+            case TuiEffect.CheckSmart:
+                _ = RunSmartCheckAsync();
+                break;
         }
+    }
+
+    private async Task RunSmartCheckAsync()
+    {
+        string message;
+        try
+        {
+            message = await Model.SmartCheck(Model.Config, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            message = "✗ " + ex.Message;
+        }
+
+        Model.CompleteTest(message);
+        Revision.Value++;
     }
 
     private async Task FetchModelsAsync()

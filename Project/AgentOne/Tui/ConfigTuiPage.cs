@@ -116,6 +116,9 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
             var marker = selected ? "›" : " ";
             var tail = model.IsCyclable(key) && selected && !editing ? "  ←→" : "";
 
+            if (key == ConfigTuiModel.JevApiKeyField && !editing && !model.SmartKeyPresent)
+                tail = "  (not set)";
+
             if (key == "apiKeyEnv" && !editing)
                 tail = model.ApiKeyPresent ? "  (set)" : "  (not set)";
 
@@ -212,8 +215,9 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
             if (model.IsCyclable(model.SelectedKey)) sb.Append("←→ cycle · ");
         }
 
+        if (model.Step == ConfigStep.Smart) sb.Append("h check · ");
         if (model.Step != ConfigStep.Connection) sb.Append("b back · ");
-        if (model.Step != ConfigStep.Options) sb.Append("Tab next · ");
+        if (model.Step != ConfigStep.Smart) sb.Append("Tab next · ");
 
         sb.Append("s save · t test · q quit");
         return sb.ToString();

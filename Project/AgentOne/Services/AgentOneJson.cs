@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using AgentOne.Agent;
 using AgentOne.Llm;
+using AgentOne.Llm.Decision;
 
 namespace AgentOne.Services;
 
@@ -34,6 +35,8 @@ public partial class AgentOneJson : JsonSerializerContext;
 [JsonSerializable(typeof(ChatCompletionResponse))]
 [JsonSerializable(typeof(ChatCompletionChunk))]
 [JsonSerializable(typeof(ModelListResponse))]
+[JsonSerializable(typeof(JevRequest))]
+[JsonSerializable(typeof(JevResponse))]
 [JsonSerializable(typeof(SessionEntry))]
 [JsonSerializable(typeof(RunReport))]
 public partial class AgentOneWireJson : JsonSerializerContext;

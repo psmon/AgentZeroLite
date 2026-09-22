@@ -38,6 +38,14 @@ public sealed class AgentConfig
     [JsonPropertyName("timeoutSeconds")]
     public int TimeoutSeconds { get; set; } = 120;
 
+    /// <summary>Base URL of the TypeSafe System One API used by smart mode.</summary>
+    [JsonPropertyName("jevBaseUrl")]
+    public string JevBaseUrl { get; set; } = "https://api.typesafe.ai/v1";
+
+    /// <summary>Which System One model answers smart mode's questions.</summary>
+    [JsonPropertyName("jevModel")]
+    public string JevModel { get; set; } = "jev-latest";
+
     /// <summary>Append every run's transcript to ~/.agent-one/sessions/.</summary>
     [JsonPropertyName("saveSessions")]
     public bool SaveSessions { get; set; } = true;
@@ -45,7 +53,8 @@ public sealed class AgentConfig
     public static readonly string[] Keys =
     [
         "provider", "baseUrl", "model", "apiKeyEnv",
-        "maxSteps", "temperature", "timeoutSeconds", "saveSessions"
+        "maxSteps", "temperature", "timeoutSeconds", "saveSessions",
+        "jevBaseUrl", "jevModel"
     ];
 
     public string? Get(string key) => key switch
@@ -58,6 +67,8 @@ public sealed class AgentConfig
         "temperature"    => Temperature.ToString("0.###"),
         "timeoutSeconds" => TimeoutSeconds.ToString(),
         "saveSessions"   => SaveSessions ? "true" : "false",
+        "jevBaseUrl"     => JevBaseUrl,
+        "jevModel"       => JevModel,
         _                => null
     };
 
@@ -109,6 +120,14 @@ public sealed class AgentConfig
             case "saveSessions":
                 if (!bool.TryParse(value, out var save)) { error = "saveSessions must be true or false"; return false; }
                 SaveSessions = save;
+                return true;
+            case "jevBaseUrl":
+                if (!Uri.TryCreate(value, UriKind.Absolute, out _)) { error = "jevBaseUrl must be an absolute URL"; return false; }
+                JevBaseUrl = value.TrimEnd('/');
+                return true;
+            case "jevModel":
+                if (value.Length == 0) { error = "jevModel must not be empty"; return false; }
+                JevModel = value;
                 return true;
             default:
                 error = $"unknown key '{key}' (known: {string.Join(", ", Keys)})";

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AgentOne.Llm;
+using AgentOne.Llm.Decision;
 using AgentOne.Services;
 
 namespace AgentOne.Tui;
@@ -44,6 +45,26 @@ public static class ConfigTuiProbe
         catch (OperationCanceledException)
         {
             return ModelCatalogResult.Failure("listing cancelled");
+        }
+    }
+
+    /// <summary>
+    /// The `h` key's work on the Smart step: one real question to TypeSafe.
+    /// A check that only looked for a key in a file would pass while the key was
+    /// wrong, which is the failure this whole screen exists to prevent.
+    /// </summary>
+    public static async Task<string> CheckSmartAsync(AgentConfig config, CancellationToken ct)
+    {
+        using var client = new JevClient(config);
+
+        try
+        {
+            var check = await client.CheckAsync(ct);
+            return check.Ok ? check.Message : "✗ " + check.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            return "✗ check cancelled";
         }
     }
 

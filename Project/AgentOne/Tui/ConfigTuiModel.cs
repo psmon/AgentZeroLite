@@ -11,7 +11,9 @@ public enum TuiEffect
     /// <summary>Kick off the connection probe; the shell reports back via <see cref="ConfigTuiModel.CompleteTest"/>.</summary>
     RunTest,
     /// <summary>Ask the endpoint what models it has; the shell reports back via <see cref="ConfigTuiModel.CompleteModelFetch"/>.</summary>
-    FetchModels
+    FetchModels,
+    /// <summary>Verify the TypeSafe key; the shell reports back via <see cref="ConfigTuiModel.CompleteTest"/>.</summary>
+    CheckSmart
 }
 
 /// <summary>The settings, in the order you have to know them.</summary>
@@ -22,7 +24,9 @@ public enum ConfigStep
     /// <summary>What that endpoint can run — asked, not typed.</summary>
     Model = 1,
     /// <summary>How the loop behaves. Safe defaults, so it comes last.</summary>
-    Options = 2
+    Options = 2,
+    /// <summary>Smart mode's own service and key. Independent of everything above.</summary>
+    Smart = 3
 }
 
 /// <summary>
@@ -39,18 +43,29 @@ public enum ConfigStep
 /// </summary>
 public sealed class ConfigTuiModel
 {
-    public static readonly string[] StepTitles = ["Connection", "Model", "Options"];
+    public static readonly string[] StepTitles = ["Connection", "Model", "Options", "Smart"];
 
     /// <summary>The config keys each step owns. The Model step is the picker, so it has none.</summary>
     public static readonly string[][] StepFields =
     [
         ["provider", "baseUrl", "apiKey", "apiKeyEnv"],
         [],
-        ["maxSteps", "temperature", "timeoutSeconds", "saveSessions"]
+        ["maxSteps", "temperature", "timeoutSeconds", "saveSessions"],
+        ["jevApiKey", "jevBaseUrl", "jevModel"]
     ];
 
-    /// <summary>The key typed on this screen, held until save. Null means untouched.</summary>
-    private string? _pendingKey;
+    /// <summary>
+    /// Rows backed by the credential store rather than by a config key. They
+    /// show a mask, they start empty when edited, and they are written on save.
+    /// </summary>
+    public static readonly Dictionary<string, CredentialStore.Slot> CredentialFields = new(StringComparer.Ordinal)
+    {
+        [ApiKeyField] = CredentialStore.Slot.Provider,
+        [JevApiKeyField] = CredentialStore.Slot.Jev
+    };
+
+    /// <summary>Keys typed on this screen, held until save. Absent means untouched.</summary>
+    private readonly Dictionary<string, string> _pendingKeys = new(StringComparer.Ordinal);
 
     private Dictionary<string, string> _saved;
 
@@ -102,7 +117,7 @@ public sealed class ConfigTuiModel
     public string Status { get; private set; }
 
     /// <summary>Set when any field, or the key, differs from what is on disk.</summary>
-    public bool Dirty => _pendingKey is not null || AgentConfig.Keys.Any(k => _saved[k] != Config.Get(k));
+    public bool Dirty => _pendingKeys.Count > 0 || AgentConfig.Keys.Any(k => _saved[k] != Config.Get(k));
 
     /// <summary>Armed by the first quit attempt while dirty; a second quit then discards.</summary>
     public bool QuitArmed { get; private set; }
@@ -114,6 +129,10 @@ public sealed class ConfigTuiModel
     public Func<AgentConfig, CancellationToken, Task<string>> ConnectionTest { get; set; } =
         ConfigTuiProbe.DefaultAsync;
 
+    /// <summary>The smart-mode health check, injectable for the same reason.</summary>
+    public Func<AgentConfig, CancellationToken, Task<string>> SmartCheck { get; set; } =
+        ConfigTuiProbe.CheckSmartAsync;
+
     /// <summary>The model listing, injectable for the same reason.</summary>
     public Func<AgentConfig, CancellationToken, Task<ModelCatalogResult>> ModelCatalog { get; set; } =
         ConfigTuiProbe.ListModelsAsync;
@@ -122,21 +141,33 @@ public sealed class ConfigTuiModel
     /// The apiKey row is not a config field — it is the credential store, shown
     /// masked. Everything else comes straight from the config.
     /// </summary>
-    public string Value(string key) => key == ApiKeyField
-        ? CredentialStore.Mask(_pendingKey ?? CredentialStore.Load())
+    public string Value(string key) => CredentialFields.TryGetValue(key, out var slot)
+        ? CredentialStore.Mask(_pendingKeys.TryGetValue(key, out var typed) ? typed : CredentialStore.Load(slot))
         : Config.Get(key) ?? "";
 
-    /// <summary>The pseudo-field name for the key itself.</summary>
+    /// <summary>The pseudo-field for the LLM provider key.</summary>
     public const string ApiKeyField = "apiKey";
+
+    /// <summary>The pseudo-field for the TypeSafe key that smart mode will use.</summary>
+    public const string JevApiKeyField = "jevApiKey";
 
     public bool IsCyclable(string key) => key is "provider" or "saveSessions";
 
     public bool ApiKeyPresent =>
         !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Config.ApiKeyEnv));
 
+    /// <summary>True when a TypeSafe key is stored, typed, or in the environment.</summary>
+    public bool SmartKeyPresent =>
+        _pendingKeys.ContainsKey(JevApiKeyField)
+        || CredentialStore.Load(CredentialStore.Slot.Jev) is not null
+        || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TYPESAFE_API_KEY"));
+
     /// <summary>Extra context for whatever the cursor is on.</summary>
     public string Hint() => Step switch
     {
+        ConfigStep.Smart when SelectedKey == JevApiKeyField && !SmartKeyPresent =>
+            "smart mode needs a TypeSafe key — paste it here, then press h to check it",
+
         ConfigStep.Model when Picking =>
             "the list came from the endpoint itself — picking from it cannot be a typo",
         ConfigStep.Model =>
@@ -149,6 +180,9 @@ public sealed class ConfigTuiModel
         "provider" => "echo runs offline and exercises the real loop · openai talks to any OpenAI-compatible endpoint",
         "baseUrl" => "https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama) · http://localhost:1234/v1 (LM Studio)",
         ApiKeyField => "paste the key itself here — it is stored in ~/.agent-one/credentials.json, never in config.json",
+        JevApiKeyField => "the TypeSafe (Jev) key for smart mode — a different service, stored the same way · h to check it",
+        "jevBaseUrl" => "TypeSafe System One API root — https://api.typesafe.ai/v1",
+        "jevModel" => "which System One model answers · jev-latest",
         "apiKeyEnv" => $"FALLBACK only — the NAME of a variable to read the key from, not the key. ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "not set")}",
         "model" => "set on the Model step",
         "maxSteps" => "tool-loop budget per run, 1..100",
@@ -205,6 +239,11 @@ public sealed class ConfigTuiModel
                 Busy = true;
                 Status = $"asking {Config.BaseUrl}/models …";
                 return TuiEffect.FetchModels;
+
+            case ConsoleKey.H when Step == ConfigStep.Smart:
+                Busy = true;
+                Status = $"asking {Config.JevBaseUrl}/systemone …";
+                return TuiEffect.CheckSmart;
 
             // Esc means "back" on a stack, so it only leaves from the first step.
             case ConsoleKey.Escape when Step != ConfigStep.Connection:
@@ -440,7 +479,7 @@ public sealed class ConfigTuiModel
     {
         Editing = true;
         // The key row shows a mask, which would be nonsense to edit in place.
-        EditBuffer = SelectedKey == ApiKeyField ? "" : Value(SelectedKey);
+        EditBuffer = CredentialFields.ContainsKey(SelectedKey) ? "" : Value(SelectedKey);
         Status = $"editing {SelectedKey} — Enter to accept, Esc to cancel";
     }
 
@@ -448,7 +487,7 @@ public sealed class ConfigTuiModel
     {
         var key = SelectedKey;
 
-        if (key == ApiKeyField)
+        if (CredentialFields.ContainsKey(key))
         {
             var typed = EditBuffer.Trim();
             Editing = false;
@@ -456,12 +495,12 @@ public sealed class ConfigTuiModel
 
             if (typed.Length == 0)
             {
-                Status = "key unchanged";
+                Status = $"{key} unchanged";
                 return;
             }
 
-            _pendingKey = typed;
-            Status = $"key set to {CredentialStore.Mask(typed)} — press s to store it";
+            _pendingKeys[key] = typed;
+            Status = $"{key} set to {CredentialStore.Mask(typed)} — press s to store it";
             return;
         }
 
@@ -510,11 +549,10 @@ public sealed class ConfigTuiModel
     {
         try
         {
-            if (_pendingKey is not null)
-            {
-                CredentialStore.Save(_pendingKey);
-                _pendingKey = null;
-            }
+            foreach (var (field, typed) in _pendingKeys)
+                CredentialStore.Save(typed, CredentialFields[field]);
+
+            _pendingKeys.Clear();
 
             ConfigStore.Save(Config);
             _saved = Snapshot(Config);
@@ -529,7 +567,7 @@ public sealed class ConfigTuiModel
 
     public void Reload()
     {
-        _pendingKey = null;
+        _pendingKeys.Clear();
         Config = ConfigStore.Load(out var warning);
         _saved = Snapshot(Config);
         QuitArmed = false;
