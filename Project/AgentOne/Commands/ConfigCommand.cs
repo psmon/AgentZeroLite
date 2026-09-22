@@ -108,6 +108,8 @@ public sealed class ConfigCommand
             agent-one config set <key> <v> Store one value
             agent-one config path          Print the config file path
             agent-one config reset         Restore defaults
+            agent-one config tui           Edit everything in a full-screen UI
+                                           (same as `agent-one tui`)
 
             Keys: provider, baseUrl, model, apiKeyEnv, maxSteps, temperature,
                   timeoutSeconds, saveSessions

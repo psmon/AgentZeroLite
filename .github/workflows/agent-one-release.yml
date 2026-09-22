@@ -117,6 +117,9 @@ jobs:
           OUT=$("$BIN" run "hello" --provider echo --no-session)
           echo "$OUT"
           test "$OUT" = "hello"
+          # The settings TUI boots a host and renders; --selftest drives it from a
+          # scripted key source so a runner with no terminal still proves it works.
+          "$BIN" tui --selftest > /dev/null
 
       - name: Archive
         shell: bash

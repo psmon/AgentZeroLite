@@ -125,6 +125,7 @@ public class AgentConfigTests
 /// Config round-trips through the real file, relocated by AGENT_ONE_HOME — the
 /// same escape hatch CI and the installer use, so the test exercises it too.
 /// </summary>
+[Collection(AgentOneHomeCollection.Name)]
 public class ConfigStoreTests : IDisposable
 {
     private readonly string _home;

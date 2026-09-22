@@ -240,6 +240,16 @@ envelope per turn) so it stays extractable into its own repo. The intended
 integration is process-level: launch `agent-one --json` and read one object off
 stdout, the way the GUI launches `AgentZeroWearable.exe`.
 
+**Settings TUI** (`agent-one tui` / `agent-one config tui`) — a full-screen editor
+for `~/.agent-one/config.json` with a `t` key that sends one request through the
+settings as they stand. Built on **Termina** (`Tui/`), the one TUI measured to
+survive Native AOT here — see `Docs/agent-netclaw/README.md`. The rules live in
+`Tui/ConfigTuiModel.cs`, a state machine over `ConsoleKeyInfo` with no terminal
+in it, so the key map itself is unit tested; the Termina page only projects it.
+`agent-one tui --selftest` drives the real screen from a scripted key source and
+checks where it landed — that is how a release artifact proves its TUI on a
+runner with no terminal, and the release workflow runs it on every RID.
+
 Three things that are easy to break here:
 
 - **AOT means no reflection-based JSON.** Every serialized type is declared in
@@ -252,6 +262,10 @@ Three things that are easy to break here:
   prompt is generated from it, `agent-one tools list` prints it, and
   `ToolCatalogTests` asserts the toolbelt answers every verb in it. Add a verb in
   one place only and the tests fail rather than the model getting confused.
+- **`AGENT_ONE_HOME` is a process-wide environment variable**, so every test class
+  that relocates it joins the `AgentOneHomeCollection` xUnit collection and they
+  run one at a time. Add a class that sets it without joining, and unrelated
+  config tests start failing in parallel runs for no visible reason.
 - **The Windows AOT link step needs `vswhere.exe` on `PATH`** (
   `C:\Program Files (x86)\Microsoft Visual Studio\Installer`) or a Developer
   prompt; Linux needs `clang` + `zlib1g-dev`. The release workflow
@@ -273,3 +287,25 @@ AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). Wh
 - `Docs/agent-origin/03-adoption-recommendations.md` — Adoption roadmap with cost & trade-offs
 
 These docs are a 2026-04-27 snapshot. If they look stale (e.g. > 6 months) or the user asks about a topic not covered, re-survey `D:\Code\AI\AgentWin` directly and **update the relevant `Docs/agent-origin/*.md` file** so the snapshot stays useful for future sessions.
+
+## Reference projects — read the analysis doc before crawling the clone
+
+External codebases surveyed for adoption. Each has a `Docs/agent-<name>/` doc set;
+**read it first**, and re-survey the clone only when the snapshot looks stale or the
+topic is not covered — then update the doc so the next session inherits the answer.
+
+| Mentioned as | Doc set | Clone (read-only, never copied into the repo) |
+|---|---|---|
+| orca, ADE, 병렬 에이전틱 IDE | `Docs/agent-orca/` | `E:\git-other\orca` |
+| herdr | `Docs/agent-herdr/` | — |
+| netclaw, Termina, TUI, AOT TUI | `Docs/agent-netclaw/` | `C:\code\psmon\research\netclaw` |
+| CodeScan (agent-one's skeleton) | — (see `Project/AgentOne/README.md`) | `C:\code\psmon\CodeScan` |
+
+`C:\code\psmon\research\` is where reference clones for analysis live.
+
+**One finding worth not re-deriving**: `Docs/agent-netclaw/README.md` records a
+*measured* result — **Termina 0.16.2 publishes under Native AOT with zero trim
+warnings and the published binary actually runs** (5.19 MB probe, headless via
+`VirtualInputSource`). Terminal.Gui was not shown to do this: CodeScan ships it
+with `-p:TrimMode=""` and a 112 MB non-trimmed binary. So a TUI added to
+`Project/AgentOne` uses Termina, not Terminal.Gui. Only win-x64 was measured.

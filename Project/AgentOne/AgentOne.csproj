@@ -37,6 +37,16 @@
         <EmbeddedResource Remove="packaging\**" />
     </ItemGroup>
 
+    <!-- Settings TUI. Termina is the one TUI framework measured to survive Native
+         AOT with this project's settings — publish is clean and the published
+         binary actually renders (see Docs/agent-netclaw/README.md). It brings
+         R3 + DI/Hosting abstractions; Hosting itself is the host Termina runs on.
+         Only the `tui` verb touches any of it. -->
+    <ItemGroup>
+        <PackageReference Include="Termina" Version="0.16.2" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    </ItemGroup>
+
     <!-- ============================================================
          Auto version bump: patch +1 per build, rollover at 100 -> minor +1.
          Major is manual only (edit version.txt). Mirrors CodeScan/AgentZeroWpf.

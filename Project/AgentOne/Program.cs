@@ -55,6 +55,9 @@ internal static class Program
             {
                 "run" or "ask" => await new RunCommand().ExecuteAsync(rest, cts.Token),
                 "chat" or "repl" => await new ChatCommand().ExecuteAsync(rest, cts.Token),
+                "tui" when rest.Length > 0 && rest[0] == "--selftest" => await Tui.ConfigTuiApp.SelfTestAsync(),
+                "tui" => await Tui.ConfigTuiApp.RunAsync(),
+                "config" when rest.Length > 0 && rest[0] == "tui" => await Tui.ConfigTuiApp.RunAsync(),
                 "config" => new ConfigCommand().Execute(rest),
                 "tools" => new ToolsCommand().Execute(rest),
                 "version" => PrintVersion(),
@@ -124,12 +127,14 @@ internal static class Program
               run <prompt>     Ask once and print the answer
               chat             Interactive session
               config           Show or change settings (~/.agent-one/config.json)
+              tui              Edit settings in a full-screen terminal UI
               tools            List the verbs the agent can call
               home             Print where agent-one keeps its files
               version          Print the version
               help <command>   Detailed help for one command
 
             Quick start (no API key, fully offline):
+              agent-one tui                    ← set things up, then press t to test
               agent-one run "hello" --provider echo
               agent-one tools prompt
 
