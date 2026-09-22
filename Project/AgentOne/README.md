@@ -1,17 +1,43 @@
 # agent-one
 
-A standalone CLI agent. Ask it something, it reads your workspace through a small
-set of tools and answers — on Windows, macOS and Linux, from one native binary
-with no .NET runtime to install.
+A standalone CLI agent. Ask it something, it reads your workspace, writes
+files, runs commands behind a gate and answers — on Windows, macOS and Linux,
+from one native binary with no .NET runtime to install.
 
 ```bash
 agent-one run "what does this project do?"
 agent-one chat
+agent-one session start --smart && agent-one ask "build it and run the tests"
 ```
 
 It is **independent**: `Project/AgentOne` references nothing else in this
 repository. AgentZero Lite may drive it as a child process, but agent-one does
 not need AgentZero, a GUI, or Windows to run.
+
+What is in the box, one line each — the sections below go into each:
+
+- **Tools with a boundary** — `list_files` / `read_file` / `find_files` / `grep`,
+  `write_file` (workspace root only), `web_search` / `web_read` (GETs), and
+  `run_command` (PowerShell or bash in the root) behind a **gate**: risky
+  patterns always ask a person, the decision engine clears the rest.
+- **Smart mode with Jev** — a small, fast model does the work; a decision
+  engine (TypeSafe *System One*) answers fixed-option questions in 0.3 s —
+  route, scope, safety, escalate, task switch — and a slower, stronger
+  *reasoning model* is brought in only when the engine says the draft needs more.
+- **A workspace that remembers** — per-folder memory (50 k chars) that opens
+  every session, saved sessions with `/resume` replaying the screen, and a task
+  title kept by the model.
+- **Long-term memory as a graph** — after each turn the engine judges whether it
+  taught anything; what it did is distilled into an embedded **Kùzu** graph with
+  the engine's rationale attached, and consulted before any file is scanned.
+- **A background session** — `session start` runs one detached; `ask` sends a
+  request from any shell and prints the turn as it happens. That is how the chat
+  mode tests itself and how another agent collaborates with this one.
+- **The Bot / Loop actor pair** — the conversation runs as AgentZero's
+  `AgentBotActor` / `AgentLoopActor` on Akka.NET (a 1.6 nightly) inside the AOT
+  binary; the window, the REPL, `run` and the pipe server are renderers over it.
+- **Pause** — Esc holds a running turn at its next step; the next line you type
+  is read as resume, stop or refine.
 
 ---
 
@@ -60,7 +86,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | Command | What it does |
 |---|---|
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
-| `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/reset`, `/exit`. |
+| `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/status`, `/resume`, `/new`, `/reset`, `/exit`; Esc pauses a running turn. |
 | `agent-one session` | The one background session: `start` (detached), `status`, `stop`, `selftest`. |
 | `agent-one ask <request>` | Send one request to the background session and print the turn. `--yes`, `--json`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |

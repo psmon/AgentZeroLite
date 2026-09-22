@@ -136,6 +136,18 @@ macros to whichever terminal is in focus — nothing more, nothing less.
 - **Actor model (Akka.NET)** — terminal lifecycle, workspace routing and chat input
   all run through supervised actors, so a crashing session does not take the window
   down with it.
+- **🧭 agent-one — a standalone CLI agent, same repo, no shared code** — a
+  Native AOT single binary (Windows / macOS / Linux, npm-installable) that
+  reads a workspace, writes files, runs commands behind an approval gate and
+  answers, with a small on-device model doing the work and a decision engine
+  (TypeSafe *Jev*) answering the fixed questions — route, scope, safety,
+  escalate to a stronger model. It remembers per workspace (memory file,
+  resumable sessions, a **Kùzu knowledge graph** the engine fills and
+  consults), runs as **the same `AgentBotActor` / `AgentLoopActor` pair** as
+  the GUI's Bot mode on its own Akka.NET, and can be driven from any shell —
+  or by another agent — through a background session. See the
+  [agent-one section](#-agent-one--the-standalone-cli-agent) below and
+  [Project/AgentOne/README.md](Project/AgentOne/README.md).
 - **One executable, one process** — single-instance guard, SQLite for config, zero
   external dependencies beyond the .NET 10 runtime. The build is under ~60 MB.
 
@@ -208,6 +220,9 @@ surface.
 
 Messages are defined in one place (`ZeroCommon/Actors/Messages.cs`).
 Canonical agent vocabulary table — `harness/knowledge/_shared/agent-architecture.md`.
+The same two-actor shape, with the same message names, runs inside
+[agent-one](#-agent-one--the-standalone-cli-agent) on its own `ActorSystem`
+(`/user/bot` → `/user/bot/loop`), so the CLI and the GUI's Bot mode read alike.
 
 ---
 
@@ -220,9 +235,14 @@ Canonical agent vocabulary table — `harness/knowledge/_shared/agent-architectu
 | **AgentTest**            | `Project/AgentTest/`        | xUnit (net10.0-windows)          | `AgentTest.*`        |
 | **ZeroWearable**         | `Project/ZeroWearable/`     | Exe (net10.0-windows10.0.19041)  | `ZeroWearable.*`     |
 | **ZeroCommon.Tests**     | `Project/ZeroCommon.Tests/` | xUnit (net10.0, headless)        | `ZeroCommon.Tests.*` |
+| **AgentZeroAvalonia**    | `Project/AgentZeroAvalonia/`| Exe (net10.0, Avalonia, Win+macOS)| `AgentZeroAvalonia.*`|
+| **AgentOne**             | `Project/AgentOne/`         | Exe (net10.0, Native AOT, `agent-one`) | `AgentOne.*`  |
+| **AgentOne.Tests**       | `Project/AgentOne.Tests/`   | xUnit (net10.0, headless)        | `AgentOne.Tests.*`   |
 
 Reference graph: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`, and
-`ZeroWearable → ZeroCommon`. Anything without WPF / Win32 dependencies belongs in
+`ZeroWearable → ZeroCommon`. **AgentOne references nothing and nothing references
+it** — it is a second product that shares the repo and the actor vocabulary, not
+the code. Anything without WPF / Win32 dependencies belongs in
 ZeroCommon. **ZeroWearable** is a second process on purpose — its BLE central is WinRT and
 needs a Windows-SDK target framework, which the GUI must not move to. It owns the watch's
 single BLE link; see [Wearable device](Docs/wearable-device.md).
@@ -247,6 +267,12 @@ Project/AgentZeroWpf/bin/Debug/net10.0-windows/AgentZeroLite.exe
 
 # Run headless tests (shared logic)
 dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj
+
+# agent-one — the standalone CLI agent (its own README has the rest)
+dotnet build Project/AgentOne/AgentOne.csproj -c Debug
+dotnet test  Project/AgentOne.Tests/AgentOne.Tests.csproj
+Project/AgentOne/agent-one.ps1 run "hello" --provider echo
+Project/AgentOne/agent-one.ps1 chat
 
 # Run WPF-dependent tests (actors, terminal sessions, approval parser)
 dotnet test Project/AgentTest/AgentTest.csproj
@@ -875,6 +901,45 @@ Project/AgentZeroWpf/
 
 ---
 
+## 🧭 agent-one — the standalone CLI agent
+
+```console
+$ agent-one chat
+› 보드 API 만들어줘
+  route: → workspace  (confidence 0.98)
+  scope: small — going ahead  (confidence 0.73)
+  graph: consulted via by_keywords — 2 item(s)  (confidence 0.81)
+  ✓ write_file  (0.0s)
+  ⚠ run this command?  dotnet build src/BoardApi     ← y runs it
+  ✓ run_command  (4.1s)
+  escalation: keeping the draft  (confidence 0.98)
+◆ 보드 API를 만들고 빌드했습니다. 다음 단계: 1. … 2. …
+  knowledge: kept 2 item(s)  (confidence 0.84)
+```
+
+AgentZero Lite is a desktop; **agent-one** is the same idea as a single binary
+you can `npm install` on any machine: an agent that works in a folder, with an
+on-device model that is small and fast and a decision engine that keeps it
+honest. It lives in [`Project/AgentOne`](Project/AgentOne/) and references
+nothing else here — Native AOT cannot carry Akka.Remote, EF Core, LLamaSharp
+or ONNX — but it borrows the shape.
+
+| | |
+|---|---|
+| **Tools** | files (`list_files` `read_file` `find_files` `grep`), `write_file` inside the workspace root only, `web_search` / `web_read` (GETs), `run_command` (PowerShell / bash in the root). Writing and running are the *guarded* families: risky patterns always ask a person; otherwise the decision engine's `safe` must be confident, or you are asked. |
+| **Smart mode** | Before a turn the engine picks the tool family (enforced, not suggested), sizes workspace work (a *design* from the strong model first when it is big), and after the everyday model's draft decides whether the strong, slow **reasoning model** should take a second look. Two models, one fixed-question engine (TypeSafe *System One*, ~0.3 s per question), no planning LLM call. Measured notes in [`docs/smart-mode-jev.md`](Project/AgentOne/docs/smart-mode-jev.md). |
+| **Memory** | Per-workspace memory file (50 k chars, opens every session), saved sessions with `/resume` replaying the screen, a task title the model keeps. And a **knowledge graph** (embedded Kùzu, Cypher): after each turn the engine judges *worth keeping?*, the model distils 1–3 lines stored with the engine's rationale as a node, and before a turn the engine decides whether — and by which query — to consult it, before any file is scanned. `agent-one memory` opens it. |
+| **Background session** | `agent-one session start` runs one detached session; `agent-one ask "…"` from any shell streams the turn's events and answers approvals on the same pipe. One at a time, `session stop` ends it. It is how chat mode tests itself on every release platform, and how another agent (a Claude tab in AgentZero, say) collaborates with agent-one. |
+| **Actors** | The conversation is `AgentBotActor` (gateway: callbacks, one turn at a time) over `AgentLoopActor` (owns the session, Idle ⇄ Running, exactly one result per start) — the vocabulary of `ZeroCommon/Actors/Messages.cs`, on an Akka.NET 1.6 nightly, inside the AOT binary. The window, the REPL, `run` and the pipe server are renderers over one gateway. |
+| **Pause** | Esc while a turn runs holds it at its next step; the next line you type is read as *resume*, *stop* or *refine* — a refinement goes in front of the model as `[the user, mid-turn] …`. |
+| **Ships as** | `dotnet publish` → one ~22 MB binary per RID (win-x64, linux-x64, osx-arm64, osx-x64) with Kùzu's library beside it; the release workflow smoke-tests each (settings screen, chat mode over the pipe) and the npm wrapper `@webnori/agent-one` downloads and verifies it. |
+
+Everything else — the settings screen, the chat window's keys, the safety
+boundary, the JSON contract, the layout of `~/.agent-one/` — is in
+**[Project/AgentOne/README.md](Project/AgentOne/README.md)**.
+
+---
+
 ## 🧪 Harness — making the function-call chain self-improve
 
 Wiring an LLM into a useful tool chain is **hard**, and it is honestly
@@ -1007,8 +1072,9 @@ EF Core on first run). User-installed WebDev plugins live next door under
 
 ## Status
 
-**Alpha — current release v0.20.x.** Headless suite green (500+ tests); the WPF
-integration suite is opt-in and requires a desktop session. API surface inside
+**Alpha — current release v0.20.x.** Headless suite green (500+ tests), and
+agent-one's own suite (500+, including the actor pair under Akka.TestKit); the
+WPF integration suite is opt-in and requires a desktop session. API surface inside
 `ZeroCommon` is considered unstable until v1.0; the WebDev `window.zero.*`
 bridge is additive-only since v0.4 — new ops added, none removed.
 
