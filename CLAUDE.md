@@ -393,6 +393,21 @@ the user as the answer and the file never written. `/status` (F2 in the window) 
 token estimate, Jev calls and ms, escalations, designs, approvals, memory size,
 grants; `/new` starts a fresh session and log.
 
+**The background session** (`Commands/SessionCommand`, `Agent/SessionServer`
++ `SessionClient`, `Services/SessionProtocol` + `SessionRegistry`): `session
+start` spawns `agent-one session serve` detached (stdout/stderr → `logs/
+session.log`), which holds one `ChatSession` behind a `NamedPipeServerStream`
+named from a hash of the home dir and records pid/pipe/root in
+`~/.agent-one/session.json`; one at a time, a dead pid is forgotten on load.
+Protocol is JSON lines: `PipeRequest{op: ask|status|stop|answer}` in,
+`PipeEvent{event: activity|step|delta|note|decided|title|design|ask|choose|
+result|error}` out; `ask`/`choose` events wait for an `answer` line on the same
+connection, which is how `Approver`/`Chooser` reach the CLI (`ask --yes`
+approves up front). `agent-one ask` is the REPL's printing over the client;
+`session selftest` runs both ends in-process on a private pipe with the echo
+provider — the release workflow runs it. Note `ask` used to alias `run`; it no
+longer does.
+
 **A session belongs to its workspace** (`Services/WorkspaceStore`, under
 `~/.agent-one/workspaces/<name>-<sha1[10]>/`): `memory.md` gets one entry per
 turn (asked / did / outcome; `MemoryCapChars` 50 000, oldest entries dropped

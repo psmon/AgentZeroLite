@@ -53,8 +53,10 @@ internal static class Program
         {
             return command switch
             {
-                "run" or "ask" => await new RunCommand().ExecuteAsync(rest, cts.Token),
+                "run" => await new RunCommand().ExecuteAsync(rest, cts.Token),
                 "chat" or "repl" => await new ChatCommand().ExecuteAsync(rest, cts.Token),
+                "session" => await new SessionCommand().ExecuteAsync(rest, cts.Token),
+                "ask" => await new AskCommand().ExecuteAsync(rest, cts.Token),
                 // `setup` is the name; `tui` stays as the alias the release smoke test and old notes use.
                 "setup" or "tui" when rest.Length > 0 && rest[0] == "--selftest" => await Tui.ConfigTuiApp.SelfTestAsync(),
                 "setup" or "tui" => await Tui.ConfigTuiApp.RunAsync(),
@@ -104,8 +106,9 @@ internal static class Program
 
         switch (args[0].ToLowerInvariant())
         {
-            case "run" or "ask": RunCommand.PrintHelp(); return 0;
+            case "run": RunCommand.PrintHelp(); return 0;
             case "chat" or "repl": ChatCommand.PrintHelp(); return 0;
+            case "session" or "ask": SessionCommand.PrintHelp(); return 0;
             case "config": ConfigCommand.PrintHelp(); return 0;
             case "models": ModelsCommand.PrintHelp(); return 0;
             case "auth": AuthCommand.PrintHelp(); return 0;
@@ -135,6 +138,8 @@ internal static class Program
             Commands:
               run <prompt>     Ask once and print the answer
               chat             Interactive session
+              session          Background session: start · status · stop · selftest
+              ask <request>    Send one request to the background session
               setup            Set it up on a screen: connection, model, reasoning model, options, smart mode
               config           Show or change settings from the command line (~/.agent-one/config.json)
               auth             Store or inspect the API keys

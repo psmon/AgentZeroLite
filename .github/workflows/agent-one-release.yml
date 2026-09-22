@@ -120,6 +120,7 @@ jobs:
           # The settings TUI boots a host and renders; --selftest drives it from a
           # scripted key source so a runner with no terminal still proves it works.
           "$BIN" setup --selftest > /dev/null
+          "$BIN" session selftest > /dev/null
 
       - name: Archive
         shell: bash

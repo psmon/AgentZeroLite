@@ -61,6 +61,8 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 |---|---|
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
 | `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/reset`, `/exit`. |
+| `agent-one session` | The one background session: `start` (detached), `status`, `stop`, `selftest`. |
+| `agent-one ask <request>` | Send one request to the background session and print the turn. `--yes`, `--json`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one setup` | Full-screen settings: connection, model, reasoning model, options, smart mode (`tui` still works as an alias). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
@@ -363,6 +365,32 @@ context size and a token estimate, how many times the decision engine was
 called and for how long, escalations, designs, tool calls, commands approved,
 the workspace memory's size, and which folders are readable. `/new` starts a
 fresh session with a new log file.
+
+### A session in the background, driven from the CLI
+
+```bash
+agent-one session start --smart -r ./myproject     # one detached process, one pipe
+agent-one ask "scaffold a FastAPI hello service"    # the turn, printed as the REPL would
+agent-one ask --yes "run the tests"                 # approve commands without asking back
+agent-one ask --json "/status"                      # one JSON object: the result event
+agent-one session stop
+```
+
+`session start` spawns `agent-one` itself, detached, holding one `ChatSession`
+behind a local named pipe (`~/.agent-one/session.json` says where). `ask`
+connects, sends the request, and prints the turn's events as they happen —
+progress, tool steps, the streamed answer, decisions, the design's head — and
+is where a question comes back: a command to approve (`y`, or `--yes` up
+front) or a design choice to make (a number, Enter for the recommendation).
+The conversation, the log and the workspace memory are the same as the
+window's. One session at a time; a second `start` is refused while the first
+is alive, and a stale record from a crash is cleared.
+
+Two reasons it exists: **chat mode can be self-tested with no terminal** —
+`agent-one session selftest` runs server and client in one process over a
+private pipe on the echo provider, and the release smoke test runs it on every
+artifact — and **another agent can drive this one** from a script, reading
+`--json` results or the event lines.
 
 ### The workspace remembers
 
