@@ -12,6 +12,8 @@ namespace AgentOne.Services;
 /// </summary>
 public sealed class SessionStore
 {
+    private static readonly UTF8Encoding NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
     private readonly string _path;
 
     public string Id { get; }
@@ -60,7 +62,11 @@ public sealed class SessionStore
         try
         {
             var line = JsonSerializer.Serialize(entry, AgentOneWireJson.Default.SessionEntry);
-            File.AppendAllText(_path, line + Environment.NewLine, Encoding.UTF8);
+            // Encoding.UTF8 writes a BOM when it creates the file, and a BOM on
+            // line 1 makes the first record unparseable to strict JSONL readers
+            // (json.loads, jq -c, most log shippers). JSONL is bytes-of-UTF-8,
+            // no preamble.
+            File.AppendAllText(_path, line + "\n", NoBom);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

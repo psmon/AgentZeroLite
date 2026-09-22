@@ -287,6 +287,20 @@ All under `~/.agent-one/` — never in the working directory:
   logs/
 ```
 
+The session file is the record of what the agent actually did, which is how you
+tell a real answer from a confident one:
+
+```console
+$ jq -c '{kind,tool,text}' ~/.agent-one/sessions/*-chat.jsonl
+{"kind":"prompt","tool":null,"text":"hi"}
+{"kind":"step","tool":"list_files","text":"path=. -> 422 chars"}
+{"kind":"step","tool":"read_file","text":"path=README.md -> 60120 chars"}
+{"kind":"step","tool":"final","text":"AgentZero Lite is a desktop shell…"}
+```
+
+It is plain JSONL — UTF-8, no BOM, one object per line — so `jq`, `json.loads`
+and log shippers read it directly.
+
 `AGENT_ONE_HOME` relocates the whole tree (tests and CI use it).
 
 Two files rather than one because they have different risk: `config.json` is the

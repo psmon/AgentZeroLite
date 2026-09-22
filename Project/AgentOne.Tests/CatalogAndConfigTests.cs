@@ -179,6 +179,29 @@ public class ConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void SessionFilesAreValidJsonlWithNoByteOrderMark()
+    {
+        var session = SessionStore.Create("run");
+        session.Prompt("hi");
+        session.Prompt("again");
+
+        var bytes = File.ReadAllBytes(session.Path);
+
+        // A BOM on line 1 makes the first record unparseable to strict JSONL
+        // readers, which is how this was found — by failing to read a real log.
+        Assert.False(bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF,
+            "session file starts with a UTF-8 BOM");
+
+        foreach (var line in File.ReadAllLines(session.Path))
+        {
+            if (line.Length == 0) continue;
+            Assert.Equal('{', line[0]);
+            using var doc = System.Text.Json.JsonDocument.Parse(line);
+            Assert.True(doc.RootElement.TryGetProperty("kind", out _));
+        }
+    }
+
+    [Fact]
     public void SessionsLandUnderTheRelocatedHome()
     {
         var session = SessionStore.Create("run");
