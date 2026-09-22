@@ -305,6 +305,11 @@ public sealed class ChatSession : IDisposable
         IReadOnlySet<string>? families = null;
         var designed = false;
 
+        // The task is (re)named from the request, in the background, as the turn
+        // starts — so the header says "게시판 API 개발" seconds in, not minutes
+        // later when a long build ends. A greeting is not a task.
+        if (SmartRouter.Applies(line)) _ = RetitleAsync(line);
+
         if (smart)
         {
             var route = await _router.RouteAsync(line, Digest(), ct);
@@ -347,7 +352,6 @@ public sealed class ChatSession : IDisposable
 
         _log?.Result(run);
         Remember(line, run);
-        _ = RetitleAsync(line, run);
         return run;
     }
 
@@ -387,16 +391,18 @@ public sealed class ChatSession : IDisposable
     // ------------------------------------------------------------- title
 
     /// <summary>
-    /// Names the task, off the turn — the answer is already on screen. With an
-    /// engine, its task-switch question (0.3 s) decides whether the name still
+    /// Names the task from the request, concurrently with the turn, so the
+    /// name is on screen while the work is still running. With an engine, its
+    /// task-switch question (0.3 s) decides whether the current name still
     /// fits, and the LLM is only asked for a new one when it does not; without
-    /// an engine the LLM names the task once and the name stays. `run` and the
-    /// echo provider never name anything.
+    /// an engine the LLM names the task once and the name stays. Requests
+    /// shorter than a sentence ("안녕", "hi") never name anything, and neither
+    /// do `run` and the echo provider.
     /// </summary>
-    /// <summary>Off for tests that count provider calls; the naming call runs off the turn and would race them.</summary>
+    /// <summary>Off for tests that count provider calls; the naming call runs beside the turn and would race them.</summary>
     internal bool NamesTasks { get; set; } = true;
 
-    private async Task RetitleAsync(string request, AgentRun run)
+    private async Task RetitleAsync(string request)
     {
         if (!NamesTasks || _logKind != "chat" || _provider.Name == "echo") return;
         var ct = _background.Token;
@@ -409,8 +415,7 @@ public sealed class ChatSession : IDisposable
                 if (!await _router.TaskSwitchedAsync(current, request, ct)) return;
             }
 
-            var outcome = run.Succeeded ? run.Text : $"stopped: {run.Reason}";
-            var title = await TaskTitler.NameAsync(_provider, request, outcome, Title, ct);
+            var title = await TaskTitler.NameAsync(_provider, request, "(in progress)", Title, ct);
             if (title.Length == 0 || title == Title) return;
 
             Title = title;

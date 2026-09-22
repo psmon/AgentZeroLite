@@ -381,12 +381,14 @@ and the workspace keeps two things under `~/.agent-one/workspaces/<name>-<hash>/
   ── continuing from here ──
 ```
 
-**The task's name** is made by the model, off the turn — never on the way to
-an answer — and shown in the header, the status block, the resume list and the
-memory. With a TypeSafe key, each new request is first put to the decision
-engine as "same task or a new one?" (0.3 s), and the model is only asked for a
-new name when the task changed; without one, the task is named once per
-session. `run` and the echo provider never name anything.
+**The task's name** is made by the model from the request, in the background
+as the turn starts — so the header says "게시판 API 개발" seconds in, not
+minutes later when a long build ends — and shown in the header, the status
+block, the resume list and the memory. A greeting ("안녕", "hi") is not a task
+and names nothing. With a TypeSafe key, each new request is first put to the
+decision engine as "same task or a new one?" (0.3 s), and the model is only
+asked for a new name when the task changed; without one, the task is named
+once per session. `run` and the echo provider never name anything.
 
 When input or output is a pipe — or with `--plain` — the same conversation runs
 as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin

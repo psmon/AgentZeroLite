@@ -191,12 +191,16 @@ public class MemoryAndResumeSessionTests : IDisposable
     private static Decision Choose(string choice, double confidence) =>
         new(true, choice, confidence, new Dictionary<string, double> { [choice] = confidence }, "ok", 10);
 
-    private ChatSession Session(ScriptedChatProvider provider, IDecisionEngine? engine = null, bool smart = false, bool save = true)
+    /// <param name="names">Whether the session names its task; off unless the test is about names, so no naming call races the assertions.</param>
+    private ChatSession Session(ScriptedChatProvider provider, IDecisionEngine? engine = null, bool smart = false, bool save = true, bool names = false)
     {
         var config = new AgentConfig();
         config.TrySet("smartMode", smart ? "on" : "off", out _);
         config.TrySet("saveSessions", save ? "true" : "false", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine ?? new ScriptedDecisionEngine(Choose("x", 1)), engine is not null);
+        return new ChatSession(config, _root, streaming: false, provider, engine ?? new ScriptedDecisionEngine(Choose("x", 1)), engine is not null)
+        {
+            NamesTasks = names
+        };
     }
 
     private static async Task<string?> WaitForTitleAsync(ChatSession session, string? other = null)
@@ -250,9 +254,9 @@ public class MemoryAndResumeSessionTests : IDisposable
     public async Task ResumeRebuildsTheContextRestoresTheTitleAndKeepsAppendingToTheSameFile()
     {
         string path;
-        using (var first = Session(new ScriptedChatProvider(
-                   """{"tool":"final","args":{"text":"the board API has one endpoint"}}""",
-                   "게시판 API 만들기")))                                 // the second reply names the task
+        var namer = new ScriptedChatProvider("""{"tool":"final","args":{"text":"the board API has one endpoint"}}""");
+        namer.TitleReplies.Enqueue("게시판 API 만들기");
+        using (var first = Session(namer, names: true))
         {
             await first.SubmitAsync("tell me about the board api", CancellationToken.None);
             Assert.Equal("게시판 API 만들기", await WaitForTitleAsync(first));
@@ -285,13 +289,15 @@ public class MemoryAndResumeSessionTests : IDisposable
     public async Task WithAnEngineTheTitleChangesOnlyWhenTheTaskDoes()
     {
         var provider = new ScriptedChatProvider(
-            """{"tool":"final","args":{"text":"built"}}""", "Board API build",       // turn 1 + its name
-            """{"tool":"final","args":{"text":"fixed"}}""",                          // turn 2 (same task: no naming call)
-            """{"tool":"final","args":{"text":"deployed"}}""", "Deploy to staging"); // turn 3 + its new name
+            """{"tool":"final","args":{"text":"built"}}""",
+            """{"tool":"final","args":{"text":"fixed"}}""",
+            """{"tool":"final","args":{"text":"deployed"}}""");
+        provider.TitleReplies.Enqueue("Board API build");        // turn 1's name
+        provider.TitleReplies.Enqueue("Deploy to staging");      // turn 3's; turn 2 is the same task and asks for none
         var engine = new ScriptedDecisionEngine(
             Choose(SmartRouter.SameTask, 0.9),
             Choose(SmartRouter.NewTask, 0.8));
-        using var session = Session(provider, engine, smart: false);
+        using var session = Session(provider, engine, smart: false, names: true);
 
         await session.SubmitAsync("build the board api", CancellationToken.None);
         Assert.Equal("Board API build", await WaitForTitleAsync(session));
@@ -308,12 +314,31 @@ public class MemoryAndResumeSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task AGreetingIsNotATaskAndTheNextRealRequestNamesIt()
+    {
+        var provider = new ScriptedChatProvider(
+            """{"tool":"final","args":{"text":"안녕하세요!"}}""",
+            """{"tool":"final","args":{"text":"making it"}}""");
+        provider.TitleReplies.Enqueue("게시판 API 개발");
+        using var session = Session(provider, names: true);
+
+        await session.SubmitAsync("안녕", CancellationToken.None);
+        await Task.Delay(50);
+        Assert.Null(session.Title);                                     // "안녕" is not a task
+        Assert.Single(provider.Calls);                                  // and asked for no name
+
+        await session.SubmitAsync("보드API 개발해줘, 만들다 만 파일이 있음", CancellationToken.None);
+        Assert.Equal("게시판 API 개발", await WaitForTitleAsync(session));
+    }
+
+    [Fact]
     public async Task WithoutAnEngineTheTaskIsNamedOnceAndNewSessionForgetsIt()
     {
         var provider = new ScriptedChatProvider(
-            """{"tool":"final","args":{"text":"a"}}""", "First name",
+            """{"tool":"final","args":{"text":"a"}}""",
             """{"tool":"final","args":{"text":"b"}}""");
-        using var session = Session(provider);
+        provider.TitleReplies.Enqueue("First name");
+        using var session = Session(provider, names: true);
 
         await session.SubmitAsync("first request here", CancellationToken.None);
         Assert.Equal("First name", await WaitForTitleAsync(session));

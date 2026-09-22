@@ -392,12 +392,17 @@ turns, first prompt) and `/resume <n>` calls `ChatSession.Resume(path)`, which
 rebuilds the loop's context from prompt/result pairs (`AgentLoop.Restore`),
 restores the last `title` entry, and keeps appending to the same file
 (`SessionStore.Open`); the renderers replay the entries on screen. **Task
-titles** (`Agent/TaskTitler`) are made by the everyday model *off the turn*
-(`RetitleAsync`, fire-and-forget on `_background`): with an engine,
+titles** (`Agent/TaskTitler`) are made by the everyday model from the request,
+*beside* the turn (`RetitleAsync`, fire-and-forget on `_background` as the
+turn starts — a greeting got "상담 시작 및 문의 응대" and a long build turn
+left the header stale until it ended, so now only requests that pass
+`SmartRouter.Applies` are named, and at the start): with an engine,
 `SmartRouter.TaskSwitchedAsync` (same_task / new_task, choice only) gates the
 naming call; without one the task is named once. `ChatSession.NamesTasks` is
 the test switch — a naming call racing a test's assertions on provider calls
-is the flake it prevents.
+is the flake it prevents; `ScriptedChatProvider.TitleReplies` answers naming
+calls (recognised by `TaskTitler.SystemPrompt`) so they never eat the turn's
+scripted replies.
 
 `grep` is plain substring, not regex, on purpose: the pattern comes from a model,
 and a regex from an untrusted source hangs the process on backtracking. Search
