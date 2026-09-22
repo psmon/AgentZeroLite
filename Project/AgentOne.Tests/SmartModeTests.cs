@@ -1,14 +1,19 @@
 using AgentOne.Agent;
 using AgentOne.Llm.Decision;
+using AgentOne.Tools;
 
 namespace AgentOne.Tests;
 
-/// <summary>A decision engine that answers from a script, and counts its calls.</summary>
-internal sealed class ScriptedDecisionEngine(Decision answer) : IDecisionEngine
+/// <summary>A decision engine that answers from a script, in order, and records what it was asked.</summary>
+internal sealed class ScriptedDecisionEngine(params Decision[] answers) : IDecisionEngine
 {
+    private int _index;
+
     public int Calls { get; private set; }
+    public List<string> States { get; } = [];
+    public List<string> Questions { get; } = [];
     public IReadOnlyList<DecisionOption>? LastOptions { get; private set; }
-    public string? LastState { get; private set; }
+    public string? LastState => States.Count == 0 ? null : States[^1];
 
     public string Name => "scripted";
 
@@ -16,313 +21,253 @@ internal sealed class ScriptedDecisionEngine(Decision answer) : IDecisionEngine
         string state, string question, IReadOnlyList<DecisionOption> options, CancellationToken ct)
     {
         Calls++;
-        LastState = state;
+        States.Add(state);
+        Questions.Add(question);
         LastOptions = options;
+        var answer = answers[Math.Min(_index, answers.Length - 1)];
+        _index++;
         return Task.FromResult(answer);
     }
 }
 
-public class PlannerTests
+/// <summary>
+/// Smart mode's two questions. Both have fixed options, so the only things
+/// that vary are the state the engine is shown and what its answer is taken
+/// to mean.
+/// </summary>
+public class SmartRouterTests
 {
-    [Fact]
-    public void APlanEnvelopeBecomesOptions()
-    {
-        var options = Planner.Parse(
-            """{"tool":"plan","args":{"read_local":"Read the files here.","search_web":"Search the web."}}""", 4);
+    private static Decision Choose(string choice, double confidence) =>
+        new(true, choice, confidence, new Dictionary<string, double> { [choice] = confidence }, "ok", 100);
 
-        Assert.Equal(2, options.Count);
-        Assert.Equal("read_local", options[0].Name);
-        Assert.Equal("Read the files here.", options[0].Description);
+    private static SmartRouter Router(IDecisionEngine engine, double floor = 0.60, string? reasoning = "big-model") =>
+        new(engine, floor, "small-model", reasoning);
+
+    // --- the gate -------------------------------------------------------------
+
+    [Theory]
+    [InlineData("hi", false)]
+    [InlineData("안녕", false)]
+    [InlineData("123456789", false)]      // nine: one short
+    [InlineData("1234567890", true)]      // ten: the threshold
+    [InlineData("  what is MSA?  ", true)]
+    public void OnlyARequestOfTenCharactersOrMoreIsRouted(string request, bool expected)
+    {
+        Assert.Equal(expected, SmartRouter.Applies(request));
+    }
+
+    // --- the route ------------------------------------------------------------
+
+    [Fact]
+    public async Task TheRouteQuestionOffersExactlyTheThreeResources()
+    {
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.SearchWeb, 0.9));
+
+        await Router(engine).RouteAsync("what is the weather in Seoul today?", "", CancellationToken.None);
+
+        Assert.Equal(SmartRouter.RouteQuestion, engine.Questions[0]);
+        Assert.Equal([SmartRouter.SearchWeb, SmartRouter.ReadWorkspace, SmartRouter.AnswerDirectly],
+                     engine.LastOptions!.Select(o => o.Name));
     }
 
     [Fact]
-    public void FencedAndPrefacedRepliesStillParse()
+    public async Task TheEngineIsToldTheRequestTheModelsAndWhatIsAlreadyKnown()
     {
-        var options = Planner.Parse(
-            """
-            Here is the plan:
-            ```json
-            {"tool":"plan","args":{"a":"Do A.","b":"Do B."}}
-            ```
-            """, 4);
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.AnswerDirectly, 0.9));
 
-        Assert.Equal(2, options.Count);
-    }
+        await Router(engine).RouteAsync("and the trade-offs?", "[tool:web_read] MSA guide", CancellationToken.None);
 
-    [Fact]
-    public void MoreThanTheLimitIsTrimmed()
-    {
-        var options = Planner.Parse(
-            """{"tool":"plan","args":{"a":"A.","b":"B.","c":"C.","d":"D.","e":"E.","f":"F."}}""", 4);
-
-        Assert.Equal(4, options.Count);
-    }
-
-    [Fact]
-    public void EmptyDescriptionsAreDropped()
-    {
-        var options = Planner.Parse("""{"tool":"plan","args":{"a":"A.","b":"   "}}""", 4);
-
-        Assert.Single(options);
+        var state = engine.LastState!;
+        Assert.Contains("and the trade-offs?", state);
+        Assert.Contains("small-model", state);
+        Assert.Contains("big-model", state);
+        Assert.Contains("[tool:web_read] MSA guide", state);
     }
 
     [Theory]
-    [InlineData("""{"tool":"final","args":{"text":"I'll just answer."}}""")]   // answered instead of planning
-    [InlineData("I think we should read the files.")]                          // prose
-    [InlineData("")]
-    public void AnythingThatIsNotAPlanYieldsNoOptions(string raw)
+    [InlineData(SmartRouter.SearchWeb, Route.Web, ToolCatalog.WebFamily)]
+    [InlineData(SmartRouter.ReadWorkspace, Route.Files, ToolCatalog.FilesFamily)]
+    public async Task AConfidentRouteRestrictsTheLoopToOneFamily(string choice, Route expected, string family)
     {
-        Assert.Empty(Planner.Parse(raw, 4));
+        var route = await Router(new ScriptedDecisionEngine(Choose(choice, 0.9)))
+            .RouteAsync("a request long enough", "", CancellationToken.None);
+
+        Assert.True(route.Steers);
+        Assert.Equal(expected, route.Route);
+        Assert.Equal([family], route.Families!);
+        Assert.Contains($"[route: {expected.ToString().ToLowerInvariant()}]", route.Guidance("a request long enough"));
     }
 
     [Fact]
-    public void ThePromptInsistsTheApproachesDiffer()
+    public async Task AnswerDirectlyLeavesNoToolAtAll()
     {
-        var prompt = Planner.Prompt("files, web");
+        var route = await Router(new ScriptedDecisionEngine(Choose(SmartRouter.AnswerDirectly, 0.95)))
+            .RouteAsync("explain the actor model", "", CancellationToken.None);
 
-        // Low confidence comes from indistinguishable options, so this is the
-        // instruction that keeps the decision worth making.
-        Assert.Contains("DIFFERENT", prompt);
-        Assert.Contains("files, web", prompt);
+        Assert.Equal(Route.Answer, route.Route);
+        Assert.Empty(route.Families!);
     }
-}
 
-public class SmartTurnTests
-{
-    private static Decision Confident(string choice) =>
-        new(true, choice, 0.92, new Dictionary<string, double> { [choice] = 0.95 }, "ok", 100);
-
-    private static Decision Unsure(string choice) =>
-        new(true, choice, 0.31, new Dictionary<string, double> { [choice] = 0.55 }, "ok", 100);
-
-    private static SmartTurn Turn(ScriptedChatProvider provider, IDecisionEngine engine, double floor = 0.60) =>
-        new(provider, engine, floor);
-
-    private const string TwoApproaches =
-        """{"tool":"plan","args":{"read_local":"Read the files here.","search_web":"Search the web."}}""";
-
-    [Fact]
-    public async Task AConfidentDecisionIsMarkedConfident()
+    [Theory]
+    [InlineData(0.60, true)]      // the floor is inclusive
+    [InlineData(0.59, false)]
+    public async Task OnlyAChoiceAtOrAboveTheFloorSteers(double confidence, bool steers)
     {
-        var engine = new ScriptedDecisionEngine(Confident("search_web"));
-        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), engine)
-            .PrepareAsync("what is the weather?", "files, web", CancellationToken.None);
+        var route = await Router(new ScriptedDecisionEngine(Choose(SmartRouter.SearchWeb, confidence)))
+            .RouteAsync("a request long enough", "", CancellationToken.None);
 
-        Assert.True(plan.Confident);
-        Assert.True(plan.HasChoice);
-        Assert.Equal("search_web", plan.Chosen?.Name);
-        Assert.Equal(1, engine.Calls);
+        Assert.Equal(steers, route.Steers);
+        if (!steers)
+        {
+            Assert.Null(route.Families);                                        // every tool stays available
+            Assert.Equal("a request long enough", route.Guidance("a request long enough"));
+        }
     }
 
     [Fact]
-    public async Task ADecisionBelowTheFloorIsNotConfidentButStillHasAChoice()
+    public async Task AFailedEngineDoesNotSteer()
     {
-        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), new ScriptedDecisionEngine(Unsure("read_local")))
-            .PrepareAsync("do the thing", "files, web", CancellationToken.None);
+        var route = await Router(new ScriptedDecisionEngine(Decision.Failed("service down")))
+            .RouteAsync("a request long enough", "", CancellationToken.None);
 
-        Assert.False(plan.Confident);
-        Assert.True(plan.HasChoice);          // the caller decides what to do about it
-        Assert.Equal("read_local", plan.Decision!.Choice);
+        Assert.Null(route.Route);
+        Assert.False(route.Steers);
     }
 
-    [Fact]
-    public async Task OnePlannedApproachIsStillWeighedAgainstAskingAPerson()
-    {
-        var engine = new ScriptedDecisionEngine(Confident("only"));
-        var provider = new ScriptedChatProvider("""{"tool":"plan","args":{"only":"The single way."}}""");
-
-        var plan = await Turn(provider, engine).PrepareAsync("hi", "files", CancellationToken.None);
-
-        // Before review existed this short-circuited. Now "one way forward, or a
-        // person?" is a question worth asking, so it reaches the engine.
-        Assert.Equal(1, engine.Calls);
-        Assert.Equal(2, plan.Options.Count);
-    }
+    // --- the escalation -------------------------------------------------------
 
     [Fact]
-    public async Task AFailedPlanNeverReachesTheEngineEither()
+    public async Task WithoutAReasoningModelTheEngineIsNeverAsked()
     {
-        var engine = new ScriptedDecisionEngine(Confident("x"));
-        var provider = new ScriptedChatProvider("sorry, I can't plan that");
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.EscalateOption, 0.99));
 
-        var plan = await Turn(provider, engine).PrepareAsync("hi", "files", CancellationToken.None);
+        var judged = await Router(engine, reasoning: null)
+            .EscalateAsync("request", "material", "draft", CancellationToken.None);
 
+        Assert.False(judged.Escalate);
         Assert.Equal(0, engine.Calls);
-        Assert.Empty(plan.Options);
-        Assert.False(plan.HasChoice);
     }
 
     [Fact]
-    public async Task ContextReachesBothThePlannerAndTheEngine()
+    public async Task TheEngineSeesTheRequestTheMaterialTheDraftAndBothModels()
     {
-        var provider = new ScriptedChatProvider(TwoApproaches);
-        var engine = new ScriptedDecisionEngine(Confident("search_web"));
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.KeepDraft, 0.8));
 
-        await Turn(provider, engine).PrepareAsync("and now?", "files, web", "[tool:web_read] MSA guide", CancellationToken.None);
+        await Router(engine).EscalateAsync(
+            "why is the build slow?",
+            "[tool:read_file] Directory.Build.props …",
+            "Because of X.",
+            CancellationToken.None);
 
-        Assert.Contains(provider.Calls[0], m => m.Role == "user" && m.Content.Contains("Already in the conversation"));
-        Assert.Contains("[tool:web_read] MSA guide", engine.LastState);
+        var state = engine.LastState!;
+        Assert.Equal(SmartRouter.EscalationQuestion, engine.Questions[0]);
+        Assert.Contains("why is the build slow?", state);
+        Assert.Contains("Directory.Build.props", state);
+        Assert.Contains("Because of X.", state);
+        Assert.Contains("small-model", state);
+        Assert.Contains("big-model", state);
+        Assert.Equal([SmartRouter.KeepDraft, SmartRouter.EscalateOption], engine.LastOptions!.Select(o => o.Name));
     }
 
     [Fact]
-    public async Task PlanningTimeIsMeasured()
+    public async Task NoMaterialIsSaidSoRatherThanLeftBlank()
     {
-        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), new ScriptedDecisionEngine(Confident("search_web")))
-            .PrepareAsync("hi", "files, web", CancellationToken.None);
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.KeepDraft, 0.8));
 
-        Assert.True(plan.PlanningMs >= 0);
+        await Router(engine).EscalateAsync("request", "", "draft", CancellationToken.None);
+
+        Assert.Contains("no tool was used", engine.LastState!);
     }
 
     [Fact]
-    public async Task TheOptionsAndTheRequestAreWhatTheEngineIsAskedAbout()
+    public async Task LongMaterialIsClippedWithACount()
     {
-        var engine = new ScriptedDecisionEngine(Confident("search_web"));
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.KeepDraft, 0.8));
+        var material = new string('m', SmartRouter.MaterialChars + 500);
 
-        await Turn(new ScriptedChatProvider(TwoApproaches), engine)
-            .PrepareAsync("what is the weather in Seoul?", "files, web", CancellationToken.None);
+        await Router(engine).EscalateAsync("request", material, "draft", CancellationToken.None);
 
-        Assert.Equal("what is the weather in Seoul?", engine.LastState);
-        Assert.Equal(["read_local", "search_web", SmartTurn.ReviewOption],
-                     engine.LastOptions!.Select(o => o.Name));
+        Assert.Contains("500 more characters", engine.LastState!);
+        Assert.True(engine.LastState!.Length < material.Length);
+    }
+
+    [Theory]
+    [InlineData(SmartRouter.EscalateOption, 0.9, true)]
+    [InlineData(SmartRouter.EscalateOption, 0.25, true)]     // the floor guards steering, not a slower second look
+    [InlineData(SmartRouter.KeepDraft, 0.9, false)]
+    [InlineData(SmartRouter.KeepDraft, 0.2, false)]
+    public async Task EscalationFollowsTheChoiceNotTheFloor(string choice, double confidence, bool expected)
+    {
+        var judged = await Router(new ScriptedDecisionEngine(Choose(choice, confidence)))
+            .EscalateAsync("request", "", "draft", CancellationToken.None);
+
+        Assert.Equal(expected, judged.Escalate);
     }
 
     [Fact]
     public async Task BothStagesAreAnnouncedSoNeitherLooksLikeAHang()
     {
-        var turn = Turn(new ScriptedChatProvider(TwoApproaches), new ScriptedDecisionEngine(Confident("search_web")));
+        var router = Router(new ScriptedDecisionEngine(Choose(SmartRouter.SearchWeb, 0.9), Choose(SmartRouter.KeepDraft, 0.9)));
         var activities = new List<string>();
-        turn.ActivityStarted += activities.Add;
+        router.ActivityStarted += activities.Add;
 
-        await turn.PrepareAsync("hi", "files, web", CancellationToken.None);
+        await router.RouteAsync("a request long enough", "", CancellationToken.None);
+        await router.EscalateAsync("a request long enough", "", "draft", CancellationToken.None);
 
-        Assert.Contains(activities, a => a.Contains("planning"));
-        Assert.Contains(activities, a => a.Contains("deciding between 3"));   // two planned, plus review
-    }
-
-    [Fact]
-    public async Task TheChosenApproachIsAppendedToTheRequestAsAUserLine()
-    {
-        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), new ScriptedDecisionEngine(Confident("search_web")))
-            .PrepareAsync("what is the weather?", "files, web", CancellationToken.None);
-
-        var guided = plan.Guidance("what is the weather?");
-
-        Assert.StartsWith("what is the weather?", guided);
-        Assert.Contains("[plan] Take this approach: search_web", guided);
-        Assert.Contains("Search the web.", guided);
-    }
-
-    [Fact]
-    public void AnOverriddenApproachIsTheOneThatGetsUsed()
-    {
-        // A person picking option 2 must not be silently handed option 1.
-        var chosen = new DecisionOption("read_local", "Read the files here.");
-
-        var guided = SmartPlan.GuidanceFor("the request", chosen);
-
-        Assert.Contains("read_local", guided);
-        Assert.DoesNotContain("search_web", guided);
-    }
-
-    [Fact]
-    public async Task AFailedDecisionLeavesTheRequestUntouched()
-    {
-        var engine = new ScriptedDecisionEngine(Decision.Failed("service down"));
-
-        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), engine)
-            .PrepareAsync("the request", "files, web", CancellationToken.None);
-
-        Assert.False(plan.HasChoice);
-        Assert.Equal("the request", plan.Guidance("the request"));
-    }
-
-    // --- the option that asks a person -----------------------------------
-
-    [Fact]
-    public async Task ReviewIsAlwaysOnTheBallotAndAlwaysLast()
-    {
-        var engine = new ScriptedDecisionEngine(Confident("search_web"));
-
-        await Turn(new ScriptedChatProvider(TwoApproaches), engine)
-            .PrepareAsync("hi", "files, web", CancellationToken.None);
-
-        var offered = engine.LastOptions!;
-        Assert.Equal(3, offered.Count);                       // the planner's two, plus review
-        Assert.Equal(SmartTurn.ReviewOption, offered[^1].Name);
-        Assert.Equal(SmartTurn.ReviewDescription, offered[^1].Description);
-    }
-
-    [Fact]
-    public async Task ThePlannerCannotSupplyItsOwnWordingForReview()
-    {
-        // Otherwise the criterion changes every turn, and a criterion that keeps
-        // changing is one the engine cannot judge consistently.
-        var provider = new ScriptedChatProvider(
-            """{"tool":"plan","args":{"needs_review":"ask the user i guess","search_web":"Search."}}""");
-        var engine = new ScriptedDecisionEngine(Confident("search_web"));
-
-        await Turn(provider, engine).PrepareAsync("hi", "files, web", CancellationToken.None);
-
-        var review = engine.LastOptions!.Single(o => o.Name == SmartTurn.ReviewOption);
-        Assert.Equal(SmartTurn.ReviewDescription, review.Description);
-        Assert.Equal(2, engine.LastOptions!.Count);           // the duplicate was dropped
-    }
-
-    [Fact]
-    public async Task ChoosingReviewIsNeverConfidentHoweverSureTheEngineIs()
-    {
-        var certain = new Decision(true, SmartTurn.ReviewOption, 1.0,
-            new Dictionary<string, double> { [SmartTurn.ReviewOption] = 1.0 }, "ok", 10);
-
-        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), new ScriptedDecisionEngine(certain))
-            .PrepareAsync("delete everything", "files, web", CancellationToken.None);
-
-        Assert.True(plan.NeedsReview);
-        Assert.False(plan.Confident);     // confident means "act unasked", which is the opposite
-    }
-
-    [Fact]
-    public async Task ASingleApproachStillGetsDecidedAgainstReview()
-    {
-        // One real option plus review is exactly the "should a person look at
-        // this?" question, so it must still reach the engine.
-        var provider = new ScriptedChatProvider("""{"tool":"plan","args":{"delete_all":"Remove every file."}}""");
-        var engine = new ScriptedDecisionEngine(Confident("delete_all"));
-
-        var plan = await Turn(provider, engine).PrepareAsync("clean up", "files", CancellationToken.None);
-
-        Assert.Equal(1, engine.Calls);
-        Assert.Equal(2, plan.Options.Count);
-    }
-
-    [Fact]
-    public async Task NoPlanAtAllStillNeverCallsTheEngine()
-    {
-        var engine = new ScriptedDecisionEngine(Confident("x"));
-
-        await Turn(new ScriptedChatProvider("not a plan"), engine)
-            .PrepareAsync("hi", "files", CancellationToken.None);
-
-        Assert.Equal(0, engine.Calls);
-    }
-
-    [Theory]
-    [InlineData(0.92, 0.60, true)]
-    [InlineData(0.60, 0.60, true)]     // the floor is inclusive
-    [InlineData(0.59, 0.60, false)]
-    [InlineData(0.92, 0.95, false)]
-    public async Task TheFloorIsWhatDecidesConfident(double confidence, double floor, bool expected)
-    {
-        var decision = new Decision(true, "search_web", confidence,
-            new Dictionary<string, double> { ["search_web"] = confidence }, "ok", 10);
-
-        var plan = await Turn(new ScriptedChatProvider(TwoApproaches), new ScriptedDecisionEngine(decision), floor)
-            .PrepareAsync("hi", "files, web", CancellationToken.None);
-
-        Assert.Equal(expected, plan.Confident);
+        Assert.Contains(activities, a => a.Contains("deciding what this needs"));
+        Assert.Contains(activities, a => a.Contains("judging the draft"));
     }
 }
 
+/// <summary>The hand-off to the stronger model and the line that brings its answer back.</summary>
+public class ReasoningSubtaskTests
+{
+    [Fact]
+    public async Task TheStrongModelGetsRequestMaterialAndDraftAndNoTools()
+    {
+        var strong = new ScriptedChatProvider("  a careful answer  ");
+
+        var reply = await ReasoningSubtask.RunAsync(strong, "small-model", "the request", "[tool:grep] hits", "the draft", CancellationToken.None);
+
+        Assert.Equal("a careful answer", reply);
+        var call = strong.Calls[0];
+        Assert.Equal("system", call[0].Role);
+        Assert.Contains("no JSON, no tool calls", call[0].Content);
+        Assert.Contains("the request", call[1].Content);
+        Assert.Contains("[tool:grep] hits", call[1].Content);
+        Assert.Contains("the draft", call[1].Content);
+    }
+
+    [Fact]
+    public async Task TheCallIsStreamedAndProgressIsCounted()
+    {
+        var strong = new ScriptedChatProvider("twenty-one characters") { ChunkSize = 5 };
+        var seen = new List<int>();
+
+        await ReasoningSubtask.RunAsync(strong, "small", "r", "", "d", CancellationToken.None, seen.Add);
+
+        Assert.Equal([5, 10, 15, 20, 21], seen);
+    }
+
+    [Theory]
+    [InlineData("<think>hmm</think>\nthe answer", "the answer")]
+    [InlineData("<THINK>a\nb</THINK>the answer", "the answer")]
+    [InlineData("the answer <think>cut off", "the answer")]
+    [InlineData("no tags at all", "no tags at all")]
+    public void TheThinkingBlockIsStrippedBeforeTheHandBack(string reply, string expected)
+    {
+        Assert.Equal(expected, ReasoningSubtask.StripThinking(reply).Trim());
+    }
+
+    [Fact]
+    public void TheFeedBackLineIsTaggedLikeMaterialAndAsksForTheFinalAnswer()
+    {
+        var line = ReasoningSubtask.FeedBack("big-model", "deep thoughts");
+
+        Assert.StartsWith("[reasoning:big-model] deep thoughts", line);
+        Assert.Contains("final answer", line);
+    }
+}
 
 /// <summary>
 /// The session's own state. Actor-shaped rather than an actor framework — one
@@ -349,36 +294,16 @@ public class SessionStateTests
     }
 
     [Fact]
-    public void AParkedTurnComesBackExactlyOnce()
-    {
-        var state = new SessionState(true);
-        var review = new PendingReview("the request", SmartPlan.None, PauseReason.NeedsPerson);
-
-        state.AwaitReview(review);
-
-        Assert.Equal(review, state.TakeReview());
-        Assert.Null(state.TakeReview());      // taken means taken
-    }
-
-    [Fact]
-    public void NothingIsWaitingByDefault()
-    {
-        Assert.Null(new SessionState(true).TakeReview());
-    }
-
-    [Fact]
-    public void ResetForgetsTheTurnsAndTheParkedReviewButNotTheMode()
+    public void ResetForgetsTheTurnsButNotTheMode()
     {
         var state = new SessionState(smart: true);
         state.CountTurn();
-        state.AwaitReview(new PendingReview("x", SmartPlan.None, PauseReason.Unsure));
 
         state.Reset();
 
         var snapshot = state.Read();
         Assert.True(snapshot.Smart);          // the mode is the operator's choice, not turn state
         Assert.Equal(0, snapshot.Turns);
-        Assert.Null(snapshot.Pending);
     }
 
     [Fact]

@@ -41,7 +41,13 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
         _messages.Add(ChatMessage.System(SystemPrompt.Build(toolbelt.Scope)));
     }
 
-    public async Task<AgentRun> RunAsync(string userPrompt, CancellationToken ct = default)
+    /// <param name="families">
+    /// The tool families this turn may use, or null for all of them. A call
+    /// outside the set is answered with a refusal instead of being run — smart
+    /// mode's route is enforced here, not merely suggested in the prompt, because
+    /// a small model takes a suggestion as one option among many.
+    /// </param>
+    public async Task<AgentRun> RunAsync(string userPrompt, CancellationToken ct = default, IReadOnlySet<string>? families = null)
     {
         if (_messages.Count == 0) Reset();
         _messages.Add(ChatMessage.User(userPrompt));
@@ -92,6 +98,21 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
                 // rounds of "reply with ONE JSON object" cost a minute for the
                 // same text. So substantive prose is taken as final, and only a
                 // short, ambiguous reply gets the nudge.
+                // A final envelope that is not valid JSON — raw newlines inside the
+                // string, an unescaped quote — is still a final envelope. Taking the
+                // whole thing as prose would print the braces to the user, and
+                // print the answer twice (the stream had already decoded the text
+                // field). The lenient decoder the stream uses gets it out.
+                if (TryDecodeBrokenFinal(raw, out var decoded))
+                {
+                    Emit(steps, step, "unwrapped",
+                        $"final envelope was not valid JSON; decoded its text ({decoded.Length} chars)",
+                        ok: true, stepClock.ElapsedMilliseconds);
+                    Emit(steps, step, ToolCall.FinalTool, decoded, ok: true);
+                    _messages.Add(ChatMessage.Assistant(raw));
+                    return Finish(StopReason.Final, decoded, steps, sw, streamer.Visible);
+                }
+
                 if (LooksLikeAnAnswer(raw, steps))
                 {
                     var prose = raw.Trim();
@@ -143,17 +164,26 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
             ActivityStarted?.Invoke(Describe(call));
 
             ToolResult result;
-            try
+            if (families is not null && ToolCatalog.FamilyOf(call.Tool) is { } family && !families.Contains(family))
             {
-                result = await toolbelt.InvokeAsync(call, ct);
+                result = ToolResult.Failure(
+                    $"'{call.Tool}' is not available on this turn ({family} tools were ruled out for it). " +
+                    "Answer with what you have, or use a tool that is allowed.");
             }
-            catch (OperationCanceledException)
+            else
             {
-                return Finish(StopReason.Cancelled, "cancelled", steps, sw);
-            }
-            catch (Exception ex)
-            {
-                result = ToolResult.Failure($"tool '{call.Tool}' threw: {ex.Message}");
+                try
+                {
+                    result = await toolbelt.InvokeAsync(call, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    return Finish(StopReason.Cancelled, "cancelled", steps, sw);
+                }
+                catch (Exception ex)
+                {
+                    result = ToolResult.Failure($"tool '{call.Tool}' threw: {ex.Message}");
+                }
             }
 
             Emit(steps, step, call.Tool, Summarize(call, result), result.Ok, stepClock.ElapsedMilliseconds);
@@ -171,6 +201,25 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
         steps.Add(step);
         StepCompleted?.Invoke(step);
         return step;
+    }
+
+    /// <summary>
+    /// A reply shaped like a final envelope that the strict parser refused: the
+    /// text is pulled out with the same lenient decoder the stream uses, which
+    /// tolerates raw newlines and stray quotes inside the string. False for
+    /// anything that is not a final envelope, so a broken tool call still gets
+    /// the parse nudge rather than being shown as an answer.
+    /// </summary>
+    internal static bool TryDecodeBrokenFinal(string raw, out string text)
+    {
+        text = "";
+        var trimmed = raw.Trim();
+        if (!trimmed.StartsWith('{') || !trimmed.Contains($"\"{ToolCall.FinalTool}\"", StringComparison.Ordinal)) return false;
+
+        var decoder = new FinalAnswerStreamer();
+        decoder.Push(trimmed);
+        text = decoder.Visible.Trim();
+        return text.Length > 0;
     }
 
     /// <summary>Real tool calls so far — nudges, parse failures and the final do not count.</summary>

@@ -64,9 +64,9 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one tui` | Full-screen settings editor (`agent-one config tui` is the same screen). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
-| `agent-one auth` | `show` / `set` / `check` / `clear` / `import`. `--jev` addresses the TypeSafe key. |
+| `agent-one auth` | `show` / `set` / `check` / `clear` / `import`. `--jev` addresses the TypeSafe key, `--reasoning` the strong model's. |
 | `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
-| `--smart` / `--basic` | On `run` and `chat`: plan-then-decide, or straight to the loop. |
+| `--smart` / `--basic` | On `run` and `chat`: route and escalate through the decision engine, or straight to the loop. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
@@ -122,7 +122,7 @@ streams nothing: `grep` also has a `text` argument, and printing a search patter
 as though it were the answer would be a lie with a very plausible shape.
 
 Exit codes: `0` answered, `1` stopped early (budget, repeat, parse, provider),
-`2` usage error, `3` smart mode decided a person has to look at it, `130` cancelled. `--json` makes the outcome machine-readable:
+`2` usage error, `130` cancelled. `--json` makes the outcome machine-readable:
 
 ```console
 $ agent-one run "hi" -p echo --json
@@ -281,20 +281,18 @@ fails: it is not a preference, it is a dependency.
   agent-one chat · openai · google/gemma-4-e4b
   tools: files: C:\work\repo · web: the web (read-only: search and fetch)
 
-› 이 저장소의 파일들을 전부 정리해줘
-  plan: needs you  (confidence 0.68)
-  ⚠ this needs you (confidence 0.68)
-  None of the other approaches should be taken without a person deciding first: …
-    1. analyze_local_structure  (0.22)  Read all files to understand the code base…
-    2. generate_documentation   (0.00)  Generate a README explaining the project…
+› MSA로 전환할 때 데이터 일관성은 어떻게 보장하지?
+  route: → web  (confidence 0.91)
+  ✓ web_search  (1.2s)
+  ✓ web_read  (4.8s)
+◆ 사가 패턴과 이벤트 소싱으로 …
 
-› 목록만 보여줘. 절대 삭제하지 마.
-  ✓ list_files  (0.1s)
-  ✓ read_file  (0.2s)
-◆ 이 저장소는 AgentZero Lite라는 이름의 …
+  escalation: escalating to qwen/qwen3.8-27b  (confidence 0.83)
+  ✓ reasoning  qwen/qwen3.8-27b · 2 913 chars  (24.1s)
+◆ MSA에서 데이터 일관성은 세 층위로 나눠 봐야 합니다 …
 
- done in 41.2s · 3 steps
-answer › ▌
+ done in 61.2s · 4 steps
+› ▌
 ```
 
 The answer streams into the transcript as the model writes, and the transcript
@@ -315,69 +313,68 @@ stack dump). Short lines make the cost vanish.
 
 When input or output is a pipe — or with `--plain` — the same conversation runs
 as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin
-renderers over one `ChatSession`, so a turn plans, decides, pauses for a person
-and resumes identically in either. That is not an aesthetic choice: two copies
-of that logic would drift within a week.
+renderers over one `ChatSession` — as is `run`, a single turn of the same
+session — so a turn routes, runs, judges its draft and escalates identically in
+all three. That is not an aesthetic choice: three copies of that logic would
+drift within a week.
 
 ## Smart mode
 
-Off by default. On, every turn plans before it acts:
+Off by default. On, a turn asks the decision engine (TypeSafe *Jev*) two
+questions with fixed options — no planning LLM call, so each costs about 0.3 s:
 
 ```
-prompt ──> LLM proposes 2-4 approaches ──> Jev picks one ──┐
-                                                           ├─> the loop, steered
-                        not confident ──> nobody is steered ┘
-                        needs a person ──> it stops and asks
+request (≥ 10 chars)
+   │
+   ├─ ① route: web · files · answer directly ──> the loop, restricted to that family
+   │        (unsure: every tool stays available)
+   │
+   └─ the everyday model drafts an answer with what the tools found
+            │
+            ├─ ② escalate?  keep the draft ──────────────────────> answer
+            │              escalate ──> the strong model reasons over the
+            │                          same material ──> the everyday model
+            │                          writes the final answer from it
+            └─ (no reasoning model configured: the draft is the answer)
 ```
 
-The LLM proposes the approaches because a System One model cannot invent them;
-Jev chooses between them because it returns a calibrated confidence and an LLM
-does not. **"A person has to decide this" is always the last option**, added in
-code rather than left to the planner — the model would sometimes forget it, and
-a criterion that is worded differently every turn is one the decision engine
-cannot judge consistently.
+**① Route.** "Which resource does this need first?" — search the web, read the
+workspace, or answer directly. The chosen family is the *only* one the loop may
+use that turn: a call outside it is refused with a message, not run. A small
+model treats a suggestion as one option among many; a refusal it understands.
+Below the confidence floor nothing is restricted. Requests under ten characters
+("hi", "네") skip the engine entirely.
+
+**② Escalate.** After the draft, the engine sees the request, everything the
+tools returned, the draft, and **which model wrote it and which one is on
+offer** — "is this good enough?" means something different from a 4B model than
+from a 27B one. If it says the request needs more, the strong model (step 3 of
+the TUI) gets the same material and thinks it through; its answer goes back into
+the everyday model's conversation as `[reasoning:<model>] …`, and *that* model
+writes the final answer — same voice, same language, borrowed thinking. A
+strong model that cannot be reached leaves the draft standing and says so.
 
 ```console
-[smart] > 이 저장소의 파일들을 전부 정리해줘
-… planning the approach
-… deciding between 4 approaches
-⚠ this needs you (confidence 0.68)
-  None of the other approaches should be taken without a person deciding first:
-  the request is risky, irreversible, ambiguous about what is wanted, or needs approval.
-
-  the approaches that were considered:
-    analyze_local_structure  (0.22)  Read all files to understand the code base…
-    generate_documentation   (0.00)  Generate a README explaining the project…
-    identify_refactoring_tasks (0.01) Scan for anti-patterns and propose steps…
-
-  answer, approve or redirect on the next line — it continues from there.
-
-[smart] > 목록만 보여줘. 절대 삭제하지 마.
-… listing .
-✓ list_files  (0.0s)
-…
+[smart] > MSA로 전환할 때 데이터 일관성은 어떻게 보장하지?
+(route: → web · confidence 0.91)
+… searching the web for "MSA data consistency"
+✓ web_search  (1.2s)
+✓ web_read  (4.8s)
+사가 패턴과 이벤트 소싱으로 …
+(escalation: escalating to qwen/qwen3.8-27b · confidence 0.83)
+… reasoning with qwen/qwen3.8-27b
+✓ reasoning  (24.1s)
+MSA에서 데이터 일관성은 세 층위로 나눠 봐야 합니다 …
 ```
-
-"정리해줘" is ambiguous between *summarise* and *delete*, which is exactly what
-the option is for. The turn is parked, the next line typed is the answer, and the
-run resumes from it carrying the original request.
 
 **Shift+Tab** switches basic ↔ smart, and the header (or, in the REPL, the
 prompt) says which you are in. With no TypeSafe key the toggle refuses and says
-why. When a decision is merely **unsure** — below the floor — the turn pauses
-the same way a review does: the approaches are listed, a number picks one, and
-an empty line accepts the engine's own pick. Silence is never taken as approval
-when a person was actually asked for. `run` has the same modes via
-`--smart` / `--basic`, but it cannot ask anybody: a decision of "needs a person"
-makes it print the approaches and **exit 3 without running anything**.
+why. `run` has the same modes via `--smart` / `--basic`, and is literally one
+turn of the same session.
 
-Only a confident decision steers. Below the floor, `run` says so and leaves the
-loop alone — measured, that matters: an unsure plan once turned a one-step
-answer into an exhausted step budget, because it pushed the agent down an
-approach the options had failed to separate.
-
-The design and the measurements behind the threshold are in
-[`docs/smart-mode-jev.md`](docs/smart-mode-jev.md).
+Every decision is in the session log as a `route` or `escalation` entry with
+its choice, confidence and cost. The design and the measurements behind the
+threshold are in [`docs/smart-mode-jev.md`](docs/smart-mode-jev.md).
 
 `agent-one jev choose` is the bench for it — a decision put to the service by
 hand, with the whole distribution shown:

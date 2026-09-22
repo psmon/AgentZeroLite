@@ -21,6 +21,14 @@ public static class ToolCatalog
     public const string WebFamily = "web";
     public const string LoopFamily = "loop";
 
+    /// <summary>The family a verb belongs to, or null for a verb the catalog does not know.</summary>
+    public static string? FamilyOf(string tool)
+    {
+        foreach (var spec in All)
+            if (string.Equals(spec.Name, tool, StringComparison.OrdinalIgnoreCase)) return spec.Family;
+        return null;
+    }
+
     public static readonly ToolSpec[] All =
     [
         new("list_files", FilesFamily,

@@ -50,19 +50,20 @@ public sealed class SessionStore
         ElapsedMs = step.ElapsedMs > 0 ? step.ElapsedMs : null
     });
 
-    /// <summary>What smart mode decided before the loop ran, and whether it was acted on.</summary>
-    public void Plan(Agent.SmartPlan plan) => Append(new SessionEntry
+    /// <summary>
+    /// One of smart mode's decisions — "route" before the loop, "escalation"
+    /// after the draft — with what it chose, how sure it was, and what that meant.
+    /// </summary>
+    public void Decision(string kind, Llm.Decision.Decision decision, string verdict) => Append(new SessionEntry
     {
         Timestamp = Now(),
-        Kind = "plan",
-        Tool = plan.Decision?.Choice,
-        Ok = plan.Confident,
-        Text = plan.Decision is { } d
-            ? $"{(plan.NeedsReview ? "needs a person" : plan.Confident ? "steering" : "unsure, not steering")} "
-              + $"· confidence {d.Confidence:0.00} · options: {string.Join(", ", plan.Options.Select(o => o.Name))}"
-            : plan.Options.Count == 0 ? "no plan produced" : "one approach, nothing to decide",
-        // Planning (the model) plus deciding (the engine): the whole cost of smart mode this turn.
-        ElapsedMs = plan.PlanningMs + (plan.Decision?.ElapsedMs ?? 0)
+        Kind = kind,
+        Tool = decision.Ok ? decision.Choice : null,
+        Ok = decision.Ok,
+        Text = decision.Ok
+            ? $"{verdict} · confidence {decision.Confidence:0.00}"
+            : $"{verdict} · {decision.Message}",
+        ElapsedMs = decision.ElapsedMs > 0 ? decision.ElapsedMs : null
     });
 
     public void Result(AgentRun run) => Append(new SessionEntry

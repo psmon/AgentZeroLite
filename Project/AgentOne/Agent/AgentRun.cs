@@ -12,8 +12,6 @@ public enum StopReason
     ParseFailure,
     /// <summary>The provider errored (network, auth, HTTP status).</summary>
     ProviderError,
-    /// <summary>Smart mode decided a person has to settle this before anything runs.</summary>
-    NeedsReview,
     Cancelled
 }
 
@@ -47,7 +45,6 @@ public sealed record AgentRun(
     {
         StopReason.Final => 0,
         StopReason.Cancelled => 130,
-        StopReason.NeedsReview => 3,
         _ => 1
     };
 }

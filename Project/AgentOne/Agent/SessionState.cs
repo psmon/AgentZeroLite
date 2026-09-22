@@ -1,5 +1,3 @@
-using AgentOne.Llm.Decision;
-
 namespace AgentOne.Agent;
 
 /// <summary>
@@ -13,16 +11,14 @@ namespace AgentOne.Agent;
 /// session ever needs supervision, remoting or persistence, that is the moment
 /// to revisit it; a REPL turn does not.
 ///
-/// It exists because smart mode made state real: a turn can now pause waiting
-/// for a person, and the mode, the pending approval and the turn count are all
-/// touched from the prompt, the progress timer and async callbacks at once.
+/// The mode and the turn count are touched from the prompt, the progress timer
+/// and async callbacks at once, which is why they live behind one lock.
 /// </summary>
 public sealed class SessionState
 {
     private readonly Lock _gate = new();
 
     private bool _smart;
-    private PendingReview? _pending;
     private int _turns;
 
     public SessionState(bool smart) => _smart = smart;
@@ -30,13 +26,12 @@ public sealed class SessionState
     /// <summary>An immutable view of everything, taken atomically.</summary>
     public Snapshot Read()
     {
-        lock (_gate) return new Snapshot(_smart, _pending, _turns);
+        lock (_gate) return new Snapshot(_smart, _turns);
     }
 
-    /// <param name="Smart">Whether this session plans and decides before acting.</param>
-    /// <param name="Pending">A turn waiting for a person, or null.</param>
+    /// <param name="Smart">Whether this session routes and escalates through the decision engine.</param>
     /// <param name="Turns">How many requests this session has handled.</param>
-    public readonly record struct Snapshot(bool Smart, PendingReview? Pending, int Turns);
+    public readonly record struct Snapshot(bool Smart, int Turns);
 
     /// <summary>Flips the mode and returns what it became.</summary>
     public bool ToggleSmart()
@@ -49,23 +44,6 @@ public sealed class SessionState
         lock (_gate) _smart = on;
     }
 
-    /// <summary>Parks a turn until a person answers.</summary>
-    public void AwaitReview(PendingReview review)
-    {
-        lock (_gate) _pending = review;
-    }
-
-    /// <summary>Takes the parked turn, clearing it. Null when nothing is waiting.</summary>
-    public PendingReview? TakeReview()
-    {
-        lock (_gate)
-        {
-            var pending = _pending;
-            _pending = null;
-            return pending;
-        }
-    }
-
     public int CountTurn()
     {
         lock (_gate) return ++_turns;
@@ -74,10 +52,6 @@ public sealed class SessionState
     /// <summary>Forgets the conversation's progress, keeping the mode.</summary>
     public void Reset()
     {
-        lock (_gate)
-        {
-            _pending = null;
-            _turns = 0;
-        }
+        lock (_gate) _turns = 0;
     }
 }

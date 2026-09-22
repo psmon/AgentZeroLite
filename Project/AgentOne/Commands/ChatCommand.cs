@@ -72,13 +72,15 @@ public sealed class ChatCommand
             Console.Out.Flush();
         };
 
-        session.PlanMade += plan =>
+        session.Decided += note =>
         {
-            if (plan.Decision is { Ok: true } d && plan.Confident)
-                Console.WriteLine($"(plan: {d.Choice} · confidence {d.Confidence:0.00})");
+            // A streamed draft that is about to be replaced needs its own line end.
+            if (wroteAnything && note.Kind == "escalation") Console.WriteLine();
+            Console.WriteLine($"({note.Kind}: {note.Verdict} · confidence {note.Decision.Confidence:0.00})");
         };
 
-        Console.WriteLine($"agent-one chat — provider {session.ProviderName}, model {session.Model}");
+        Console.WriteLine($"agent-one chat — provider {session.ProviderName}, model {session.Model}" +
+                          (session.ReasoningModel is { } strong ? $" (reasoning: {strong})" : ""));
         Console.WriteLine($"tools:     {session.ToolScope}");
         if (session.LogPath is { } log) Console.WriteLine($"session:   {log}");
         Console.WriteLine(session.SmartAvailable
@@ -88,10 +90,7 @@ public sealed class ChatCommand
 
         while (!ct.IsCancellationRequested)
         {
-            var prompt = session.Pending is not null ? "answer › "
-                : session.Smart ? "[smart] > " : "[basic] > ";
-
-            var input = LineEditor.Read(prompt);
+            var input = LineEditor.Read(session.Smart ? "[smart] > " : "[basic] > ");
             if (input.Kind == LineKind.EndOfInput) break;
 
             if (input.Kind == LineKind.ToggleMode)
@@ -109,19 +108,14 @@ public sealed class ChatCommand
                 Console.WriteLine("(conversation cleared)");
                 continue;
             }
-            if (line.Length == 0 && session.Pending is null) continue;
+            if (line.Length == 0) continue;
 
             wroteAnything = false;
             progress.Restart();
 
             var run = await session.SubmitAsync(line, ct);
             progress.Stop();
-
-            if (run is null)
-            {
-                if (session.Pending is { } pending) PrintPause(pending, session.ConfidenceFloor);
-                continue;
-            }
+            if (run is null) continue;
 
             Console.WriteLine(run.Succeeded
                 ? (wroteAnything ? run.Unstreamed : run.Text)
@@ -130,33 +124,6 @@ public sealed class ChatCommand
         }
 
         return 0;
-    }
-
-    private static void PrintPause(PendingReview pending, double floor)
-    {
-        var decision = pending.Plan.Decision!;
-
-        if (pending.Reason == PauseReason.NeedsPerson)
-        {
-            Console.WriteLine($"⚠ this needs you (confidence {decision.Confidence:0.00})");
-            Console.WriteLine($"  {SmartTurn.ReviewDescription}");
-        }
-        else
-        {
-            Console.WriteLine($"(unsure — confidence {decision.Confidence:0.00} is below {floor:0.00})");
-        }
-
-        var i = 0;
-        foreach (var option in pending.Plan.Options.Where(o => o.Name != SmartTurn.ReviewOption))
-        {
-            var probability = decision.Probabilities.TryGetValue(option.Name, out var p) ? p : 0;
-            Console.WriteLine($"  {++i}. {option.Name}  ({probability:0.00})  {option.Description}");
-        }
-
-        Console.WriteLine(pending.Reason == PauseReason.NeedsPerson
-            ? "  answer, approve or redirect on the next line — it continues from there."
-            : $"  pick a number, or press Enter to accept {decision.Choice}.");
-        Console.WriteLine();
     }
 
     public static void PrintHelp()
@@ -171,8 +138,8 @@ public sealed class ChatCommand
             Options: the same as `agent-one run`, plus
               --plain      The line REPL even in a terminal
 
-            Keys (window):    Enter send · Shift+Tab basic/smart · PageUp/PageDown scroll
-                              Esc clear the line (twice: quit) · Ctrl+D quit
+            Keys (window):    Enter send · Shift+Tab basic/smart · wheel or PageUp/PageDown scroll
+                              Ctrl+End follow · Esc clear the line (twice: quit) · Ctrl+D quit
             Commands (both):  /reset  start the conversation over · /exit  leave
             """);
     }

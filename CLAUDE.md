@@ -272,16 +272,26 @@ in it, so the steps and the key map are unit tested; the Termina page only
 projects it. `agent-one tui --selftest` drives the real screen from a scripted
 key source, and the release workflow runs it on every RID.
 
-**Smart mode** (`--smart`, or Shift+Tab in chat) plans before it acts: the LLM
-proposes 2–4 approaches (`Agent/Planner`), `IDecisionEngine` picks one with a
-calibrated confidence, and only a decision above `jevConfidenceFloor` steers the
-loop. Measured, that last clause matters — an unsure plan once turned a one-step
-answer into an exhausted step budget by pushing the agent down an approach the
-options had failed to separate. **"A person has to decide this" is always the
-last option**, appended in `SmartTurn` rather than left to the planner, and
-choosing it is never "confident" however sure the engine is: `run` then exits 3
-without running anything, and `chat` parks the turn in `SessionState` so the next
-line typed resumes it.
+**Smart mode** (`--smart`, or Shift+Tab in chat) asks `IDecisionEngine` (Jev)
+two fixed-option questions per turn, in `Agent/SmartRouter` — no planning LLM
+call (a planner-generated option set cost 12–15 s and rarely separated; a fixed
+one costs 0.3 s). **① Route**, before the loop: web / files / answer directly;
+a confident choice is *enforced* — `AgentLoop.RunAsync(…, families)` refuses a
+call outside the family rather than merely suggesting, because a small model
+treats a suggestion as one option among many. **② Escalate**, after the
+everyday model's draft: the engine sees the request, every tool result, the
+draft and *both model names*, and if it says the problem needs more,
+`Agent/ReasoningSubtask` hands the same material to the reasoning model (TUI
+step 3, `AgentConfig.ForReasoning()`) and its answer goes back into the
+everyday model's conversation as `[reasoning:<model>]` for that model to write
+the final answer. Requests under `SmartRouter.MinRequestChars` (10) skip the
+engine; a route steers only at or above `jevConfidenceFloor`, but escalation
+follows the engine's choice alone (a two-option judgement call sat at 0.25 for
+a plainly shallow draft — the strong model costs time, not correctness); a
+failed engine or unreachable strong model leaves the turn as basic mode would
+have run it.
+`run` is one turn of the same `ChatSession`, so there is exactly one copy of
+this flow.
 
 **Chat has two faces over one pipeline.** `agent-one chat` in a terminal opens a
 Termina window (`Tui/ChatTui*`: transcript in a `StreamingTextNode`, input line at

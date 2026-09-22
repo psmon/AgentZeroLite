@@ -1,14 +1,15 @@
-using System.Text;
 using System.Text.Json;
 using AgentOne.Agent;
 using AgentOne.Llm;
-using AgentOne.Llm.Decision;
 using AgentOne.Services;
-using AgentOne.Tools;
 
 namespace AgentOne.Commands;
 
-/// <summary>One question, one answer, one exit code — the form other programs script against.</summary>
+/// <summary>
+/// One question, one answer, one exit code — the form other programs script
+/// against. A single-turn <see cref="ChatSession"/>, so smart mode's routing
+/// and escalation are exactly the chat's, and there is one place they live.
+/// </summary>
 public sealed class RunCommand
 {
     public async Task<int> ExecuteAsync(string[] args, CancellationToken ct)
@@ -38,10 +39,15 @@ public sealed class RunCommand
             }
         }
 
-        IChatProvider provider;
+        // Progress goes to stderr and the answer to stdout, so a pipe still gets
+        // exactly the answer. --json and --quiet silence the display entirely.
+        var showProgress = !options.Json && !options.Quiet;
+        var streaming = showProgress && !Console.IsOutputRedirected;
+
+        ChatSession session;
         try
         {
-            provider = ChatProviderFactory.Create(options.Config);
+            session = new ChatSession(options.Config, options.Root, streaming, logKind: "run");
         }
         catch (ChatProviderException ex)
         {
@@ -49,147 +55,70 @@ public sealed class RunCommand
             return 2;
         }
 
-        using var disposable = provider as IDisposable;
-
-        using var toolbelt = new CompositeToolbelt(
-            (ToolCatalog.FilesFamily, new LocalFileToolbelt(options.Root)),
-            (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(options.Config.WebTimeoutSeconds))));
-        var loop = new AgentLoop(provider, toolbelt, options.Config.MaxSteps);
-
-        SessionStore? session = options.Config.SaveSessions ? SessionStore.Create("run") : null;
-        session?.Prompt(prompt, options.Config.SmartMode);
-
-        // Progress goes to stderr and the answer to stdout, so a pipe still gets
-        // exactly the answer. --json and --quiet silence the display entirely.
-        var showProgress = !options.Json && !options.Quiet;
-        using var progress = ProgressDisplay.For(showProgress);
-
-        loop.Streaming = showProgress && !Console.IsOutputRedirected;
-
-        loop.ActivityStarted += what => progress.Activity(what);
-
-        loop.StepCompleted += step =>
+        using (session)
         {
-            session?.Step(step);
-            if (options.Verbose && !options.Json)
-                Console.Error.WriteLine($"  [{step.Index}] {step.Tool}: {step.Detail}");
-            else if (step.Tool != Agent.ToolCall.FinalTool)
-                progress.Done(step.Tool, step.Ok);
-        };
+            using var progress = ProgressDisplay.For(showProgress);
 
-        var wroteAnything = false;
-        loop.AnswerDelta += fragment =>
-        {
-            // The first fragment is the moment the spinner has to go: the answer
-            // is about to occupy the screen.
-            if (!wroteAnything) { progress.Stop(); wroteAnything = true; }
-            Console.Out.Write(fragment);
-            Console.Out.Flush();
-        };
+            session.ActivityStarted += what => progress.Activity(what);
 
-        // Smart mode plans and decides before the loop starts. `run` cannot ask
-        // anybody, so a weak decision is taken anyway and said out loud on
-        // stderr rather than silently followed.
-        if (options.Config.SmartMode)
-        {
-            using var engine = new JevClient(options.Config);
-            var smart = new SmartTurn(provider, engine, options.Config.JevConfidenceFloor);
-            smart.ActivityStarted += what => progress.Activity(what);
-
-            var plan = await smart.PrepareAsync(prompt, toolbelt.Scope, ct);
-            session?.Plan(plan);
-
-            // The decision was that a person has to settle it, and `run` has no
-            // person. Doing it anyway would be the one thing the option exists
-            // to prevent, so nothing is run and the exit code says so.
-            if (plan.NeedsReview)
+            session.StepCompleted += step =>
             {
-                var decision = plan.Decision!;
-                session?.Result(new AgentRun(StopReason.NeedsReview, SmartTurn.ReviewDescription, [], TimeSpan.Zero));
-
-                if (options.Json)
-                {
-                    Console.WriteLine(JsonSerializer.Serialize(new RunReport
-                    {
-                        Ok = false,
-                        StopReason = nameof(StopReason.NeedsReview),
-                        Text = SmartTurn.ReviewDescription,
-                        Provider = provider.Name,
-                        Model = options.Config.Model,
-                        Session = session?.Path
-                    }, AgentOneWireJson.Default.RunReport));
-                }
-                else
-                {
-                    Console.Error.WriteLine($"agent-one: this needs a person (confidence {decision.Confidence:0.00})");
-                    Console.Error.WriteLine("  " + SmartTurn.ReviewDescription);
-                    foreach (var option in plan.Options.Where(o => o.Name != SmartTurn.ReviewOption))
-                        Console.Error.WriteLine($"    {option.Name}: {option.Description}");
-                    Console.Error.WriteLine("  run it in `agent-one chat`, where it can ask you, or use --basic.");
-                }
-
-                return 3;
-            }
-
-            if (plan.HasChoice)
-            {
-                var decision = plan.Decision!;
-
-                // Only a confident decision steers the loop. An unsure one means
-                // the approaches did not separate, and pushing the agent down one
-                // of them anyway is worse than letting it work the problem out —
-                // measured: an unsure plan turned a one-step answer into an
-                // exhausted step budget.
-                if (plan.Confident)
-                {
-                    prompt = plan.Guidance(prompt);
-                    if (!options.Json)
-                        Console.Error.WriteLine($"  plan: {decision.Choice} (confidence {decision.Confidence:0.00})");
-                }
-                else if (!options.Json)
-                {
-                    Console.Error.WriteLine(
-                        $"  plan: unsure ({decision.Confidence:0.00} < {options.Config.JevConfidenceFloor:0.00}) — not steering");
-                }
-
-            }
-            else if (plan.Decision is { Ok: false } failed && !options.Json)
-            {
-                Console.Error.WriteLine($"  plan: unavailable ({failed.Message}) — running without one");
-            }
-        }
-
-        var run = await loop.RunAsync(prompt, ct);
-        session?.Result(run);
-        progress.Stop();
-
-        if (options.Json)
-        {
-            var report = new RunReport
-            {
-                Ok = run.Succeeded,
-                StopReason = run.Reason.ToString(),
-                Text = run.Text,
-                Steps = run.Steps.Count,
-                ElapsedMs = (long)run.Elapsed.TotalMilliseconds,
-                Provider = provider.Name,
-                Model = options.Config.Model,
-                Session = session?.Path
+                if (options.Verbose && !options.Json)
+                    Console.Error.WriteLine($"  [{step.Index}] {step.Tool}: {step.Detail}");
+                else if (step.Tool != ToolCall.FinalTool)
+                    progress.Done(step.Tool, step.Ok);
             };
-            Console.WriteLine(JsonSerializer.Serialize(report, AgentOneWireJson.Default.RunReport));
-        }
-        else if (run.Succeeded)
-        {
-            // Whatever streamed is already on screen; print only the rest, then
-            // the newline the stream never wrote.
-            Console.WriteLine(wroteAnything ? run.Unstreamed : run.Text);
-        }
-        else
-        {
-            Console.Error.WriteLine($"agent-one: stopped ({run.Reason}) — {run.Text}");
-        }
 
-        return run.ExitCode;
+            var wroteAnything = false;
+            session.AnswerDelta += fragment =>
+            {
+                // The first fragment is the moment the spinner has to go: the answer
+                // is about to occupy the screen.
+                if (!wroteAnything) { progress.Stop(); wroteAnything = true; }
+                Console.Out.Write(fragment);
+                Console.Out.Flush();
+            };
+
+            session.Decided += note =>
+            {
+                if (options.Json) return;
+                // A draft that streamed and is now being replaced needs a line
+                // break before the verdict, or the two answers run together.
+                if (wroteAnything && note.Kind == "escalation") Console.Out.WriteLine();
+                Console.Error.WriteLine($"  {note.Kind}: {note.Verdict} (confidence {note.Decision.Confidence:0.00})");
+            };
+
+            var run = (await session.SubmitAsync(prompt, ct))!;
+            progress.Stop();
+
+            if (options.Json)
+            {
+                var report = new RunReport
+                {
+                    Ok = run.Succeeded,
+                    StopReason = run.Reason.ToString(),
+                    Text = run.Text,
+                    Steps = run.Steps.Count,
+                    ElapsedMs = (long)run.Elapsed.TotalMilliseconds,
+                    Provider = session.ProviderName,
+                    Model = options.Config.Model,
+                    Session = session.LogPath
+                };
+                Console.WriteLine(JsonSerializer.Serialize(report, AgentOneWireJson.Default.RunReport));
+            }
+            else if (run.Succeeded)
+            {
+                // Whatever streamed is already on screen; print only the rest, then
+                // the newline the stream never wrote.
+                Console.WriteLine(wroteAnything ? run.Unstreamed : run.Text);
+            }
+            else
+            {
+                Console.Error.WriteLine($"agent-one: stopped ({run.Reason}) — {run.Text}");
+            }
+
+            return run.ExitCode;
+        }
     }
 
     public static void PrintHelp()
@@ -209,7 +138,7 @@ public sealed class RunCommand
                   --json              Print one JSON object instead of prose
               -v, --verbose           Trace each tool call on stderr
               -q, --quiet             No progress display, no streaming
-                  --smart             Plan first, then let the decision engine choose
+                  --smart             Route through the decision engine, escalate hard questions
                   --basic             Straight to the tool loop (the default)
 
             While it works, a live line on stderr says what it is doing, and the

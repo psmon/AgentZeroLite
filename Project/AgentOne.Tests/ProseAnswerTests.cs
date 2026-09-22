@@ -98,6 +98,34 @@ public class ProseAnswerTests : IDisposable
     }
 
     [Fact]
+    public async Task AFinalEnvelopeWithRawNewlinesIsDecodedNotShownWithItsBraces()
+    {
+        // Gemma writes real newlines inside the JSON string. That is not valid
+        // JSON, but it is unmistakably a final envelope — and the stream has
+        // already shown the user the decoded text, so printing the braces after
+        // it would show the answer twice.
+        var broken = "{\"tool\":\"final\",\"args\":{\"text\":\"line one\nline two\"}}";
+
+        var run = await Loop(broken).RunAsync("what?");
+
+        Assert.Equal(StopReason.Final, run.Reason);
+        Assert.Equal("line one\nline two", run.Text);
+        Assert.DoesNotContain("{\"tool\"", run.Text);
+        Assert.Contains(run.Steps, s => s.Tool == "unwrapped" && s.Detail.Contains("not valid JSON"));
+    }
+
+    [Fact]
+    public async Task ABrokenToolCallStillGetsTheNudge()
+    {
+        var run = await Loop(
+            "{\"tool\":\"grep\",\"args\":{\"text\":\"a\nb\"}}",
+            """{"tool":"final","args":{"text":"ok"}}""").RunAsync("find it");
+
+        Assert.Equal("ok", run.Text);
+        Assert.Contains(run.Steps, s => s.Tool == "(unparsed)");
+    }
+
+    [Fact]
     public async Task StepsCarryTheirOwnTiming()
     {
         var run = await Loop(
@@ -152,36 +180,33 @@ public class SessionLoggingTests : IDisposable
     }
 
     [Fact]
-    public void APlanRecordsTheDecisionAndWhetherItSteered()
+    public void ADecisionRecordsItsKindChoiceVerdictAndCost()
     {
         var decision = new Llm.Decision.Decision(true, "search_web", 0.91,
-            new Dictionary<string, double> { ["search_web"] = 0.95, ["read_local"] = 0.05 }, "ok", 310);
-        var plan = new SmartPlan(
-            [new("read_local", "Read."), new("search_web", "Search."), new(SmartTurn.ReviewOption, SmartTurn.ReviewDescription)],
-            decision, Confident: true);
+            new Dictionary<string, double> { ["search_web"] = 0.95, ["answer_directly"] = 0.05 }, "ok", 310);
 
         var session = SessionStore.Create("chat");
-        session.Plan(plan);
+        session.Decision("route", decision, "steering to web");
 
         var line = File.ReadAllText(session.Path);
-        Assert.Contains("\"kind\":\"plan\"", line);
+        Assert.Contains("\"kind\":\"route\"", line);
         Assert.Contains("\"tool\":\"search_web\"", line);
         Assert.Contains("\"ok\":true", line);
-        Assert.Contains("steering", line);
+        Assert.Contains("steering to web", line);
         Assert.Contains("0.91", line);
         Assert.Contains("\"elapsedMs\":310", line);
     }
 
     [Fact]
-    public void AReviewDecisionSaysAPersonWasNeeded()
+    public void AFailedDecisionRecordsWhyInsteadOfAChoice()
     {
-        var decision = new Llm.Decision.Decision(true, SmartTurn.ReviewOption, 0.68,
-            new Dictionary<string, double> { [SmartTurn.ReviewOption] = 0.7 }, "ok", 300);
-        var plan = new SmartPlan([new("x", "X."), new(SmartTurn.ReviewOption, SmartTurn.ReviewDescription)], decision, false);
-
         var session = SessionStore.Create("chat");
-        session.Plan(plan);
+        session.Decision("escalation", Llm.Decision.Decision.Failed("service down"), "keeping the draft");
 
-        Assert.Contains("needs a person", File.ReadAllText(session.Path));
+        var line = File.ReadAllText(session.Path);
+        Assert.Contains("\"kind\":\"escalation\"", line);
+        Assert.Contains("\"ok\":false", line);
+        Assert.Contains("service down", line);
+        Assert.DoesNotContain("\"tool\":\"", line);
     }
 }

@@ -48,19 +48,33 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         session.StepCompleted += step =>
         {
             if (step.Tool is "final" or "unwrapped") return;
+
+            // The reasoning hand-off means the draft on screen is about to be
+            // replaced: close it, so the final answer starts on its own line.
+            if (step.Tool == ReasoningSubtask.Tag && _answering)
+            {
+                _lines.OnNext(new TranscriptLine(LineKind.AnswerEnd, ""));
+                _answering = false;
+            }
+
             var seconds = step.ElapsedMs > 0 ? $"  ({step.ElapsedMs / 1000.0:0.0}s)" : "";
-            _lines.OnNext(new TranscriptLine(LineKind.Note, $"{(step.Ok ? "✓" : "✗")} {step.Tool}{seconds}"));
+            var detail = step.Tool == ReasoningSubtask.Tag ? "  " + step.Detail : "";
+            _lines.OnNext(new TranscriptLine(LineKind.Note, $"{(step.Ok ? "✓" : "✗")} {step.Tool}{detail}{seconds}"));
         };
         session.AnswerDelta += fragment =>
         {
             if (!_answering) { _answering = true; _lines.OnNext(new TranscriptLine(LineKind.AnswerStart, "")); }
             _lines.OnNext(new TranscriptLine(LineKind.Delta, fragment));
         };
-        session.PlanMade += plan =>
+        session.Decided += note =>
         {
-            if (plan.Decision is not { Ok: true } d) return;
-            var verdict = plan.NeedsReview ? "needs you" : plan.Confident ? $"→ {d.Choice}" : "unsure";
-            _lines.OnNext(new TranscriptLine(LineKind.Note, $"plan: {verdict}  (confidence {d.Confidence:0.00})"));
+            if (note.Kind == "escalation" && _answering && note.Verdict.StartsWith("escalating", StringComparison.Ordinal))
+            {
+                _lines.OnNext(new TranscriptLine(LineKind.AnswerEnd, ""));
+                _answering = false;
+            }
+            var confidence = note.Decision.Ok ? $"  (confidence {note.Decision.Confidence:0.00})" : "";
+            _lines.OnNext(new TranscriptLine(LineKind.Note, $"{note.Kind}: {note.Verdict}{confidence}"));
         };
     }
 
@@ -180,10 +194,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
 
         if (run is null)
         {
-            // Paused for the person: show what the decision was about.
-            if (Session.Pending is { } pending) ShowPause(pending);
-            Model.SetAwaitingPerson(true);
-            Model.SetBusy(false, "waiting for you — answer, pick a number, or press Enter to accept");
+            Model.SetBusy(false);
             Bump();
             return;
         }
@@ -202,25 +213,6 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         Model.SetAwaitingPerson(false);
         Model.SetBusy(false, $"done in {run.Elapsed.TotalSeconds:0.0}s · {run.Steps.Count} steps");
         Bump();
-    }
-
-    private void ShowPause(PendingReview pending)
-    {
-        var decision = pending.Plan.Decision!;
-        var head = pending.Reason == PauseReason.NeedsPerson
-            ? $"⚠ this needs you (confidence {decision.Confidence:0.00})"
-            : $"⚠ unsure — confidence {decision.Confidence:0.00} is below {Session.ConfidenceFloor:0.00}";
-
-        _lines.OnNext(new TranscriptLine(LineKind.Alert, head));
-        if (pending.Reason == PauseReason.NeedsPerson)
-            _lines.OnNext(new TranscriptLine(LineKind.Note, SmartTurn.ReviewDescription));
-
-        var i = 0;
-        foreach (var option in pending.Plan.Options.Where(o => o.Name != SmartTurn.ReviewOption))
-        {
-            var probability = decision.Probabilities.TryGetValue(option.Name, out var p) ? p : 0;
-            _lines.OnNext(new TranscriptLine(LineKind.Note, $"  {++i}. {option.Name}  ({probability:0.00})  {option.Description}"));
-        }
     }
 
     private void Bump() => Revision.Value++;

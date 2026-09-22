@@ -182,7 +182,7 @@ public class ChatTuiModelTests
 
 /// <summary>
 /// The conversation itself, driven the way both the window and the REPL drive
-/// it: one line in, a run or a pause out. Scripted provider and engine, so a
+/// it: one line in, a run out. Scripted provider and engine, so a
 /// pause-and-resume can be walked deterministically.
 /// </summary>
 [Collection(AgentOneHomeCollection.Name)]
@@ -210,36 +210,34 @@ public class ChatSessionTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private const string TwoApproaches =
-        """{"tool":"plan","args":{"read_local":"Read the files here.","search_web":"Search the web."}}""";
+    private const string Final = """{"tool":"final","args":{"text":"hi there"}}""";
 
     private static Decision Choose(string choice, double confidence) =>
         new(true, choice, confidence, new Dictionary<string, double> { [choice] = confidence }, "ok", 10);
 
-    private ChatSession Session(ScriptedChatProvider provider, IDecisionEngine engine, bool smart, bool available = true)
+    private ChatSession Session(ScriptedChatProvider provider, IDecisionEngine engine, bool smart,
+        bool available = true, AgentOne.Llm.IChatProvider? reasoning = null)
     {
         var config = new AgentConfig();
         config.TrySet("smartMode", smart ? "on" : "off", out _);
         config.TrySet("saveSessions", "false", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine, available);
+        if (reasoning is not null) config.TrySet("reasoningModel", "big-model", out _);
+        return new ChatSession(config, _root, streaming: false, provider, engine, available, reasoning);
     }
 
     [Fact]
     public async Task ABasicTurnRunsTheLoopAndReturnsTheRun()
     {
-        using var session = Session(
-            new ScriptedChatProvider("""{"tool":"final","args":{"text":"hi there"}}"""),
-            new ScriptedDecisionEngine(Choose("x", 1)), smart: false);
+        using var session = Session(new ScriptedChatProvider(Final), new ScriptedDecisionEngine(Choose("x", 1)), smart: false);
 
         var run = await session.SubmitAsync("hello", CancellationToken.None);
 
         Assert.NotNull(run);
         Assert.Equal("hi there", run!.Text);
-        Assert.Null(session.Pending);
     }
 
     [Fact]
-    public async Task AnEmptyLineWithNothingPendingIsIgnored()
+    public async Task AnEmptyLineIsIgnored()
     {
         using var session = Session(new ScriptedChatProvider("x"), new ScriptedDecisionEngine(Choose("x", 1)), false);
         Assert.Null(await session.SubmitAsync("   ", CancellationToken.None));
@@ -271,96 +269,142 @@ public class ChatSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task AConfidentPlanSteersTheTurn()
+    public async Task AShortRequestSkipsTheEngineEvenInSmartMode()
     {
-        var provider = new ScriptedChatProvider(TwoApproaches, """{"tool":"final","args":{"text":"done"}}""");
-        using var session = Session(provider, new ScriptedDecisionEngine(Choose("search_web", 0.9)), smart: true);
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.SearchWeb, 0.9));
+        using var session = Session(new ScriptedChatProvider(Final), engine, smart: true);
 
-        SmartPlan? made = null;
-        session.PlanMade += p => made = p;
-
-        var run = await session.SubmitAsync("what is new?", CancellationToken.None);
+        var run = await session.SubmitAsync("hi!", CancellationToken.None);
 
         Assert.NotNull(run);
-        Assert.True(made!.Confident);
-        // The loop's prompt carried the guidance line.
-        Assert.Contains(provider.Calls[1], m => m.Role == "user" && m.Content.Contains("[plan] Take this approach: search_web"));
+        Assert.Equal(0, engine.Calls);
     }
 
     [Fact]
-    public async Task NeedingAPersonPausesAndTheNextLineResumesAsApproval()
+    public async Task AConfidentRouteSteersAndRulesOutTheOtherFamily()
     {
-        var provider = new ScriptedChatProvider(TwoApproaches, """{"tool":"final","args":{"text":"listed"}}""");
-        using var session = Session(provider, new ScriptedDecisionEngine(Choose(SmartTurn.ReviewOption, 0.8)), smart: true);
+        // Routed to files, the model tries the web anyway: the call is refused,
+        // not run, and the model is told so — then it answers.
+        var provider = new ScriptedChatProvider(
+            """{"tool":"web_search","args":{"query":"x"}}""",
+            """{"tool":"read_file","args":{"path":"README.md"}}""",
+            """{"tool":"final","args":{"text":"it says hello"}}""");
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.ReadWorkspace, 0.9));
+        using var session = Session(provider, engine, smart: true);
 
-        var first = await session.SubmitAsync("clean everything up", CancellationToken.None);
+        var notes = new List<SmartNote>();
+        session.Decided += notes.Add;
 
-        Assert.Null(first);
-        Assert.NotNull(session.Pending);
-        Assert.Equal(PauseReason.NeedsPerson, session.Pending!.Reason);
+        var run = await session.SubmitAsync("what does the readme say?", CancellationToken.None);
 
-        var second = await session.SubmitAsync("only list, never delete", CancellationToken.None);
-
-        Assert.NotNull(second);
-        Assert.Equal("listed", second!.Text);
-        Assert.Null(session.Pending);
-        Assert.Contains(provider.Calls[1], m => m.Content.Contains("[approved] only list, never delete"));
+        Assert.Equal("it says hello", run!.Text);
+        Assert.Contains(provider.Calls[0], m => m.Role == "user" && m.Content.Contains("[route: files]"));
+        Assert.Contains(provider.Calls[1], m => m.Content.Contains("not available on this turn"));
+        Assert.Contains(provider.Calls[2], m => m.Content.StartsWith("[tool:read_file]"));
+        Assert.Equal("route", notes[0].Kind);
+        Assert.Contains("files", notes[0].Verdict);
+        Assert.Equal(1, engine.Calls);                       // no reasoning model: no escalation question
     }
 
     [Fact]
-    public async Task SilenceIsNotApproval()
+    public async Task AnUnsureRouteLeavesEveryToolAvailable()
     {
-        var provider = new ScriptedChatProvider(TwoApproaches, """{"tool":"final","args":{"text":"x"}}""");
-        using var session = Session(provider, new ScriptedDecisionEngine(Choose(SmartTurn.ReviewOption, 0.8)), smart: true);
-        await session.SubmitAsync("risky thing", CancellationToken.None);
+        var provider = new ScriptedChatProvider(
+            """{"tool":"read_file","args":{"path":"README.md"}}""",
+            """{"tool":"final","args":{"text":"hello"}}""");
+        using var session = Session(provider, new ScriptedDecisionEngine(Choose(SmartRouter.SearchWeb, 0.3)), smart: true);
 
-        var again = await session.SubmitAsync("", CancellationToken.None);
+        var run = await session.SubmitAsync("what does the readme say?", CancellationToken.None);
 
-        Assert.Null(again);
-        Assert.NotNull(session.Pending);            // still parked
-        Assert.Single(provider.Calls);              // nothing was run
+        Assert.Equal("hello", run!.Text);
+        Assert.DoesNotContain(provider.Calls[0], m => m.Content.Contains("[route:"));
+        Assert.Contains(provider.Calls[1], m => m.Content.StartsWith("[tool:read_file]"));
     }
 
     [Fact]
-    public async Task ANumberPicksAnApproachByHand()
+    public async Task EscalationHandsTheMaterialToTheStrongModelAndTheEverydayModelAnswersFromIt()
     {
-        var provider = new ScriptedChatProvider(TwoApproaches, """{"tool":"final","args":{"text":"read"}}""");
-        using var session = Session(provider, new ScriptedDecisionEngine(Choose(SmartTurn.ReviewOption, 0.8)), smart: true);
-        await session.SubmitAsync("do something", CancellationToken.None);
+        var basic = new ScriptedChatProvider(
+            """{"tool":"read_file","args":{"path":"README.md"}}""",
+            """{"tool":"final","args":{"text":"a shallow draft"}}""",
+            """{"tool":"final","args":{"text":"the refined answer"}}""");
+        var strong = new ScriptedChatProvider("deep thoughts about hello");
+        var engine = new ScriptedDecisionEngine(
+            Choose(SmartRouter.ReadWorkspace, 0.9),
+            Choose(SmartRouter.EscalateOption, 0.85));
+        using var session = Session(basic, engine, smart: true, reasoning: strong);
 
-        var run = await session.SubmitAsync("1", CancellationToken.None);       // read_local
+        var notes = new List<SmartNote>();
+        var steps = new List<AgentStep>();
+        session.Decided += notes.Add;
+        session.StepCompleted += steps.Add;
 
-        Assert.NotNull(run);
-        Assert.Contains(provider.Calls[1], m => m.Content.Contains("[plan] Take this approach: read_local"));
+        var run = await session.SubmitAsync("explain what the readme implies", CancellationToken.None);
+
+        Assert.Equal("the refined answer", run!.Text);
+
+        // The engine saw the tool result and the draft when judging.
+        Assert.Contains("[tool:read_file]", engine.States[1]);
+        Assert.Contains("a shallow draft", engine.States[1]);
+        Assert.Contains("big-model", engine.States[1]);
+
+        // The strong model got the same material, and its answer went back as a tagged line.
+        Assert.Single(strong.Calls);
+        Assert.Contains(strong.Calls[0], m => m.Content.Contains("[tool:read_file]") && m.Content.Contains("a shallow draft"));
+        Assert.Contains(basic.Calls[2], m => m.Content.StartsWith("[reasoning:big-model] deep thoughts about hello"));
+
+        Assert.Contains(steps, s => s.Tool == ReasoningSubtask.Tag && s.Ok);
+        Assert.Equal(["route", "escalation"], notes.Select(n => n.Kind));
+        Assert.Contains("escalating to big-model", notes[1].Verdict);
     }
 
     [Fact]
-    public async Task AnUnsureDecisionPausesAndAnEmptyLineAcceptsThePick()
+    public async Task KeepingTheDraftReturnsItUntouched()
     {
-        var provider = new ScriptedChatProvider(TwoApproaches, """{"tool":"final","args":{"text":"ok"}}""");
-        using var session = Session(provider, new ScriptedDecisionEngine(Choose("read_local", 0.4)), smart: true);
+        var basic = new ScriptedChatProvider("""{"tool":"final","args":{"text":"good enough"}}""");
+        var strong = new ScriptedChatProvider("never asked");
+        var engine = new ScriptedDecisionEngine(
+            Choose(SmartRouter.AnswerDirectly, 0.9),
+            Choose(SmartRouter.KeepDraft, 0.8));
+        using var session = Session(basic, engine, smart: true, reasoning: strong);
 
-        var first = await session.SubmitAsync("hmm", CancellationToken.None);
-        Assert.Null(first);
-        Assert.Equal(PauseReason.Unsure, session.Pending!.Reason);
+        var run = await session.SubmitAsync("a simple question here", CancellationToken.None);
 
-        var second = await session.SubmitAsync("", CancellationToken.None);
-
-        Assert.NotNull(second);
-        Assert.Contains(provider.Calls[1], m => m.Content.Contains("[plan] Take this approach: read_local"));
+        Assert.Equal("good enough", run!.Text);
+        Assert.Empty(strong.Calls);
+        Assert.Single(basic.Calls);
+        Assert.Equal(2, engine.Calls);
     }
 
     [Fact]
-    public async Task ResetClearsAParkedTurn()
+    public async Task AStrongModelThatFailsLeavesTheDraftStanding()
     {
-        var provider = new ScriptedChatProvider(TwoApproaches);
-        using var session = Session(provider, new ScriptedDecisionEngine(Choose(SmartTurn.ReviewOption, 0.8)), smart: true);
-        await session.SubmitAsync("risky", CancellationToken.None);
-        Assert.NotNull(session.Pending);
+        var basic = new ScriptedChatProvider("""{"tool":"final","args":{"text":"the draft"}}""");
+        var engine = new ScriptedDecisionEngine(
+            Choose(SmartRouter.AnswerDirectly, 0.9),
+            Choose(SmartRouter.EscalateOption, 0.9));
+        using var session = Session(basic, engine, smart: true, reasoning: new FailingChatProvider("cannot reach the strong model"));
 
-        session.Reset();
+        var steps = new List<AgentStep>();
+        session.StepCompleted += steps.Add;
 
-        Assert.Null(session.Pending);
+        var run = await session.SubmitAsync("a hard question here", CancellationToken.None);
+
+        Assert.Equal("the draft", run!.Text);
+        Assert.Contains(steps, s => s.Tool == ReasoningSubtask.Tag && !s.Ok && s.Detail.Contains("keeping the draft"));
+    }
+
+    [Fact]
+    public async Task ADraftThatDidNotSucceedIsNotJudged()
+    {
+        var basic = new ScriptedChatProvider("not json, not long enough");
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.AnswerDirectly, 0.9), Choose(SmartRouter.EscalateOption, 0.9));
+        using var session = Session(basic, engine, smart: true, reasoning: new ScriptedChatProvider("x"));
+
+        var run = await session.SubmitAsync("a question that fails", CancellationToken.None);
+
+        Assert.False(run!.Succeeded);
+        Assert.Equal(1, engine.Calls);
     }
 
     [Fact]
