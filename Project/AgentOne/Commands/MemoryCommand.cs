@@ -35,10 +35,18 @@ public sealed class MemoryCommand
         }
 
         var workspace = new WorkspaceStore(root);
+        if (!KuzuNative.IsAvailable())
+        {
+            Console.Error.WriteLine("agent-one memory: the knowledge graph is off — Kùzu's library (kuzu_shared.dll / libkuzu.so / libkuzu.dylib) is not next to the binary");
+            return 1;
+        }
+
         using var graph = KnowledgeGraph.Open(Path.Combine(workspace.Dir, "graph"));
         if (graph is null)
         {
-            Console.Error.WriteLine("agent-one memory: the knowledge graph is off — Kùzu's library (kuzu_shared.dll / libkuzu.so / libkuzu.dylib) is not next to the binary");
+            // Kùzu allows one open handle per database, across processes too.
+            Console.Error.WriteLine("agent-one memory: the graph is open in another agent-one process — the background session, most likely.");
+            Console.Error.WriteLine("  ask it instead (`agent-one ask \"/status\"`), or `agent-one session stop` and run this again.");
             return 1;
         }
 

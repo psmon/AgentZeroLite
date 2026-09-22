@@ -6,6 +6,13 @@ using AgentOne.Services;
 
 namespace AgentOne.Agent;
 
+/// <summary>What the engine said about a finished turn, and what was kept.</summary>
+/// <param name="Verdict">The "worth saving?" decision — visible so a silent graph is explainable.</param>
+public sealed record LearnOutcome(Decision Verdict, IReadOnlyList<Distilled> Items)
+{
+    public bool Saved => Items.Count > 0;
+}
+
 /// <summary>What the graph was asked before a turn, and what it gave.</summary>
 /// <param name="Helps">The engine's "would the graph help?" decision.</param>
 /// <param name="Strategy">Which query it chose, or null when it said no.</param>
@@ -135,7 +142,7 @@ public sealed class GraphMemory : IDisposable
     /// engine's decision as its rationale, linked to the turn and to the
     /// files it names. Returns what was kept, for the renderers.
     /// </summary>
-    public async Task<IReadOnlyList<Distilled>> LearnAsync(
+    public async Task<LearnOutcome> LearnAsync(
         SmartRouter router, IChatProvider provider, string turnId, string request, AgentRun run, CancellationToken ct)
     {
         var did = string.Join("; ", run.Steps
@@ -147,10 +154,10 @@ public sealed class GraphMemory : IDisposable
         Graph.RememberTurn(turnId, request, outcome);
 
         var verdict = await router.WorthSavingAsync(request, did, outcome, ct);
-        if (!verdict.Ok || verdict.Choice != SmartRouter.SaveKnowledge) return [];
+        if (!verdict.Ok || verdict.Choice != SmartRouter.SaveKnowledge) return new LearnOutcome(verdict, []);
 
         var items = await KnowledgeDistiller.DistillAsync(provider, request, did, outcome, ct);
-        if (items.Count == 0) return [];
+        if (items.Count == 0) return new LearnOutcome(verdict, []);
 
         var why = new Rationale(SmartRouter.WorthSavingQuestion, verdict.Choice, verdict.Confidence,
             "asked: " + WorkspaceStore.FirstLine(request, 200) + "\ndid: " + did + "\noutcome: " + WorkspaceStore.FirstLine(outcome, 300));
@@ -162,7 +169,7 @@ public sealed class GraphMemory : IDisposable
         foreach (var item in items)
             Graph.Learn(turnId, item.Title, item.Text, item.Kind, why, KnowledgeGraph.PathsIn(item.Text).Concat(pathsFromSteps));
 
-        return items;
+        return new LearnOutcome(verdict, items);
     }
 
     public void Dispose() => Graph.Dispose();

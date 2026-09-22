@@ -458,12 +458,24 @@ public sealed class ChatSession : IDisposable
     {
         try
         {
-            var items = await _graph!.LearnAsync(_router, _provider, turnId, request, run, _background.Token);
-            if (items.Count == 0) return;
+            var outcome = await _graph!.LearnAsync(_router, _provider, turnId, request, run, _background.Token);
 
-            foreach (var item in items)
+            // The verdict is shown either way: a graph that stays empty has to
+            // be explainable — "skip" three turns running is a fact, not a bug.
+            var verdict = outcome.Saved ? $"kept {outcome.Items.Count} item(s)"
+                : outcome.Verdict is { Ok: true, Choice: SmartRouter.SaveKnowledge } ? "worth keeping, but nothing distilled"
+                : outcome.Verdict.Ok ? "nothing worth keeping"
+                : $"unavailable ({outcome.Verdict.Message})";
+            _log?.Decision("knowledge", outcome.Verdict, verdict);
+            Decided?.Invoke(new SmartNote("knowledge", outcome.Verdict, verdict));
+
+            if (!outcome.Saved) return;
+            foreach (var item in outcome.Items)
+            {
                 _log?.Step(new AgentStep(0, "learned", $"({item.Kind}) {item.Title} — {item.Text}", true));
-            Learned?.Invoke(items);
+                Noted?.Invoke($"  ↳ learned ({item.Kind}) {item.Title}");
+            }
+            Learned?.Invoke(outcome.Items);
         }
         catch (Exception ex) when (ex is OperationCanceledException or ChatProviderException or InvalidOperationException)
         {
