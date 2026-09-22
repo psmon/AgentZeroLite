@@ -217,7 +217,7 @@ What differs from the WPF host, and why:
 
 A second, **independent** product in this repo: a cross-platform CLI agent that
 publishes as a Native AOT single binary (win-x64 / linux-x64 / osx-arm64 /
-osx-x64, ~6 MB, no runtime to install) and ships through npm as
+osx-x64, ~22 MB with Akka.NET and Kùzu's loader inside, no runtime to install) and ships through npm as
 `@webnori/agent-one`. Skeleton borrowed from `C:\code\psmon\CodeScan` — argv
 switch in `Program.cs` → `Commands/`, all state under `~/.agent-one/`
 (`Services/AppPaths`), `version.txt` MSBuild auto-bump, `packaging/npm/` wrapper
@@ -310,10 +310,63 @@ keystroke); and `StreamingTextNode` re-measures a line per cell it draws, so
 2,300-char answer line used to freeze the window for 9 s). ChatSession has its
 own deterministic tests for pause/resume.
 
-`SessionState` is actor-*shaped*, not Akka: one owner, serialised mutations,
-snapshot reads. An actor runtime is exactly the dependency a Native AOT single
-binary cannot afford — the same reason this project does not reference
-ZeroCommon.
+**The conversation runs as AgentZero's Bot / Loop actor pair** (`Actors/`, on
+Akka.NET — a 1.6 nightly, `1.6.0-beta20260922000138`, from Akka.NET's feedz.io
+feed via `Project/AgentOne/NuGet.config` and its twin in the tests; 1.6 is not
+on nuget.org). `AgentBotActor` at `/user/bot` is the gateway: spawns
+`AgentLoopActor` (`/user/bot/loop`) lazily, holds the renderer's callbacks
+(`SetAgentLoopCallbacks`: progress, result, notice, pause), refuses a second
+`StartAgentLoop` while one runs (`TurnRefused`), forwards session commands
+(`IAgentSessionCommand`) with the sender kept. `AgentLoopActor` owns one
+`ChatSession` — the loop — as Idle ⇄ Running: the turn runs on the pool
+(`Task.Run` + `PipeTo`), every session event comes back through the mailbox
+as a private internal record before it is told to the parent, cancel is
+`_cts.Cancel()` only and the run's own end tips it back to Idle, so there is
+exactly one `AgentLoopResult` per start. The vocabulary is AgentZero's
+(`Messages.cs` §8 / `harness/knowledge/_shared/agent-architecture.md`):
+`AgentLoopProgress` (phase tick: Thinking / Acting with the `AgentStep` /
+Generating with the fragment / Done / Error) and `AgentLoopResult` (end of
+run, carrying the `AgentRun`) are never reused for each other; agent-one adds
+`AgentLoopNotice` (decision / note / title / design / learned) and
+`PersonNeeded` → `ResolvePause` for the approval and design-choice pauses
+(the session's `Approver`/`Chooser` delegates post the question through the
+mailbox from the pool thread and await a TCS). `Actors/AgentGateway` is what
+the commands hold: `IAgentSession` — the same events / delegates / commands
+as `ChatSession` — implemented as a Tell of `StartAgentLoop` plus a wait for
+the one result, and blocking Asks for the session commands. **The bot's
+callbacks only enqueue**: one pump task raises the gateway's events in order
+on its own thread, and `ChatTuiViewModel` posts every handler to Termina's
+loop (`ReactiveViewModel.Post`, once `OnActivated` has wired it) — AgentZero's
+rule (the UI registers delegates that marshal; the actor never runs UI code),
+learned here the hard way: raised on the bot's thread, the window's first
+repaint deadlocked against Termina's loop, the turn never came back and no
+key was read again, which the person saw as "blocked during a request".
+`ChatTuiOverActorsTests` boots the real headless window over the gateway and
+asserts the turn ends with no further key. `ChatSession` implements
+`IAgentSession` too, so the TUI selftest and the tests drive it directly.
+**Esc pauses a running turn** (`Agent/PauseGate`, asked by `AgentLoop` before
+every step — a model mid-answer or a command mid-run cannot be interrupted):
+`IAgentSession.Pause()` holds it, and `ResumeAsync(line)` reads the next line
+as resume / stop / refine — `SmartRouter.PauseVerdictAsync` (one fixed
+question, choice only) with a key, `ChatSession.JudgePauseLine`'s word list
+without — then resumes, cancels the turn's own linked token (`_turnCts`, so
+a stop ends that turn only), or resumes with the line put in front of the
+model as `[the user, mid-turn] …`. Actor messages `PauseAgentLoop` /
+`ResumeAgentLoop` → `AgentLoopPaused` / `AgentLoopResumed`; in the window
+`ChatEffect.Pause` (Esc while busy) and `ChatTuiModel.Paused` let Enter
+through while held. `AgentActorSystem` is the HOCON: Akka's own log lines go to
+**stderr** (`StderrLogger`, kept for reflection with `DynamicDependency`),
+`exit-clr = off` — the command owns the exit code. **AOT needs
+`TrimmerRootAssembly Include="Akka"`**: Akka resolves its provider,
+dispatchers and serializers by type name from HOCON; measured, without the
+root the published binary dies in `ActorSystem.Create` ("'akka.actor.provider'
+is not a valid type name"), with it a thousand Asks take 2 ms and the binary
+grows from ~6 MB to ~22 MB. `session selftest` runs the gateway on every
+release RID, which is the AOT proof per platform. Tests:
+`AgentActorTests` (TestKit: the probe as the loop's parent; the bot's lazy
+spawn, refusal and callback isolation; the gateway end to end).
+`SessionState` keeps its lock: the counters are touched from the turn's
+pool thread, not the actor's.
 
 **Every stdin read goes through `Services/StandardInput`.** `Console.In` decodes
 a redirected stream with the console code page, which turns piped Korean into
@@ -389,9 +442,73 @@ escapes raw newlines/tabs and unknown backslash escapes inside JSON strings and
 retries the parse (gemma's `write_file` with real newlines, a grep with `\.`);
 what still fails gets the nudge, because `LooksLikeAnAnswer` refuses anything
 shaped like an envelope — measured, a 2,564-char write_file was once shown to
-the user as the answer and the file never written. `/status` (F2 in the window) prints `SessionStats` — task name, context size and
+the user as the answer and the file never written. `ToolCall.RestoreEscapes`
+is the other half: a small model writes `".\run.ps1"` inside JSON and the
+parser, correctly, makes `\r` a carriage return — measured, PowerShell got
+`.<CR>un.ps1`, threw a ParserError, and the model "fixed" the wrong file — so a
+CR/BS/FF followed by a word character gets its backslash back in every
+argument, a tab in paths and commands, a newline in paths only (content, answer
+text and multi-line commands keep theirs). The repeat nudge names the earlier
+result when it failed ("it FAILED: exit code 1 …", "never report it as done"),
+because the plain "use the result" nudge was followed by a claimed success.
+`/status` (F2 in the window) prints `SessionStats` — task name, context size and
 token estimate, Jev calls and ms, escalations, designs, approvals, memory size,
 grants; `/new` starts a fresh session and log.
+
+**The knowledge graph** (`Graph/`: `KuzuNative` P/Invoke + `KuzuGraph` wrapper
+taken from `C:\code\psmon\akka-graph-loop`, `KnowledgeGraph` schema and
+queries; `Agent/GraphMemory` the session-level use; `Agent/KnowledgeDistiller`
+the 1–3-line extraction; `Commands/MemoryCommand`). An embedded **Kùzu**
+database at `<workspace>/graph/knowledge.kuzu`; the shared library
+(`kuzu_shared.dll` / `libkuzu.so` / `libkuzu.dylib`, ~13 MB) is downloaded
+once by `native/Kuzu.targets` into the gitignored `native/_cache/` and copied
+next to the build, test and publish output — the release workflow stages it
+into the archive and the smoke test checks it is there. No library → `Open`
+returns null → the agent runs without the graph and says so. Schema: `Turn
+-LEARNED-> Knowledge -JUSTIFIED_BY-> Rationale`, `Knowledge -ABOUT-> Path`,
+`Knowledge -HELPED-> Turn {how}`; one open handle per database (a test that
+wants to look inside disposes the session first). Three more fixed-option Jev
+questions in `SmartRouter`: after a turn `WorthSavingAsync` (save/skip —
+`KeepsKnowledge`: save on the choice, but skip must clear the floor, an unsure
+skip keeps; measured "skip" at 0.16 for a turn that wrote a run script → distil
+and `Learn` off the turn, on `_background`; the verdict is logged and shown as
+a `knowledge:` note); before a turn, when
+the graph holds anything and the route is not web, `GraphHelpsAsync`
+(consult/skip) then `GraphStrategyAsync` (by_keywords / by_paths / recent /
+most_helpful — the "best Cypher" is one of four, run with the request's
+words; keywords is the fallback when the chosen one finds nothing), and hits
+are injected as `[graph memory]` material with `MarkHelped` edges + use
+counts, so ranking learns from use. Two measured misses shaped the rest:
+knowledge distilled in English was invisible to a Korean question, so the
+distiller's line is now `kind | title | text | keywords` (search words in
+English and the user's language, stored in a `keywords` column that
+`EnsureSchema` adds to older graphs with `ALTER TABLE`), and when the chosen
+query and the keyword pass both find nothing the newest items go anyway
+(`recent (fallback)`) — the engine said the graph helps, and a miss on words is
+not a no. `ChatSession.UsesGraph` is the test
+switch (like `NamesTasks`): consulting and learning would eat a scripted
+engine's answers. **Dispose is idempotent** — the graph tests dispose the
+session early to open the database themselves.
+
+**The background session** (`Commands/SessionCommand`, `Agent/SessionServer`
++ `SessionClient`, `Services/SessionProtocol` + `SessionRegistry`): `session
+start` spawns `agent-one session serve` detached through
+`Services/DetachedProcess` — on Windows CreateProcessW with handle inheritance
+OFF, because `Process.Start` hands the child every inheritable handle and a
+daemon started from a piped shell then held the pipe: `session start | cat`
+blocked 3m55s until `session stop` (0.37 s now); elsewhere the three streams
+are redirected and dropped. It logs to `logs/session.log`, holds one
+`ChatSession` behind a `NamedPipeServerStream`
+named from a hash of the home dir and records pid/pipe/root in
+`~/.agent-one/session.json`; one at a time, a dead pid is forgotten on load.
+Protocol is JSON lines: `PipeRequest{op: ask|status|stop|answer}` in,
+`PipeEvent{event: activity|step|delta|note|decided|title|design|ask|choose|
+result|error}` out; `ask`/`choose` events wait for an `answer` line on the same
+connection, which is how `Approver`/`Chooser` reach the CLI (`ask --yes`
+approves up front). `agent-one ask` is the REPL's printing over the client;
+`session selftest` runs both ends in-process on a private pipe with the echo
+provider — the release workflow runs it. Note `ask` used to alias `run`; it no
+longer does.
 
 **A session belongs to its workspace** (`Services/WorkspaceStore`, under
 `~/.agent-one/workspaces/<name>-<sha1[10]>/`): `memory.md` gets one entry per

@@ -47,6 +47,23 @@
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     </ItemGroup>
 
+    <!-- Akka.NET: the conversation runs as the same Bot / Loop actor pair AgentZero's
+         Bot mode uses (Actors/). A 1.6 nightly from Akka.NET's feed (NuGet.config);
+         1.6 is not on nuget.org yet. Akka finds its provider, dispatchers and
+         serializers by type NAME from HOCON, so the trimmer must keep the whole
+         assembly: measured, without the root the AOT binary dies in
+         ActorSystem.Create ("'akka.actor.provider' is not a valid type name"),
+         with it the probe answers 1,000 Asks in 2 ms. Cost: ~12 MB of binary. -->
+    <ItemGroup>
+        <PackageReference Include="Akka" Version="1.6.0-beta20260922000138" />
+        <TrimmerRootAssembly Include="Akka" />
+    </ItemGroup>
+
+    <!-- Kùzu, the embedded graph database behind the workspace knowledge graph
+         (Graph/). P/Invoke over a shared library the targets file downloads
+         once and copies next to the binary; no NuGet package, no runtime. -->
+    <Import Project="native\Kuzu.targets" />
+
     <!-- ============================================================
          Auto version bump: patch +1 per build, rollover at 100 -> minor +1.
          Major is manual only (edit version.txt). Mirrors CodeScan/AgentZeroWpf.

@@ -385,7 +385,7 @@ public class DevSessionTests : IDisposable
         config.TrySet("smartMode", smart ? "on" : "off", out _);
         config.TrySet("saveSessions", "false", out _);
         if (reasoning is not null) config.TrySet("reasoningModel", "big-model", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine, available, reasoning) { NamesTasks = false };
+        return new ChatSession(config, _root, streaming: false, provider, engine, available, reasoning) { NamesTasks = false, UsesGraph = false };
     }
 
     private const string RunEcho = """{"tool":"run_command","args":{"command":"echo approved-run"}}""";
@@ -409,6 +409,24 @@ public class DevSessionTests : IDisposable
         Assert.Equal(0, engine.Calls);                                   // the floor is not a judgement call
         Assert.Contains(provider.Calls[1], m => m.Content.Contains("not run") && m.Content.Contains("declined"));
         Assert.Equal((1, 0), (session.Stats().Counters.ApprovalsAsked, session.Stats().Counters.ApprovalsGranted));
+    }
+
+    [Fact]
+    public async Task RepeatingACommandThatFailedIsToldSo()
+    {
+        // Measured: a failed command was repeated, the model was told "use the
+        // result", and it then reported success. The nudge names the failure.
+        const string failing = """{"tool":"run_command","args":{"command":"exit 7"}}""";
+        var provider = new ScriptedChatProvider(failing, failing, Done);
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.SafeOption, 0.95), Choose(SmartRouter.SafeOption, 0.95));
+        using var session = Session(provider, engine, smart: false);
+
+        await session.SubmitAsync("run it", CancellationToken.None);
+
+        var nudge = provider.Calls[2].Last(m => m.Role == "user").Content;
+        Assert.Contains("it FAILED", nudge);
+        Assert.Contains("exit code 7", nudge);
+        Assert.Contains("Never report it as done", nudge);
     }
 
     [Fact]

@@ -41,6 +41,9 @@ public partial class AgentOneJson : JsonSerializerContext;
 [JsonSerializable(typeof(Decision))]
 [JsonSerializable(typeof(SessionEntry))]
 [JsonSerializable(typeof(RunReport))]
+[JsonSerializable(typeof(PipeRequest))]
+[JsonSerializable(typeof(PipeEvent))]
+[JsonSerializable(typeof(SessionRecord))]
 public partial class AgentOneWireJson : JsonSerializerContext;
 
 /// <summary>One line of a session transcript (~/.agent-one/sessions/*.jsonl).</summary>

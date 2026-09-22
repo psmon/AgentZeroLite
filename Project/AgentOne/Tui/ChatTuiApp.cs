@@ -11,7 +11,7 @@ namespace AgentOne.Tui;
 /// <summary>Hosts the chat window. Wiring only; the conversation is <see cref="ChatSession"/>.</summary>
 public static class ChatTuiApp
 {
-    public static async Task<int> RunAsync(ChatSession session, VirtualInputSource? scripted = null)
+    public static async Task<int> RunAsync(IAgentSession session, VirtualInputSource? scripted = null)
     {
         if (scripted is null && (Console.IsInputRedirected || Console.IsOutputRedirected))
         {
@@ -75,7 +75,7 @@ public static class ChatTuiApp
 
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
-        builder.Services.AddSingleton(session);
+        builder.Services.AddSingleton<IAgentSession>(session);
         builder.Services.AddSingleton(model);
         builder.Services.AddTermina("/chat", t => t.RegisterRoute<ChatTuiPage, ChatTuiViewModel>("/chat"));
         builder.Services.AddTerminaVirtualInput(scripted);

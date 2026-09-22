@@ -15,6 +15,8 @@ public enum ChatEffect
     ScrollToBottom,
     /// <summary>Print the session's status block (F2).</summary>
     ShowStatus,
+    /// <summary>Esc while a turn runs: hold it at its next step.</summary>
+    Pause,
     Quit
 }
 
@@ -46,6 +48,9 @@ public sealed class ChatTuiModel
     /// <summary>A turn is waiting for the person to answer.</summary>
     public bool AwaitingPerson { get; private set; }
 
+    /// <summary>The running turn is held; the next line typed says resume, stop or refine.</summary>
+    public bool Paused { get; private set; }
+
     public bool Smart { get; private set; }
     public bool SmartAvailable { get; }
     public string Status { get; private set; }
@@ -72,7 +77,14 @@ public sealed class ChatTuiModel
     public void SetBusy(bool busy, string? status = null)
     {
         Busy = busy;
+        if (!busy) Paused = false;
         if (status is not null) Status = status;
+    }
+
+    public void SetPaused(bool paused)
+    {
+        Paused = paused;
+        if (paused) Status = "⏸ paused — Enter to go on · 'stop' to abandon · or type what to change";
     }
 
     public void SetAwaitingPerson(bool awaiting) => AwaitingPerson = awaiting;
@@ -105,12 +117,12 @@ public sealed class ChatTuiModel
         switch (key.Key)
         {
             case ConsoleKey.Enter:
-                if (Busy)
+                if (Busy && !Paused && !AwaitingPerson)
                 {
-                    Status = "still working — wait for it to finish or pause";
+                    Status = "still working — Esc pauses it at the next step";
                     return ChatEffect.None;
                 }
-                if (_input.ToString().Trim().Length == 0 && !AwaitingPerson) return ChatEffect.None;
+                if (_input.ToString().Trim().Length == 0 && !AwaitingPerson && !Paused) return ChatEffect.None;
                 return ChatEffect.Submit;
 
             case ConsoleKey.Tab when key.Modifiers.HasFlag(ConsoleModifiers.Shift):
@@ -138,6 +150,8 @@ public sealed class ChatTuiModel
                 return ChatEffect.Quit;
 
             case ConsoleKey.Escape:
+                // A running turn: Esc holds it. The line typed next decides.
+                if (Busy && !Paused && !AwaitingPerson) return ChatEffect.Pause;
                 if (_input.Length > 0)
                 {
                     _input.Clear();

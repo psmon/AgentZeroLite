@@ -14,13 +14,11 @@ public readonly record struct SessionCounters(
 /// <summary>
 /// One chat session's mutable state, owned in one place.
 ///
-/// Actor-shaped rather than an actor framework: a single owner, mutations
-/// serialised, and reads that hand out immutable snapshots so nothing mutable
-/// escapes. It is deliberately not Akka — agent-one is a Native AOT single
-/// binary, and the actor runtime is exactly the kind of dependency that costs
-/// that (the same reason this project does not reference ZeroCommon). If a
-/// session ever needs supervision, remoting or persistence, that is the moment
-/// to revisit it; a REPL turn does not.
+/// A single owner, mutations serialised, and reads that hand out immutable
+/// snapshots so nothing mutable escapes. The session that owns it now lives
+/// inside an Akka actor (Actors/AgentLoopActor), but this lock stays: the
+/// counters are touched from the turn's pool thread, tool callbacks and the
+/// decision engine, none of which run on the actor's thread.
 ///
 /// The mode, the counters and the read grants are touched from the prompt,
 /// the progress timer, tool callbacks and the decision engine at once, which is

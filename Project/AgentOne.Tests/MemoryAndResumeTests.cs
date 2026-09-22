@@ -199,7 +199,7 @@ public class MemoryAndResumeSessionTests : IDisposable
         config.TrySet("saveSessions", save ? "true" : "false", out _);
         return new ChatSession(config, _root, streaming: false, provider, engine ?? new ScriptedDecisionEngine(Choose("x", 1)), engine is not null)
         {
-            NamesTasks = names
+            NamesTasks = names, UsesGraph = false
         };
     }
 

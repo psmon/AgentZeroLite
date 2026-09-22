@@ -32,6 +32,29 @@ public class ToolCallTests
     }
 
     [Fact]
+    public void AWindowsPathEscapeInACommandIsPutBack()
+    {
+        // Measured: the model wrote ".\run.ps1"; JSON made it ".<CR>un.ps1" and PowerShell threw a ParserError.
+        Assert.True(ToolCall.TryParse("""{"tool":"run_command","args":{"command":".\run.ps1 -Verbose"}}""", out var call, out _));
+        Assert.Equal(@".\run.ps1 -Verbose", call.Arg("command"));
+
+        Assert.True(ToolCall.TryParse("""{"tool":"read_file","args":{"path":"src\new\bin\tools\form.txt"}}""", out call, out _));
+        Assert.Equal(@"src\new\bin\tools\form.txt", call.Arg("path"));
+    }
+
+    [Fact]
+    public void RealNewlinesAndTabsSurviveWhereTheyAreMeant()
+    {
+        var raw = """{"tool":"write_file","args":{"path":"a.py","content":"if x:\n\treturn 1\r\n"}}""";
+        Assert.True(ToolCall.TryParse(raw, out var call, out _));
+        Assert.Equal("if x:\n\treturn 1\r\n", call.Arg("content"));
+
+        raw = """{"tool":"run_command","args":{"command":"echo one\necho two"}}""";
+        Assert.True(ToolCall.TryParse(raw, out call, out _));
+        Assert.Equal("echo one\necho two", call.Arg("command"));
+    }
+
+    [Fact]
     public void RecognizesFinal()
     {
         Assert.True(ToolCall.TryParse("""{"tool":"final","args":{"text":"done"}}""", out var call, out _));

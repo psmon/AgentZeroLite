@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using AgentOne.Graph;
 using AgentOne.Llm;
 using AgentOne.Llm.Decision;
 using AgentOne.Services;
@@ -45,12 +46,16 @@ public sealed record SessionStats(
     int MemoryChars,
     string MemoryPath,
     SessionCounters Counters,
-    IReadOnlyList<string> ReadGrants)
+    IReadOnlyList<string> ReadGrants,
+    GraphStats? Graph = null)
 {
     /// <summary>The status block, one fact per line.</summary>
     public IReadOnlyList<string> Describe()
     {
         var c = Counters;
+        var graph = Graph is { } g
+            ? $"graph     {g.Knowledge} items · {g.Paths} paths · {g.Turns} turns · helped {g.Helped} times"
+            : "graph     off (Kùzu library not next to the binary)";
         var lines = new List<string>
         {
             $"task      {Title ?? "(not named yet)"}",
@@ -58,6 +63,7 @@ public sealed record SessionStats(
             $"mode      {(Smart ? "smart" : "basic")} · turns {c.Turns}",
             $"context   {ContextMessages} messages · {ContextChars:N0} chars · ~{EstimatedTokens:N0} tokens (estimate)",
             $"memory    {MemoryChars:N0} / {WorkspaceStore.MemoryCapChars:N0} chars · {MemoryPath}",
+            graph,
             $"models    {Model} · reasoning {ReasoningModel ?? "none"} · shell {Shell}",
             $"jev       {c.JevCalls} calls · {c.JevMs:N0} ms · escalations {c.Escalations} · designs {c.Designs}",
             $"tools     {c.ToolCalls} calls · commands approved {c.ApprovalsGranted}/{c.ApprovalsAsked} asked",
@@ -82,7 +88,7 @@ public sealed record SessionStats(
 /// back into that memory, logs under the workspace, and can resume any of the
 /// workspace's saved sessions.
 /// </summary>
-public sealed class ChatSession : IDisposable
+public sealed class ChatSession : IAgentSession
 {
     private readonly IChatProvider _provider;
     private readonly IChatProvider? _reasoning;
@@ -98,7 +104,13 @@ public sealed class ChatSession : IDisposable
     private readonly string _root;
     private readonly string _logKind;
     private readonly CancellationTokenSource _background = new();
+    private readonly GraphMemory? _graph;
     private SessionStore? _log;
+
+    /// <summary>The running turn's own cancellation — Stop, from a pause, cancels this.</summary>
+    private CancellationTokenSource? _turnCts;
+    private string _turnRequest = "";
+    private readonly List<string> _turnProgress = [];
 
     /// <summary>What the agent is doing right now, for a status line.</summary>
     public event Action<string>? ActivityStarted;
@@ -120,6 +132,9 @@ public sealed class ChatSession : IDisposable
 
     /// <summary>The strong model's design came back: its first lines, for a person following along.</summary>
     public event Action<IReadOnlyList<string>>? DesignMade;
+
+    /// <summary>The turn taught something and it was kept in the knowledge graph. Raised off the turn.</summary>
+    public event Action<IReadOnlyList<Distilled>>? Learned;
 
     /// <summary>
     /// Who picks when a design hinges on a choice. The REPL reads a line, the
@@ -165,6 +180,11 @@ public sealed class ChatSession : IDisposable
 
         Workspace = new WorkspaceStore(_root).Ensure();
 
+        // The knowledge graph needs Kùzu's library next to the binary; without
+        // it the agent runs as before and the status block says so.
+        try { _graph = GraphMemory.Open(Workspace); }
+        catch (InvalidOperationException) { _graph = null; }
+
         // Smart starts where the config left it, but only with a key to make it
         // work. Starting "on" with no key would fail on the first turn.
         _state = new SessionState(config.SmartMode && _smartAvailable);
@@ -184,6 +204,7 @@ public sealed class ChatSession : IDisposable
         _loop.ActivityStarted += what => ActivityStarted?.Invoke(what);
         _loop.StepCompleted += step =>
         {
+            if (step.Tool is not ("final" or "unwrapped")) _turnProgress.Add($"{step.Tool}{(step.Ok ? "" : " (failed)")}");
             if (ToolCatalog.FamilyOf(step.Tool) is { } family && family != ToolCatalog.LoopFamily) _state.CountToolCall();
             _log?.Step(step);
             StepCompleted?.Invoke(step);
@@ -297,7 +318,8 @@ public sealed class ChatSession : IDisposable
             snapshot.Smart, LogPath, _root, Model, ReasoningModel, Shell, Title,
             _loop.Messages.Count, chars, Tokens.Estimate(_loop.Messages),
             Workspace.MemoryChars, Workspace.MemoryPath,
-            snapshot.Counters, snapshot.ReadGrants);
+            snapshot.Counters, snapshot.ReadGrants,
+            _graph is null ? null : SafeStats());
     }
 
     /// <summary>
@@ -318,11 +340,111 @@ public sealed class ChatSession : IDisposable
         line = line.Trim();
         if (line.Length == 0) return null;
 
+        // The turn runs on its own token, linked to the caller's, so a Stop
+        // typed during a pause ends this turn and nothing else.
+        using var turn = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _turnCts = turn;
+        _turnRequest = line;
+        _turnProgress.Clear();
+        try
+        {
+            return await SubmitCoreAsync(line, turn.Token);
+        }
+        finally
+        {
+            _turnCts = null;
+            _loop.Pause.Clear();
+        }
+    }
+
+    // ------------------------------------------------------------- pause
+
+    /// <summary>True while the turn is held between steps.</summary>
+    public bool Paused => _loop.Pause.IsPaused;
+
+    /// <summary>
+    /// Holds the turn at its next step — the request in flight finishes first;
+    /// nothing can interrupt a model mid-sentence. Harmless when nothing runs:
+    /// the next turn would pause at its first step, so it is cleared then.
+    /// </summary>
+    public void Pause()
+    {
+        if (_turnCts is null) return;
+        _loop.Pause.Pause();
+        Noted?.Invoke("⏸ pausing at the next step — type to go on, 'stop' to abandon, or say what to change");
+    }
+
+    /// <summary>
+    /// The line typed during a pause, read for what it means — resume, stop,
+    /// or refine — by the decision engine when there is one, by a short word
+    /// list otherwise; then applied. Refining puts the line in front of the
+    /// model as the next thing it reads.
+    /// </summary>
+    public async Task<PauseOutcome> ResumeAsync(string line, CancellationToken ct)
+    {
+        line = line.Trim();
+        if (_turnCts is null || !_loop.Pause.IsPaused)
+            return new PauseOutcome(PauseVerdict.Resume, null, "nothing is paused");
+
+        Decision? decision = null;
+        PauseVerdict verdict;
+        if (line.Length == 0 || !_smartAvailable)
+        {
+            verdict = JudgePauseLine(line);
+        }
+        else
+        {
+            decision = await _router.PauseVerdictAsync(_turnRequest, string.Join("; ", _turnProgress), line, ct);
+            verdict = decision.Ok ? decision.Choice switch
+            {
+                SmartRouter.StopOption => PauseVerdict.Stop,
+                SmartRouter.RefineOption => PauseVerdict.Refine,
+                _ => PauseVerdict.Resume
+            } : JudgePauseLine(line);
+        }
+
+        string message;
+        switch (verdict)
+        {
+            case PauseVerdict.Stop:
+                message = "stopped — the turn is abandoned";
+                _turnCts.Cancel();
+                _loop.Pause.Resume();
+                break;
+            case PauseVerdict.Refine:
+                message = "refining: " + WorkspaceStore.FirstLine(line, 120);
+                _loop.Pause.Resume(line);
+                break;
+            default:
+                message = "resuming";
+                _loop.Pause.Resume();
+                break;
+        }
+
+        _log?.Decision("pause", decision ?? new Decision(true, verdict.ToString().ToLowerInvariant(), 1.0, new Dictionary<string, double>(), "rule", 0), message);
+        Decided?.Invoke(new SmartNote("pause", decision ?? new Decision(true, verdict.ToString().ToLowerInvariant(), 1.0, new Dictionary<string, double>(), "rule", 0), message));
+        return new PauseOutcome(verdict, decision, message);
+    }
+
+    /// <summary>The plain rule, for no engine or an empty line: a few words mean go on or stop; anything else is a refinement.</summary>
+    internal static PauseVerdict JudgePauseLine(string line)
+    {
+        var l = line.Trim().ToLowerInvariant().TrimEnd('.', '!');
+        if (l.Length == 0 || l is "continue" or "go on" or "go" or "ok" or "resume" or "y" or "yes" or "계속" or "재개" or "진행" or "고" or "ㅇㅋ")
+            return PauseVerdict.Resume;
+        if (l is "stop" or "cancel" or "abort" or "quit" or "never mind" or "forget it" or "n" or "no" or "중단" or "그만" or "취소" or "멈춰" or "스톱")
+            return PauseVerdict.Stop;
+        return PauseVerdict.Refine;
+    }
+
+    private async Task<AgentRun?> SubmitCoreAsync(string line, CancellationToken ct)
+    {
         GrantNamedFolders(line);
 
         var snapshot = _state.Read();
         _log?.Prompt(line, snapshot.Smart);
-        _state.CountTurn();
+        var turnNumber = _state.CountTurn();
+        var turnId = $"{_log?.Id ?? "session"}-{turnNumber}";
 
         var smart = snapshot.Smart && SmartRouter.Applies(line);
         var prompt = line;
@@ -347,6 +469,17 @@ public sealed class ChatSession : IDisposable
             {
                 prompt = route.Guidance(line);
                 families = route.Families;
+            }
+
+            // Before any file is scanned: does the graph already know? The
+            // engine says whether to look and which query to run; what comes
+            // back is material for the model, and the graph remembers it helped.
+            if (_graph is not null && UsesGraph && route.Route != Route.Web && GraphHasKnowledge())
+            {
+                _graph.Graph.RememberTurn(turnId, line, "(in progress)");
+                var consult = await ConsultGraphAsync(turnId, line, ct);
+                if (consult is { Items.Count: > 0 })
+                    prompt = prompt + Environment.NewLine + Environment.NewLine + consult.Material();
             }
 
             // Work in the workspace, or work whose shape is unclear, may be big
@@ -381,7 +514,79 @@ public sealed class ChatSession : IDisposable
 
         _log?.Result(run);
         Remember(line, run);
+        if (_graph is not null && UsesGraph && _smartAvailable && _provider.Name != "echo") _ = LearnAsync(turnId, line, run);
         return run;
+    }
+
+    // ------------------------------------------------------- knowledge graph
+
+    private bool GraphHasKnowledge()
+    {
+        try { return _graph!.HasKnowledge; }
+        catch (InvalidOperationException) { return false; }
+    }
+
+    private GraphStats? SafeStats()
+    {
+        try { return _graph!.Stats(); }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    private async Task<GraphConsult?> ConsultGraphAsync(string turnId, string request, CancellationToken ct)
+    {
+        GraphConsult? consult;
+        try
+        {
+            consult = await _graph!.ConsultAsync(_router, turnId, request, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Noted?.Invoke("graph memory unavailable: " + ex.Message);
+            return null;
+        }
+
+        var verdict = consult.Consulted
+            ? consult.Items.Count > 0 ? $"consulted via {consult.StrategyName} — {consult.Items.Count} item(s)" : $"consulted via {consult.StrategyName} — nothing matched"
+            : consult.Helps.Ok ? "not needed" : $"unavailable ({consult.Helps.Message})";
+        _log?.Decision("graph", consult.Helps, verdict);
+        Decided?.Invoke(new SmartNote("graph", consult.Helps, verdict));
+
+        if (consult.Items.Count > 0)
+            foreach (var item in consult.Items)
+                Noted?.Invoke($"  ↳ ({item.Kind}) {item.Title}");
+
+        return consult;
+    }
+
+    /// <summary>Off the turn: judge, distil, store. Nothing here can fail the turn that is already over.</summary>
+    private async Task LearnAsync(string turnId, string request, AgentRun run)
+    {
+        try
+        {
+            var outcome = await _graph!.LearnAsync(_router, _provider, turnId, request, run, _background.Token);
+
+            // The verdict is shown either way: a graph that stays empty has to
+            // be explainable — "skip" three turns running is a fact, not a bug.
+            var verdict = outcome.KeptUnsure ? $"kept {outcome.Items.Count} item(s) — the engine leaned to skip but was not sure"
+                : outcome.Saved ? $"kept {outcome.Items.Count} item(s)"
+                : !outcome.Verdict.Ok ? $"unavailable ({outcome.Verdict.Message})"
+                : outcome.Verdict.Choice == SmartRouter.SaveKnowledge ? "worth keeping, but nothing distilled"
+                : "nothing worth keeping";
+            _log?.Decision("knowledge", outcome.Verdict, verdict);
+            Decided?.Invoke(new SmartNote("knowledge", outcome.Verdict, verdict));
+
+            if (!outcome.Saved) return;
+            foreach (var item in outcome.Items)
+            {
+                _log?.Step(new AgentStep(0, "learned", $"({item.Kind}) {item.Title} — {item.Text}", true));
+                Noted?.Invoke($"  ↳ learned ({item.Kind}) {item.Title}");
+            }
+            Learned?.Invoke(outcome.Items);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ChatProviderException or InvalidOperationException)
+        {
+            // Memory is a bonus; a failed distillation is not worth a line.
+        }
     }
 
     private static int ToolSteps(AgentRun run) =>
@@ -454,6 +659,9 @@ public sealed class ChatSession : IDisposable
     /// </summary>
     /// <summary>Off for tests that count provider calls; the naming call runs beside the turn and would race them.</summary>
     internal bool NamesTasks { get; set; } = true;
+
+    /// <summary>Off for tests that script the engine: consulting and learning would consume its answers.</summary>
+    internal bool UsesGraph { get; set; } = true;
 
     private async Task RetitleAsync(string request)
     {
@@ -705,10 +913,15 @@ public sealed class ChatSession : IDisposable
         return digest;
     }
 
+    private bool _disposed;
+
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _background.Cancel();
         _background.Dispose();
+        _graph?.Dispose();
         _engine.Dispose();
         _toolbelt.Dispose();
         (_reasoning as IDisposable)?.Dispose();

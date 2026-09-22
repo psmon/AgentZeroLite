@@ -72,6 +72,10 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const string SafeOption = "safe";
     public const string UnsafeOption = "unsafe";
 
+    public const string ResumeOption = "resume";
+    public const string StopOption = "stop";
+    public const string RefineOption = "refine";
+
     public const string SameTask = "same_task";
     public const string NewTask = "new_task";
 
@@ -222,6 +226,110 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         var decision = await engine.ChooseAsync(state, SafetyQuestion, SafetyOptions, ct);
         var safe = decision.Ok && decision.Choice == SafeOption && decision.Confidence >= confidenceFloor;
         return new SafetyDecision(safe, decision);
+    }
+
+    // ------------------------------------------------------ knowledge graph
+
+    public const string SaveKnowledge = "save";
+    public const string SkipKnowledge = "skip";
+    public const string ConsultGraph = "consult_graph";
+    public const string SkipGraph = "skip_graph";
+    public const string ByKeywords = "by_keywords";
+    public const string ByPaths = "by_paths";
+    public const string RecentFirst = "recent";
+    public const string MostHelpful = "most_helpful";
+
+    public const string PauseQuestion =
+        "The person paused the agent mid-task and then typed this line. What do they mean by it?";
+
+    public static readonly DecisionOption[] PauseOptions =
+    [
+        new(ResumeOption, "Go on exactly as before: an empty line, 'continue', 'go on', 'ok', 'resume', or a remark that changes nothing."),
+        new(StopOption, "Abandon the task: 'stop', 'cancel', 'never mind', 'forget it', or a new request unrelated to the task."),
+        new(RefineOption, "Go on, but with this instruction taken into account: a correction, a constraint, a detail, a change of direction within the same task.")
+    ];
+
+    public const string WorthSavingQuestion =
+        "Did this turn produce knowledge a future session in this project would be glad to have — something not obvious " +
+        "from the files themselves, and not a passing detail?";
+
+    public const string GraphHelpsQuestion =
+        "Would looking up what this project's knowledge graph already knows help answer this request, before the agent " +
+        "starts searching files or the web?";
+
+    public const string GraphStrategyQuestion =
+        "Which way of querying the knowledge graph would most likely surface what this request needs?";
+
+    public static readonly DecisionOption[] WorthSavingOptions =
+    [
+        new(SaveKnowledge,
+            "Yes: a fact about how this project is built or laid out, a decision and its reason, an error and its fix, " +
+            "a command that works, a constraint discovered. Worth keeping and finding again."),
+        new(SkipKnowledge,
+            "No: a greeting, a question answered from general knowledge, a routine read with nothing learned, a failed " +
+            "turn that taught nothing, or something the files already say plainly.")
+    ];
+
+    public static readonly DecisionOption[] GraphHelpsOptions =
+    [
+        new(ConsultGraph,
+            "Yes: the request touches this project — its files, its build, its history, decisions made here — and the " +
+            "graph's stored knowledge (listed) overlaps with it. Reading it first avoids scanning files again."),
+        new(SkipGraph,
+            "No: the request is about something the graph clearly does not cover, or needs no project knowledge at all.")
+    ];
+
+    public static readonly DecisionOption[] GraphStrategyOptions =
+    [
+        new(ByKeywords, "Match the request's words against the stored knowledge's titles and text."),
+        new(ByPaths, "Follow the files the request names or implies: knowledge attached to those paths."),
+        new(RecentFirst, "The newest knowledge: the request continues what was done most recently."),
+        new(MostHelpful, "The knowledge that has helped the most turns before: the request is a recurring kind.")
+    ];
+
+    /// <summary>After a turn: keep what it taught? Follows the choice; a stored nothing costs little, a lost fact costs a search.</summary>
+    public async Task<Decision> WorthSavingAsync(string request, string did, string outcome, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("judging whether this turn taught anything worth keeping");
+        var state = "Request:\n" + request + "\n\nWhat the agent did:\n" + did + "\n\nOutcome:\n" + Clip(outcome, 1500);
+        return await engine.ChooseAsync(state, WorthSavingQuestion, WorthSavingOptions, ct);
+    }
+
+    /// <summary>
+    /// Whether a "worth saving?" verdict keeps the turn. Save follows the
+    /// choice; skip has to clear the floor. The costs are lopsided: an item
+    /// kept by mistake is three lines that ranking sinks when nothing ever
+    /// uses them, while a fact forgotten is another scan of the files next
+    /// session. Measured: a turn that wrote a run script and a README — the
+    /// option text's own example of "a command that works" — came back
+    /// "skip" at 0.16. That is the engine saying it cannot tell, and when it
+    /// cannot tell, keeping is the cheap mistake.
+    /// </summary>
+    public bool KeepsKnowledge(Decision verdict) =>
+        verdict.Ok && (verdict.Choice == SaveKnowledge || verdict.Confidence < confidenceFloor);
+
+    /// <summary>A line typed during a pause: resume, stop, or refine. Follows the choice — three options rarely clear a floor.</summary>
+    public async Task<Decision> PauseVerdictAsync(string request, string progress, string line, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("reading what the pause line means");
+        var state = "Task in progress:\n" + request + "\n\nDone so far:\n" + Clip(progress, 1500) + "\n\nTyped while paused:\n" + line;
+        return await engine.ChooseAsync(state, PauseQuestion, PauseOptions, ct);
+    }
+
+    /// <summary>Before a turn: is the graph worth a look? Follows the choice.</summary>
+    public async Task<Decision> GraphHelpsAsync(string request, string graphSummary, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("judging whether the knowledge graph can help");
+        var state = "Request:\n" + request + "\n\nWhat the project's knowledge graph holds:\n" + graphSummary;
+        return await engine.ChooseAsync(state, GraphHelpsQuestion, GraphHelpsOptions, ct);
+    }
+
+    /// <summary>Which query to run — the engine picks the Cypher, in effect, from four fixed ones.</summary>
+    public async Task<Decision> GraphStrategyAsync(string request, string graphSummary, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("choosing how to query the knowledge graph");
+        var state = "Request:\n" + request + "\n\nWhat the project's knowledge graph holds:\n" + graphSummary;
+        return await engine.ChooseAsync(state, GraphStrategyQuestion, GraphStrategyOptions, ct);
     }
 
     // ------------------------------------------------------- task switch

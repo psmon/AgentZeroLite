@@ -471,3 +471,6 @@ Project/Plugins/agent-band.zip
 # launcher in bin/ is source and must survive the global [Bb]in/ rule above.
 Project/AgentOne/packaging/npm/agent-one/vendor/
 !Project/AgentOne/packaging/npm/agent-one/bin/
+
+# Kuzu native library cache (downloaded by Project/AgentOne/native/Kuzu.targets)
+Project/AgentOne/native/_cache/

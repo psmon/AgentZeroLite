@@ -1,3 +1,4 @@
+using AgentOne.Actors;
 using AgentOne.Agent;
 using AgentOne.Llm;
 using AgentOne.Services;
@@ -30,10 +31,11 @@ public sealed class ChatCommand
         var interactive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
         var window = interactive && !options.Plain;
 
-        ChatSession session;
+        // The conversation runs as the Bot / Loop actor pair; this is its handle.
+        IAgentSession session;
         try
         {
-            session = new ChatSession(options.Config, options.Root, streaming: !options.Quiet);
+            session = AgentGateway.Start(options.Config, options.Root, streaming: !options.Quiet);
         }
         catch (ChatProviderException ex)
         {
@@ -50,7 +52,7 @@ public sealed class ChatCommand
     }
 
     /// <summary>The REPL: one prompt per line, progress on stderr, the answer streamed to stdout.</summary>
-    private static async Task<int> RunPlainAsync(ChatSession session, AgentOptions options, CancellationToken ct)
+    private static async Task<int> RunPlainAsync(IAgentSession session, AgentOptions options, CancellationToken ct)
     {
         var showProgress = !options.Quiet;
         using var progress = ProgressDisplay.For(showProgress);
@@ -252,6 +254,8 @@ public sealed class ChatCommand
 
             Keys (window):    Enter send · Shift+Tab basic/smart · F2 status
                               wheel or PageUp/PageDown scroll · Ctrl+End follow
+                              Esc while a turn runs: pause it at its next step — then
+                                  Enter goes on, "stop" abandons it, anything else refines it
                               Esc clear the line (twice: quit) · Ctrl+D quit
             Commands (both):  /status  context, counters, memory, grants
                               /resume  list this workspace's sessions · /resume <n>  pick one up again

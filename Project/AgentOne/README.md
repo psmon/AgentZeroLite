@@ -61,6 +61,8 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 |---|---|
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
 | `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/reset`, `/exit`. |
+| `agent-one session` | The one background session: `start` (detached), `status`, `stop`, `selftest`. |
+| `agent-one ask <request>` | Send one request to the background session and print the turn. `--yes`, `--json`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one setup` | Full-screen settings: connection, model, reasoning model, options, smart mode (`tui` still works as an alias). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
@@ -68,6 +70,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
 | `--smart` / `--basic` | On `run` and `chat`: route and escalate through the decision engine, or straight to the loop. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
+| `agent-one memory` | The workspace's knowledge graph: stats, `recent`, `helpful`, `search <words>`, `path <fragment>`, `query "<cypher>"`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
 Shared flags for `run` and `chat` — each one overrides the stored config for
@@ -306,6 +309,27 @@ end · Ctrl+End to follow` until you do. The header also says which mode you
 are in and whether a turn is running; the bottom line is yours. Shift+Tab
 switches basic ↔ smart, Esc clears the line (twice: quit), Ctrl+D quits.
 
+**Esc while a turn runs pauses it.** Nothing can interrupt a model
+mid-sentence or a command mid-run, so the turn finishes the step it is on
+and then waits — the status line says so — and the line you type next is
+read for what it means: an empty line or "continue" resumes, "stop" abandons
+the turn (it ends as cancelled), and anything else is a *refinement* — put in
+front of the model as `[the user, mid-turn] …` before it thinks again, so
+"use tabs, not spaces" mid-build changes the build. With a TypeSafe key the
+decision engine reads the line (resume / stop / refine, one fixed question);
+without one a short word list does, in English and Korean.
+
+```
+› 보드 API 만들어줘
+  ✓ write_file  (0.0s)
+  … thinking about what came back            ← Esc
+  ⏸ pausing at the next step — type to go on, 'stop' to abandon, or say what to change
+› 테스트도 같이 만들어
+  pause: refining: 테스트도 같이 만들어  (confidence 0.81)
+  … thinking about what came back
+  ✓ write_file  (0.0s)
+```
+
 Long answers are folded to the window width *before* they reach the transcript
 (`Tui/SoftWrap`). That is a performance fix, not a cosmetic one: Termina's
 streaming node re-measures a line for every cell it draws, and one
@@ -363,6 +387,82 @@ context size and a token estimate, how many times the decision engine was
 called and for how long, escalations, designs, tool calls, commands approved,
 the workspace memory's size, and which folders are readable. `/new` starts a
 fresh session with a new log file.
+
+### A session in the background, driven from the CLI
+
+```bash
+agent-one session start --smart -r ./myproject     # one detached process, one pipe
+agent-one ask "scaffold a FastAPI hello service"    # the turn, printed as the REPL would
+agent-one ask --yes "run the tests"                 # approve commands without asking back
+agent-one ask --json "/status"                      # one JSON object: the result event
+agent-one session stop
+```
+
+`session start` spawns `agent-one` itself, detached, holding one `ChatSession`
+behind a local named pipe (`~/.agent-one/session.json` says where). `ask`
+connects, sends the request, and prints the turn's events as they happen —
+progress, tool steps, the streamed answer, decisions, the design's head — and
+is where a question comes back: a command to approve (`y`, or `--yes` up
+front) or a design choice to make (a number, Enter for the recommendation).
+The conversation, the log and the workspace memory are the same as the
+window's. One session at a time; a second `start` is refused while the first
+is alive, and a stale record from a crash is cleared.
+
+Two reasons it exists: **chat mode can be self-tested with no terminal** —
+`agent-one session selftest` runs server and client in one process over a
+private pipe on the echo provider, and the release smoke test runs it on every
+artifact — and **another agent can drive this one** from a script, reading
+`--json` results or the event lines.
+
+### Long-term memory as a graph
+
+Beside the memory file there is a **knowledge graph** — an embedded
+[Kùzu](https://kuzudb.com) database under the workspace folder, queried with
+Cypher, the shape borrowed from `akka-graph-loop`'s per-project graph memory.
+The file remembers what happened; the graph keeps what was *judged worth
+knowing*, and gets better the more it is used.
+
+```
+Turn ──LEARNED──▶ Knowledge ──JUSTIFIED_BY──▶ Rationale   (the engine's judgement, attached)
+                     │  ──ABOUT──▶ Path                   (the files it concerns)
+                     └──HELPED──▶ Turn                     (each later turn it was handed to)
+```
+
+**After every turn** the decision engine is asked one fixed question — did
+this turn produce knowledge a future session would be glad to have? — and
+and unless it answers *skip* with confidence does the everyday model distil it into one to three lines
+(`kind | title | text`: fact, decision, fix, procedure, constraint). Each is
+stored with the engine's verdict, confidence and the evidence it saw as a
+`Rationale` node, linked to the turn and to the paths it names. All of it
+off the turn, after the answer is on screen.
+
+**Before a turn** — when the graph holds anything and the route is not the
+web — the engine is asked whether the graph can help *this* request, given a
+summary of what it holds (counts, the paths it knows most about, the newest
+titles). On *consult* it picks one of four queries — by keywords, by the
+paths named, newest first, most helpful first — and what comes back reaches
+the model as `[graph memory] …` material **before any file is scanned**.
+Every item handed over gets a `HELPED` edge and a use count, and the
+queries rank by use, so the knowledge that keeps helping rises. Each item
+also carries search words in English and in your language, so a question
+asked in Korean finds what was learned in English; and when no query finds
+anything, the newest few items go to the model anyway — the engine said the
+graph helps, and a miss on words is not a no.
+
+```
+› 빌드가 되는지 확인해줘
+  route: → workspace  (confidence 0.96)
+  graph: consulted via by_keywords — 2 item(s)  (confidence 0.81)
+    ↳ (procedure) Build command
+    ↳ (fix) Missing entry point
+  ✓ run_command  (2.4s)
+◆ 빌드 성공 …
+```
+
+`agent-one memory` shows what the graph holds; `memory query "MATCH (k:Knowledge)-[:ABOUT]->(p:Path) RETURN p.path, k.title"`
+runs any Cypher. The graph needs Kùzu's shared library next to the binary
+(the build fetches it, the release archive carries it); without it the agent
+runs as before and the status block says `graph off`.
 
 ### The workspace remembers
 
@@ -552,6 +652,30 @@ keystroke, so PageUp finds the answer already in the transcript.
 
 ## How it works
 
+The conversation runs as the same two actors AgentZero's Bot mode uses —
+Akka.NET, a 1.6 nightly, inside the AOT binary:
+
+```
+ REPL · window · run · pipe server
+        │  StartAgentLoop / CancelAgentLoop / ResolvePause / session commands
+        ▼
+ /user/bot        AgentBotActor   — the gateway: spawns the loop lazily, one turn
+        │                           at a time, hands every event to the renderer's
+        │                           callbacks in order
+        ▼
+ /user/bot/loop   AgentLoopActor  — the agent: owns one ChatSession, Idle ⇄ Running,
+        │                           the turn on the pool, exactly one AgentLoopResult
+        ▼                           per StartAgentLoop (cancelled or not)
+     ChatSession  — the turn: smart routing, the graph, the loop, the gate, the memory
+```
+
+`AgentLoopProgress` (Thinking / Acting / Generating / Done / Error) is a phase
+tick, `AgentLoopResult` the end of a run, `AgentLoopNotice` the side channel
+(decisions, titles, designs, what the graph learned), `PersonNeeded` /
+`ResolvePause` the pause for a person. `Actors/AgentGateway` wraps the pair in
+the same events-and-delegates surface `ChatSession` has, which is what the
+renderers hold. Inside the session, the turn is:
+
 ```
  prompt ──> AgentLoop ──> IChatProvider ──> model
               │  ▲                            │
@@ -620,7 +744,8 @@ nudge each). Every stop is reported with its reason rather than a silent hang.
 |---|---|
 | `Program.cs` | argv routing — a plain switch, no parser library, so the AOT binary carries no reflection-based command binding |
 | `Commands/` | one class per verb, plus the shared flag parser (`AgentOptions`) |
-| `Agent/` | the loop, the envelope (`ToolCall`), the guards, the system prompt |
+| `Actors/` | the Bot / Loop actor pair, its message vocabulary, the gateway the renderers hold, the actor system's HOCON |
+| `Agent/` | the loop, the envelope (`ToolCall`), the guards, the system prompt, the session (`ChatSession`) |
 | `Llm/` | `IChatProvider`, the echo provider, the OpenAI-compatible client |
 | `Tools/` | `ToolCatalog` (what the model is told), the belts that run it, and `Tools/Web/` (fetch, search parsing, HTML→text) |
 | `Tui/` | the settings screen — testable model, Termina page/viewmodel, host wiring |
@@ -732,7 +857,7 @@ Set-Alias a1 C:\code\psmon\AgentZeroLite\Project\AgentOne\agent-one.ps1
 a1 tui
 ```
 
-Native AOT single binary (8.3 MB on win-x64, no runtime dependency):
+Native AOT single binary (about 22 MB on win-x64 with Akka.NET and the Kùzu loader inside, no runtime dependency):
 
 ```bash
 dotnet publish Project/AgentOne/AgentOne.csproj -c Release -r win-x64   -o out/win-x64
@@ -778,11 +903,23 @@ offline installs.
 ## Relationship to AgentZero Lite
 
 Same repository, no code dependency in either direction. AgentZero Lite's own
-agent loop lives in `ZeroCommon` and is bound to Akka, EF Core, LLamaSharp and
-ONNX — none of which survives Native AOT or a cross-platform single binary, and
-all of which a small CLI has no use for. agent-one therefore reimplements the
-small part it needs and stays free to be extracted into its own repository once
-it ships on npm.
+agent loop lives in `ZeroCommon` and is bound to EF Core, LLamaSharp and ONNX —
+none of which survives Native AOT or a cross-platform single binary, and all of
+which a small CLI has no use for. agent-one therefore reimplements the small
+part it needs and stays free to be extracted into its own repository once it
+ships on npm.
+
+What the two do share is the **shape**: the same `AgentBotActor` / `AgentLoopActor`
+split, the same message names (`StartAgentLoop`, `AgentLoopProgress`,
+`AgentLoopResult`, `CancelAgentLoop`, `ResetAgentLoopMemory`,
+`SetAgentLoopCallbacks`), the same rules — the bot never runs inference, the
+loop is only ever Idle or Running, a cancel is a token cancel and the run's own
+end tips the actor back. agent-one runs them on its own Akka.NET (a 1.6
+nightly; 1.6 is not on nuget.org yet, so `NuGet.config` adds Akka.NET's feed).
+Akka finds its provider and dispatchers by type name from HOCON, which the
+trimmer cannot see — measured, the AOT binary died in `ActorSystem.Create`
+without a `TrimmerRootAssembly` for Akka, and answers a thousand Asks in 2 ms
+with one. The price is about 12 MB of binary.
 
 The intended integration is process-level: AgentZero launches `agent-one` with
 `--json` and reads one object off stdout, the same way it launches
