@@ -79,6 +79,7 @@ public static class ConfigTuiApp
         // than when something is actually broken.
         CheckStepNavigation(failures);
         await CheckModelPickerAsync(failures);
+        await CheckReasoningPickerAsync(failures);
 
         // The chat window boots the same host with its own page; it is checked
         // the same way, keys only, no turn submitted.
@@ -103,11 +104,41 @@ public static class ConfigTuiApp
 
         walker.JumpToStep(ConfigStep.Options);
         if (walker.Step != ConfigStep.Options) failures.Add("could not reach the Options step");
-        if (walker.SelectedKey != ConfigTuiModel.StepFields[2][0])
-            failures.Add($"Options opened on '{walker.SelectedKey}', expected '{ConfigTuiModel.StepFields[2][0]}'");
+        if (walker.SelectedKey != ConfigTuiModel.StepFields[(int)ConfigStep.Options][0])
+            failures.Add($"Options opened on '{walker.SelectedKey}', expected '{ConfigTuiModel.StepFields[(int)ConfigStep.Options][0]}'");
 
         walker.JumpToStep(ConfigStep.Connection);
         if (walker.Step != ConfigStep.Connection) failures.Add("could not get back to the Connection step");
+    }
+
+    /// <summary>
+    /// The Reasoning step's model row: Enter asks the endpoint, the list overlays
+    /// the step, a pick lands in reasoningModel, and Esc closes the list without
+    /// leaving the step.
+    /// </summary>
+    private static async Task CheckReasoningPickerAsync(List<string> failures)
+    {
+        var model = new ConfigTuiModel(new AgentConfig());
+        model.JumpToStep(ConfigStep.Reasoning);
+        model.HandleKey(new ConsoleKeyInfo('\0', ConsoleKey.End, false, false, false));     // reasoningModel row
+
+        if (model.SelectedKey != ConfigTuiModel.ReasoningModelField)
+            failures.Add($"End on the Reasoning step selected '{model.SelectedKey}'");
+
+        if (model.HandleKey(new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)) != TuiEffect.FetchModels)
+            failures.Add("Enter on reasoningModel did not request a listing");
+
+        model.CompleteModelFetch(await model.ModelCatalog(model.ProbeTarget, CancellationToken.None));
+        if (!model.Picking) { failures.Add("the reasoning listing did not open the picker"); return; }
+
+        model.HandleKey(new ConsoleKeyInfo('\0', ConsoleKey.Home, false, false, false));
+        model.HandleKey(new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false));
+        if (model.Value(ConfigTuiModel.ReasoningModelField) != "echo")
+            failures.Add($"picking left reasoningModel as '{model.Value(ConfigTuiModel.ReasoningModelField)}', expected 'echo'");
+
+        model.HandleKey(new ConsoleKeyInfo('\0', ConsoleKey.Escape, false, false, false));
+        if (model.Picking) failures.Add("Esc did not close the reasoning list");
+        if (model.Step != ConfigStep.Reasoning) failures.Add("Esc on the list left the Reasoning step");
     }
 
     private static async Task CheckModelPickerAsync(List<string> failures)

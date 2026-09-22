@@ -13,6 +13,10 @@ public sealed class Credentials
     /// <summary>The TypeSafe / Jev key used by smart mode. A different service, a different key.</summary>
     [JsonPropertyName("jevApiKey")]
     public string? JevApiKey { get; set; }
+
+    /// <summary>The reasoning model's key, when its endpoint is not the provider's. Null means "use the provider key".</summary>
+    [JsonPropertyName("reasoningApiKey")]
+    public string? ReasoningApiKey { get; set; }
 }
 
 /// <summary>
@@ -28,7 +32,7 @@ public static class CredentialStore
     public static string Path => System.IO.Path.Combine(AppPaths.BaseDir, "credentials.json");
 
     /// <summary>Names the keys this store holds, so callers never pass a bare string.</summary>
-    public enum Slot { Provider, Jev }
+    public enum Slot { Provider, Jev, Reasoning }
 
     /// <summary>Everything in the file, or an empty set when there is nothing yet.</summary>
     public static Credentials LoadAll()
@@ -49,7 +53,8 @@ public static class CredentialStore
     /// <summary>One stored key, or null when there is none.</summary>
     public static string? Load(Slot slot = Slot.Provider)
     {
-        var key = slot == Slot.Jev ? LoadAll().JevApiKey : LoadAll().ApiKey;
+        var all = LoadAll();
+        var key = slot switch { Slot.Jev => all.JevApiKey, Slot.Reasoning => all.ReasoningApiKey, _ => all.ApiKey };
         return string.IsNullOrWhiteSpace(key) ? null : key.Trim();
     }
 
@@ -62,8 +67,12 @@ public static class CredentialStore
         AppPaths.EnsureBaseDir();
 
         var all = LoadAll();
-        if (slot == Slot.Jev) all.JevApiKey = apiKey.Trim();
-        else all.ApiKey = apiKey.Trim();
+        switch (slot)
+        {
+            case Slot.Jev: all.JevApiKey = apiKey.Trim(); break;
+            case Slot.Reasoning: all.ReasoningApiKey = apiKey.Trim(); break;
+            default: all.ApiKey = apiKey.Trim(); break;
+        }
 
         File.WriteAllText(Path, JsonSerializer.Serialize(all, AgentOneJson.Default.Credentials));
         RestrictToOwner(Path);
@@ -75,10 +84,14 @@ public static class CredentialStore
         if (!File.Exists(Path)) return;
 
         var all = LoadAll();
-        if (slot == Slot.Jev) all.JevApiKey = null;
-        else all.ApiKey = null;
+        switch (slot)
+        {
+            case Slot.Jev: all.JevApiKey = null; break;
+            case Slot.Reasoning: all.ReasoningApiKey = null; break;
+            default: all.ApiKey = null; break;
+        }
 
-        if (all.ApiKey is null && all.JevApiKey is null) { Clear(); return; }
+        if (all.ApiKey is null && all.JevApiKey is null && all.ReasoningApiKey is null) { Clear(); return; }
 
         File.WriteAllText(Path, JsonSerializer.Serialize(all, AgentOneJson.Default.Credentials));
         RestrictToOwner(Path);

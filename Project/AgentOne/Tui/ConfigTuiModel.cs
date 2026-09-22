@@ -23,10 +23,16 @@ public enum ConfigStep
     Connection = 0,
     /// <summary>What that endpoint can run — asked, not typed.</summary>
     Model = 1,
-    /// <summary>How the loop behaves. Safe defaults, so it comes last.</summary>
-    Options = 2,
+    /// <summary>
+    /// The slow, strong model a hard question is escalated to. Optional, and it
+    /// sits right after the everyday model because it is the same kind of thing:
+    /// an endpoint, a key, a model id — each defaulting to the step before.
+    /// </summary>
+    Reasoning = 2,
+    /// <summary>How the loop behaves. Safe defaults, so it comes late.</summary>
+    Options = 3,
     /// <summary>Smart mode's own service and key. Independent of everything above.</summary>
-    Smart = 3
+    Smart = 4
 }
 
 /// <summary>
@@ -43,13 +49,14 @@ public enum ConfigStep
 /// </summary>
 public sealed class ConfigTuiModel
 {
-    public static readonly string[] StepTitles = ["Connection", "Model", "Options", "Smart"];
+    public static readonly string[] StepTitles = ["Connection", "Model", "Reasoning", "Options", "Smart"];
 
     /// <summary>The config keys each step owns. The Model step is the picker, so it has none.</summary>
     public static readonly string[][] StepFields =
     [
         ["provider", "baseUrl", "apiKey", "apiKeyEnv"],
         [],
+        ["reasoningBaseUrl", "reasoningApiKey", "reasoningModel"],
         ["maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "saveSessions"],
         ["smartMode", "jevApiKey", "jevBaseUrl", "jevModel", "jevConfidenceFloor"]
     ];
@@ -61,7 +68,8 @@ public sealed class ConfigTuiModel
     public static readonly Dictionary<string, CredentialStore.Slot> CredentialFields = new(StringComparer.Ordinal)
     {
         [ApiKeyField] = CredentialStore.Slot.Provider,
-        [JevApiKeyField] = CredentialStore.Slot.Jev
+        [JevApiKeyField] = CredentialStore.Slot.Jev,
+        [ReasoningApiKeyField] = CredentialStore.Slot.Reasoning
     };
 
     /// <summary>Keys typed on this screen, held until save. Absent means untouched.</summary>
@@ -95,6 +103,16 @@ public sealed class ConfigTuiModel
 
     /// <summary>The config key the cursor is on — "model" while the Model step is showing.</summary>
     public string SelectedKey => Fields.Count == 0 ? "model" : Fields[Math.Clamp(Selected, 0, Fields.Count - 1)];
+
+    /// <summary>Which config key the picker fills: the everyday model, or the reasoning one on its step.</summary>
+    public string PickKey => Step == ConfigStep.Reasoning ? ReasoningModelField : "model";
+
+    /// <summary>
+    /// The config a probe (`t`, `l`, Enter on a model row) should use: on the
+    /// Reasoning step that is the derived config — its endpoint, its key, its
+    /// model — so what is tested is exactly what a turn would escalate to.
+    /// </summary>
+    public AgentConfig ProbeTarget => Step == ConfigStep.Reasoning ? Config.ForReasoning() : Config;
 
     public bool Editing { get; private set; }
 
@@ -141,12 +159,25 @@ public sealed class ConfigTuiModel
     /// The apiKey row is not a config field — it is the credential store, shown
     /// masked. Everything else comes straight from the config.
     /// </summary>
-    public string Value(string key) => CredentialFields.TryGetValue(key, out var slot)
-        ? CredentialStore.Mask(_pendingKeys.TryGetValue(key, out var typed) ? typed : CredentialStore.Load(slot))
-        : Config.Get(key) ?? "";
+    public string Value(string key)
+    {
+        if (!CredentialFields.TryGetValue(key, out var slot)) return Config.Get(key) ?? "";
+
+        var stored = _pendingKeys.TryGetValue(key, out var typed) ? typed : CredentialStore.Load(slot);
+
+        // The reasoning key is optional in a way the others are not: nothing
+        // stored means the provider key is used, and the row should say so.
+        return stored is null && key == ReasoningApiKeyField ? "(same as provider key)" : CredentialStore.Mask(stored);
+    }
 
     /// <summary>The pseudo-field for the LLM provider key.</summary>
     public const string ApiKeyField = "apiKey";
+
+    /// <summary>The pseudo-field for the reasoning endpoint's own key, when it has one.</summary>
+    public const string ReasoningApiKeyField = "reasoningApiKey";
+
+    /// <summary>The reasoning model row: Enter lists, e types.</summary>
+    public const string ReasoningModelField = "reasoningModel";
 
     /// <summary>The pseudo-field for the TypeSafe key that smart mode will use.</summary>
     public const string JevApiKeyField = "jevApiKey";
@@ -174,6 +205,9 @@ public sealed class ConfigTuiModel
         ConfigStep.Smart when SelectedKey == JevApiKeyField && !SmartKeyPresent =>
             "smart mode needs a TypeSafe key — paste it here, then press h to check it",
 
+        ConfigStep.Reasoning when Picking =>
+            "pick the strong model · Enter takes it, Esc closes the list, e types an id by hand",
+
         ConfigStep.Model when Picking =>
             "the list came from the endpoint itself — picking from it cannot be a typo",
         ConfigStep.Model =>
@@ -186,6 +220,9 @@ public sealed class ConfigTuiModel
         "provider" => "echo runs offline and exercises the real loop · openai talks to any OpenAI-compatible endpoint",
         "baseUrl" => "https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama) · http://localhost:1234/v1 (LM Studio)",
         ApiKeyField => "paste the key itself here — it is stored in ~/.agent-one/credentials.json, never in config.json",
+        "reasoningBaseUrl" => "empty = the same endpoint as the connection · set it only when the strong model lives elsewhere",
+        ReasoningApiKeyField => "empty = the provider key · paste one only when that endpoint needs its own",
+        ReasoningModelField => "the slow, strong model hard questions escalate to · Enter lists the endpoint's models, e types an id · empty = never escalate",
         JevApiKeyField => "the TypeSafe (Jev) key for smart mode — a different service, stored the same way · h to check it",
         "jevBaseUrl" => "TypeSafe System One API root — https://api.typesafe.ai/v1",
         "jevModel" => "which System One model answers · jev-latest",
@@ -240,14 +277,25 @@ public sealed class ConfigTuiModel
                 return TuiEffect.None;
 
             case ConsoleKey.T:
+                if (Step == ConfigStep.Reasoning && !Config.HasReasoningModel)
+                {
+                    Status = "✗ no reasoning model yet — Enter on reasoningModel lists what the endpoint offers";
+                    return TuiEffect.None;
+                }
                 Busy = true;
-                Status = $"testing {Config.Provider} → {Config.Model} …";
+                Status = $"testing {ProbeTarget.Provider} → {ProbeTarget.Model} …";
                 return TuiEffect.RunTest;
 
             case ConsoleKey.L:
-                Busy = true;
-                Status = $"asking {Config.BaseUrl}/models …";
-                return TuiEffect.FetchModels;
+                return FetchForPick();
+
+            // On the Reasoning step the list is an overlay, and Esc closes it
+            // before it means "back a step".
+            case ConsoleKey.Escape when Picking && Step == ConfigStep.Reasoning:
+                Picking = false;
+                PickOptions = [];
+                Status = "list closed";
+                return TuiEffect.None;
 
             case ConsoleKey.H when Step == ConfigStep.Smart:
                 Busy = true;
@@ -265,7 +313,17 @@ public sealed class ConfigTuiModel
                 return TuiEffect.None;
         }
 
-        return Step == ConfigStep.Model ? HandleModelStepKey(key) : HandleFieldKey(key);
+        return Step == ConfigStep.Model || Picking ? HandleModelStepKey(key) : HandleFieldKey(key);
+    }
+
+    /// <summary>Asks the step's endpoint for its models; the shell reports back via <see cref="CompleteModelFetch"/>.</summary>
+    private TuiEffect FetchForPick()
+    {
+        Busy = true;
+        Picking = false;
+        PickOptions = [];
+        Status = $"asking {ProbeTarget.BaseUrl}/models …";
+        return TuiEffect.FetchModels;
     }
 
     private TuiEffect HandleFieldKey(ConsoleKeyInfo key)
@@ -294,6 +352,13 @@ public sealed class ConfigTuiModel
             case ConsoleKey.RightArrow:
                 return Cycled(+1);
 
+            // The reasoning model row works like the Model step: Enter asks the
+            // endpoint, because a model id that came from the endpoint cannot be
+            // a typo; e is the way to type one anyway.
+            case ConsoleKey.Enter when SelectedKey == ReasoningModelField:
+                return FetchForPick();
+
+            case ConsoleKey.E when SelectedKey == ReasoningModelField:
             case ConsoleKey.Enter:
                 BeginEdit();
                 return TuiEffect.None;
@@ -439,8 +504,9 @@ public sealed class ConfigTuiModel
 
         // The picker stays open — it is this step's body, and the choice is now
         // marked (current), so a mis-pick is one keystroke to undo.
-        if (Config.TrySet("model", chosen, out var error))
-            Status = $"model = {chosen}" + (Dirty ? "  (unsaved)" : "") + " · Tab for options";
+        if (Config.TrySet(PickKey, chosen, out var error))
+            Status = $"{PickKey} = {chosen}" + (Dirty ? "  (unsaved)" : "")
+                     + (Step == ConfigStep.Reasoning ? " · Esc closes the list" : " · Tab for the reasoning model");
         else
             Status = "✗ " + error;
     }
@@ -467,7 +533,7 @@ public sealed class ConfigTuiModel
 
         // Start on the model already configured, so Enter twice is a no-op
         // rather than a surprise.
-        var current = options.IndexOf(Value("model"));
+        var current = options.IndexOf(Value(PickKey));
         PickIndex = current >= 0 ? current : 0;
 
         Picking = true;
@@ -500,6 +566,9 @@ public sealed class ConfigTuiModel
 
     private void BeginEdit()
     {
+        // The list is an overlay on the Reasoning step; typing replaces it.
+        if (Step == ConfigStep.Reasoning) { Picking = false; PickOptions = []; }
+
         Editing = true;
         // The key row shows a mask, which would be nonsense to edit in place.
         EditBuffer = CredentialFields.ContainsKey(SelectedKey) ? "" : Value(SelectedKey);

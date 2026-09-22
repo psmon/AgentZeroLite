@@ -20,6 +20,15 @@ public static class ApiKey
     /// </summary>
     public static ResolvedApiKey Resolve(AgentConfig config)
     {
+        // A config derived for the reasoning model asks for its own slot first;
+        // an empty one means "the same key as the everyday model", which is what
+        // one gateway serving two model sizes needs.
+        if (config.KeySlot == CredentialStore.Slot.Reasoning)
+        {
+            var own = CredentialStore.Load(CredentialStore.Slot.Reasoning);
+            if (!string.IsNullOrWhiteSpace(own)) return new ResolvedApiKey(own, "credentials.json (reasoning)");
+        }
+
         var stored = CredentialStore.Load();
         if (!string.IsNullOrWhiteSpace(stored)) return new ResolvedApiKey(stored, "credentials.json");
 

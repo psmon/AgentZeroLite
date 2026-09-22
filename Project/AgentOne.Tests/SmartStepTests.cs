@@ -87,10 +87,10 @@ public class SmartStepTests : IDisposable
     // --- the step ---------------------------------------------------------
 
     [Fact]
-    public void TheStackHasAFourthStep()
+    public void SmartIsTheLastOfFiveSteps()
     {
-        Assert.Equal(["Connection", "Model", "Options", "Smart"], ConfigTuiModel.StepTitles);
-        Assert.Contains(ConfigTuiModel.JevApiKeyField, ConfigTuiModel.StepFields[3]);
+        Assert.Equal(["Connection", "Model", "Reasoning", "Options", "Smart"], ConfigTuiModel.StepTitles);
+        Assert.Contains(ConfigTuiModel.JevApiKeyField, ConfigTuiModel.StepFields[(int)ConfigStep.Smart]);
     }
 
     [Fact]

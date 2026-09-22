@@ -252,9 +252,13 @@ envelope per turn) so it stays extractable into its own repo. The intended
 integration is process-level: launch `agent-one --json` and read one object off
 stdout, the way the GUI launches `AgentZeroWearable.exe`.
 
-**Settings TUI** (`agent-one tui` / `agent-one config tui`) — a three-step stack
+**Settings TUI** (`agent-one tui` / `agent-one config tui`) — a five-step stack
 over `~/.agent-one/config.json`: **1. Connection** (provider, baseUrl, apiKeyEnv)
-→ **2. Model** → **3. Options**. The order is the dependency: you cannot pick a
+→ **2. Model** → **3. Reasoning** (the slow, strong model hard questions are
+escalated to: `reasoningBaseUrl` / `reasoningApiKey` / `reasoningModel`, each
+empty meaning "same as the step before"; `AgentConfig.ForReasoning()` derives
+the config a provider needs, and `ApiKey.Resolve` honours its `KeySlot`) →
+**4. Options** → **5. Smart**. The order is the dependency: you cannot pick a
 model until the endpoint and key are right, and the endpoint is what knows which
 models exist. **Arriving at step 2 calls `GET {baseUrl}/models`**, which is
 deliberately also the health check for step 1 — one request covers base URL,

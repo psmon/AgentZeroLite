@@ -11,10 +11,13 @@ public sealed class AuthCommand
 {
     public async Task<int> ExecuteAsync(string[] args, CancellationToken ct)
     {
-        // `--jev` addresses the TypeSafe key instead of the provider key. Two
-        // services, two keys, one command — with the slot named, never guessed.
-        var slot = args.Contains("--jev") ? CredentialStore.Slot.Jev : CredentialStore.Slot.Provider;
-        var rest = args.Where(a => a != "--jev").ToArray();
+        // `--jev` addresses the TypeSafe key and `--reasoning` the reasoning
+        // model's, instead of the provider key. Three keys, one command — with
+        // the slot named, never guessed.
+        var slot = args.Contains("--jev") ? CredentialStore.Slot.Jev
+            : args.Contains("--reasoning") ? CredentialStore.Slot.Reasoning
+            : CredentialStore.Slot.Provider;
+        var rest = args.Where(a => a is not ("--jev" or "--reasoning")).ToArray();
         var sub = rest.Length > 0 ? rest[0] : "show";
 
         return sub switch
@@ -44,7 +47,10 @@ public sealed class AuthCommand
         var jev = CredentialStore.Load(CredentialStore.Slot.Jev)
                   ?? Environment.GetEnvironmentVariable("TYPESAFE_API_KEY");
 
+        var reasoning = CredentialStore.Load(CredentialStore.Slot.Reasoning);
+
         Console.WriteLine($"provider key   {CredentialStore.Mask(resolved.Value)}   ({resolved.Source})");
+        Console.WriteLine($"reasoning key  {(reasoning is null ? "(same as provider)" : CredentialStore.Mask(reasoning))}   (reasoning model · agent-one auth set --reasoning)");
         Console.WriteLine($"typesafe key   {CredentialStore.Mask(jev)}   (smart mode · agent-one auth check)");
         Console.WriteLine($"stored in      {CredentialStore.Path}" +
                           (File.Exists(CredentialStore.Path) ? "" : "  (no file)"));
@@ -59,7 +65,12 @@ public sealed class AuthCommand
     private static async Task<int> SetAsync(CredentialStore.Slot slot, CancellationToken ct)
     {
         string? key;
-        var label = slot == CredentialStore.Slot.Jev ? "TypeSafe (Jev) key" : "API key";
+        var label = slot switch
+        {
+            CredentialStore.Slot.Jev => "TypeSafe (Jev) key",
+            CredentialStore.Slot.Reasoning => "reasoning model key",
+            _ => "API key"
+        };
 
         if (Console.IsInputRedirected)
         {
@@ -86,7 +97,7 @@ public sealed class AuthCommand
     private static int Clear(CredentialStore.Slot slot)
     {
         CredentialStore.Clear(slot);
-        Console.WriteLine($"forgot the {(slot == CredentialStore.Slot.Jev ? "TypeSafe" : "provider")} key");
+        Console.WriteLine($"forgot the {slot switch { CredentialStore.Slot.Jev => "TypeSafe", CredentialStore.Slot.Reasoning => "reasoning", _ => "provider" }} key");
         return 0;
     }
 
@@ -157,11 +168,12 @@ public sealed class AuthCommand
     public static void PrintHelp()
     {
         Console.WriteLine("""
-            agent-one auth show          Both keys, masked, with where they come from
+            agent-one auth show          All keys, masked, with where they come from
             agent-one auth set           Store the provider key — no echo, or piped on stdin
+            agent-one auth set --reasoning  Store the reasoning model's key (only when its endpoint needs its own)
             agent-one auth set --jev     Store the TypeSafe (Jev) key for smart mode
             agent-one auth check         Verify the TypeSafe key with one real question
-            agent-one auth clear [--jev] Forget one key, keeping the other
+            agent-one auth clear [--jev|--reasoning]  Forget one key, keeping the others
             agent-one auth import        Move a key pasted into apiKeyEnv into the store
 
             The key is never written to config.json. It lives in

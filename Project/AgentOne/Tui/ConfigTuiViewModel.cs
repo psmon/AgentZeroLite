@@ -77,7 +77,7 @@ public sealed class ConfigTuiViewModel : ReactiveViewModel
         Llm.ModelCatalogResult result;
         try
         {
-            result = await Model.ModelCatalog(Model.Config, _cts.Token);
+            result = await Model.ModelCatalog(Model.ProbeTarget, _cts.Token);
         }
         catch (Exception ex)
         {
@@ -93,7 +93,7 @@ public sealed class ConfigTuiViewModel : ReactiveViewModel
         string message;
         try
         {
-            message = await Model.ConnectionTest(Model.Config, _cts.Token);
+            message = await Model.ConnectionTest(Model.ProbeTarget, _cts.Token);
         }
         catch (Exception ex)
         {

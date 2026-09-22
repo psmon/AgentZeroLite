@@ -57,7 +57,7 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
             .WithChild(BuildStepBar())
             .WithChild(new TextNode("").Height(1));
 
-        var body = ViewModel.Model.Step == ConfigStep.Model ? BuildModelStep() : BuildFieldRows();
+        var body = ViewModel.Model.Step == ConfigStep.Model || ViewModel.Model.Picking ? BuildModelStep() : BuildFieldRows();
 
         foreach (var row in body) rows = rows.WithChild(row);
 
@@ -110,8 +110,17 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
             // A key being typed is echoed as dots: shoulder-surfing a settings
             // screen should not be enough to take it.
             var value = editing
-                ? (key == ConfigTuiModel.ApiKeyField ? new string('•', model.EditBuffer.Length) : model.EditBuffer) + "▌"
+                ? (ConfigTuiModel.CredentialFields.ContainsKey(key) ? new string('•', model.EditBuffer.Length) : model.EditBuffer) + "▌"
                 : model.Value(key);
+
+            // Empty means "inherit" on the Reasoning step — say so instead of showing a blank.
+            if (!editing && value.Length == 0)
+                value = key switch
+                {
+                    "reasoningBaseUrl" => "(same as the connection)",
+                    ConfigTuiModel.ReasoningModelField => "(none — Enter to pick, e to type)",
+                    _ => value
+                };
 
             var marker = selected ? "›" : " ";
             var tail = model.IsCyclable(key) && selected && !editing ? "  ←→" : "";
@@ -139,7 +148,7 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
 
         if (model.Editing)
         {
-            rows.Add(new TextNode($"› {"model".PadRight(KeyColumn)}{model.EditBuffer}▌")
+            rows.Add(new TextNode($"› {model.PickKey.PadRight(KeyColumn)}{model.EditBuffer}▌")
                 .WithForeground(Color.BrightYellow).Height(1));
             return rows;
         }
@@ -152,7 +161,7 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
 
         if (!model.Picking)
         {
-            rows.Add(new TextNode($"  model            {model.Value("model")}").WithForeground(Color.White).Height(1));
+            rows.Add(new TextNode($"  {model.PickKey.PadRight(KeyColumn)}{model.Value(model.PickKey)}").WithForeground(Color.White).Height(1));
             rows.Add(new TextNode("").Height(1));
             rows.Add(new TextNode("  no list from the endpoint — see the line below")
                 .WithForeground(Color.BrightRed).Height(1));
@@ -165,7 +174,7 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
         {
             var option = model.PickOptions[i];
             var selected = i == model.PickIndex;
-            var inUse = option == model.Value("model");
+            var inUse = option == model.Value(model.PickKey);
 
             var colour = selected ? Color.BrightCyan
                 : option == ConfigTuiModel.PickManualEntry ? Color.BrightBlack
@@ -204,10 +213,15 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
         // wrong keys. The rest of the bindings live in the hint line above.
         var sb = new StringBuilder();
 
-        if (model.Step == ConfigStep.Model)
+        if (model.Step == ConfigStep.Model || model.Picking)
         {
             if (model.Picking) sb.Append("↑↓ pick · Enter take · ");
+            if (model.Picking && model.Step == ConfigStep.Reasoning) sb.Append("Esc close · ");
             sb.Append("e type · ");
+        }
+        else if (model.SelectedKey == ConfigTuiModel.ReasoningModelField)
+        {
+            sb.Append("↑↓ move · Enter list · e type · ");
         }
         else
         {

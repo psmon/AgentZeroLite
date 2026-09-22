@@ -73,9 +73,49 @@ public sealed class AgentConfig
     [JsonPropertyName("saveSessions")]
     public bool SaveSessions { get; set; } = true;
 
+    /// <summary>
+    /// Endpoint of the reasoning model — the slow, strong one a hard question is
+    /// escalated to. Empty means the same endpoint as <see cref="BaseUrl"/>,
+    /// which is the common case: one gateway, two model sizes.
+    /// </summary>
+    [JsonPropertyName("reasoningBaseUrl")]
+    public string ReasoningBaseUrl { get; set; } = "";
+
+    /// <summary>
+    /// The reasoning model itself. Empty means there is none, and nothing is
+    /// ever escalated. The everyday model (<see cref="Model"/>) is small and
+    /// fast and answers first; this one is asked only when the decision engine
+    /// judges the problem needs it.
+    /// </summary>
+    [JsonPropertyName("reasoningModel")]
+    public string ReasoningModel { get; set; } = "";
+
+    /// <summary>Which credential the provider built from this config authenticates with. Not persisted.</summary>
+    [JsonIgnore]
+    public CredentialStore.Slot KeySlot { get; private set; } = CredentialStore.Slot.Provider;
+
+    /// <summary>True when a reasoning model is configured to escalate to.</summary>
+    [JsonIgnore]
+    public bool HasReasoningModel => ReasoningModel.Length > 0;
+
+    /// <summary>
+    /// This config with the reasoning model in the everyday model's place, so
+    /// the same provider code talks to it. Endpoint and key fall back to the
+    /// Connection step's when the Reasoning step left them empty.
+    /// </summary>
+    public AgentConfig ForReasoning()
+    {
+        var derived = (AgentConfig)MemberwiseClone();
+        derived.KeySlot = CredentialStore.Slot.Reasoning;
+        derived.Model = ReasoningModel;
+        if (ReasoningBaseUrl.Length > 0) derived.BaseUrl = ReasoningBaseUrl;
+        return derived;
+    }
+
     public static readonly string[] Keys =
     [
         "provider", "baseUrl", "model", "apiKeyEnv",
+        "reasoningBaseUrl", "reasoningModel",
         "maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "saveSessions",
         "jevBaseUrl", "jevModel", "smartMode", "jevConfidenceFloor"
     ];
@@ -86,6 +126,8 @@ public sealed class AgentConfig
         "baseUrl"        => BaseUrl,
         "model"          => Model,
         "apiKeyEnv"      => ApiKeyEnv,
+        "reasoningBaseUrl" => ReasoningBaseUrl,
+        "reasoningModel" => ReasoningModel,
         "maxSteps"       => MaxSteps.ToString(),
         "temperature"    => Temperature.ToString("0.###"),
         "timeoutSeconds" => TimeoutSeconds.ToString(),
@@ -130,6 +172,15 @@ public sealed class AgentConfig
                     return false;
                 }
                 ApiKeyEnv = value;
+                return true;
+            case "reasoningBaseUrl":
+                // Empty is a value here: "same endpoint as the connection".
+                if (value.Length > 0 && !Uri.TryCreate(value, UriKind.Absolute, out _))
+                { error = "reasoningBaseUrl must be an absolute URL, or empty for the same endpoint"; return false; }
+                ReasoningBaseUrl = value.TrimEnd('/');
+                return true;
+            case "reasoningModel":
+                ReasoningModel = value.Trim();          // empty turns escalation off
                 return true;
             case "maxSteps":
                 if (!int.TryParse(value, out var steps) || steps is < 1 or > 100) { error = "maxSteps must be 1..100"; return false; }

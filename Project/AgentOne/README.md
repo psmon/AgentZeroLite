@@ -131,21 +131,23 @@ $ agent-one run "hi" -p echo --json
 
 ## Settings TUI
 
-`agent-one tui` (or `agent-one config tui`) walks the settings as a three-step
+`agent-one tui` (or `agent-one config tui`) walks the settings as a five-step
 stack, in the order they actually depend on each other:
 
 ```
-1. Connection  →  2. Model  →  3. Options
+1. Connection  →  2. Model  →  3. Reasoning  →  4. Options  →  5. Smart
 ```
 
 You cannot sensibly pick a model before the endpoint and key are right, and the
-endpoint is the thing that knows which models exist — so step 2 asks it.
+endpoint is the thing that knows which models exist — so step 2 asks it. Step 3
+is the same shape again for the stronger model, with everything defaulting to
+the step before.
 
 ### 1. Connection — where and who
 
 ```
 ╭─ agent-one config ──────────────────────────────────────────╮
-│[1. Connection] →  2. Model     →  3. Options                │
+│[1. Connection] →  2. Model     →  3. Reasoning  →  4. Options → │
 │                                                             │
 │› provider        openai  ←→                                 │
 │  baseUrl         https://a1.example.com/v1                  │
@@ -174,7 +176,7 @@ Lookup order: the stored key first, then `$apiKeyEnv`.
 
 ```
 ╭─ agent-one config ──────────────────────────────────────────╮
-│ 1. Connection → [2. Model]     →  3. Options                │
+│ 1. Connection → [2. Model]     →  3. Reasoning  →  4. Options → │
 │                                                             │
 │  google/gemma-4-e4b                                         │
 │› text-embedding-nomic-embed-text-v1.5                       │
@@ -207,16 +209,46 @@ answers but offers nothing is a misconfiguration, and saying so is more use than
 a blank box. The `echo` provider lists itself, so the whole flow is walkable
 offline with no key at all.
 
-### 3. Options — how the loop behaves
+### 3. Reasoning — the strong, slow model
 
-`maxSteps`, `temperature`, `timeoutSeconds`, `saveSessions`. All have working
-defaults, which is why they come last.
-
-### 4. Smart — plan first, then decide
+The everyday model is small and fast and answers first. This step names a
+second, stronger model that a hard question can be escalated to — the
+escalation itself is smart mode's job; this is only where it points.
 
 ```
 ╭─ agent-one config ──────────────────────────────────────────╮
-│ 1. Connection →  2. Model  →  3. Options  → [4. Smart]      │
+│ 1. Connection →  2. Model  → [3. Reasoning] →  4. Options → │
+│                                                             │
+│  reasoningBaseUrl (same as the connection)                  │
+│  reasoningApiKey  (same as provider key)                    │
+│› reasoningModel   (none — Enter to pick, e to type)         │
+╰─────────────────────────────────────────────────────────────╯
+ the slow, strong model hard questions escalate to · Enter lists the endpoint's models, e types an id · empty = never escalate
+ ↑↓ move · Enter list · e type · b back · Tab next · s save · t test · q quit
+```
+
+Every row defaults to the step before: an empty `reasoningBaseUrl` means the
+same endpoint, an empty `reasoningApiKey` means the provider key — the common
+case of one gateway serving two model sizes needs nothing but the model id. An
+empty `reasoningModel` means there is no strong model and nothing is ever
+escalated.
+
+`Enter` on `reasoningModel` asks *that* endpoint for its list, exactly as step 2
+does, and the list overlays the step: `Enter` takes one, `Esc` closes it, `e`
+types an id by hand. `t` on this step tests the reasoning model, not the
+everyday one. `agent-one auth set --reasoning` stores the key from the command
+line; `agent-one config set reasoningModel <id>` does the rest without a screen.
+
+### 4. Options — how the loop behaves
+
+`maxSteps`, `temperature`, `timeoutSeconds`, `saveSessions`. All have working
+defaults, which is why they come late.
+
+### 5. Smart — plan first, then decide
+
+```
+╭─ agent-one config ──────────────────────────────────────────╮
+│ … →  3. Reasoning  →  4. Options  → [5. Smart]              │
 │                                                             │
 │› smartMode        off  ←→                                   │
 │  jevApiKey        ts-abc…w9k2                               │
