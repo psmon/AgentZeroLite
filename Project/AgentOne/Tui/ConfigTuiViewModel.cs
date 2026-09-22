@@ -45,7 +45,27 @@ public sealed class ConfigTuiViewModel : ReactiveViewModel
             case TuiEffect.RunTest:
                 _ = RunTestAsync();
                 break;
+
+            case TuiEffect.FetchModels:
+                _ = FetchModelsAsync();
+                break;
         }
+    }
+
+    private async Task FetchModelsAsync()
+    {
+        Llm.ModelCatalogResult result;
+        try
+        {
+            result = await Model.ModelCatalog(Model.Config, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            result = Llm.ModelCatalogResult.Failure(ex.Message);
+        }
+
+        Model.CompleteModelFetch(result);
+        Revision.Value++;
     }
 
     private async Task RunTestAsync()

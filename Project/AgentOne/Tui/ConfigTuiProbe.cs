@@ -14,6 +14,39 @@ namespace AgentOne.Tui;
 /// </summary>
 public static class ConfigTuiProbe
 {
+    /// <summary>
+    /// The `l` key's work, and what `Enter` on the model row does: ask the
+    /// endpoint what it can run. One request exercises the base URL, the network
+    /// path and the API key at once, so a short list is a green light and an
+    /// empty one names the thing that is wrong.
+    /// </summary>
+    public static async Task<ModelCatalogResult> ListModelsAsync(AgentConfig config, CancellationToken ct)
+    {
+        IChatProvider provider;
+        try
+        {
+            provider = ChatProviderFactory.Create(config);
+        }
+        catch (ChatProviderException ex)
+        {
+            return ModelCatalogResult.Failure(ex.Message);
+        }
+
+        using var disposable = provider as IDisposable;
+
+        if (provider is not IModelCatalog catalog)
+            return ModelCatalogResult.Failure($"the {provider.Name} provider cannot list models");
+
+        try
+        {
+            return await catalog.ListModelsAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return ModelCatalogResult.Failure("listing cancelled");
+        }
+    }
+
     public static async Task<string> DefaultAsync(AgentConfig config, CancellationToken ct)
     {
         IChatProvider provider;

@@ -254,7 +254,11 @@ stdout, the way the GUI launches `AgentZeroWearable.exe`.
 
 **Settings TUI** (`agent-one tui` / `agent-one config tui`) — a full-screen editor
 for `~/.agent-one/config.json` with a `t` key that sends one request through the
-settings as they stand. Built on **Termina** (`Tui/`), the one TUI measured to
+settings as they stand, and `Enter` on the `model` row (or `l` anywhere) that
+lists `GET {baseUrl}/models` and lets you pick. That listing is deliberately
+also the health check — one request covers base URL, network and API key — so an
+empty or rejected list is reported as a failure naming both suspects rather than
+as an empty picker. Built on **Termina** (`Tui/`), the one TUI measured to
 survive Native AOT here — see `Docs/agent-netclaw/README.md`. The rules live in
 `Tui/ConfigTuiModel.cs`, a state machine over `ConsoleKeyInfo` with no terminal
 in it, so the key map itself is unit tested; the Termina page only projects it.

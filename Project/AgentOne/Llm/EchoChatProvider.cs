@@ -10,11 +10,19 @@ namespace AgentOne.Llm;
 /// caller drive one specific tool call without an LLM:
 ///   agent-one run '!tool {"tool":"list_files","args":{"path":"."}}'
 /// </summary>
-public sealed class EchoChatProvider : IChatProvider
+public sealed class EchoChatProvider : IChatProvider, IModelCatalog
 {
     public const string ToolPassthroughPrefix = "!tool ";
 
     public string Name => "echo";
+
+    /// <summary>
+    /// Echo has no endpoint to ask, so it answers with its own name. That keeps
+    /// the model picker walkable offline — the flow can be learned and tested
+    /// without a key, and the list is honestly labelled as local.
+    /// </summary>
+    public Task<ModelCatalogResult> ListModelsAsync(CancellationToken ct) =>
+        Task.FromResult(ModelCatalogResult.Success(["echo"], "the echo provider runs locally — nothing to list"));
 
     public Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct)
     {

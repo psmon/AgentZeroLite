@@ -1,3 +1,4 @@
+using AgentOne.Llm;
 using AgentOne.Services;
 
 namespace AgentOne.Tui;
@@ -8,7 +9,9 @@ public enum TuiEffect
     None,
     Quit,
     /// <summary>Kick off the connection probe; the shell reports back via <see cref="ConfigTuiModel.CompleteTest"/>.</summary>
-    RunTest
+    RunTest,
+    /// <summary>Ask the endpoint what models it has; the shell reports back via <see cref="ConfigTuiModel.CompleteModelFetch"/>.</summary>
+    FetchModels
 }
 
 /// <summary>
@@ -48,8 +51,19 @@ public sealed class ConfigTuiModel
 
     public string EditBuffer { get; private set; } = "";
 
-    /// <summary>True while the connection probe is in flight; keys other than quit are ignored.</summary>
-    public bool Testing { get; private set; }
+    /// <summary>True while a request is in flight; keys other than quit are ignored.</summary>
+    public bool Busy { get; private set; }
+
+    /// <summary>True while the model list is on screen.</summary>
+    public bool Picking { get; private set; }
+
+    /// <summary>Model ids offered by the endpoint, plus a final "type it myself" entry.</summary>
+    public IReadOnlyList<string> PickOptions { get; private set; } = [];
+
+    public int PickIndex { get; private set; }
+
+    /// <summary>The sentinel last row of the picker — choosing it falls back to free-text entry.</summary>
+    public const string PickManualEntry = "· type a model id myself ·";
 
     public string Status { get; private set; }
 
@@ -66,6 +80,10 @@ public sealed class ConfigTuiModel
     public Func<AgentConfig, CancellationToken, Task<string>> ConnectionTest { get; set; } =
         ConfigTuiProbe.DefaultAsync;
 
+    /// <summary>The model listing, injectable for the same reason.</summary>
+    public Func<AgentConfig, CancellationToken, Task<ModelCatalogResult>> ModelCatalog { get; set; } =
+        ConfigTuiProbe.ListModelsAsync;
+
     public string Value(string key) => Config.Get(key) ?? "";
 
     public bool IsCyclable(string key) => key is "provider" or "saveSessions";
@@ -75,7 +93,7 @@ public sealed class ConfigTuiModel
     {
         "provider" => "echo runs offline and exercises the real loop · openai talks to any OpenAI-compatible endpoint",
         "baseUrl" => "e.g. https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama) · http://localhost:1234/v1 (LM Studio)",
-        "model" => "model id as the endpoint names it",
+        "model" => "Enter lists what the endpoint actually offers and lets you pick — an empty list means the key or the URL is wrong",
         "apiKeyEnv" => $"environment variable to read the key from — ${Config.ApiKeyEnv} is {(ApiKeyPresent ? "set" : "NOT set")}",
         "maxSteps" => "tool-loop budget per run, 1..100",
         "temperature" => "0..2 · lower is steadier, which suits a tool-calling loop",
@@ -89,14 +107,15 @@ public sealed class ConfigTuiModel
 
     public TuiEffect HandleKey(ConsoleKeyInfo key)
     {
-        // A probe in flight owns the screen; only quit gets through.
-        if (Testing)
+        // A request in flight owns the screen; only quit gets through.
+        if (Busy)
         {
             if (key.Key is ConsoleKey.Escape or ConsoleKey.Q) return TuiEffect.Quit;
             return TuiEffect.None;
         }
 
         if (Editing) return HandleEditKey(key);
+        if (Picking) return HandlePickKey(key);
 
         // Any non-quit key disarms a pending discard, so `q` then `j` then `q`
         // cannot silently throw work away.
@@ -129,6 +148,14 @@ public sealed class ConfigTuiModel
                 return TuiEffect.None;
 
             case ConsoleKey.Enter:
+                // The model row is the one place where the endpoint knows better
+                // than the operator what the valid values are — so ask it.
+                if (SelectedKey == "model")
+                {
+                    Busy = true;
+                    Status = $"asking {Config.BaseUrl}/models …";
+                    return TuiEffect.FetchModels;
+                }
                 BeginEdit();
                 return TuiEffect.None;
 
@@ -145,9 +172,14 @@ public sealed class ConfigTuiModel
                 return TuiEffect.None;
 
             case ConsoleKey.T:
-                Testing = true;
+                Busy = true;
                 Status = $"testing {Config.Provider} → {Config.Model} …";
                 return TuiEffect.RunTest;
+
+            case ConsoleKey.L:
+                Busy = true;
+                Status = $"asking {Config.BaseUrl}/models …";
+                return TuiEffect.FetchModels;
 
             case ConsoleKey.Q or ConsoleKey.Escape:
                 if (!Dirty || QuitArmed) return TuiEffect.Quit;
@@ -184,6 +216,106 @@ public sealed class ConfigTuiModel
                     EditBuffer += key.KeyChar;
                 return TuiEffect.None;
         }
+    }
+
+    /// <summary>
+    /// Which slice of <see cref="PickOptions"/> a picker <paramref name="height"/>
+    /// rows tall should show, keeping the highlighted row inside it. The maths
+    /// lives here rather than in the page so an endpoint offering eighty models
+    /// cannot produce an off-by-one nobody sees until it does.
+    /// </summary>
+    public (int First, int Count) PickWindow(int height)
+    {
+        if (height <= 0 || PickOptions.Count == 0) return (0, 0);
+        if (PickOptions.Count <= height) return (0, PickOptions.Count);
+
+        var first = PickIndex - height / 2;
+        first = Math.Clamp(first, 0, PickOptions.Count - height);
+        return (first, height);
+    }
+
+    private TuiEffect HandlePickKey(ConsoleKeyInfo key)
+    {
+        switch (key.Key)
+        {
+            case ConsoleKey.UpArrow or ConsoleKey.K:
+                PickIndex = PickIndex == 0 ? PickOptions.Count - 1 : PickIndex - 1;
+                return TuiEffect.None;
+
+            case ConsoleKey.DownArrow or ConsoleKey.J:
+                PickIndex = (PickIndex + 1) % PickOptions.Count;
+                return TuiEffect.None;
+
+            case ConsoleKey.Home:
+                PickIndex = 0;
+                return TuiEffect.None;
+
+            case ConsoleKey.End:
+                PickIndex = PickOptions.Count - 1;
+                return TuiEffect.None;
+
+            case ConsoleKey.Enter:
+                ChoosePicked();
+                return TuiEffect.None;
+
+            case ConsoleKey.Escape or ConsoleKey.Q:
+                Picking = false;
+                PickOptions = [];
+                Status = "model unchanged";
+                return TuiEffect.None;
+
+            default:
+                return TuiEffect.None;
+        }
+    }
+
+    private void ChoosePicked()
+    {
+        var chosen = PickOptions[PickIndex];
+        Picking = false;
+        PickOptions = [];
+
+        // The endpoint offered nothing that fits, or the list is stale — fall
+        // through to the ordinary text editor rather than a dead end.
+        if (chosen == PickManualEntry)
+        {
+            BeginEdit();
+            return;
+        }
+
+        if (Config.TrySet("model", chosen, out var error))
+            Status = $"model = {chosen}" + (Dirty ? "  (unsaved — press s)" : "");
+        else
+            Status = "✗ " + error;
+    }
+
+    /// <summary>
+    /// Called by the shell with whatever the endpoint said. A failure is not an
+    /// error state to recover from — it is the answer the operator asked for, so
+    /// it goes on the status line and the screen carries on.
+    /// </summary>
+    public void CompleteModelFetch(ModelCatalogResult result)
+    {
+        Busy = false;
+
+        if (!result.Ok || result.Models.Count == 0)
+        {
+            Picking = false;
+            PickOptions = [];
+            Status = "✗ " + result.Message + " — check baseUrl and $" + Config.ApiKeyEnv;
+            return;
+        }
+
+        var options = new List<string>(result.Models) { PickManualEntry };
+        PickOptions = options;
+
+        // Start on the model already configured, so Enter twice is a no-op
+        // rather than a surprise.
+        var current = options.IndexOf(Value("model"));
+        PickIndex = current >= 0 ? current : 0;
+
+        Picking = true;
+        Status = $"✓ {result.Message} · ↑↓ to choose, Enter to take it, Esc to keep {Value("model")}";
     }
 
     private void BeginEdit()
@@ -266,7 +398,7 @@ public sealed class ConfigTuiModel
 
     public void CompleteTest(string message)
     {
-        Testing = false;
+        Busy = false;
         Status = message;
     }
 

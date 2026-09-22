@@ -57,6 +57,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one chat` | Interactive session; the conversation carries over. `/reset`, `/exit`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one tui` | Full-screen settings editor (`agent-one config tui` is the same screen). |
+| `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
@@ -108,7 +109,9 @@ $ agent-one run "hi" -p echo --json
 |---|---|
 | `↑` `↓` (`k` `j`), `Home` `End` | Move. The list wraps. |
 | `Enter` | Edit the selected value, prefilled. `Enter` accepts, `Esc` cancels. A rejected value keeps you in edit mode with what you typed, so you fix it instead of retyping. |
+| `Enter` **on `model`** | **Ask the endpoint what it can run and pick from the list** — see below. |
 | `←` `→` | Cycle a value that has a fixed set (`provider`, `saveSessions`). |
+| `l` | The same listing, from any row. |
 | `s` | Save to `~/.agent-one/config.json`. |
 | `r` | Reload from disk, discarding edits. |
 | `d` | Restore defaults in memory — still needs `s`. |
@@ -117,6 +120,60 @@ $ agent-one run "hi" -p echo --json
 
 `t` is the reason the screen exists: changing an endpoint and finding out whether
 it answers should not need a second command.
+
+### Picking a model, and why that is the health check
+
+Set `provider`, `baseUrl` and the API key, then press `Enter` on the `model`
+row. agent-one calls `GET {baseUrl}/models` and offers what came back:
+
+```
+╭ agent-one config ──────────────────────────────────────────╮
+│› google/gemma-4-e4b                                        │
+│  text-embedding-nomic-embed-text-v1.5                      │
+│  · type a model id myself ·                                │
+╰────────────────────────────────────────────────────────────╯
+ ✓ 2 models from http://localhost:1234/v1/models · ↑↓ to choose, Enter to take it, Esc to keep gpt-4o-mini
+```
+
+The list starts on the model you already have configured, `Esc` keeps it, and
+the last row always falls through to typing an id by hand — a listing that is
+stale or incomplete is never a dead end.
+
+**One request exercises the base URL, the network path and the API key at
+once**, so the listing doubles as the health check: if models appear, those
+three are right, and you picked from values the endpoint itself vouched for
+rather than a guess. If nothing appears, the status line says which one failed:
+
+```
+✗ HTTP 401 — no API key: $OPENAI_API_KEY is not set — check baseUrl and $OPENAI_API_KEY
+✗ HTTP 401 — the endpoint rejected the key in $OPENAI_API_KEY — check baseUrl and $OPENAI_API_KEY
+✗ cannot reach http://localhost:11434/v1/models — … — check baseUrl and $OPENAI_API_KEY
+✗ http://localhost:1234/v1/models answered, but listed no models — …
+```
+
+An empty list is treated as a failure, not as an empty picker: an endpoint that
+answers but offers nothing is a misconfiguration, and saying so is more use than
+an empty box. The `echo` provider lists itself, so the whole flow is walkable
+offline with no key at all.
+
+The same listing is on the command line, for scripts and for a health check
+without opening a screen:
+
+```console
+$ agent-one models
+  google/gemma-4-e4b
+* text-embedding-nomic-embed-text-v1.5
+(2 models from http://localhost:1234/v1/models)
+
+$ agent-one models --base-url https://api.openai.com/v1
+agent-one models: HTTP 401 — no API key: $OPENAI_API_KEY is not set
+agent-one models: check baseUrl (https://api.openai.com/v1) and $OPENAI_API_KEY
+$ echo $?
+1
+```
+
+The count goes to stderr so the list pipes cleanly:
+`agent-one models | fzf | xargs agent-one config set model`.
 
 The TUI refuses to start when stdin or stdout is redirected — a full-screen UI in
 a pipe renders escape sequences into a log file and then waits for a key that

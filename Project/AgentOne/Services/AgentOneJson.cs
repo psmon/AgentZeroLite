@@ -31,6 +31,7 @@ public partial class AgentOneJson : JsonSerializerContext;
 [JsonSerializable(typeof(ChatMessage))]
 [JsonSerializable(typeof(ChatCompletionRequest))]
 [JsonSerializable(typeof(ChatCompletionResponse))]
+[JsonSerializable(typeof(ModelListResponse))]
 [JsonSerializable(typeof(SessionEntry))]
 [JsonSerializable(typeof(RunReport))]
 public partial class AgentOneWireJson : JsonSerializerContext;

@@ -51,6 +51,8 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
     private ILayoutNode BuildRows()
     {
         var model = ViewModel.Model;
+        if (model.Picking) return BuildPicker();
+
         var rows = Layouts.Vertical();
 
         for (int i = 0; i < model.Keys.Count; i++)
@@ -75,6 +77,44 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
         return rows;
     }
 
+    /// <summary>
+    /// The model list, windowed to the panel's height so a provider offering
+    /// eighty models does not push the screen apart.
+    /// </summary>
+    private ILayoutNode BuildPicker()
+    {
+        var model = ViewModel.Model;
+        var rows = Layouts.Vertical();
+        var height = AgentOne.Services.AgentConfig.Keys.Length;
+        var (first, count) = model.PickWindow(height);
+
+        for (int i = first; i < first + count; i++)
+        {
+            var option = model.PickOptions[i];
+            var selected = i == model.PickIndex;
+            var inUse = option == model.Value("model");
+
+            var marker = selected ? "›" : " ";
+            var tail = inUse ? "  (current)" : "";
+            var line = $"{marker} {option}{tail}";
+
+            var colour = selected ? Color.BrightCyan
+                : option == ConfigTuiModel.PickManualEntry ? Color.BrightBlack
+                : Color.White;
+
+            rows = rows.WithChild(new TextNode(line).WithForeground(colour).Height(1));
+        }
+
+        if (model.PickOptions.Count > height)
+        {
+            rows = rows.WithChild(
+                new TextNode($"  {model.PickIndex + 1}/{model.PickOptions.Count}")
+                    .WithForeground(Color.BrightBlack).Height(1));
+        }
+
+        return rows;
+    }
+
     private ILayoutNode BuildStatus()
     {
         var status = ViewModel.Model.Status;
@@ -88,12 +128,18 @@ public sealed class ConfigTuiPage : ReactivePage<ConfigTuiViewModel>
 
     private string KeyBar()
     {
-        if (ViewModel.Model.Editing)
+        var model = ViewModel.Model;
+
+        if (model.Editing)
             return "Enter accept · Esc cancel · Backspace delete";
 
-        var sb = new StringBuilder("↑↓ move · Enter edit");
-        if (ViewModel.Model.IsCyclable(ViewModel.Model.SelectedKey)) sb.Append(" · ←→ cycle");
-        sb.Append(" · s save · r reload · d defaults · t test · q quit");
+        if (model.Picking)
+            return "↑↓ choose · Enter take it · Esc keep the current one";
+
+        var sb = new StringBuilder("↑↓ move · Enter ");
+        sb.Append(model.SelectedKey == "model" ? "list models" : "edit");
+        if (model.IsCyclable(model.SelectedKey)) sb.Append(" · ←→ cycle");
+        sb.Append(" · s save · r reload · d defaults · l models · t test · q quit");
         return sb.ToString();
     }
 }

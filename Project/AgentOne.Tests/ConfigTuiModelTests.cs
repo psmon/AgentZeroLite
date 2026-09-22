@@ -1,3 +1,4 @@
+using AgentOne.Llm;
 using AgentOne.Services;
 using AgentOne.Tui;
 
@@ -79,28 +80,30 @@ public class ConfigTuiModelTests : IDisposable
     [Fact]
     public void EnterEditsAndPrefillsTheCurrentValue()
     {
+        // A free-text key: `model` is the one row where Enter opens the picker
+        // instead (see ModelPickerTests).
         var model = New();
-        SelectKey(model, "model");
+        SelectKey(model, "apiKeyEnv");
         model.HandleKey(Key(ConsoleKey.Enter));
 
         Assert.True(model.Editing);
-        Assert.Equal("gpt-4o-mini", model.EditBuffer);
+        Assert.Equal("OPENAI_API_KEY", model.EditBuffer);
     }
 
     [Fact]
     public void TypingThenEnterCommitsTheValue()
     {
         var model = New();
-        SelectKey(model, "model");
+        SelectKey(model, "apiKeyEnv");
         model.HandleKey(Key(ConsoleKey.Enter));
 
-        // Clear the prefill, then type a new id.
+        // Clear the prefill, then type a new value.
         for (int i = 0; i < 20; i++) model.HandleKey(Key(ConsoleKey.Backspace));
-        Type(model, "qwen2.5-coder:7b");
+        Type(model, "MY_LOCAL_KEY");
         model.HandleKey(Key(ConsoleKey.Enter));
 
         Assert.False(model.Editing);
-        Assert.Equal("qwen2.5-coder:7b", model.Value("model"));
+        Assert.Equal("MY_LOCAL_KEY", model.Value("apiKeyEnv"));
         Assert.True(model.Dirty);
     }
 
@@ -108,13 +111,13 @@ public class ConfigTuiModelTests : IDisposable
     public void EscapeAbandonsTheEditAndKeepsTheOldValue()
     {
         var model = New();
-        SelectKey(model, "model");
+        SelectKey(model, "apiKeyEnv");
         model.HandleKey(Key(ConsoleKey.Enter));
         Type(model, "-typo");
         model.HandleKey(Key(ConsoleKey.Escape));
 
         Assert.False(model.Editing);
-        Assert.Equal("gpt-4o-mini", model.Value("model"));
+        Assert.Equal("OPENAI_API_KEY", model.Value("apiKeyEnv"));
         Assert.False(model.Dirty);
     }
 
@@ -266,12 +269,12 @@ public class ConfigTuiModelTests : IDisposable
         model.ConnectionTest = (_, _) => Task.FromResult("✓ reached it");
 
         Assert.Equal(TuiEffect.RunTest, model.HandleKey(Key(ConsoleKey.T)));
-        Assert.True(model.Testing);
+        Assert.True(model.Busy);
         Assert.Contains("testing", model.Status);
 
         model.CompleteTest(await model.ConnectionTest(model.Config, CancellationToken.None));
 
-        Assert.False(model.Testing);
+        Assert.False(model.Busy);
         Assert.Equal("✓ reached it", model.Status);
     }
 
@@ -292,7 +295,7 @@ public class ConfigTuiModelTests : IDisposable
     public void EditModeLetsSAndQBeTypedRatherThanActingAsCommands()
     {
         var model = New();
-        SelectKey(model, "model");
+        SelectKey(model, "apiKeyEnv");
         model.HandleKey(Key(ConsoleKey.Enter));
         for (int i = 0; i < 20; i++) model.HandleKey(Key(ConsoleKey.Backspace));
         Type(model, "qs");

@@ -13,11 +13,13 @@ namespace AgentOne.Llm;
 /// The API key is read from the environment variable named in the config; it is
 /// never persisted. An empty key is allowed, because local servers do not want one.
 /// </summary>
-public sealed class OpenAiCompatChatProvider : IChatProvider, IDisposable
+public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDisposable
 {
     private readonly HttpClient _http;
     private readonly string _model;
     private readonly double _temperature;
+    private readonly string _apiKeyEnv;
+    private readonly bool _hasKey;
 
     public string Name => "openai";
 
@@ -30,9 +32,11 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IDisposable
         _http.BaseAddress = new Uri(config.BaseUrl.TrimEnd('/') + "/");
         _http.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
 
+        _apiKeyEnv = config.ApiKeyEnv;
         var key = Environment.GetEnvironmentVariable(config.ApiKeyEnv);
-        if (!string.IsNullOrWhiteSpace(key))
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
+        _hasKey = !string.IsNullOrWhiteSpace(key);
+        if (_hasKey)
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key!.Trim());
 
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("agent-one");
     }
@@ -85,6 +89,66 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IDisposable
             throw new ChatProviderException($"provider returned no message content: {Trim(body)}");
 
         return content;
+    }
+
+    /// <summary>
+    /// GET /models. Every failure is translated into something the operator can
+    /// act on — above all a 401/403, which almost always means the API key, and
+    /// which is the whole reason this doubles as the health check.
+    /// </summary>
+    public async Task<ModelCatalogResult> ListModelsAsync(CancellationToken ct)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.GetAsync("models", ct);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return ModelCatalogResult.Failure($"timed out asking {_http.BaseAddress}models");
+        }
+        catch (HttpRequestException ex)
+        {
+            return ModelCatalogResult.Failure($"cannot reach {_http.BaseAddress}models — {ex.Message}");
+        }
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            return ModelCatalogResult.Failure(_hasKey
+                ? $"HTTP {(int)response.StatusCode} — the endpoint rejected the key in ${_apiKeyEnv}"
+                : $"HTTP {(int)response.StatusCode} — no API key: ${_apiKeyEnv} is not set");
+        }
+
+        if (!response.IsSuccessStatusCode)
+            return ModelCatalogResult.Failure($"HTTP {(int)response.StatusCode} from {_http.BaseAddress}models: {Trim(body)}");
+
+        ModelListResponse? parsed;
+        try
+        {
+            parsed = JsonSerializer.Deserialize(body, AgentOneWireJson.Default.ModelListResponse);
+        }
+        catch (JsonException)
+        {
+            return ModelCatalogResult.Failure($"{_http.BaseAddress}models did not return JSON: {Trim(body)}");
+        }
+
+        if (parsed?.Error is { } error)
+            return ModelCatalogResult.Failure("endpoint error: " + (error.Message ?? error.Type ?? "unknown"));
+
+        var models = (parsed?.Data ?? [])
+            .Select(m => m.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        if (models.Length == 0)
+            return ModelCatalogResult.Failure($"{_http.BaseAddress}models answered, but listed no models");
+
+        return ModelCatalogResult.Success(models, $"{models.Length} models from {_http.BaseAddress}models");
     }
 
     private static string Trim(string body) =>

@@ -71,6 +71,11 @@ public static class ConfigTuiApp
         if (!model.Dirty) failures.Add("model should be dirty after cycling provider");
         if (model.SelectedKey != "provider") failures.Add($"selection is '{model.SelectedKey}', expected 'provider'");
 
+        // The model picker is checked without the UI on purpose: the listing is
+        // asynchronous, and a scripted key racing an in-flight request would make
+        // this fail at random in CI rather than when something is actually broken.
+        await CheckModelPickerAsync(failures);
+
         if (failures.Count > 0)
         {
             Console.Error.WriteLine("agent-one tui selftest: FAILED");
@@ -78,7 +83,40 @@ public static class ConfigTuiApp
             return 1;
         }
 
-        Console.WriteLine("agent-one tui selftest: ok (render + key routing + state)");
+        Console.WriteLine("agent-one tui selftest: ok (render + key routing + state + model picker)");
         return 0;
+    }
+
+    private static async Task CheckModelPickerAsync(List<string> failures)
+    {
+        // Happy path, offline: the echo provider lists itself.
+        var picker = new ConfigTuiModel(new AgentConfig());
+        if (picker.HandleKey(new ConsoleKeyInfo('\0', ConsoleKey.L, false, false, false)) != TuiEffect.FetchModels)
+            failures.Add("`l` did not request a model listing");
+
+        picker.CompleteModelFetch(await picker.ModelCatalog(picker.Config, CancellationToken.None));
+
+        if (!picker.Picking) failures.Add("a successful listing did not open the picker");
+        else
+        {
+            picker.HandleKey(new ConsoleKeyInfo('\0', ConsoleKey.Home, false, false, false));
+            picker.HandleKey(new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false));
+            if (picker.Value("model") != "echo") failures.Add($"picking left model as '{picker.Value("model")}', expected 'echo'");
+            if (picker.Picking) failures.Add("the picker stayed open after a choice");
+        }
+
+        // Failure path: a port nothing listens on refuses immediately, so this
+        // stays fast and offline while still walking the real HTTP client.
+        var dead = new AgentConfig();
+        dead.TrySet("provider", "openai", out _);
+        dead.TrySet("baseUrl", "http://127.0.0.1:1/v1", out _);
+        dead.TrySet("timeoutSeconds", "5", out _);
+
+        var unreachable = new ConfigTuiModel(dead);
+        unreachable.CompleteModelFetch(await unreachable.ModelCatalog(dead, CancellationToken.None));
+
+        if (unreachable.Picking) failures.Add("an unreachable endpoint still opened the picker");
+        if (!unreachable.Status.StartsWith('✗')) failures.Add("an unreachable endpoint was not reported as a failure");
+        if (unreachable.Busy) failures.Add("the screen stayed busy after a failed listing");
     }
 }
