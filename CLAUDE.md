@@ -358,6 +358,7 @@ topic is not covered — then update the doc so the next session inherits the an
 | herdr | `Docs/agent-herdr/` | — |
 | netclaw, Termina, TUI, AOT TUI | `Docs/agent-netclaw/` | `C:\code\psmon\research\netclaw` |
 | CodeScan (agent-one's skeleton) | — (see `Project/AgentOne/README.md`) | `C:\code\psmon\CodeScan` |
+| Jev, TypeSafe, smart mode, System One | `Project/AgentOne/docs/smart-mode-jev.md` | — (hosted API, docs only) |
 
 `C:\code\psmon\research\` is where reference clones for analysis live.
 
