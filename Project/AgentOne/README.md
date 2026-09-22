@@ -836,7 +836,7 @@ Set-Alias a1 C:\code\psmon\AgentZeroLite\Project\AgentOne\agent-one.ps1
 a1 tui
 ```
 
-Native AOT single binary (8.3 MB on win-x64, no runtime dependency):
+Native AOT single binary (about 22 MB on win-x64 with Akka.NET and the Kùzu loader inside, no runtime dependency):
 
 ```bash
 dotnet publish Project/AgentOne/AgentOne.csproj -c Release -r win-x64   -o out/win-x64
