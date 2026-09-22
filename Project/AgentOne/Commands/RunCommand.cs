@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AgentOne.Actors;
 using AgentOne.Agent;
 using AgentOne.Llm;
 using AgentOne.Services;
@@ -44,10 +45,10 @@ public sealed class RunCommand
         var showProgress = !options.Json && !options.Quiet;
         var streaming = showProgress && !Console.IsOutputRedirected;
 
-        ChatSession session;
+        IAgentSession session;
         try
         {
-            session = new ChatSession(options.Config, options.Root, streaming, logKind: "run");
+            session = AgentGateway.Start(options.Config, options.Root, streaming, logKind: "run");
         }
         catch (ChatProviderException ex)
         {

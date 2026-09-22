@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AgentOne.Actors;
 using AgentOne.Agent;
 using AgentOne.Llm;
 using AgentOne.Services;
@@ -111,10 +112,10 @@ public sealed class SessionCommand
         Console.SetError(log);
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] session serve · pid {Environment.ProcessId} · root {options.Root}");
 
-        ChatSession session;
+        IAgentSession session;
         try
         {
-            session = new ChatSession(options.Config, options.Root, streaming: true);
+            session = AgentGateway.Start(options.Config, options.Root, streaming: true);
         }
         catch (ChatProviderException ex)
         {
@@ -220,7 +221,7 @@ public sealed class SessionCommand
 
         try
         {
-            using var session = new ChatSession(config, root, streaming: true);
+            using var session = AgentGateway.Start(config, root, streaming: true);
             var server = new SessionServer(session, pipe);
             var serving = server.RunAsync(ct);
             await server.Listening.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);

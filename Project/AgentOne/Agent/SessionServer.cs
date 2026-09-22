@@ -17,11 +17,11 @@ public sealed class SessionServer
 {
     private static readonly UTF8Encoding NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
-    private readonly ChatSession _session;
+    private readonly IAgentSession _session;
     private readonly string _pipe;
     private readonly CancellationTokenSource _stop = new();
 
-    public SessionServer(ChatSession session, string pipeName)
+    public SessionServer(IAgentSession session, string pipeName)
     {
         _session = session;
         _pipe = pipeName;

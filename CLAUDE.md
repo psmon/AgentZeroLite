@@ -217,7 +217,7 @@ What differs from the WPF host, and why:
 
 A second, **independent** product in this repo: a cross-platform CLI agent that
 publishes as a Native AOT single binary (win-x64 / linux-x64 / osx-arm64 /
-osx-x64, ~6 MB, no runtime to install) and ships through npm as
+osx-x64, ~22 MB with Akka.NET and Kùzu's loader inside, no runtime to install) and ships through npm as
 `@webnori/agent-one`. Skeleton borrowed from `C:\code\psmon\CodeScan` — argv
 switch in `Program.cs` → `Commands/`, all state under `~/.agent-one/`
 (`Services/AppPaths`), `version.txt` MSBuild auto-bump, `packaging/npm/` wrapper
@@ -310,10 +310,45 @@ keystroke); and `StreamingTextNode` re-measures a line per cell it draws, so
 2,300-char answer line used to freeze the window for 9 s). ChatSession has its
 own deterministic tests for pause/resume.
 
-`SessionState` is actor-*shaped*, not Akka: one owner, serialised mutations,
-snapshot reads. An actor runtime is exactly the dependency a Native AOT single
-binary cannot afford — the same reason this project does not reference
-ZeroCommon.
+**The conversation runs as AgentZero's Bot / Loop actor pair** (`Actors/`, on
+Akka.NET — a 1.6 nightly, `1.6.0-beta20260922000138`, from Akka.NET's feedz.io
+feed via `Project/AgentOne/NuGet.config` and its twin in the tests; 1.6 is not
+on nuget.org). `AgentBotActor` at `/user/bot` is the gateway: spawns
+`AgentLoopActor` (`/user/bot/loop`) lazily, holds the renderer's callbacks
+(`SetAgentLoopCallbacks`: progress, result, notice, pause), refuses a second
+`StartAgentLoop` while one runs (`TurnRefused`), forwards session commands
+(`IAgentSessionCommand`) with the sender kept. `AgentLoopActor` owns one
+`ChatSession` — the loop — as Idle ⇄ Running: the turn runs on the pool
+(`Task.Run` + `PipeTo`), every session event comes back through the mailbox
+as a private internal record before it is told to the parent, cancel is
+`_cts.Cancel()` only and the run's own end tips it back to Idle, so there is
+exactly one `AgentLoopResult` per start. The vocabulary is AgentZero's
+(`Messages.cs` §8 / `harness/knowledge/_shared/agent-architecture.md`):
+`AgentLoopProgress` (phase tick: Thinking / Acting with the `AgentStep` /
+Generating with the fragment / Done / Error) and `AgentLoopResult` (end of
+run, carrying the `AgentRun`) are never reused for each other; agent-one adds
+`AgentLoopNotice` (decision / note / title / design / learned) and
+`PersonNeeded` → `ResolvePause` for the approval and design-choice pauses
+(the session's `Approver`/`Chooser` delegates post the question through the
+mailbox from the pool thread and await a TCS). `Actors/AgentGateway` is what
+the commands hold: `IAgentSession` — the same events / delegates / commands
+as `ChatSession` — implemented as a Tell of `StartAgentLoop` plus a wait for
+the one result, and blocking Asks for the session commands; a callback must
+never block on the gateway (the bot would wait on itself). `ChatSession`
+implements `IAgentSession` too, so the TUI selftest and the tests drive it
+directly. `AgentActorSystem` is the HOCON: Akka's own log lines go to
+**stderr** (`StderrLogger`, kept for reflection with `DynamicDependency`),
+`exit-clr = off` — the command owns the exit code. **AOT needs
+`TrimmerRootAssembly Include="Akka"`**: Akka resolves its provider,
+dispatchers and serializers by type name from HOCON; measured, without the
+root the published binary dies in `ActorSystem.Create` ("'akka.actor.provider'
+is not a valid type name"), with it a thousand Asks take 2 ms and the binary
+grows from ~6 MB to ~22 MB. `session selftest` runs the gateway on every
+release RID, which is the AOT proof per platform. Tests:
+`AgentActorTests` (TestKit: the probe as the loop's parent; the bot's lazy
+spawn, refusal and callback isolation; the gateway end to end).
+`SessionState` keeps its lock: the counters are touched from the turn's
+pool thread, not the actor's.
 
 **Every stdin read goes through `Services/StandardInput`.** `Console.In` decodes
 a redirected stream with the console code page, which turns piped Korean into

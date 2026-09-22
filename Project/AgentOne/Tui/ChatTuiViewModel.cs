@@ -50,7 +50,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     /// <summary>The list /resume last printed, so "/resume 2" means the same row the person saw.</summary>
     private IReadOnlyList<SessionSummary> _resumable = [];
 
-    public ChatTuiViewModel(ChatSession session, ChatTuiModel model)
+    public ChatTuiViewModel(IAgentSession session, ChatTuiModel model)
     {
         Session = session;
         Model = model;
@@ -142,7 +142,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         return $"{(step.Ok ? "✓" : "✗")} {step.Tool}{detail}{seconds}";
     }
 
-    public ChatSession Session { get; }
+    public IAgentSession Session { get; }
     public ChatTuiModel Model { get; }
 
     /// <summary>Bumped after every change the page should repaint for.</summary>

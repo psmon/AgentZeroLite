@@ -29,8 +29,12 @@ internal sealed class ScriptedChatProvider(params string[] replies) : IChatProvi
     /// <summary>How many fragments each reply is chopped into when streaming.</summary>
     public int ChunkSize { get; set; } = 7;
 
-    public Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct, Action<string>? onDelta = null)
+    /// <summary>How long a reply takes — for the actor tests, where a turn has to be in flight to be cancelled or refused.</summary>
+    public TimeSpan Delay { get; set; } = TimeSpan.Zero;
+
+    public async Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct, Action<string>? onDelta = null)
     {
+        if (Delay > TimeSpan.Zero) await Task.Delay(Delay, ct);
         string reply;
         lock (_gate)
         {
@@ -39,7 +43,7 @@ internal sealed class ScriptedChatProvider(params string[] replies) : IChatProvi
             if (messages.Count > 0 && messages[0].Role == "system" && messages[0].Content == TaskTitler.SystemPrompt)
             {
                 reply = TitleReplies.Count > 0 ? TitleReplies.Dequeue() : "";
-                return Task.FromResult(reply);
+                return reply;
             }
 
             reply = replies[Math.Min(_index, replies.Length - 1)];
@@ -52,7 +56,7 @@ internal sealed class ScriptedChatProvider(params string[] replies) : IChatProvi
             for (int i = 0; i < reply.Length; i += ChunkSize)
                 onDelta(reply[i..Math.Min(i + ChunkSize, reply.Length)]);
 
-        return Task.FromResult(reply);
+        return reply;
     }
 }
 

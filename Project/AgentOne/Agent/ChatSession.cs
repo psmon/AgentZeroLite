@@ -88,7 +88,7 @@ public sealed record SessionStats(
 /// back into that memory, logs under the workspace, and can resume any of the
 /// workspace's saved sessions.
 /// </summary>
-public sealed class ChatSession : IDisposable
+public sealed class ChatSession : IAgentSession
 {
     private readonly IChatProvider _provider;
     private readonly IChatProvider? _reasoning;

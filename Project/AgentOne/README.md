@@ -631,6 +631,30 @@ keystroke, so PageUp finds the answer already in the transcript.
 
 ## How it works
 
+The conversation runs as the same two actors AgentZero's Bot mode uses —
+Akka.NET, a 1.6 nightly, inside the AOT binary:
+
+```
+ REPL · window · run · pipe server
+        │  StartAgentLoop / CancelAgentLoop / ResolvePause / session commands
+        ▼
+ /user/bot        AgentBotActor   — the gateway: spawns the loop lazily, one turn
+        │                           at a time, hands every event to the renderer's
+        │                           callbacks in order
+        ▼
+ /user/bot/loop   AgentLoopActor  — the agent: owns one ChatSession, Idle ⇄ Running,
+        │                           the turn on the pool, exactly one AgentLoopResult
+        ▼                           per StartAgentLoop (cancelled or not)
+     ChatSession  — the turn: smart routing, the graph, the loop, the gate, the memory
+```
+
+`AgentLoopProgress` (Thinking / Acting / Generating / Done / Error) is a phase
+tick, `AgentLoopResult` the end of a run, `AgentLoopNotice` the side channel
+(decisions, titles, designs, what the graph learned), `PersonNeeded` /
+`ResolvePause` the pause for a person. `Actors/AgentGateway` wraps the pair in
+the same events-and-delegates surface `ChatSession` has, which is what the
+renderers hold. Inside the session, the turn is:
+
 ```
  prompt ──> AgentLoop ──> IChatProvider ──> model
               │  ▲                            │
@@ -699,7 +723,8 @@ nudge each). Every stop is reported with its reason rather than a silent hang.
 |---|---|
 | `Program.cs` | argv routing — a plain switch, no parser library, so the AOT binary carries no reflection-based command binding |
 | `Commands/` | one class per verb, plus the shared flag parser (`AgentOptions`) |
-| `Agent/` | the loop, the envelope (`ToolCall`), the guards, the system prompt |
+| `Actors/` | the Bot / Loop actor pair, its message vocabulary, the gateway the renderers hold, the actor system's HOCON |
+| `Agent/` | the loop, the envelope (`ToolCall`), the guards, the system prompt, the session (`ChatSession`) |
 | `Llm/` | `IChatProvider`, the echo provider, the OpenAI-compatible client |
 | `Tools/` | `ToolCatalog` (what the model is told), the belts that run it, and `Tools/Web/` (fetch, search parsing, HTML→text) |
 | `Tui/` | the settings screen — testable model, Termina page/viewmodel, host wiring |
@@ -857,11 +882,23 @@ offline installs.
 ## Relationship to AgentZero Lite
 
 Same repository, no code dependency in either direction. AgentZero Lite's own
-agent loop lives in `ZeroCommon` and is bound to Akka, EF Core, LLamaSharp and
-ONNX — none of which survives Native AOT or a cross-platform single binary, and
-all of which a small CLI has no use for. agent-one therefore reimplements the
-small part it needs and stays free to be extracted into its own repository once
-it ships on npm.
+agent loop lives in `ZeroCommon` and is bound to EF Core, LLamaSharp and ONNX —
+none of which survives Native AOT or a cross-platform single binary, and all of
+which a small CLI has no use for. agent-one therefore reimplements the small
+part it needs and stays free to be extracted into its own repository once it
+ships on npm.
+
+What the two do share is the **shape**: the same `AgentBotActor` / `AgentLoopActor`
+split, the same message names (`StartAgentLoop`, `AgentLoopProgress`,
+`AgentLoopResult`, `CancelAgentLoop`, `ResetAgentLoopMemory`,
+`SetAgentLoopCallbacks`), the same rules — the bot never runs inference, the
+loop is only ever Idle or Running, a cancel is a token cancel and the run's own
+end tips the actor back. agent-one runs them on its own Akka.NET (a 1.6
+nightly; 1.6 is not on nuget.org yet, so `NuGet.config` adds Akka.NET's feed).
+Akka finds its provider and dispatchers by type name from HOCON, which the
+trimmer cannot see — measured, the AOT binary died in `ActorSystem.Create`
+without a `TrimmerRootAssembly` for Akka, and answers a thousand Asks in 2 ms
+with one. The price is about 12 MB of binary.
 
 The intended integration is process-level: AgentZero launches `agent-one` with
 `--json` and reads one object off stdout, the same way it launches
