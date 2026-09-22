@@ -85,6 +85,7 @@ macOS: download `AgentZeroLite-Avalonia-v<ver>-osx-arm64.zip` from the *Avalonia
 | Tool belt: terminals, files, `find_files/open_file/stop_media`, web (headless) | ✅ | `WorkspaceToolHost` |
 | Settings: External LLM (+ test), CLI definitions CRUD, terminal appearance (live) | ✅ | Local LLM section on Windows only |
 | CLI: status, terminal-list/send/key/read/wait/alias (`--alias`), layout, bot-chat, bot-ask, web, selftest | ✅ | pipe `AgentZeroLite.cli`; `.ps1` / `.sh` wrappers |
+| Remote shell (SSH) definitions: composed `ssh` launch + stored-password autofill | ✅ Windows / ⏳ macOS | composition moved into `TerminalLaunchPlanner` (WPF composes at its own call sites, unchanged); autofill is `ZeroCommon/Services/SshPasswordWatcher`. The password column is shared with WPF, so this host seals it with `Security/SshPasswordVault` (same DPAPI entropy, no marker). On macOS remote definitions stay hidden — `ComposeArguments` only knows cmd/PowerShell wrappers |
 | CI: windows-latest + macos-14, win-x64 zip, `.app` bundle | ✅ | `.github/workflows/avalonia-build.yml` |
 | AgentBot skills: SkillSync, starter-pack import, `.agent-zero/` cache, slash autocomplete | ⏳ not yet | one dependency chain — the slash list is empty without SkillSync, which drives the Claude CLI through a Windows-only shell probe |
 | AgentBot voice (mic, VAD, STT, TTS, mute, delegation) | ⏳ not yet | needs the audio capture layer in ZeroCommon first; NAudio/WASAPI is Windows-only |

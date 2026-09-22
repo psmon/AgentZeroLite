@@ -18,6 +18,10 @@ public class SettingsViewModelTests
         item.IsRemote = true;
         Assert.Equal("SSH needs a host.", item.Validate());
         item.SshHost = "example.org";
+        // ssh connects as user@host — half a target is a tab that would silently open a
+        // local shell instead.
+        Assert.Equal("SSH needs a user.", item.Validate());
+        item.SshUser = "me";
         Assert.Null(item.Validate());
     }
 
