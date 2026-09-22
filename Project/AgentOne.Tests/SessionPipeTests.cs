@@ -41,7 +41,7 @@ public class SessionPipeTests : IDisposable
         config.TrySet("smartMode", "off", out _);
         config.TrySet("saveSessions", "false", out _);
         return new ChatSession(config, _root, streaming: true, provider,
-            engine ?? new ScriptedDecisionEngine(Choose("x", 1)), engine is not null) { NamesTasks = false };
+            engine ?? new ScriptedDecisionEngine(Choose("x", 1)), engine is not null) { NamesTasks = false, UsesGraph = false };
     }
 
     private static async Task<(SessionServer Server, Task Running)> StartAsync(ChatSession session, string pipe, CancellationToken ct)

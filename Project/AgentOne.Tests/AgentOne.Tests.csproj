@@ -26,4 +26,7 @@
     <ProjectReference Include="..\AgentOne\AgentOne.csproj" />
   </ItemGroup>
 
+  <!-- The Kùzu shared library must sit next to the test host too. -->
+  <Import Project="..\AgentOne\native\Kuzu.targets" />
+
 </Project>

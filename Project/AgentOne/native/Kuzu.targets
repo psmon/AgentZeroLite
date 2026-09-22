@@ -1,0 +1,60 @@
+<Project>
+  <!--
+    Kùzu, the embedded graph database behind the workspace's knowledge graph.
+    Its native library (12 MB+) is not committed: this downloads the release
+    archive for the host OS/architecture once into native/_cache/<version>/,
+    extracts the shared library, and copies it next to the build and publish
+    output. Host = target is assumed, which is how the release workflow runs
+    (one job per RID on its own runner). Pattern borrowed from
+    C:\code\psmon\akka-graph-loop/native/Kuzu.targets.
+  -->
+  <PropertyGroup>
+    <KuzuVersion>0.11.3</KuzuVersion>
+    <KuzuBaseUrl>https://github.com/kuzudb/kuzu/releases/download/v$(KuzuVersion)</KuzuBaseUrl>
+    <KuzuCacheDir>$(MSBuildThisFileDirectory)_cache\$(KuzuVersion)\</KuzuCacheDir>
+
+    <_KuzuArch>$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)</_KuzuArch>
+
+    <_KuzuAsset Condition="$([MSBuild]::IsOSPlatform('Windows'))">libkuzu-windows-x86_64.zip</_KuzuAsset>
+    <_KuzuLib   Condition="$([MSBuild]::IsOSPlatform('Windows'))">kuzu_shared.dll</_KuzuLib>
+
+    <_KuzuAsset Condition="$([MSBuild]::IsOSPlatform('Linux')) and '$(_KuzuArch)' == 'Arm64'">libkuzu-linux-aarch64.tar.gz</_KuzuAsset>
+    <_KuzuAsset Condition="$([MSBuild]::IsOSPlatform('Linux')) and '$(_KuzuArch)' != 'Arm64'">libkuzu-linux-x86_64.tar.gz</_KuzuAsset>
+    <_KuzuLib   Condition="$([MSBuild]::IsOSPlatform('Linux'))">libkuzu.so</_KuzuLib>
+
+    <_KuzuAsset Condition="$([MSBuild]::IsOSPlatform('OSX'))">libkuzu-osx-universal.tar.gz</_KuzuAsset>
+    <_KuzuLib   Condition="$([MSBuild]::IsOSPlatform('OSX'))">libkuzu.dylib</_KuzuLib>
+
+    <_KuzuArchive>$(KuzuCacheDir)$(_KuzuAsset)</_KuzuArchive>
+    <_KuzuExtractedLib>$(KuzuCacheDir)$(_KuzuLib)</_KuzuExtractedLib>
+  </PropertyGroup>
+
+  <!-- Next to the build output and in the publish folder alike. -->
+  <ItemGroup>
+    <None Include="$(_KuzuExtractedLib)">
+      <Link>$(_KuzuLib)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <!-- Fetch before anything computes copy paths. -->
+  <Target Name="EnsureKuzuNative" BeforeTargets="AssignTargetPaths;BeforeBuild;Build">
+    <DownloadFile Condition="!Exists('$(_KuzuArchive)')"
+                  SourceUrl="$(KuzuBaseUrl)/$(_KuzuAsset)"
+                  DestinationFolder="$(KuzuCacheDir)"
+                  DestinationFileName="$(_KuzuAsset)"
+                  SkipUnchangedFiles="true" />
+
+    <Unzip Condition="!Exists('$(_KuzuExtractedLib)') and '$(_KuzuAsset.EndsWith(`.zip`))' == 'true'"
+           SourceFiles="$(_KuzuArchive)"
+           DestinationFolder="$(KuzuCacheDir)"
+           OverwriteReadOnlyFiles="true" />
+    <Exec Condition="!Exists('$(_KuzuExtractedLib)') and '$(_KuzuAsset.EndsWith(`.tar.gz`))' == 'true'"
+          Command="tar -xzf &quot;$(_KuzuArchive)&quot; -C &quot;$(KuzuCacheDir)&quot;" />
+
+    <Warning Condition="!Exists('$(_KuzuExtractedLib)')"
+             Text="The Kùzu native library ($(_KuzuLib)) could not be prepared — the knowledge graph will be off. Check network/platform." />
+  </Target>
+</Project>

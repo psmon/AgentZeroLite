@@ -223,7 +223,7 @@ public class ChatSessionTests : IDisposable
         config.TrySet("smartMode", smart ? "on" : "off", out _);
         config.TrySet("saveSessions", "false", out _);
         if (reasoning is not null) config.TrySet("reasoningModel", "big-model", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine, available, reasoning) { NamesTasks = false };
+        return new ChatSession(config, _root, streaming: false, provider, engine, available, reasoning) { NamesTasks = false, UsesGraph = false };
     }
 
     [Fact]

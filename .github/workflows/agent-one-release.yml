@@ -105,6 +105,10 @@ jobs:
             chmod +x stage/agent-one/agent-one
           fi
           cp Project/AgentOne/README.md stage/agent-one/ || true
+          # Kùzu's shared library rides next to the binary: the knowledge graph
+          # is off without it, and the smoke test checks it is there.
+          cp out/${{ matrix.rid }}/kuzu_shared.dll out/${{ matrix.rid }}/libkuzu.so out/${{ matrix.rid }}/libkuzu.dylib stage/agent-one/ 2>/dev/null || true
+          ls stage/agent-one | grep -qi kuzu
 
       # Smoke-test the artifact itself, not the build tree: a binary that cannot
       # answer `run --provider echo` must never reach a release page.

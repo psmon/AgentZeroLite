@@ -70,6 +70,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
 | `--smart` / `--basic` | On `run` and `chat`: route and escalate through the decision engine, or straight to the loop. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
+| `agent-one memory` | The workspace's knowledge graph: stats, `recent`, `helpful`, `search <words>`, `path <fragment>`, `query "<cypher>"`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
 Shared flags for `run` and `chat` — each one overrides the stored config for
@@ -391,6 +392,52 @@ Two reasons it exists: **chat mode can be self-tested with no terminal** —
 private pipe on the echo provider, and the release smoke test runs it on every
 artifact — and **another agent can drive this one** from a script, reading
 `--json` results or the event lines.
+
+### Long-term memory as a graph
+
+Beside the memory file there is a **knowledge graph** — an embedded
+[Kùzu](https://kuzudb.com) database under the workspace folder, queried with
+Cypher, the shape borrowed from `akka-graph-loop`'s per-project graph memory.
+The file remembers what happened; the graph keeps what was *judged worth
+knowing*, and gets better the more it is used.
+
+```
+Turn ──LEARNED──▶ Knowledge ──JUSTIFIED_BY──▶ Rationale   (the engine's judgement, attached)
+                     │  ──ABOUT──▶ Path                   (the files it concerns)
+                     └──HELPED──▶ Turn                     (each later turn it was handed to)
+```
+
+**After every turn** the decision engine is asked one fixed question — did
+this turn produce knowledge a future session would be glad to have? — and
+only on *save* does the everyday model distil it into one to three lines
+(`kind | title | text`: fact, decision, fix, procedure, constraint). Each is
+stored with the engine's verdict, confidence and the evidence it saw as a
+`Rationale` node, linked to the turn and to the paths it names. All of it
+off the turn, after the answer is on screen.
+
+**Before a turn** — when the graph holds anything and the route is not the
+web — the engine is asked whether the graph can help *this* request, given a
+summary of what it holds (counts, the paths it knows most about, the newest
+titles). On *consult* it picks one of four queries — by keywords, by the
+paths named, newest first, most helpful first — and what comes back reaches
+the model as `[graph memory] …` material **before any file is scanned**.
+Every item handed over gets a `HELPED` edge and a use count, and the
+queries rank by use, so the knowledge that keeps helping rises.
+
+```
+› 빌드가 되는지 확인해줘
+  route: → workspace  (confidence 0.96)
+  graph: consulted via by_keywords — 2 item(s)  (confidence 0.81)
+    ↳ (procedure) Build command
+    ↳ (fix) Missing entry point
+  ✓ run_command  (2.4s)
+◆ 빌드 성공 …
+```
+
+`agent-one memory` shows what the graph holds; `memory query "MATCH (k:Knowledge)-[:ABOUT]->(p:Path) RETURN p.path, k.title"`
+runs any Cypher. The graph needs Kùzu's shared library next to the binary
+(the build fetches it, the release archive carries it); without it the agent
+runs as before and the status block says `graph off`.
 
 ### The workspace remembers
 

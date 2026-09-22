@@ -111,7 +111,7 @@ public class DesignAndWrapUpSessionTests : IDisposable
         config.TrySet("saveSessions", "false", out _);
         config.TrySet("maxSteps", maxSteps.ToString(), out _);
         if (reasoning is not null) config.TrySet("reasoningModel", "big-model", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine, true, reasoning) { NamesTasks = false };
+        return new ChatSession(config, _root, streaming: false, provider, engine, true, reasoning) { NamesTasks = false, UsesGraph = false };
     }
 
     [Fact]

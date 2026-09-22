@@ -393,6 +393,31 @@ the user as the answer and the file never written. `/status` (F2 in the window) 
 token estimate, Jev calls and ms, escalations, designs, approvals, memory size,
 grants; `/new` starts a fresh session and log.
 
+**The knowledge graph** (`Graph/`: `KuzuNative` P/Invoke + `KuzuGraph` wrapper
+taken from `C:\code\psmon\akka-graph-loop`, `KnowledgeGraph` schema and
+queries; `Agent/GraphMemory` the session-level use; `Agent/KnowledgeDistiller`
+the 1–3-line extraction; `Commands/MemoryCommand`). An embedded **Kùzu**
+database at `<workspace>/graph/knowledge.kuzu`; the shared library
+(`kuzu_shared.dll` / `libkuzu.so` / `libkuzu.dylib`, ~13 MB) is downloaded
+once by `native/Kuzu.targets` into the gitignored `native/_cache/` and copied
+next to the build, test and publish output — the release workflow stages it
+into the archive and the smoke test checks it is there. No library → `Open`
+returns null → the agent runs without the graph and says so. Schema: `Turn
+-LEARNED-> Knowledge -JUSTIFIED_BY-> Rationale`, `Knowledge -ABOUT-> Path`,
+`Knowledge -HELPED-> Turn {how}`; one open handle per database (a test that
+wants to look inside disposes the session first). Three more fixed-option Jev
+questions in `SmartRouter`: after a turn `WorthSavingAsync` (save/skip, choice
+only → distil and `Learn` off the turn, on `_background`); before a turn, when
+the graph holds anything and the route is not web, `GraphHelpsAsync`
+(consult/skip) then `GraphStrategyAsync` (by_keywords / by_paths / recent /
+most_helpful — the "best Cypher" is one of four, run with the request's
+words; keywords is the fallback when the chosen one finds nothing), and hits
+are injected as `[graph memory]` material with `MarkHelped` edges + use
+counts, so ranking learns from use. `ChatSession.UsesGraph` is the test
+switch (like `NamesTasks`): consulting and learning would eat a scripted
+engine's answers. **Dispose is idempotent** — the graph tests dispose the
+session early to open the database themselves.
+
 **The background session** (`Commands/SessionCommand`, `Agent/SessionServer`
 + `SessionClient`, `Services/SessionProtocol` + `SessionRegistry`): `session
 start` spawns `agent-one session serve` detached (stdout/stderr → `logs/

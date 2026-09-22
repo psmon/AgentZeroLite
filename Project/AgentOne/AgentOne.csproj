@@ -47,6 +47,11 @@
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     </ItemGroup>
 
+    <!-- Kùzu, the embedded graph database behind the workspace knowledge graph
+         (Graph/). P/Invoke over a shared library the targets file downloads
+         once and copies next to the binary; no NuGet package, no runtime. -->
+    <Import Project="native\Kuzu.targets" />
+
     <!-- ============================================================
          Auto version bump: patch +1 per build, rollover at 100 -> minor +1.
          Major is manual only (edit version.txt). Mirrors CodeScan/AgentZeroWpf.

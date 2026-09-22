@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using AgentOne.Graph;
 using AgentOne.Llm;
 using AgentOne.Llm.Decision;
 using AgentOne.Services;
@@ -45,12 +46,16 @@ public sealed record SessionStats(
     int MemoryChars,
     string MemoryPath,
     SessionCounters Counters,
-    IReadOnlyList<string> ReadGrants)
+    IReadOnlyList<string> ReadGrants,
+    GraphStats? Graph = null)
 {
     /// <summary>The status block, one fact per line.</summary>
     public IReadOnlyList<string> Describe()
     {
         var c = Counters;
+        var graph = Graph is { } g
+            ? $"graph     {g.Knowledge} items · {g.Paths} paths · {g.Turns} turns · helped {g.Helped} times"
+            : "graph     off (Kùzu library not next to the binary)";
         var lines = new List<string>
         {
             $"task      {Title ?? "(not named yet)"}",
@@ -58,6 +63,7 @@ public sealed record SessionStats(
             $"mode      {(Smart ? "smart" : "basic")} · turns {c.Turns}",
             $"context   {ContextMessages} messages · {ContextChars:N0} chars · ~{EstimatedTokens:N0} tokens (estimate)",
             $"memory    {MemoryChars:N0} / {WorkspaceStore.MemoryCapChars:N0} chars · {MemoryPath}",
+            graph,
             $"models    {Model} · reasoning {ReasoningModel ?? "none"} · shell {Shell}",
             $"jev       {c.JevCalls} calls · {c.JevMs:N0} ms · escalations {c.Escalations} · designs {c.Designs}",
             $"tools     {c.ToolCalls} calls · commands approved {c.ApprovalsGranted}/{c.ApprovalsAsked} asked",
@@ -98,6 +104,7 @@ public sealed class ChatSession : IDisposable
     private readonly string _root;
     private readonly string _logKind;
     private readonly CancellationTokenSource _background = new();
+    private readonly GraphMemory? _graph;
     private SessionStore? _log;
 
     /// <summary>What the agent is doing right now, for a status line.</summary>
@@ -120,6 +127,9 @@ public sealed class ChatSession : IDisposable
 
     /// <summary>The strong model's design came back: its first lines, for a person following along.</summary>
     public event Action<IReadOnlyList<string>>? DesignMade;
+
+    /// <summary>The turn taught something and it was kept in the knowledge graph. Raised off the turn.</summary>
+    public event Action<IReadOnlyList<Distilled>>? Learned;
 
     /// <summary>
     /// Who picks when a design hinges on a choice. The REPL reads a line, the
@@ -164,6 +174,11 @@ public sealed class ChatSession : IDisposable
         _logKind = logKind;
 
         Workspace = new WorkspaceStore(_root).Ensure();
+
+        // The knowledge graph needs Kùzu's library next to the binary; without
+        // it the agent runs as before and the status block says so.
+        try { _graph = GraphMemory.Open(Workspace); }
+        catch (InvalidOperationException) { _graph = null; }
 
         // Smart starts where the config left it, but only with a key to make it
         // work. Starting "on" with no key would fail on the first turn.
@@ -297,7 +312,8 @@ public sealed class ChatSession : IDisposable
             snapshot.Smart, LogPath, _root, Model, ReasoningModel, Shell, Title,
             _loop.Messages.Count, chars, Tokens.Estimate(_loop.Messages),
             Workspace.MemoryChars, Workspace.MemoryPath,
-            snapshot.Counters, snapshot.ReadGrants);
+            snapshot.Counters, snapshot.ReadGrants,
+            _graph is null ? null : SafeStats());
     }
 
     /// <summary>
@@ -322,7 +338,8 @@ public sealed class ChatSession : IDisposable
 
         var snapshot = _state.Read();
         _log?.Prompt(line, snapshot.Smart);
-        _state.CountTurn();
+        var turnNumber = _state.CountTurn();
+        var turnId = $"{_log?.Id ?? "session"}-{turnNumber}";
 
         var smart = snapshot.Smart && SmartRouter.Applies(line);
         var prompt = line;
@@ -347,6 +364,17 @@ public sealed class ChatSession : IDisposable
             {
                 prompt = route.Guidance(line);
                 families = route.Families;
+            }
+
+            // Before any file is scanned: does the graph already know? The
+            // engine says whether to look and which query to run; what comes
+            // back is material for the model, and the graph remembers it helped.
+            if (_graph is not null && UsesGraph && route.Route != Route.Web && GraphHasKnowledge())
+            {
+                _graph.Graph.RememberTurn(turnId, line, "(in progress)");
+                var consult = await ConsultGraphAsync(turnId, line, ct);
+                if (consult is { Items.Count: > 0 })
+                    prompt = prompt + Environment.NewLine + Environment.NewLine + consult.Material();
             }
 
             // Work in the workspace, or work whose shape is unclear, may be big
@@ -381,7 +409,66 @@ public sealed class ChatSession : IDisposable
 
         _log?.Result(run);
         Remember(line, run);
+        if (_graph is not null && UsesGraph && _smartAvailable && _provider.Name != "echo") _ = LearnAsync(turnId, line, run);
         return run;
+    }
+
+    // ------------------------------------------------------- knowledge graph
+
+    private bool GraphHasKnowledge()
+    {
+        try { return _graph!.HasKnowledge; }
+        catch (InvalidOperationException) { return false; }
+    }
+
+    private GraphStats? SafeStats()
+    {
+        try { return _graph!.Stats(); }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    private async Task<GraphConsult?> ConsultGraphAsync(string turnId, string request, CancellationToken ct)
+    {
+        GraphConsult? consult;
+        try
+        {
+            consult = await _graph!.ConsultAsync(_router, turnId, request, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Noted?.Invoke("graph memory unavailable: " + ex.Message);
+            return null;
+        }
+
+        var verdict = consult.Consulted
+            ? consult.Items.Count > 0 ? $"consulted via {consult.StrategyName} — {consult.Items.Count} item(s)" : $"consulted via {consult.StrategyName} — nothing matched"
+            : consult.Helps.Ok ? "not needed" : $"unavailable ({consult.Helps.Message})";
+        _log?.Decision("graph", consult.Helps, verdict);
+        Decided?.Invoke(new SmartNote("graph", consult.Helps, verdict));
+
+        if (consult.Items.Count > 0)
+            foreach (var item in consult.Items)
+                Noted?.Invoke($"  ↳ ({item.Kind}) {item.Title}");
+
+        return consult;
+    }
+
+    /// <summary>Off the turn: judge, distil, store. Nothing here can fail the turn that is already over.</summary>
+    private async Task LearnAsync(string turnId, string request, AgentRun run)
+    {
+        try
+        {
+            var items = await _graph!.LearnAsync(_router, _provider, turnId, request, run, _background.Token);
+            if (items.Count == 0) return;
+
+            foreach (var item in items)
+                _log?.Step(new AgentStep(0, "learned", $"({item.Kind}) {item.Title} — {item.Text}", true));
+            Learned?.Invoke(items);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ChatProviderException or InvalidOperationException)
+        {
+            // Memory is a bonus; a failed distillation is not worth a line.
+        }
     }
 
     private static int ToolSteps(AgentRun run) =>
@@ -454,6 +541,9 @@ public sealed class ChatSession : IDisposable
     /// </summary>
     /// <summary>Off for tests that count provider calls; the naming call runs beside the turn and would race them.</summary>
     internal bool NamesTasks { get; set; } = true;
+
+    /// <summary>Off for tests that script the engine: consulting and learning would consume its answers.</summary>
+    internal bool UsesGraph { get; set; } = true;
 
     private async Task RetitleAsync(string request)
     {
@@ -705,10 +795,15 @@ public sealed class ChatSession : IDisposable
         return digest;
     }
 
+    private bool _disposed;
+
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _background.Cancel();
         _background.Dispose();
+        _graph?.Dispose();
         _engine.Dispose();
         _toolbelt.Dispose();
         (_reasoning as IDisposable)?.Dispose();
