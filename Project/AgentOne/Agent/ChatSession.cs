@@ -256,8 +256,12 @@ public sealed class ChatSession : IDisposable
             }
 
             // Work in the workspace, or work whose shape is unclear, may be big
-            // enough to design first. Web lookups and plain answers never are.
-            if (_reasoning is not null && route.Route is not (Route.Web or Route.Answer))
+            // enough to design first. A confident web lookup or plain answer
+            // never is — but an unsure route keeps every tool, so it is sized too:
+            // "make a board API" once routed answer_directly at 0.58 and got no
+            // design for exactly the request that needed one.
+            var mayBuild = !route.Steers || route.Route == Route.Files;
+            if (_reasoning is not null && mayBuild)
             {
                 var design = await MaybeDesignAsync(line, ct);
                 if (design is { } plan)
@@ -293,6 +297,7 @@ public sealed class ChatSession : IDisposable
         var scope = await _router.ScopeAsync(request, Digest(), ct);
         var strong = _config.ReasoningModel;
         var verdict = scope.NeedsDesign ? $"large — {strong} designs first"
+            : scope.Decision is { Ok: true, Choice: SmartRouter.NeedsDesign } ? "large but unsure — going ahead without a design"
             : scope.Decision.Ok ? "small — going ahead"
             : $"unavailable ({scope.Decision.Message}), going ahead";
         _log?.Decision("scope", scope.Decision, verdict);

@@ -373,7 +373,9 @@ for the session. **Commands go through a gate** (`ChatSession.GateAsync`):
 force-push…) always ask a person; otherwise Jev's safety question runs it only
 on a *confident* `safe`; everything else is put to `ChatSession.Approver` — the
 REPL reads a line, the window parks the turn on the input line, `run` refuses
-unless `--yes`. Smart mode also sizes workspace work (`scope`): `needs_design`
+unless `--yes`. Smart mode also sizes workspace work (`scope`, asked for a
+workspace route and for an unsure one): a *confident* `needs_design` — it is a
+steer, so the floor applies; "run the build" once got needs_design at 0.55 —
 sends the request to the reasoning model for a design (`ReasoningSubtask.
 DesignAsync`) that comes back as `[design:<model>]` for the everyday model to
 build. `/status` (F2 in the window) prints `SessionStats` — context size and

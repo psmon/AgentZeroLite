@@ -302,9 +302,16 @@ public class ScopeAndSafetyTests
         new(engine, 0.60, "small-model", reasoning);
 
     [Fact]
-    public async Task ScopeFollowsTheChoiceAndIsNeverAskedWithoutAStrongModel()
+    public async Task ScopeNeedsAConfidentChoiceAndIsNeverAskedWithoutAStrongModel()
     {
-        var asked = new ScriptedDecisionEngine(Choose(SmartRouter.NeedsDesign, 0.3));
+        // A design steers the whole turn, so it is held to the floor like a route:
+        // "run the build" once got needs_design at 0.55 and a design nobody asked for.
+        var unsure = new ScriptedDecisionEngine(Choose(SmartRouter.NeedsDesign, 0.55));
+        var weak = await Router(unsure).ScopeAsync("run the build and see if it works", "", CancellationToken.None);
+        Assert.False(weak.NeedsDesign);
+        Assert.Contains("NOW, not the state of the project", unsure.LastState!);
+
+        var asked = new ScriptedDecisionEngine(Choose(SmartRouter.NeedsDesign, 0.9));
         var scope = await Router(asked).ScopeAsync("build a fastapi service with three routes", "", CancellationToken.None);
         Assert.True(scope.NeedsDesign);
         Assert.Equal([SmartRouter.SmallTask, SmartRouter.NeedsDesign], asked.LastOptions!.Select(o => o.Name));
@@ -476,7 +483,7 @@ public class DevSessionTests : IDisposable
         var strong = new ScriptedChatProvider("1. create app.py\n2. run it");
         var engine = new ScriptedDecisionEngine(
             Choose(SmartRouter.WorkInWorkspace, 0.9),
-            Choose(SmartRouter.NeedsDesign, 0.4));
+            Choose(SmartRouter.NeedsDesign, 0.9));
         using var session = Session(basic, engine, smart: true, reasoning: strong);
 
         var steps = new List<AgentStep>();

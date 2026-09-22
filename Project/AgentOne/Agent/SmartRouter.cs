@@ -110,12 +110,13 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public static readonly DecisionOption[] ScopeOptions =
     [
         new(SmallTask,
-            "A small, well-defined piece of work or question: one or two files, a single command, a fix, an explanation. " +
-            "The everyday model can do it directly."),
+            "The request itself is small and well-defined, whatever state the project is in: run a build, run the tests, " +
+            "execute a command, check whether something works, fix one error, change one or two files, answer a question. " +
+            "The everyday model does it directly."),
         new(NeedsDesign,
-            "A feature or a project large enough that doing it without a plan would go wrong: several new files, a structure " +
-            "to choose, dependencies between steps, a scaffold to create. Have the stronger model design the file layout " +
-            "and the steps first; then the everyday model implements it.")
+            "The request asks for something new and large: a project or a feature from scratch, several new files, a " +
+            "structure to choose, dependencies between steps, a scaffold to create. Doing it without a plan would go wrong. " +
+            "Have the stronger model design the file layout and the steps first; then the everyday model implements it.")
     ];
 
     public static readonly DecisionOption[] SafetyOptions =
@@ -167,8 +168,12 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     // ------------------------------------------------------------- scope
 
     /// <summary>
-    /// Follows the choice, not the floor: designing first costs a strong-model
-    /// call, not correctness, and a two-option judgement rarely clears 0.60.
+    /// The floor applies here, unlike escalation: a design changes what the
+    /// turn <em>does</em> — the everyday model is handed a plan and starts
+    /// building — so it is a steer, and a weak call must not steer. Measured:
+    /// "run the build and see if it works" got needs_design at 0.55 because the
+    /// half-built project in the digest looked like large work, and the person
+    /// waited on a design they had not asked for.
     /// </summary>
     public async Task<ScopeDecision> ScopeAsync(string request, string context, CancellationToken ct)
     {
@@ -177,10 +182,12 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         ActivityStarted?.Invoke("judging the size of the work");
 
         var state = ModelsLine + "\n\nRequest:\n" + request
-                    + (context.Length == 0 ? "" : "\n\nWhat is already known about the project:\n" + context);
+                    + (context.Length == 0 ? "" : "\n\nWhat is already known about the project:\n" + context)
+                    + "\n\nJudge the size of what the request asks for NOW, not the state of the project.";
 
         var decision = await engine.ChooseAsync(state, ScopeQuestion, ScopeOptions, ct);
-        return new ScopeDecision(decision.Ok && decision.Choice == NeedsDesign, decision);
+        var needsDesign = decision.Ok && decision.Choice == NeedsDesign && decision.Confidence >= confidenceFloor;
+        return new ScopeDecision(needsDesign, decision);
     }
 
     // ------------------------------------------------------------ safety
