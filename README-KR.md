@@ -117,6 +117,16 @@ AgentZero Lite는 단순한 아이디어로 만들어진 Windows 데스크톱 �
   스크립트 어디서든 실행해 GUI를 `WM_COPYDATA` + 메모리 맵 파일로 제어합니다.
 - **액터 모델 (Akka.NET)** — 터미널 생명주기, 워크스페이스 라우팅, 채팅 입력을
   감독받는 액터로 처리합니다. 한 세션이 죽어도 창 전체가 내려가지 않습니다.
+- **🧭 agent-one — 같은 저장소의 독립 CLI 에이전트, 코드 공유 없음** — Native AOT
+  단일 바이너리(Windows / macOS / Linux, npm 설치)로, 워크스페이스를 읽고 파일을
+  쓰고 승인 게이트 뒤에서 명령을 실행해 답합니다. 작고 빠른 온디바이스 모델이
+  일을 하고, 결정 엔진(TypeSafe *Jev*)이 고정 질문 — 라우팅, 규모, 안전, 상위
+  모델로 에스컬레이션 — 에 답합니다. 워크스페이스별로 기억하고(메모리 파일,
+  재개 가능한 세션, 엔진이 채우고 참고하는 **Kùzu 지식 그래프**), GUI Bot 모드와
+  **같은 `AgentBotActor` / `AgentLoopActor` 쌍**을 자체 Akka.NET 위에서 돌리며,
+  백그라운드 세션으로 어느 셸에서든 — 다른 에이전트가 — 구동할 수 있습니다.
+  아래 [agent-one 섹션](#-agent-one--독립-cli-에이전트)과
+  [Project/AgentOne/README.md](Project/AgentOne/README.md) 참고.
 - **실행 파일 하나, 프로세스 하나** — 단일 인스턴스 가드, 설정은 SQLite, .NET 10
   런타임 외 의존성 없음. 빌드 크기 ~60 MB.
 
@@ -189,6 +199,9 @@ NOTE(워크스페이스별 마크다운 뷰어).
 
 모든 메시지는 `ZeroCommon/Actors/Messages.cs` 한 곳에 정의돼 있습니다.
 Agent 어휘 표준 표 — `harness/knowledge/_shared/agent-architecture.md`.
+같은 두 액터 구조가 같은 메시지 이름으로 [agent-one](#-agent-one--독립-cli-에이전트)
+안에서도 자체 `ActorSystem`(`/user/bot` → `/user/bot/loop`)으로 돌아가므로, CLI 와
+GUI 의 Bot 모드를 같은 눈으로 읽을 수 있습니다.
 
 ---
 
@@ -201,9 +214,14 @@ Agent 어휘 표준 표 — `harness/knowledge/_shared/agent-architecture.md`.
 | **AgentTest**        | `Project/AgentTest/`          | xUnit (net10.0-windows)       | `AgentTest.*`        |
 | **ZeroWearable**     | `Project/ZeroWearable/`       | Exe (net10.0-windows10.0.19041) | `ZeroWearable.*`   |
 | **ZeroCommon.Tests** | `Project/ZeroCommon.Tests/`   | xUnit (net10.0, 헤드리스)     | `ZeroCommon.Tests.*` |
+| **AgentZeroAvalonia** | `Project/AgentZeroAvalonia/` | Exe (net10.0, Avalonia, Win+macOS) | `AgentZeroAvalonia.*` |
+| **AgentOne**         | `Project/AgentOne/`           | Exe (net10.0, Native AOT, `agent-one`) | `AgentOne.*` |
+| **AgentOne.Tests**   | `Project/AgentOne.Tests/`     | xUnit (net10.0, 헤드리스)     | `AgentOne.Tests.*`   |
 
 참조 관계: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`, 그리고
-`ZeroWearable → ZeroCommon`. WPF / Win32 의존성이 없는 코드는 전부 ZeroCommon에
+`ZeroWearable → ZeroCommon`. **AgentOne 은 아무것도 참조하지 않고 참조되지도
+않습니다** — 저장소와 액터 어휘를 공유하는 두 번째 제품이지, 코드를 공유하지는
+않습니다. WPF / Win32 의존성이 없는 코드는 전부 ZeroCommon에
 있어야 합니다. **ZeroWearable은 의도적으로 별도 프로세스**입니다 — BLE 센트럴이
 WinRT라 Windows SDK 타겟 프레임워크가 필요하고, GUI를 거기로 옮길 수는 없기 때문입니다.
 시계의 단일 BLE 링크를 이 프로세스가 소유합니다 —
@@ -229,6 +247,12 @@ Project/AgentZeroWpf/bin/Debug/net10.0-windows/AgentZeroLite.exe
 
 # 헤드리스 테스트 (공용 로직)
 dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj
+
+# agent-one — 독립 CLI 에이전트 (나머지는 자체 README 에)
+dotnet build Project/AgentOne/AgentOne.csproj -c Debug
+dotnet test  Project/AgentOne.Tests/AgentOne.Tests.csproj
+Project/AgentOne/agent-one.ps1 run "hello" --provider echo
+Project/AgentOne/agent-one.ps1 chat
 
 # WPF 의존 테스트 (액터, 터미널 세션, 승인 파서)
 dotnet test Project/AgentTest/AgentTest.csproj
@@ -567,6 +591,44 @@ mAP 가 약간 떨어집니다 — 명확한 악기 (피아노, 드럼, 기타, 
 
 ---
 
+## 🧭 agent-one — 독립 CLI 에이전트
+
+```console
+$ agent-one chat
+› 보드 API 만들어줘
+  route: → workspace  (confidence 0.98)
+  scope: small — going ahead  (confidence 0.73)
+  graph: consulted via by_keywords — 2 item(s)  (confidence 0.81)
+  ✓ write_file  (0.0s)
+  ⚠ run this command?  dotnet build src/BoardApi     ← y 를 치면 실행
+  ✓ run_command  (4.1s)
+  escalation: keeping the draft  (confidence 0.98)
+◆ 보드 API를 만들고 빌드했습니다. 다음 단계: 1. … 2. …
+  knowledge: kept 2 item(s)  (confidence 0.84)
+```
+
+AgentZero Lite 는 데스크톱이고, **agent-one** 은 같은 생각을 어느 머신에나
+`npm install` 할 수 있는 단일 바이너리로 옮긴 것입니다: 폴더 안에서 일하는
+에이전트, 작고 빠른 온디바이스 모델, 그 모델을 정직하게 잡아 주는 결정 엔진.
+[`Project/AgentOne`](Project/AgentOne/) 에 살고 이 저장소의 다른 어떤 것도
+참조하지 않습니다 — Native AOT 는 Akka.Remote, EF Core, LLamaSharp, ONNX 를
+실을 수 없습니다 — 다만 구조는 빌려 왔습니다.
+
+| | |
+|---|---|
+| **도구** | 파일(`list_files` `read_file` `find_files` `grep`), 워크스페이스 루트 안에서만 `write_file`, `web_search` / `web_read`(GET 만), `run_command`(루트에서 PowerShell / bash). 쓰기와 실행은 *보호되는* 패밀리: 위험 패턴은 항상 사람에게 묻고, 그 외는 결정 엔진의 `safe` 가 확신할 때만 그냥 실행, 아니면 묻습니다. |
+| **스마트 모드** | 턴 앞에서 엔진이 도구 패밀리를 고르고(제안이 아니라 강제), 워크스페이스 작업의 규모를 재며(크면 상위 모델의 *설계* 부터), 일상 모델의 초안이 나온 뒤에는 느리고 강한 **추론 모델**이 한 번 더 봐야 하는지 결정합니다. 모델 둘, 고정 질문 엔진 하나(TypeSafe *System One*, 질문당 ~0.3 초), 계획용 LLM 호출 없음. 실측 기록은 [`docs/smart-mode-jev.md`](Project/AgentOne/docs/smart-mode-jev.md). |
+| **메모리** | 워크스페이스별 메모리 파일(50 k 자, 세션마다 열림), `/resume` 으로 화면까지 재연되는 저장 세션, 모델이 붙이는 작업 제목. 그리고 **지식 그래프**(임베디드 Kùzu, Cypher): 턴이 끝날 때마다 엔진이 *남길 가치가 있나?* 를 판단하고, 모델이 1~3 줄로 증류해 엔진의 근거를 노드로 붙여 저장하며, 턴 앞에서는 엔진이 그래프를 볼지 — 어떤 쿼리로 볼지 — 를 정해 파일을 뒤지기 전에 참고합니다. `agent-one memory` 로 들여다볼 수 있습니다. |
+| **백그라운드 세션** | `agent-one session start` 가 세션 하나를 분리 실행하고, 어느 셸에서든 `agent-one ask "…"` 가 턴의 이벤트를 스트리밍하며 승인도 같은 파이프로 답합니다. 한 번에 하나, `session stop` 으로 끝. 릴리스 플랫폼마다 채팅 모드가 스스로를 테스트하는 방법이자, 다른 에이전트(예: AgentZero 의 Claude 탭)가 agent-one 과 협업하는 방법입니다. |
+| **액터** | 대화는 `AgentBotActor`(게이트웨이: 콜백, 한 번에 한 턴) 위의 `AgentLoopActor`(세션 소유, Idle ⇄ Running, 시작당 결과 정확히 하나) — `ZeroCommon/Actors/Messages.cs` 의 어휘 그대로, Akka.NET 1.6 나이틀리로, AOT 바이너리 안에서. 창, REPL, `run`, 파이프 서버는 게이트웨이 하나 위의 렌더러입니다. |
+| **일시중지** | 턴이 도는 중 Esc 를 누르면 다음 스텝 앞에서 멈추고, 다음에 친 한 줄을 *재개* / *중단* / *개선* 으로 읽습니다 — 개선이면 그 줄이 `[the user, mid-turn] …` 으로 모델 앞에 놓입니다. |
+| **배포** | `dotnet publish` → RID 마다(win-x64, linux-x64, osx-arm64, osx-x64) 약 22 MB 바이너리 하나와 옆의 Kùzu 라이브러리. 릴리스 워크플로가 각각을 스모크 테스트(설정 화면, 파이프 위의 채팅 모드)하고 npm 래퍼 `@webnori/agent-one` 이 받아서 검증합니다. |
+
+나머지 — 설정 화면, 채팅 창의 키, 안전 경계, JSON 계약, `~/.agent-one/` 의 구성 —
+는 **[Project/AgentOne/README.md](Project/AgentOne/README.md)** 에 있습니다.
+
+---
+
 ## 🧪 하네스 — 펑션콜 체인의 셀프 개선
 
 LLM을 유용한 툴 체인으로 엮는 일은 **어렵고**, 솔직히 (아직) 제가 잘하는
@@ -762,7 +824,8 @@ EF Core가 자동 마이그레이션).
 
 ## 상태
 
-**Alpha — 현재 릴리스 v0.20.x.** 헤드리스 스위트 그린(500+ 테스트). WPF 통합
+**Alpha — 현재 릴리스 v0.20.x.** 헤드리스 스위트 그린(500+ 테스트), agent-one
+자체 스위트도 그린(500+, Akka.TestKit 아래의 액터 쌍 포함). WPF 통합
 테스트는 데스크톱 세션에서만 실행되는 opt-in 항목입니다. `ZeroCommon` 내부 API는
 v1.0까지 불안정한 것으로 간주됩니다.
 

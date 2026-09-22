@@ -554,6 +554,21 @@ the `text` field out of the JSON envelope as it arrives, and deliberately stream
 **nothing** for a tool call, because `grep` also has a `text` argument and
 printing a search pattern as the answer would be a plausible-looking lie.
 
+## Documentation pairs — update both languages together
+
+Three READMEs exist in two languages, and a change to one is not done until
+the other says the same thing (translated, not summarised):
+
+| English | Korean |
+|---|---|
+| `README.md` | `README-KR.md` |
+| `README-EX.en.md` | `README-EX.md` |
+| `README-Avalonia.md` | `README-Avalonia-KR.md` |
+
+`Project/AgentOne/README.md` and `Docs/wearable-device.md` (`.kr.md`) follow
+the same rule where a twin exists. Anchors differ per language — a section
+link in the Korean file points at the Korean heading's slug.
+
 ## Ancestor reference — AgentWin (Origin)
 
 AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). When the user mentions *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"the ancestor"*, or asks to *"compare with origin"* / *"오리진이랑 비교"* / *"오리진 참고"*, **read `Docs/agent-origin/` first** instead of crawling the Origin codebase from scratch:
