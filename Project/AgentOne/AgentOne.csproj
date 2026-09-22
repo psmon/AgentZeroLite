@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>AgentOne</RootNamespace>
+        <AssemblyName>agent-one</AssemblyName>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+
+        <!-- Cross-OS single binary. AOT only kicks in on `dotnet publish`;
+             plain `dotnet build` stays a normal framework-dependent build. -->
+        <PublishAot>true</PublishAot>
+        <TrimMode>link</TrimMode>
+        <IlcOptimizationPreference>Size</IlcOptimizationPreference>
+        <!-- Ordinal string semantics only: no ICU dependency, so the linux-x64
+             binary also runs on musl/alpine images without libicu installed. -->
+        <InvariantGlobalization>true</InvariantGlobalization>
+
+        <!-- Every JSON type goes through AgentOneJson (source-generated).
+             This flag makes any accidental reflection-based path a build error. -->
+        <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+
+        <!-- Version: auto-bumped by BumpVersion below (do not set manually) -->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="AgentOne.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- packaging/ is the npm wrapper (JS + docs); never compile it. -->
+        <Compile Remove="packaging\**" />
+        <Content Remove="packaging\**" />
+        <None Remove="packaging\**" />
+        <EmbeddedResource Remove="packaging\**" />
+    </ItemGroup>
+
+    <!-- ============================================================
+         Auto version bump: patch +1 per build, rollover at 100 -> minor +1.
+         Major is manual only (edit version.txt). Mirrors CodeScan/AgentZeroWpf.
+         CI passes SkipAutoBumpVersion=true -p:Version=x.y.z so a tagged release
+         keeps the tag's version instead of bumping it.
+         ============================================================ -->
+    <UsingTask TaskName="BumpVersion"
+               TaskFactory="RoslynCodeTaskFactory"
+               AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+        <ParameterGroup>
+            <VersionFilePath ParameterType="System.String" Required="true" />
+            <ResultVersion ParameterType="System.String" Output="true" />
+        </ParameterGroup>
+        <Task>
+            <Code Type="Fragment" Language="cs"><![CDATA[
+int major = 0, minor = 0, patch = 0;
+if (File.Exists(VersionFilePath))
+{
+    var parts = File.ReadAllText(VersionFilePath).Trim().Split('.');
+    if (parts.Length == 3)
+    {
+        int.TryParse(parts[0], out major);
+        int.TryParse(parts[1], out minor);
+        int.TryParse(parts[2], out patch);
+    }
+}
+patch++;
+if (patch >= 100) { patch = 0; minor++; }
+ResultVersion = $"{major}.{minor}.{patch}";
+File.WriteAllText(VersionFilePath, ResultVersion);
+]]>
+            </Code>
+        </Task>
+    </UsingTask>
+
+    <Target Name="AutoBumpVersion" BeforeTargets="BeforeBuild" Condition="'$(SkipAutoBumpVersion)' != 'true'">
+        <BumpVersion VersionFilePath="$(MSBuildProjectDirectory)\version.txt">
+            <Output TaskParameter="ResultVersion" PropertyName="Version" />
+        </BumpVersion>
+        <Message Importance="high" Text="=== agent-one build version: $(Version) ===" />
+    </Target>
+
+    <Target Name="LogPinnedVersion" BeforeTargets="BeforeBuild" Condition="'$(SkipAutoBumpVersion)' == 'true'">
+        <Message Importance="high" Text="=== agent-one pinned version: $(Version) (auto-bump skipped) ===" />
+    </Target>
+
+</Project>

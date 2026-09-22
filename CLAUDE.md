@@ -213,6 +213,56 @@ What differs from the WPF host, and why:
 - **Local LLM is Windows-only** (LLamaSharp DLLs); macOS uses External providers. Gemma 4's native tool-call syntax is converted to the JSON envelope by `GemmaNativeToolCall` (ZeroCommon, benefits both hosts).
 - CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-14, `.app` bundle via `macos/build-app.sh`); `release.yml` is untouched. macOS GUI checks need a person: `Docs/avalonia-v2/macos-smoke.md`.
 
+### `Project/AgentOne` — a standalone CLI agent (`agent-one`), npm-bound
+
+A second, **independent** product in this repo: a cross-platform CLI agent that
+publishes as a Native AOT single binary (win-x64 / linux-x64 / osx-arm64 /
+osx-x64, ~6 MB, no runtime to install) and ships through npm as
+`@webnori/agent-one`. Skeleton borrowed from `C:\code\psmon\CodeScan` — argv
+switch in `Program.cs` → `Commands/`, all state under `~/.agent-one/`
+(`Services/AppPaths`), `version.txt` MSBuild auto-bump, `packaging/npm/` wrapper
+that downloads a release asset and verifies its SHA256. Full guide:
+`Project/AgentOne/README.md`.
+
+```bash
+dotnet build Project/AgentOne/AgentOne.csproj -c Debug
+dotnet test  Project/AgentOne.Tests/AgentOne.Tests.csproj     # headless, cross-platform
+Project/AgentOne/bin/Debug/net10.0/agent-one run "hello" --provider echo
+dotnet publish Project/AgentOne/AgentOne.csproj -c Release -r win-x64 -o out/win-x64
+```
+
+**It references nothing else in this solution, and nothing references it.** That
+is the point, not an oversight: ZeroCommon's agent loop is bound to Akka, EF
+Core, LLamaSharp and ONNX with `runtimes/win-x64-*` natives — none of which
+survives Native AOT or a non-Windows target. agent-one reimplements the small
+part it needs (`Agent/AgentLoop` over `IChatProvider` + `IToolbelt`, one JSON
+envelope per turn) so it stays extractable into its own repo. The intended
+integration is process-level: launch `agent-one --json` and read one object off
+stdout, the way the GUI launches `AgentZeroWearable.exe`.
+
+Three things that are easy to break here:
+
+- **AOT means no reflection-based JSON.** Every serialized type is declared in
+  `AgentOneJson` (config, indented) or `AgentOneWireJson` (wire / JSONL /
+  `--json`, compact), and the csproj sets
+  `JsonSerializerIsReflectionEnabledByDefault=false` so a stray
+  `JsonSerializer.Serialize(obj, type, options)` is an IL2026/IL3050 **warning at
+  build time** instead of a crash that only appears in the published binary.
+- **`ToolCatalog` is the single source of truth** for the verbs — the system
+  prompt is generated from it, `agent-one tools list` prints it, and
+  `ToolCatalogTests` asserts the toolbelt answers every verb in it. Add a verb in
+  one place only and the tests fail rather than the model getting confused.
+- **The Windows AOT link step needs `vswhere.exe` on `PATH`** (
+  `C:\Program Files (x86)\Microsoft Visual Studio\Installer`) or a Developer
+  prompt; Linux needs `clang` + `zlib1g-dev`. The release workflow
+  (`.github/workflows/agent-one-release.yml`, tag `agent-one-v*`) handles both and
+  smoke-tests each artifact before it reaches the release page.
+
+v0 tools are read-only (`list_files`, `read_file`) and sandboxed to `--root`,
+resolved through symlinks before the containment check. Tool output reaches the
+model as `[tool:<name>]` user messages and the system prompt states it is data,
+not instructions.
+
 ## Ancestor reference — AgentWin (Origin)
 
 AgentZeroLite was forked from `D:\Code\AI\AgentWin` (the **Origin** project). When the user mentions *"오리진"*, *"AgentWin"*, *"조상 프로젝트"*, *"the ancestor"*, or asks to *"compare with origin"* / *"오리진이랑 비교"* / *"오리진 참고"*, **read `Docs/agent-origin/` first** instead of crawling the Origin codebase from scratch:

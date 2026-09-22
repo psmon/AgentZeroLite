@@ -466,3 +466,8 @@ env.json
 .mcp.json
 /.playwright-mcp
 Project/Plugins/agent-band.zip
+
+# agent-one npm wrapper: the downloaded binary never gets committed, but the
+# launcher in bin/ is source and must survive the global [Bb]in/ rule above.
+Project/AgentOne/packaging/npm/agent-one/vendor/
+!Project/AgentOne/packaging/npm/agent-one/bin/

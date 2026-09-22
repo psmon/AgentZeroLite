@@ -1,0 +1,182 @@
+name: agent-one release
+
+# Tag `agent-one-v0.1.0` (or run manually) to build the native binaries, publish
+# a GitHub Release, and push the npm wrapper whose version matches that tag.
+#
+# This workflow is scoped to Project/AgentOne only — release.yml (AgentZero Lite
+# installer) and avalonia-build.yml are untouched by it.
+
+on:
+  push:
+    tags:
+      - 'agent-one-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 0.1.0). No tag is created.'
+        required: true
+      publish_npm:
+        description: 'Also publish the npm wrapper (needs NPM_TOKEN)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  PROJECT: Project/AgentOne/AgentOne.csproj
+  TESTS: Project/AgentOne.Tests/AgentOne.Tests.csproj
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            V="${GITHUB_REF_NAME#agent-one-v}"
+          else
+            V="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "building agent-one $V"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test ${{ env.TESTS }} --nologo
+
+  build:
+    needs: [version, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            archive: zip
+          - os: ubuntu-latest
+            rid: linux-x64
+            archive: tar.gz
+          - os: macos-14
+            rid: osx-arm64
+            archive: tar.gz
+          - os: macos-13
+            rid: osx-x64
+            archive: tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Native AOT on Linux links with clang against zlib; the hosted image has
+      # neither by default.
+      - name: Install native toolchain (Linux)
+        if: matrix.rid == 'linux-x64'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish AOT binary
+        shell: bash
+        run: |
+          dotnet publish "$PROJECT" \
+            -c Release -r ${{ matrix.rid }} \
+            -p:SkipAutoBumpVersion=true \
+            -p:Version=${{ needs.version.outputs.version }} \
+            -o out/${{ matrix.rid }} \
+            --nologo
+
+      - name: Stage archive contents
+        shell: bash
+        run: |
+          mkdir -p stage/agent-one
+          if [ "${{ matrix.rid }}" = "win-x64" ]; then
+            cp out/${{ matrix.rid }}/agent-one.exe stage/agent-one/
+          else
+            cp out/${{ matrix.rid }}/agent-one stage/agent-one/
+            chmod +x stage/agent-one/agent-one
+          fi
+          cp Project/AgentOne/README.md stage/agent-one/ || true
+
+      # Smoke-test the artifact itself, not the build tree: a binary that cannot
+      # answer `run --provider echo` must never reach a release page.
+      - name: Smoke test
+        shell: bash
+        run: |
+          if [ "${{ matrix.rid }}" = "win-x64" ]; then BIN=stage/agent-one/agent-one.exe; else BIN=stage/agent-one/agent-one; fi
+          "$BIN" --version
+          "$BIN" tools list
+          OUT=$("$BIN" run "hello" --provider echo --no-session)
+          echo "$OUT"
+          test "$OUT" = "hello"
+
+      - name: Archive
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd stage && 7z a -tzip ../dist/agent-one-${{ matrix.rid }}.zip agent-one)
+          else
+            tar -czf dist/agent-one-${{ matrix.rid }}.tar.gz -C stage agent-one
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-one-${{ matrix.rid }}
+          path: dist/*
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect and checksum
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name '*.zip' -o -name '*.tar.gz' \) -exec cp {} dist/ \;
+          cd dist && sha256sum * > checksums.txt && cat checksums.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: agent-one-v${{ needs.version.outputs.version }}
+          name: agent-one v${{ needs.version.outputs.version }}
+          files: dist/*
+          generate_release_notes: true
+
+  npm:
+    needs: [version, release]
+    if: github.event_name == 'push' || github.event.inputs.publish_npm == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # The npm version IS the release tag — scripts/install.js derives the
+      # download URL from it, so they can never drift apart.
+      - name: Stamp version and publish
+        working-directory: Project/AgentOne/packaging/npm/agent-one
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN not set — skipping npm publish (the GitHub Release is already up)."
+            exit 0
+          fi
+          npm version ${{ needs.version.outputs.version }} --no-git-tag-version
+          npm publish --access public
