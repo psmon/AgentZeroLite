@@ -281,6 +281,19 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         return await engine.ChooseAsync(state, WorthSavingQuestion, WorthSavingOptions, ct);
     }
 
+    /// <summary>
+    /// Whether a "worth saving?" verdict keeps the turn. Save follows the
+    /// choice; skip has to clear the floor. The costs are lopsided: an item
+    /// kept by mistake is three lines that ranking sinks when nothing ever
+    /// uses them, while a fact forgotten is another scan of the files next
+    /// session. Measured: a turn that wrote a run script and a README — the
+    /// option text's own example of "a command that works" — came back
+    /// "skip" at 0.16. That is the engine saying it cannot tell, and when it
+    /// cannot tell, keeping is the cheap mistake.
+    /// </summary>
+    public bool KeepsKnowledge(Decision verdict) =>
+        verdict.Ok && (verdict.Choice == SaveKnowledge || verdict.Confidence < confidenceFloor);
+
     /// <summary>Before a turn: is the graph worth a look? Follows the choice.</summary>
     public async Task<Decision> GraphHelpsAsync(string request, string graphSummary, CancellationToken ct)
     {

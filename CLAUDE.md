@@ -389,7 +389,16 @@ escapes raw newlines/tabs and unknown backslash escapes inside JSON strings and
 retries the parse (gemma's `write_file` with real newlines, a grep with `\.`);
 what still fails gets the nudge, because `LooksLikeAnAnswer` refuses anything
 shaped like an envelope — measured, a 2,564-char write_file was once shown to
-the user as the answer and the file never written. `/status` (F2 in the window) prints `SessionStats` — task name, context size and
+the user as the answer and the file never written. `ToolCall.RestoreEscapes`
+is the other half: a small model writes `".\run.ps1"` inside JSON and the
+parser, correctly, makes `\r` a carriage return — measured, PowerShell got
+`.<CR>un.ps1`, threw a ParserError, and the model "fixed" the wrong file — so a
+CR/BS/FF followed by a word character gets its backslash back in every
+argument, a tab in paths and commands, a newline in paths only (content, answer
+text and multi-line commands keep theirs). The repeat nudge names the earlier
+result when it failed ("it FAILED: exit code 1 …", "never report it as done"),
+because the plain "use the result" nudge was followed by a claimed success.
+`/status` (F2 in the window) prints `SessionStats` — task name, context size and
 token estimate, Jev calls and ms, escalations, designs, approvals, memory size,
 grants; `/new` starts a fresh session and log.
 
@@ -406,22 +415,37 @@ returns null → the agent runs without the graph and says so. Schema: `Turn
 -LEARNED-> Knowledge -JUSTIFIED_BY-> Rationale`, `Knowledge -ABOUT-> Path`,
 `Knowledge -HELPED-> Turn {how}`; one open handle per database (a test that
 wants to look inside disposes the session first). Three more fixed-option Jev
-questions in `SmartRouter`: after a turn `WorthSavingAsync` (save/skip, choice
-only → distil and `Learn` off the turn, on `_background`); before a turn, when
+questions in `SmartRouter`: after a turn `WorthSavingAsync` (save/skip —
+`KeepsKnowledge`: save on the choice, but skip must clear the floor, an unsure
+skip keeps; measured "skip" at 0.16 for a turn that wrote a run script → distil
+and `Learn` off the turn, on `_background`; the verdict is logged and shown as
+a `knowledge:` note); before a turn, when
 the graph holds anything and the route is not web, `GraphHelpsAsync`
 (consult/skip) then `GraphStrategyAsync` (by_keywords / by_paths / recent /
 most_helpful — the "best Cypher" is one of four, run with the request's
 words; keywords is the fallback when the chosen one finds nothing), and hits
 are injected as `[graph memory]` material with `MarkHelped` edges + use
-counts, so ranking learns from use. `ChatSession.UsesGraph` is the test
+counts, so ranking learns from use. Two measured misses shaped the rest:
+knowledge distilled in English was invisible to a Korean question, so the
+distiller's line is now `kind | title | text | keywords` (search words in
+English and the user's language, stored in a `keywords` column that
+`EnsureSchema` adds to older graphs with `ALTER TABLE`), and when the chosen
+query and the keyword pass both find nothing the newest items go anyway
+(`recent (fallback)`) — the engine said the graph helps, and a miss on words is
+not a no. `ChatSession.UsesGraph` is the test
 switch (like `NamesTasks`): consulting and learning would eat a scripted
 engine's answers. **Dispose is idempotent** — the graph tests dispose the
 session early to open the database themselves.
 
 **The background session** (`Commands/SessionCommand`, `Agent/SessionServer`
 + `SessionClient`, `Services/SessionProtocol` + `SessionRegistry`): `session
-start` spawns `agent-one session serve` detached (stdout/stderr → `logs/
-session.log`), which holds one `ChatSession` behind a `NamedPipeServerStream`
+start` spawns `agent-one session serve` detached through
+`Services/DetachedProcess` — on Windows CreateProcessW with handle inheritance
+OFF, because `Process.Start` hands the child every inheritable handle and a
+daemon started from a piped shell then held the pipe: `session start | cat`
+blocked 3m55s until `session stop` (0.37 s now); elsewhere the three streams
+are redirected and dropped. It logs to `logs/session.log`, holds one
+`ChatSession` behind a `NamedPipeServerStream`
 named from a hash of the home dir and records pid/pipe/root in
 `~/.agent-one/session.json`; one at a time, a dead pid is forgotten on load.
 Protocol is JSON lines: `PipeRequest{op: ask|status|stop|answer}` in,

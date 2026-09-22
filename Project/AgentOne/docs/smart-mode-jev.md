@@ -532,13 +532,41 @@ csproj 를 만들었다. unsure 라우팅일 때도 규모 질문은 묻도록 �
 
 | 질문 | 시점 | 선택지 | 규칙 |
 |---|---|---|---|
-| ⑥ 남길 가치 | 턴 뒤 (백그라운드) | `save` · `skip` | choice 만. save 면 기본 모델이 1~3줄로 증류(`kind \| title \| text`), Jev 의 판단(질문·choice·confidence·근거)이 `Rationale` 노드로 함께 저장 |
+| ⑥ 남길 가치 | 턴 뒤 (백그라운드) | `save` · `skip` | save 는 choice 만, **skip 은 floor 를 넘어야** 한다(확신 없는 skip 은 save). save 면 기본 모델이 1~3줄로 증류(`kind \| title \| text`), Jev 의 판단(질문·choice·confidence·근거)이 `Rationale` 노드로 함께 저장 |
 | ⑦ 그래프가 도움될까 | 턴 앞 (그래프에 뭔가 있고 web 라우팅이 아닐 때) | `consult_graph` · `skip_graph` | state 에 그래프 요약(개수, 가장 많이 아는 경로, 최신 제목) |
 | ⑧ 어떤 쿼리로 | ⑦ 이 consult 일 때 | `by_keywords` · `by_paths` · `recent` · `most_helpful` | 네 개의 고정 Cypher 중 하나를 Jev 가 고른다. 결과 없으면 키워드로 폴백. 결과는 `[graph memory]` 자료로 모델에, 파일 스캔 **전에** |
 
 간선이 곧 학습이다: 어떤 턴에 건네진 지식은 `HELPED` 간선과 `uses` 카운트를 얻고, 쿼리는 uses 순으로
 정렬한다 — 계속 도움이 되는 지식이 올라온다. Jev 의 근거를 `JUSTIFIED_BY` 로 붙여 두는 이유는 나중에
 "왜 이걸 기억하고 있지?"에 답하기 위해서다(`agent-one memory query`).
+
+**skip 에만 floor 를 거는 이유** (실측, 2026-09-23): `hello.py` 한 줄 턴은 `skip` 0.99 — 맞다. 그런데 `run.ps1` 과
+README 를 쓰고 실행까지 한 턴이 `skip` **0.16** 으로 돌아왔다. 선택지 문구가 든 예("동작하는 명령")에 정확히
+해당하는 턴인데도 엔진이 "모르겠다"고 한 것이다. 비용이 비대칭이라 규칙도 비대칭으로 둔다: 잘못 남긴
+지식은 3줄이고 쓰이지 않으면 랭킹에서 가라앉지만, 잘못 잊은 지식은 다음 세션의 파일 스캔 한 번이다.
+그래서 안전 질문(③)의 거울상 — 거기서는 *허용* 쪽(`safe`)이 floor 를 넘어야 했고, 여기서는 *잊는* 쪽(`skip`)이
+넘어야 한다. 화면에는 `knowledge: kept 2 item(s) — the engine leaned to skip but was not sure` 로 남는다.
+
+**실측 (2026-09-23, 백그라운드 세션에서 `agent-one ask` 로 자기 테스트)**
+
+| 턴 | ⑥ 남길 가치 | 그래프 |
+|---|---|---|
+| `hello.py` 한 줄 생성·실행 | `skip` 0.99 | 0 items — 맞다 |
+| `run.ps1` + README 작성·실행 (문서화된 설정) | `skip` 0.98 | 0 items — 선택지 문구대로("파일이 이미 말하는 것") |
+| `py -3.99` 로 바꿔 실행 → 실패 → 원인 찾아 복구 | `save` 0.21 | 2 items: (constraint) Python Versioning, (procedure) Stable Script Execution |
+| "특정 파이썬 버전 지정 시 주의점?" (한국어) | — | ⑦ `consult_graph` 0.70 → ⑧ `by_keywords` → **0건** |
+
+마지막 줄이 문제였다. 지식은 영어로 증류됐고("Python Versioning") 질문은 한국어("파이썬 버전")라 키워드가
+하나도 겹치지 않았다. 두 가지로 막았다: 증류 라인에 네 번째 칸 `keywords` 를 두어 영어와 사용자 언어의
+검색어를 함께 저장하고(`python 파이썬 version 버전`), 고른 쿼리와 키워드 폴백이 모두 빈손이면 최신 항목을
+그냥 건넨다(`recent (fallback)`) — Jev 가 "도움된다"고 했는데 단어가 안 맞는 건 "아니오"가 아니다. 같은
+질문을 다시 물었을 때: `graph: consulted via recent (fallback) — 2 item(s)`, `helped 2 times`.
+
+같은 실측에서 그래프와 무관하게 잡힌 것 둘: 모델이 JSON 안에 `".\run.ps1"` 을 써서 `\r` 이 캐리지리턴으로
+풀렸고(PowerShell 에 `.<CR>un.ps1` 이 갔다), 실패한 명령을 반복하다 "use the result" 만 듣고는 성공했다고
+보고했다. 각각 `ToolCall.RestoreEscapes` 와 실패 내용을 적어 주는 반복 넛지로 고쳤다. 그리고 `session start`
+가 셸 파이프에서 호출되면 데몬이 핸들을 물려받아 파이프가 3분 55초 동안 안 풀렸다 — Windows 에서는
+CreateProcessW(bInheritHandles=FALSE) 로 띄운다(0.37초).
 
 Jev 를 쓰지 않는 자리: 증류(텍스트 생성)와 Cypher 문장 자체. Jev 는 고르고, LLM 은 쓴다 — 8-D 이후
 줄곧 같은 분업이다.

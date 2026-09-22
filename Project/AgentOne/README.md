@@ -409,7 +409,7 @@ Turn ──LEARNED──▶ Knowledge ──JUSTIFIED_BY──▶ Rationale   (t
 
 **After every turn** the decision engine is asked one fixed question — did
 this turn produce knowledge a future session would be glad to have? — and
-only on *save* does the everyday model distil it into one to three lines
+and unless it answers *skip* with confidence does the everyday model distil it into one to three lines
 (`kind | title | text`: fact, decision, fix, procedure, constraint). Each is
 stored with the engine's verdict, confidence and the evidence it saw as a
 `Rationale` node, linked to the turn and to the paths it names. All of it
@@ -422,7 +422,11 @@ titles). On *consult* it picks one of four queries — by keywords, by the
 paths named, newest first, most helpful first — and what comes back reaches
 the model as `[graph memory] …` material **before any file is scanned**.
 Every item handed over gets a `HELPED` edge and a use count, and the
-queries rank by use, so the knowledge that keeps helping rises.
+queries rank by use, so the knowledge that keeps helping rises. Each item
+also carries search words in English and in your language, so a question
+asked in Korean finds what was learned in English; and when no query finds
+anything, the newest few items go to the model anyway — the engine said the
+graph helps, and a miss on words is not a no.
 
 ```
 › 빌드가 되는지 확인해줘

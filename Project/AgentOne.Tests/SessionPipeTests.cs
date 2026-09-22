@@ -169,3 +169,20 @@ public class SessionPipeTests : IDisposable
         Assert.False(File.Exists(SessionRegistry.Path));
     }
 }
+
+public sealed class DetachedProcessTests
+{
+    [Theory]
+    [InlineData("plain", "plain")]
+    [InlineData("has space", "\"has space\"")]
+    [InlineData(@"C:\dir with space\", @"""C:\dir with space\\""")]
+    [InlineData(@"say ""hi""", @"""say \""hi\""""")]
+    [InlineData("", "\"\"")]
+    public void QuotesTheWayCommandLineToArgvUnquotes(string arg, string expected)
+    {
+        var sb = new System.Text.StringBuilder();
+        DetachedProcess.Quote(sb, arg);
+        Assert.Equal(expected, sb.ToString());
+    }
+}
+

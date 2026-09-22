@@ -53,6 +53,8 @@ public static class SystemPrompt
         sb.AppendLine("  user's language: what was done, what is left or unverified, and 1–3 suggested next steps as a");
         sb.AppendLine("  numbered list. Never end with just \"done\".");
         sb.AppendLine("- write_file takes the WHOLE file as a JSON string: escape newlines as \\n and quotes as \\\".");
+        sb.AppendLine("- Use forward slashes in paths and commands (src/app.py, ./run.ps1) — PowerShell accepts them, and a");
+        sb.AppendLine("  backslash inside JSON starts an escape (\".\\run.ps1\" turns \\r into a carriage return).");
         sb.AppendLine();
         sb.AppendLine("Tools:");
 

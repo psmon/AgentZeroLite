@@ -462,10 +462,11 @@ public sealed class ChatSession : IDisposable
 
             // The verdict is shown either way: a graph that stays empty has to
             // be explainable — "skip" three turns running is a fact, not a bug.
-            var verdict = outcome.Saved ? $"kept {outcome.Items.Count} item(s)"
-                : outcome.Verdict is { Ok: true, Choice: SmartRouter.SaveKnowledge } ? "worth keeping, but nothing distilled"
-                : outcome.Verdict.Ok ? "nothing worth keeping"
-                : $"unavailable ({outcome.Verdict.Message})";
+            var verdict = outcome.KeptUnsure ? $"kept {outcome.Items.Count} item(s) — the engine leaned to skip but was not sure"
+                : outcome.Saved ? $"kept {outcome.Items.Count} item(s)"
+                : !outcome.Verdict.Ok ? $"unavailable ({outcome.Verdict.Message})"
+                : outcome.Verdict.Choice == SmartRouter.SaveKnowledge ? "worth keeping, but nothing distilled"
+                : "nothing worth keeping";
             _log?.Decision("knowledge", outcome.Verdict, verdict);
             Decided?.Invoke(new SmartNote("knowledge", outcome.Verdict, verdict));
 

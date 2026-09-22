@@ -170,8 +170,15 @@ public sealed class AgentLoop(IChatProvider provider, IToolbelt toolbelt, int ma
                     return Finish(StopReason.Repeat, $"model repeated {call.Signature()} with nothing new to add", steps, sw);
 
                 _messages.Add(ChatMessage.Assistant(raw));
-                _messages.Add(ChatMessage.User(
-                    "[error] You already made that exact call and have its result. Use it, or answer with \"final\"."));
+                // Measured: a command failed, the model changed an unrelated
+                // file, repeated the command, was told "use the result", and
+                // then reported success. The nudge has to say what the result was.
+                var earlier = steps.LastOrDefault(s => s.Tool == call.Tool && s.Detail != "repeated call");
+                _messages.Add(ChatMessage.User(earlier is { Ok: false }
+                    ? "[error] You already made that exact call and it FAILED: " + Services.WorkspaceStore.FirstLine(earlier.Detail, 300)
+                      + "\nIt did not work and repeating it will not change that. Do something different, or tell the user"
+                      + " plainly in \"final\" that it failed and why. Never report it as done."
+                    : "[error] You already made that exact call and have its result. Use it, or answer with \"final\"."));
                 continue;
             }
 

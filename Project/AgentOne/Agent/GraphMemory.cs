@@ -11,6 +11,9 @@ namespace AgentOne.Agent;
 public sealed record LearnOutcome(Decision Verdict, IReadOnlyList<Distilled> Items)
 {
     public bool Saved => Items.Count > 0;
+
+    /// <summary>Kept although the engine leaned to skip — it did not clear the floor, so keeping was the cheap mistake.</summary>
+    public bool KeptUnsure => Saved && Verdict.Choice == SmartRouter.SkipKnowledge;
 }
 
 /// <summary>What the graph was asked before a turn, and what it gave.</summary>
@@ -108,6 +111,16 @@ public sealed class GraphMemory : IDisposable
             if (items.Count > 0) name = SmartRouter.ByKeywords + " (fallback)";
         }
 
+        // Still nothing: the engine said the graph helps, and a miss on words
+        // is not a no — measured, a Korean question found nothing in English
+        // items. The newest few are handed over; with five at most, that is
+        // cheap, and the model discards what does not apply.
+        if (items.Count == 0)
+        {
+            items = Run(SmartRouter.RecentFirst, request);
+            if (items.Count > 0) name = SmartRouter.RecentFirst + " (fallback)";
+        }
+
         if (items.Count > 0)
             Graph.MarkHelped(items.Select(i => i.Id), turnId, name);
 
@@ -154,7 +167,7 @@ public sealed class GraphMemory : IDisposable
         Graph.RememberTurn(turnId, request, outcome);
 
         var verdict = await router.WorthSavingAsync(request, did, outcome, ct);
-        if (!verdict.Ok || verdict.Choice != SmartRouter.SaveKnowledge) return new LearnOutcome(verdict, []);
+        if (!router.KeepsKnowledge(verdict)) return new LearnOutcome(verdict, []);
 
         var items = await KnowledgeDistiller.DistillAsync(provider, request, did, outcome, ct);
         if (items.Count == 0) return new LearnOutcome(verdict, []);
@@ -167,7 +180,7 @@ public sealed class GraphMemory : IDisposable
             .SelectMany(s => KnowledgeGraph.PathsIn(s.Detail));
 
         foreach (var item in items)
-            Graph.Learn(turnId, item.Title, item.Text, item.Kind, why, KnowledgeGraph.PathsIn(item.Text).Concat(pathsFromSteps));
+            Graph.Learn(turnId, item.Title, item.Text, item.Kind, why, KnowledgeGraph.PathsIn(item.Text).Concat(pathsFromSteps), item.Keywords);
 
         return new LearnOutcome(verdict, items);
     }

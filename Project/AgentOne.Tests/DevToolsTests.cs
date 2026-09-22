@@ -412,6 +412,24 @@ public class DevSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task RepeatingACommandThatFailedIsToldSo()
+    {
+        // Measured: a failed command was repeated, the model was told "use the
+        // result", and it then reported success. The nudge names the failure.
+        const string failing = """{"tool":"run_command","args":{"command":"exit 7"}}""";
+        var provider = new ScriptedChatProvider(failing, failing, Done);
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.SafeOption, 0.95), Choose(SmartRouter.SafeOption, 0.95));
+        using var session = Session(provider, engine, smart: false);
+
+        await session.SubmitAsync("run it", CancellationToken.None);
+
+        var nudge = provider.Calls[2].Last(m => m.Role == "user").Content;
+        Assert.Contains("it FAILED", nudge);
+        Assert.Contains("exit code 7", nudge);
+        Assert.Contains("Never report it as done", nudge);
+    }
+
+    [Fact]
     public async Task AConfidentSafeVerdictRunsWithoutAsking()
     {
         var provider = new ScriptedChatProvider(RunEcho, Done);

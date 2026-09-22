@@ -148,7 +148,7 @@ public sealed class ToolCall
             if (root.TryGetProperty("args", out var argsEl) && argsEl.ValueKind == JsonValueKind.Object)
             {
                 foreach (var prop in argsEl.EnumerateObject())
-                    call.Args[prop.Name] = ScalarToString(prop.Value);
+                    call.Args[prop.Name] = RestoreEscapes(prop.Name, ScalarToString(prop.Value));
             }
 
             return true;
@@ -159,6 +159,46 @@ public sealed class ToolCall
             return false;
         }
     }
+
+    /// <summary>
+    /// A Windows path inside JSON is a trap for a small model: it writes
+    /// ".\run.ps1" and the parser, correctly, turns \r into a carriage return —
+    /// the command reaches PowerShell as ".<CR>un.ps1" and fails with a
+    /// ParserError that the model then "fixes" in the wrong file (measured).
+    /// A carriage return, backspace or form feed directly followed by a word
+    /// character is never what anyone meant, in any argument, so the backslash
+    /// is put back. A tab is the same in a path or a command (".\tools"), a
+    /// bare newline the same in a path ("src\new") — but both are real in
+    /// file content and in answer text, and a newline is real in a command
+    /// that spans lines, so there they stay.
+    /// </summary>
+    internal static string RestoreEscapes(string argName, string value)
+    {
+        if (value.IndexOfAny(ControlEscapes) < 0) return value;
+
+        var pathLike = PathLikeArgs.Contains(argName);
+        var command = argName.Equals("command", StringComparison.OrdinalIgnoreCase);
+        var sb = new System.Text.StringBuilder(value.Length + 4);
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            var nextIsWord = i + 1 < value.Length && (char.IsLetterOrDigit(value[i + 1]) || value[i + 1] == '_');
+            var restore = nextIsWord && c switch
+            {
+                '\r' or '\b' or '\f' => true,
+                '\t' => pathLike || command,
+                '\n' => pathLike,
+                _ => false
+            };
+            if (restore) sb.Append('\\').Append(c switch { '\r' => 'r', '\b' => 'b', '\f' => 'f', '\t' => 't', _ => 'n' });
+            else sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    private static readonly HashSet<string> PathLikeArgs = new(StringComparer.OrdinalIgnoreCase) { "path", "glob", "pattern", "cwd", "dir", "file" };
+
+    private static readonly char[] ControlEscapes = ['\r', '\b', '\f', '\t', '\n'];
 
     private static string ScalarToString(JsonElement el) => el.ValueKind switch
     {

@@ -38,6 +38,19 @@ public class KnowledgeGraphTests : IDisposable
     }
 
     [Fact]
+    public void KeywordsInAnotherLanguageFindEnglishKnowledge()
+    {
+        // Measured: "Python Versioning" (English) was invisible to "파이썬 버전" (Korean).
+        _graph.RememberTurn("t1", "py -3.99", "fixed");
+        _graph.Learn("t1", "Python versioning", "py -X.Y needs that runtime installed; else 'No runtime installed'.", "constraint", Why,
+            [], keywords: "python 파이썬 version 버전 py launcher");
+
+        Assert.Single(_graph.ByKeywords(["파이썬", "버전"]));
+        Assert.Single(_graph.ByKeywords(["Launcher"]));          // case-insensitive on the stored side too
+        Assert.Empty(_graph.ByKeywords(["도커"]));
+    }
+
+    [Fact]
     public void LearnLinksTheItemToItsTurnRationaleAndPaths()
     {
         _graph.RememberTurn("t1", "build the board api", "built");
@@ -153,6 +166,20 @@ public class KnowledgeDistillerTests
     }
 
     [Fact]
+    public void AFourthSegmentIsTheKeywordsAndAThirdIsNotRequired()
+    {
+        var items = KnowledgeDistiller.Parse("""
+            constraint | Python versioning | py -X.Y needs that runtime installed. | python 파이썬 version 버전
+            fix | Old format | Three segments still parse.
+            """);
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal("python 파이썬 version 버전", items[0].Keywords);
+        Assert.Equal("py -X.Y needs that runtime installed.", items[0].Text);
+        Assert.Equal("", items[1].Keywords);
+    }
+
+    [Fact]
     public void ABareLineIsKeptAsAFactAndTheHeaderAndFencesAreNot()
     {
         var items = KnowledgeDistiller.Parse("kind | title | text\n```\n- The API lives under src/BoardApi and targets net8.0.\n```");
@@ -255,15 +282,73 @@ public class GraphMemorySessionTests : IDisposable
     }
 
     [Fact]
+    public async Task WhenTheWordsMissTheNewestItemsAreHandedOverAnyway()
+    {
+        using (var seed = KnowledgeGraph.Open(Path.Combine(new WorkspaceStore(_root).Ensure().Dir, "graph"))!)
+        {
+            seed.RememberTurn("old-1", "py -3.99", "fixed");
+            seed.Learn("old-1", "Python versioning", "py -X.Y needs that runtime installed.", "constraint",
+                new Rationale("q", "save", 0.9, "b"), []);
+        }
+
+        var provider = new ScriptedChatProvider("""{"tool":"final","args":{"text":"answered"}}""");
+        var engine = new ScriptedDecisionEngine(
+            Choose(SmartRouter.AnswerDirectly, 0.9),
+            Choose(SmartRouter.ConsultGraph, 0.7),
+            Choose(SmartRouter.ByKeywords, 0.7),
+            Choose(SmartRouter.SkipKnowledge, 0.9));
+        using var session = Session(provider, engine);
+
+        var notes = new List<SmartNote>();
+        session.Decided += notes.Add;
+
+        // Not one word in common with the item — the measured Korean-vs-English miss.
+        await session.SubmitAsync("이 프로젝트에서 특정 파이썬 버전을 지정하려면 뭘 주의해야 하지?", CancellationToken.None);
+
+        Assert.Contains(notes, n => n.Kind == "graph" && n.Verdict.Contains("recent (fallback)") && n.Verdict.Contains("1 item"));
+        Assert.Contains(provider.Calls[0], m => m.Role == "user" && m.Content.Contains("[graph memory]") && m.Content.Contains("Python versioning"));
+    }
+
+    [Fact]
+    public async Task AnUnsureSkipStillKeepsTheTurn()
+    {
+        // Measured live: a turn that wrote a run script and a README came back
+        // "skip" at 0.16. Forgetting needs a confident skip; this one keeps.
+        var provider = new ScriptedChatProvider(
+            """{"tool":"write_file","args":{"path":"run.ps1","content":"python hello.py"}}""",
+            """{"tool":"final","args":{"text":"run.ps1 runs hello.py"}}""",
+            "procedure | Run script | run.ps1 runs hello.py with python.");
+        var engine = new ScriptedDecisionEngine(
+            Choose(SmartRouter.WorkInWorkspace, 0.9),
+            Choose(SmartRouter.SkipKnowledge, 0.16));
+        using var session = Session(provider, engine);
+
+        var notes = new List<SmartNote>();
+        session.Decided += notes.Add;
+        IReadOnlyList<Distilled>? learned = null;
+        session.Learned += items => learned = items;
+
+        await session.SubmitAsync("make a run.ps1 that runs hello.py", CancellationToken.None);
+        Assert.True(await WaitForAsync(() => learned is not null), "an unsure skip was treated as a confident one");
+
+        Assert.Equal(1, session.Stats().Graph!.Value.Knowledge);
+        Assert.Contains(notes, n => n.Kind == "knowledge" && n.Verdict.StartsWith("kept 1 item") && n.Verdict.Contains("not sure"));
+    }
+
+    [Fact]
     public async Task ATurnJudgedNotWorthKeepingStoresNothing()
     {
         var provider = new ScriptedChatProvider("""{"tool":"final","args":{"text":"hello!"}}""", "fact | should not | be stored");
         var engine = new ScriptedDecisionEngine(Choose(SmartRouter.AnswerDirectly, 0.9), Choose(SmartRouter.SkipKnowledge, 0.9));
         using var session = Session(provider, engine);
 
-        await session.SubmitAsync("say hello to me please", CancellationToken.None);
-        await Task.Delay(150);
+        var notes = new List<SmartNote>();
+        session.Decided += notes.Add;
 
+        await session.SubmitAsync("say hello to me please", CancellationToken.None);
+        Assert.True(await WaitForAsync(() => notes.Any(n => n.Kind == "knowledge")), "the verdict was never shown");
+
+        Assert.Contains(notes, n => n.Kind == "knowledge" && n.Verdict == "nothing worth keeping");
         Assert.Equal(0, session.Stats().Graph!.Value.Knowledge);
         Assert.Equal(1, session.Stats().Graph!.Value.Turns);      // the turn itself is remembered
     }

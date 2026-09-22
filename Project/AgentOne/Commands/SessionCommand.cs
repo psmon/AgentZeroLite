@@ -55,20 +55,15 @@ public sealed class SessionCommand
             return 1;
         }
 
-        // The child gets the same options, verbatim, and runs `serve`. Nothing
-        // is redirected: the server logs to a file and never touches a console.
-        var start = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true };
-        start.ArgumentList.Add("session");
-        start.ArgumentList.Add("serve");
-        foreach (var a in args) start.ArgumentList.Add(a);
-        start.WorkingDirectory = options.Root;
-
+        // The child gets the same options, verbatim, and runs `serve` — detached,
+        // sharing no handle with this process (see DetachedProcess for the 3m55s
+        // pipe stall that inheriting them caused).
         Process child;
         try
         {
-            child = Process.Start(start) ?? throw new InvalidOperationException("no process");
+            child = DetachedProcess.Start(exe, ["session", "serve", .. args], options.Root);
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException)
         {
             Console.Error.WriteLine("agent-one session start: could not spawn the server: " + ex.Message);
             return 1;

@@ -3,7 +3,12 @@ using AgentOne.Llm;
 namespace AgentOne.Agent;
 
 /// <summary>One distilled thing to keep.</summary>
-public sealed record Distilled(string Kind, string Title, string Text);
+/// <param name="Keywords">
+/// Search words, space-separated, in English and in the user's language.
+/// Measured: knowledge distilled in English ("Python Versioning") was invisible
+/// to a Korean question ("파이썬 버전") — the keyword query matched nothing.
+/// </param>
+public sealed record Distilled(string Kind, string Title, string Text, string Keywords = "");
 
 /// <summary>
 /// Turns a finished turn into one to three facts a future session should
@@ -19,9 +24,11 @@ public static class KnowledgeDistiller
 
     public const string SystemPrompt =
         "You extract durable knowledge from one turn of an assistant working in a software project, for the project's " +
-        "long-term memory. Reply with 1 to 3 lines and nothing else. Each line: kind | title | text — where kind is one of " +
-        "fact, decision, fix, procedure, constraint; title is at most 8 words; text is one or two sentences that a future " +
-        "session can act on alone (name files by their relative path, commands verbatim, errors by their code or message). " +
+        "long-term memory. Reply with 1 to 3 lines and nothing else. Each line: kind | title | text | keywords — where kind " +
+        "is one of fact, decision, fix, procedure, constraint; title is at most 8 words; text is one or two sentences that a " +
+        "future session can act on alone (name files by their relative path, commands verbatim, errors by their code or " +
+        "message); keywords are 4 to 8 search words separated by spaces — the technical terms in English AND in the user's " +
+        "language when that is not English (example: python 파이썬 version 버전 py launcher). " +
         "Skip anything the files already state plainly. Write in the user's language, except paths, commands and identifiers.";
 
     public static string Request(string request, string did, string outcome) =>
@@ -54,12 +61,13 @@ public static class KnowledgeDistiller
             if (line.Length < 8 || line.StartsWith("```", StringComparison.Ordinal)) continue;
             if (line.StartsWith("kind", StringComparison.OrdinalIgnoreCase) && line.Contains("title", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var parts = line.Split('|', 3, StringSplitOptions.TrimEntries);
+            var parts = line.Split('|', 4, StringSplitOptions.TrimEntries);
+            var keywords = parts.Length == 4 ? parts[3] : "";
             Distilled item;
-            if (parts.Length == 3 && Kinds.Contains(parts[0].ToLowerInvariant()))
-                item = new Distilled(parts[0].ToLowerInvariant(), parts[1], parts[2]);
-            else if (parts.Length == 3)
-                item = new Distilled("fact", parts[1], parts[2]);
+            if (parts.Length >= 3 && Kinds.Contains(parts[0].ToLowerInvariant()))
+                item = new Distilled(parts[0].ToLowerInvariant(), parts[1], parts[2], keywords);
+            else if (parts.Length >= 3)
+                item = new Distilled("fact", parts[1], parts[2], keywords);
             else
                 item = new Distilled("fact", Clip(line, 60), line);
 

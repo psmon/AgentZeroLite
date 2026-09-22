@@ -55,7 +55,9 @@ public sealed partial class KnowledgeGraph : IDisposable
         // "already exists" is the normal case after the first open.
         foreach (var ddl in new[]
         {
-            "CREATE NODE TABLE Knowledge(id STRING, title STRING, text STRING, kind STRING, created STRING, uses INT64, PRIMARY KEY(id))",
+            "CREATE NODE TABLE Knowledge(id STRING, title STRING, text STRING, kind STRING, created STRING, uses INT64, keywords STRING, PRIMARY KEY(id))",
+            // Graphs made before keywords existed get the column; "already exists" is the normal case after that.
+            "ALTER TABLE Knowledge ADD keywords STRING DEFAULT ''",
             "CREATE NODE TABLE Turn(id STRING, asked STRING, outcome STRING, at STRING, PRIMARY KEY(id))",
             "CREATE NODE TABLE Rationale(id STRING, question STRING, choice STRING, confidence DOUBLE, basis STRING, PRIMARY KEY(id))",
             "CREATE NODE TABLE Path(path STRING, PRIMARY KEY(path))",
@@ -66,7 +68,8 @@ public sealed partial class KnowledgeGraph : IDisposable
         })
         {
             try { _graph.Execute(ddl); }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)) { }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                                                       || ex.Message.Contains("already has", StringComparison.OrdinalIgnoreCase)) { }
         }
     }
 
@@ -92,7 +95,8 @@ public sealed partial class KnowledgeGraph : IDisposable
     /// paths it mentions become nodes it is ABOUT, so a later question about a
     /// file finds it without a text match.
     /// </summary>
-    public void Learn(string turnId, string title, string text, string kind, Rationale why, IEnumerable<string> paths)
+    /// <param name="keywords">Search words in any language, space-separated; the keyword query matches them as well as title and text.</param>
+    public void Learn(string turnId, string title, string text, string kind, Rationale why, IEnumerable<string> paths, string keywords = "")
     {
         lock (_gate)
         {
@@ -101,11 +105,11 @@ public sealed partial class KnowledgeGraph : IDisposable
             var rid = NewId("r");
 
             _graph.Execute(
-                "CREATE (:Knowledge {id: $id, title: $title, text: $text, kind: $kind, created: $created, uses: 0})",
+                "CREATE (:Knowledge {id: $id, title: $title, text: $text, kind: $kind, created: $created, uses: 0, keywords: $keywords})",
                 new Dictionary<string, object>
                 {
                     ["id"] = id, ["title"] = Clip(title, 120), ["text"] = Clip(text, 2000), ["kind"] = kind,
-                    ["created"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm")
+                    ["created"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), ["keywords"] = Clip(keywords.ToLowerInvariant(), 300)
                 });
 
             _graph.Execute(
@@ -155,7 +159,7 @@ public sealed partial class KnowledgeGraph : IDisposable
 
     private const string Columns = "k.id, k.title, k.text, k.kind, k.created, k.uses";
 
-    /// <summary>Items whose title or text contains any of the words (case-insensitive), most used and newest first.</summary>
+    /// <summary>Items whose title, text or keywords contain any of the words (case-insensitive), most used and newest first.</summary>
     public IReadOnlyList<KnowledgeItem> ByKeywords(IEnumerable<string> words, int limit = 5)
     {
         var terms = words.Select(w => w.Trim().ToLowerInvariant()).Where(w => w.Length >= 2).Distinct().Take(8).ToList();
@@ -166,7 +170,7 @@ public sealed partial class KnowledgeGraph : IDisposable
         for (var i = 0; i < terms.Count; i++)
         {
             parameters[$"w{i}"] = terms[i];
-            clauses.Add($"contains(lower(k.title), $w{i}) OR contains(lower(k.text), $w{i})");
+            clauses.Add($"contains(lower(k.title), $w{i}) OR contains(lower(k.text), $w{i}) OR contains(k.keywords, $w{i})");
         }
 
         var cypher = $"MATCH (k:Knowledge) WHERE {string.Join(" OR ", clauses)} RETURN {Columns} ORDER BY k.uses DESC, k.created DESC LIMIT $limit";
