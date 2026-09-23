@@ -589,8 +589,11 @@ why. `run` has the same modes via `--smart` / `--basic`, and is literally one
 turn of the same session.
 
 Every decision is in the session log as a `route` or `escalation` entry with
-its choice, confidence and cost. The design and the measurements behind the
-threshold are in [`docs/smart-mode-jev.md`](docs/smart-mode-jev.md).
+its choice, confidence and cost. [`docs/AgentLoop.md`](docs/AgentLoop.md) walks
+the loop as it runs — the step loop, the turn pipeline with every smart-mode
+question in place, and why the confidence floor applies to some of them and not
+others; [`docs/smart-mode-jev.md`](docs/smart-mode-jev.md) is the pre-build
+review of Jev itself.
 
 `agent-one jev choose` is the bench for it — a decision put to the service by
 hand, with the whole distribution shown:
