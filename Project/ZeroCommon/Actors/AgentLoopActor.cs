@@ -35,6 +35,12 @@ public sealed class AgentLoopActor : ReceiveActor
     private int _round;
     private long _runStartedAtTicks;
 
+    // Stamped on every run and carried by its PipeTo'd completion. A run that
+    // was abandoned mid-flight (ResetAgentLoopMemory) bumps this, so the task
+    // that is still finishing cannot end the NEXT run with the previous run's
+    // reason. Exactly one AgentLoopResult per StartAgentLoop depends on it.
+    private int _generation;
+
     public AgentLoopActor(AgentLoopBindings bindings)
     {
         _bindings = bindings;
@@ -47,6 +53,19 @@ public sealed class AgentLoopActor : ReceiveActor
 
     private long ElapsedMsSinceStart()
         => (Now() - _runStartedAtTicks) / TimeSpan.TicksPerMillisecond;
+
+    /// <summary>
+    /// True when a piped-back run result belongs to a run we already ended —
+    /// abandoned by ResetAgentLoopMemory. Letting one through would end the
+    /// current run with the previous run's reason, and leave the current run's
+    /// own result to arrive in Idle, where it is dropped.
+    /// </summary>
+    private bool IsStale(int generation)
+    {
+        if (generation == _generation) return false;
+        _log.Info("[AgentLoop] Stale result from gen {0} ignored (current {1})", generation, _generation);
+        return true;
+    }
 
     private void BecomeIdle()
     {
@@ -106,20 +125,21 @@ public sealed class AgentLoopActor : ReceiveActor
                 var loopRef = _loop;
                 var ctsRef = _cts;
                 var userRequest = msg.UserRequest;
+                var gen = ++_generation;
                 Task.Run(async () =>
                 {
                     try
                     {
                         var run = await loopRef.RunAsync(userRequest, ctsRef.Token);
-                        return (object)new RunCompletedInternal(run);
+                        return (object)new RunCompletedInternal(gen, run);
                     }
                     catch (OperationCanceledException)
                     {
-                        return new RunFailedInternal("Cancelled by user");
+                        return new RunFailedInternal(gen, "Cancelled by user");
                     }
                     catch (Exception ex)
                     {
-                        return new RunFailedInternal(ex.Message);
+                        return new RunFailedInternal(gen, ex.Message);
                     }
                 }).PipeTo(Self);
 
@@ -132,6 +152,18 @@ public sealed class AgentLoopActor : ReceiveActor
             });
 
             Receive<ResetAgentLoopMemory>(_ => DisposeLoopAndIdle("reset (idle)"));
+
+            // A run abandoned by ResetAgentLoopMemory already reported its
+            // result before we came back here; its task finishes afterwards
+            // anyway. Swallow it explicitly rather than letting it reach the
+            // dead-letter queue, where it reads like a lost message.
+            Receive<RunCompletedInternal>(msg =>
+                _log.Info("[AgentLoop] Stale completion from gen {0} (current {1}) discarded in Idle",
+                    msg.Generation, _generation));
+
+            Receive<RunFailedInternal>(msg =>
+                _log.Info("[AgentLoop] Stale failure from gen {0} (current {1}) discarded in Idle: {2}",
+                    msg.Generation, _generation, msg.Error));
 
             Receive<Ping>(_ => Sender.Tell(new Pong("AgentLoop", Self.Path.ToString(),
                 $"Idle, loopActive={_loop is not null}")));
@@ -165,6 +197,8 @@ public sealed class AgentLoopActor : ReceiveActor
 
             Receive<RunCompletedInternal>(msg =>
             {
+                if (IsStale(msg.Generation)) return;
+
                 var elapsed = ElapsedMsSinceStart();
                 if (msg.Run.TerminatedCleanly)
                 {
@@ -192,6 +226,8 @@ public sealed class AgentLoopActor : ReceiveActor
 
             Receive<RunFailedInternal>(msg =>
             {
+                if (IsStale(msg.Generation)) return;
+
                 var elapsed = ElapsedMsSinceStart();
                 TellParent(new AgentLoopProgress(AgentLoopPhase.Error, msg.Error, _round));
                 TellParent(new AgentLoopResult(
@@ -215,7 +251,26 @@ public sealed class AgentLoopActor : ReceiveActor
             {
                 // User asked for a fresh session mid-run: cancel current and
                 // dispose the loop. Next StartAgentLoop recreates from scratch.
+                //
+                // The in-flight turn still owes the parent its one result. We
+                // report it HERE rather than waiting for the cancelled task,
+                // because disposing the loop takes us back to Idle immediately
+                // and Idle no longer ends turns. Without this the StartAgentLoop
+                // that began this run never produced an AgentLoopResult and the
+                // parent stayed "busy" for good; bumping the generation then
+                // keeps the task's own late result from ending the NEXT run.
                 try { _cts?.Cancel(); } catch { }
+
+                var elapsed = ElapsedMsSinceStart();
+                TellParent(new AgentLoopProgress(AgentLoopPhase.Error, "reset by user", _round));
+                TellParent(new AgentLoopResult(
+                    Success: false,
+                    FinalMessage: "⚠ Session reset before the turn finished.",
+                    TurnCount: _round,
+                    ElapsedMs: elapsed,
+                    FailureReason: "Reset by user"));
+
+                _generation++;
                 DisposeLoopAndIdle("reset (running)");
             });
 
@@ -263,6 +318,6 @@ public sealed class AgentLoopActor : ReceiveActor
     // ─── Internal mailbox messages (PipeTo / Self.Tell only) ───
     private sealed record GenerationProgressInternal(string Phase, int Tokens);
     private sealed record TurnCompletedInternal(ToolTurn Turn);
-    private sealed record RunCompletedInternal(AgentLoopRun Run);
-    private sealed record RunFailedInternal(string Error);
+    private sealed record RunCompletedInternal(int Generation, AgentLoopRun Run);
+    private sealed record RunFailedInternal(int Generation, string Error);
 }

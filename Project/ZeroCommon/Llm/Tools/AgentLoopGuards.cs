@@ -86,9 +86,35 @@ public sealed class AgentLoopGuards
         _recent.AddLast(new RecentAttempt(
             call.Tool,
             Truncate(NormalizeArgsJson(call.Args), RecentArgsTruncate),
-            Truncate(toolResult, RecentResultTruncate)));
+            Truncate(toolResult, RecentResultTruncate),
+            LooksFailed(toolResult)));
         if (_recent.Count > RecentBufferSize)
             _recent.RemoveFirst();
+    }
+
+    /// <summary>
+    /// Whether a tool result says the tool did not do what it was asked.
+    /// Tools answer with the <c>{"ok":bool, ...}</c> envelope
+    /// (<see cref="FileToolCore"/>), and a thrown tool becomes
+    /// <c>{"error":"..."}</c>; a few verbs return raw text, which is treated
+    /// as success. Only used to word the repeat-block message, so a
+    /// misclassification costs a sentence, never a decision.
+    /// </summary>
+    internal static bool LooksFailed(string toolResult)
+    {
+        if (string.IsNullOrWhiteSpace(toolResult)) return false;
+
+        try
+        {
+            if (JsonNode.Parse(toolResult) is not JsonObject obj) return false;
+            if (obj.TryGetPropertyValue("error", out var error) && error is not null) return true;
+            return obj.TryGetPropertyValue("ok", out var ok)
+                && ok?.GetValue<bool>() == false;
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException or FormatException)
+        {
+            return false;
+        }
     }
 
     /// <summary>True once <see cref="ConsecutiveBlocks"/> reaches the cap — caller breaks the loop.</summary>
@@ -166,15 +192,28 @@ public sealed class AgentLoopGuards
             sb.AppendLine();
             sb.AppendLine("Recent attempts (most recent last):");
             foreach (var attempt in _recent)
-                sb.AppendLine($"  • {attempt.Tool}({attempt.ArgsJson}) -> {attempt.Result}");
+                sb.AppendLine($"  • {attempt.Tool}({attempt.ArgsJson}) -> {(attempt.Failed ? "FAILED: " : "")}{attempt.Result}");
         }
+
+        // A neutral "you already have the result" was measured, in the sibling
+        // agent-one loop, to be followed by the model reporting the work as
+        // done — the call had FAILED and repeating it changed nothing. When a
+        // recent attempt failed, the message has to say so outright.
+        if (_recent.Any(a => a.Failed))
+        {
+            sb.AppendLine();
+            sb.AppendLine("At least one of those attempts FAILED. Repeating it will not change that.");
+            sb.AppendLine("Do something different, or tell the user plainly in \"done\" that it failed and why.");
+            sb.AppendLine("Never report it as done.");
+        }
+
         return sb.ToString().TrimEnd();
     }
 
     private static string Truncate(string s, int max)
         => string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s[..max] + "...");
 
-    private readonly record struct RecentAttempt(string Tool, string ArgsJson, string Result);
+    private readonly record struct RecentAttempt(string Tool, string ArgsJson, string Result, bool Failed);
 }
 
 /// <summary>
