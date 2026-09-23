@@ -256,6 +256,66 @@ public sealed class AgentLoopGuardsTests
     // Helpers
     // ─────────────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Failure-aware repeat nudge (agent-loop-auditor F-3, 2026-09-24)
+    //
+    // The block message used to be failure-blind: it quoted the earlier
+    // result but never said it had failed. Measured in the sibling agent-one
+    // loop, the neutral wording was followed by the model reporting the work
+    // as done — on a call that had failed and would fail again.
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("{\"ok\":false,\"error\":\"exit code 1\"}", true)]
+    [InlineData("{\"error\":\"tool threw\"}", true)]
+    [InlineData("{\"ok\":true,\"text\":\"$ \"}", false)]
+    [InlineData("[]", false)]                    // raw JSON that is not an envelope
+    [InlineData("plain text output", false)]     // verbs that answer with text
+    [InlineData("", false)]
+    public void LooksFailed_reads_the_ok_envelope_and_treats_anything_else_as_success(
+        string toolResult, bool expected)
+        => Assert.Equal(expected, AgentLoopGuards.LooksFailed(toolResult));
+
+    [Fact]
+    public void Block_message_after_a_failed_attempt_says_so_and_forbids_reporting_it_done()
+    {
+        var guards = new AgentLoopGuards();
+        var call = MakeCall("send_to_terminal", "{\"group\":0,\"tab\":0,\"text\":\"build\"}");
+
+        for (var i = 0; i < 3; i++)
+        {
+            guards.CheckRepeat(call, 3);
+            guards.RecordResult(call, "{\"ok\":false,\"error\":\"exit code 1\"}");
+        }
+
+        var blocked = guards.CheckRepeat(call, 3);
+
+        Assert.NotNull(blocked);
+        Assert.Contains("FAILED: ", blocked);
+        Assert.Contains("Repeating it will not change that", blocked);
+        Assert.Contains("Never report it as done", blocked);
+    }
+
+    [Fact]
+    public void Block_message_after_successful_attempts_keeps_the_neutral_wording()
+    {
+        var guards = new AgentLoopGuards();
+        var call = MakeCall("read_terminal", "{\"group\":0,\"tab\":0}");
+
+        for (var i = 0; i < 3; i++)
+        {
+            guards.CheckRepeat(call, 3);
+            guards.RecordResult(call, "{\"ok\":true,\"text\":\"$ \"}");
+        }
+
+        var blocked = guards.CheckRepeat(call, 3);
+
+        Assert.NotNull(blocked);
+        Assert.Contains("Recent attempts", blocked);
+        Assert.DoesNotContain("FAILED", blocked);
+        Assert.DoesNotContain("Never report it as done", blocked);
+    }
+
     private static ToolCall MakeCall(string tool, string argsJson)
         => new(tool, JsonNode.Parse(argsJson)!.AsObject());
 }

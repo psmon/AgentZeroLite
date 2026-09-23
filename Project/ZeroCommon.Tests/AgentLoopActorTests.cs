@@ -76,6 +76,103 @@ public sealed class AgentLoopActorTests : TestKit
         Assert.Contains("Idle", pong.Status);
     }
 
+    // ─── ResetAgentLoopMemory mid-run: one result per start ───
+    //
+    // Found by the agent-loop-auditor's first full audit (2026-09-24, F-2).
+    // Reset while Running disposed the loop and went straight back to Idle
+    // without telling the parent anything, so the StartAgentLoop that began
+    // the run never produced its AgentLoopResult — the parent stayed busy —
+    // and the cancelled task's own late result could then end the NEXT run.
+
+    [Fact]
+    public void Reset_during_a_run_still_produces_exactly_one_result_for_that_start()
+    {
+        var gates = new BlockingLoopFactory(1);
+        var probe = CreateTestProbe("parent-reset");
+        var loop = probe.ChildActorOf(
+            Props.Create(() => new AgentLoopActor(gates.Bindings())));
+
+        loop.Tell(new StartAgentLoop("long one"), TestActor);
+        probe.ExpectMsg<AgentLoopProgress>(TimeSpan.FromSeconds(2));   // Thinking
+
+        loop.Tell(new ResetAgentLoopMemory(), TestActor);
+
+        probe.ExpectMsg<AgentLoopProgress>(TimeSpan.FromSeconds(2));   // Error
+        var result = probe.ExpectMsg<AgentLoopResult>(TimeSpan.FromSeconds(2));
+        Assert.False(result.Success);
+        Assert.Equal("Reset by user", result.FailureReason);
+
+        // The abandoned task ends too (its wait is cancelled). That late
+        // RunFailedInternal belongs to a generation we already reported, so
+        // it must NOT reach the parent as a second result for this start.
+        gates.Release(0);
+        probe.ExpectNoMsg(TimeSpan.FromMilliseconds(400));
+    }
+
+    [Fact]
+    public void A_run_abandoned_by_reset_cannot_end_the_next_run()
+    {
+        // Each run gets its OWN gate: sharing one would let the first
+        // Release finish the *second* run and the test would pass for the
+        // wrong reason (it did, the first time this was written).
+        var gates = new BlockingLoopFactory(2);
+        var probe = CreateTestProbe("parent-generations");
+        var loop = probe.ChildActorOf(
+            Props.Create(() => new AgentLoopActor(gates.Bindings())));
+
+        loop.Tell(new StartAgentLoop("first"), TestActor);
+        probe.ExpectMsg<AgentLoopProgress>(TimeSpan.FromSeconds(2));
+        loop.Tell(new ResetAgentLoopMemory(), TestActor);
+        probe.ExpectMsg<AgentLoopProgress>(TimeSpan.FromSeconds(2));
+        probe.ExpectMsg<AgentLoopResult>(TimeSpan.FromSeconds(2));
+
+        // Second turn starts while the first run is still unwinding.
+        loop.Tell(new StartAgentLoop("second"), TestActor);
+        probe.ExpectMsg<AgentLoopProgress>(TimeSpan.FromSeconds(2));
+
+        // Release the FIRST run only. The second turn is still parked on its
+        // own gate, so anything arriving now came from the abandoned run.
+        gates.Release(0);
+        probe.ExpectNoMsg(TimeSpan.FromMilliseconds(400));
+    }
+
+    /// <summary>
+    /// Hands out one <see cref="BlockingLoop"/> per created loop, each with its
+    /// own gate, so a test can release run N without touching run N+1.
+    /// </summary>
+    private sealed class BlockingLoopFactory(int count)
+    {
+        private readonly SemaphoreSlim[] _gates =
+            Enumerable.Range(0, count).Select(_ => new SemaphoreSlim(0, 1)).ToArray();
+        private int _created;
+
+        public AgentLoopBindings Bindings() => new(
+            ToolbeltFactory: () => new StubHost(),
+            OptionsFactory: () => new AgentLoopOptions(),
+            AgentLoopFactory: (_, _) =>
+            {
+                var index = Interlocked.Increment(ref _created) - 1;
+                return new BlockingLoop(_gates[index]);
+            });
+
+        public void Release(int index) => _gates[index].Release();
+    }
+
+    /// <summary>A loop that parks until the test lets it go, so a turn can be reset mid-flight.</summary>
+    private sealed class BlockingLoop(SemaphoreSlim gate) : IAgentLoop
+    {
+        public int UserSendCount { get; private set; }
+
+        public async Task<AgentLoopRun> RunAsync(string userRequest, CancellationToken ct = default)
+        {
+            UserSendCount++;
+            await gate.WaitAsync(ct);
+            return new AgentLoopRun([], "done", TerminatedCleanly: true, FailureReason: null);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class StubHost : IAgentToolbelt
     {
         public Task<string> ListTerminalsAsync(CancellationToken ct = default)
