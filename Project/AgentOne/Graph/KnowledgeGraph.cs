@@ -53,8 +53,7 @@ public sealed partial class KnowledgeGraph : IDisposable
     private void EnsureSchema()
     {
         // "already exists" is the normal case after the first open.
-        foreach (var ddl in new[]
-        {
+        Ddl(
             "CREATE NODE TABLE Knowledge(id STRING, title STRING, text STRING, kind STRING, created STRING, uses INT64, keywords STRING, PRIMARY KEY(id))",
             // Graphs made before keywords existed get the column; "already exists" is the normal case after that.
             "ALTER TABLE Knowledge ADD keywords STRING DEFAULT ''",
@@ -64,8 +63,19 @@ public sealed partial class KnowledgeGraph : IDisposable
             "CREATE REL TABLE LEARNED(FROM Turn TO Knowledge)",
             "CREATE REL TABLE JUSTIFIED_BY(FROM Knowledge TO Rationale)",
             "CREATE REL TABLE ABOUT(FROM Knowledge TO Path)",
-            "CREATE REL TABLE HELPED(FROM Knowledge TO Turn, how STRING)",
-        })
+            "CREATE REL TABLE HELPED(FROM Knowledge TO Turn, how STRING)");
+
+        EnsurePdsaSchema();
+    }
+
+    /// <summary>
+    /// Runs schema statements, ignoring the one failure that is not a failure:
+    /// the table is already there. Kùzu has no IF NOT EXISTS for every form
+    /// used here, and every open after the first hits this path.
+    /// </summary>
+    private void Ddl(params string[] statements)
+    {
+        foreach (var ddl in statements)
         {
             try { _graph.Execute(ddl); }
             catch (InvalidOperationException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)

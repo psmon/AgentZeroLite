@@ -474,3 +474,8 @@ Project/AgentOne/packaging/npm/agent-one/vendor/
 
 # Kuzu native library cache (downloaded by Project/AgentOne/native/Kuzu.targets)
 Project/AgentOne/native/_cache/
+
+# Native AOT publish output — the path CLAUDE.md documents for agent-one
+# (dotnet publish ... -o out/win-x64). One RID is ~122 MB and it carries
+# kuzu_shared.dll, so it must never reach a commit.
+/out/

@@ -37,6 +37,14 @@ public sealed record ScopeDecision(bool NeedsDesign, Decision Decision);
 /// <param name="Safe">True when the command may run without asking anyone.</param>
 public sealed record SafetyDecision(bool Safe, Decision Decision);
 
+/// <param name="Step">Which PDSA step the request is, or null when the engine failed.</param>
+/// <param name="Confident">True when the choice cleared the floor — the bar for opening a new cycle.</param>
+public sealed record PdsaStepDecision(string? Step, Decision Decision, bool Confident)
+{
+    /// <summary>The step the cycle should record, falling back to Do — work with no stated step is work being done.</summary>
+    public string Kind => Step ?? SmartRouter.DoStep;
+}
+
 /// <summary>
 /// Smart mode's questions to the decision engine, all with fixed options so
 /// each costs one engine call (≈0.3 s) and no planning LLM call (12–15 s,
@@ -100,11 +108,16 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
             "The answer depends on current or external information — news, documentation on the web, " +
             "prices, weather, anything not in the user's own files. The agent should search the web and read pages before answering."),
         new(WorkInWorkspace,
-            "The request is about the project in the working directory: reading its files, creating or editing files, " +
-            "running a build, tests or a command there. The agent should use the file and command tools."),
+            "Something has to be MADE OR CHANGED ON DISK, or read from disk. Building anything the user will run or " +
+            "keep counts — a program, a game, a web page, a script, a config, a document — and it counts even when the " +
+            "folder is empty and there is no project yet, because the files are the deliverable. Also: reading the " +
+            "project's files, editing them, running a build, tests or a command. The agent should use the file and " +
+            "command tools."),
         new(AnswerDirectly,
-            "No lookup is needed: general knowledge, reasoning, writing, translation, or material already in the conversation. " +
-            "The model should answer at once, without tools.")
+            "The user wants to KNOW something, not to have something built: an explanation, a comparison, a definition, " +
+            "advice, a translation, or reasoning over material already in the conversation. No file is to be created or " +
+            "changed. Do NOT choose this because the model could write the code in its reply — if the user asked for a " +
+            "thing to be made, they want it on disk, and this option cannot write anything.")
     ];
 
     public static readonly DecisionOption[] EscalationOptions =
@@ -330,6 +343,77 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         ActivityStarted?.Invoke("choosing how to query the knowledge graph");
         var state = "Request:\n" + request + "\n\nWhat the project's knowledge graph holds:\n" + graphSummary;
         return await engine.ChooseAsync(state, GraphStrategyQuestion, GraphStrategyOptions, ct);
+    }
+
+    // -------------------------------------------------------------- pdsa
+
+    public const string PlanStep = "plan";
+    public const string DoStep = "do";
+    public const string StudyStep = "study";
+    public const string ActStep = "act";
+
+    public const string MetVerdict = "met";
+    public const string PartialVerdict = "partial";
+    public const string UnmetVerdict = "unmet";
+
+    public const string PdsaStepQuestion =
+        "Deming's improvement cycle runs Plan → Do → Study → Act. Which of those four steps does this request ask for?";
+
+    public const string StudyVerdictQuestion =
+        "Measured against what the plan said would happen, what actually happened? Judge the outcome, not the effort.";
+
+    public static readonly DecisionOption[] PdsaStepOptions =
+    [
+        new(PlanStep,
+            "Plan: decide what to build or change and how, and what result would count as success. The request asks for a " +
+            "design, an approach, a structure, a scope — or starts a new piece of work whose shape is not settled yet."),
+        new(DoStep,
+            "Do: carry the plan out. The request asks to build, write, edit, install, run or fix something — the work itself, " +
+            "on a course already chosen."),
+        new(StudyStep,
+            "Study: find out what actually happened and why. The request asks to test, verify, measure, check the result, " +
+            "read the errors, compare against what was expected, or explain why something behaved as it did."),
+        new(ActStep,
+            "Act: settle what was learned. The request asks to adopt the change, clean it up, document it, commit or release " +
+            "it, write down the rule that came out of it — or to decide what the next cycle should tackle.")
+    ];
+
+    public static readonly DecisionOption[] StudyVerdictOptions =
+    [
+        new(MetVerdict, "What the plan predicted is what happened: it works, the checks pass, the result is there."),
+        new(PartialVerdict, "Some of it holds and some does not: it runs but something is missing, wrong, or unverified."),
+        new(UnmetVerdict, "The prediction did not hold: it fails, it was not built, or the result contradicts what was expected.")
+    ];
+
+    /// <summary>
+    /// Which step of the cycle this request is. Follows the choice inside a
+    /// running cycle — a mislabelled phase costs a row, not an action — but the
+    /// caller applies the floor when the answer would <em>open</em> a cycle,
+    /// because that steers several turns after it.
+    /// </summary>
+    /// <param name="cycle">What the open cycle is and how far it has got, or a line saying there is none.</param>
+    public async Task<PdsaStepDecision> PdsaStepAsync(string request, string cycle, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("placing this request in the improvement cycle");
+        var state = "Improvement cycle in progress:\n" + cycle + "\n\nRequest:\n" + request;
+        var decision = await engine.ChooseAsync(state, PdsaStepQuestion, PdsaStepOptions, ct);
+
+        var step = decision.Ok && Array.Exists(PdsaStepOptions, o => o.Name == decision.Choice) ? decision.Choice : null;
+        return new PdsaStepDecision(step, decision, step is not null && decision.Confidence >= confidenceFloor);
+    }
+
+    /// <summary>
+    /// Study's verdict: what the plan predicted against what the turn actually
+    /// produced. Three options rarely clear a floor, so this follows the
+    /// choice; a failed engine leaves the cycle unjudged rather than guessing "met".
+    /// </summary>
+    public async Task<Decision> StudyVerdictAsync(string expected, string request, string outcome, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("judging the result against the plan");
+        var state = "What the plan said would happen:\n" + (expected.Length == 0 ? "(the cycle opened without a stated expectation)" : Clip(expected, 2000))
+                    + "\n\nWhat was just asked:\n" + request
+                    + "\n\nWhat actually happened:\n" + Clip(outcome, 3000);
+        return await engine.ChooseAsync(state, StudyVerdictQuestion, StudyVerdictOptions, ct);
     }
 
     // ------------------------------------------------------- task switch

@@ -69,12 +69,12 @@ if ($reason -and $skipBuild) {
         Write-Host "agent-one.ps1: build it with  dotnet build `"$projectFile`" -c Debug" -ForegroundColor Red
         exit 1
     }
-    Write-Host "agent-one.ps1: $reason — running the existing binary anyway (-NoBuild)." -ForegroundColor DarkYellow
+    Write-Host "agent-one.ps1: $reason - running the existing binary anyway (-NoBuild)." -ForegroundColor DarkYellow
     $reason = $null
 }
 
 if ($reason) {
-    Write-Host "agent-one.ps1: building ($reason)…" -ForegroundColor DarkCyan
+    Write-Host "agent-one.ps1: building ($reason)..." -ForegroundColor DarkCyan
 
     # Pin the version instead of letting the MSBuild target bump version.txt:
     # a convenience wrapper should not dirty a tracked file every time it runs.

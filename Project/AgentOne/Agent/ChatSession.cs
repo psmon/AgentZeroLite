@@ -9,7 +9,7 @@ using AgentOne.Tools;
 namespace AgentOne.Agent;
 
 /// <summary>What smart mode decided at one of its checkpoints, for the renderers.</summary>
-/// <param name="Kind">"route", "scope", "safety" or "escalation".</param>
+/// <param name="Kind">"route", "scope", "safety", "escalation", "graph", "knowledge", "pdsa" or "pdsa-study".</param>
 /// <param name="Verdict">One line for a person: "→ web", "keeping the draft", "escalating to …".</param>
 public sealed record SmartNote(string Kind, Decision Decision, string Verdict);
 
@@ -47,7 +47,8 @@ public sealed record SessionStats(
     string MemoryPath,
     SessionCounters Counters,
     IReadOnlyList<string> ReadGrants,
-    GraphStats? Graph = null)
+    GraphStats? Graph = null,
+    string? Pdsa = null)
 {
     /// <summary>The status block, one fact per line.</summary>
     public IReadOnlyList<string> Describe()
@@ -56,6 +57,9 @@ public sealed record SessionStats(
         var graph = Graph is { } g
             ? $"graph     {g.Knowledge} items · {g.Paths} paths · {g.Turns} turns · helped {g.Helped} times"
             : "graph     off (Kùzu library not next to the binary)";
+        var pdsa = Pdsa is { Length: > 0 } p ? "pdsa      " + p
+            : Graph is null ? "pdsa      off (needs the knowledge graph)"
+            : "pdsa      no improvement cycle yet — a plan starts one";
         var lines = new List<string>
         {
             $"task      {Title ?? "(not named yet)"}",
@@ -64,6 +68,7 @@ public sealed record SessionStats(
             $"context   {ContextMessages} messages · {ContextChars:N0} chars · ~{EstimatedTokens:N0} tokens (estimate)",
             $"memory    {MemoryChars:N0} / {WorkspaceStore.MemoryCapChars:N0} chars · {MemoryPath}",
             graph,
+            pdsa,
             $"models    {Model} · reasoning {ReasoningModel ?? "none"} · shell {Shell}",
             $"jev       {c.JevCalls} calls · {c.JevMs:N0} ms · escalations {c.Escalations} · designs {c.Designs}",
             $"tools     {c.ToolCalls} calls · commands approved {c.ApprovalsGranted}/{c.ApprovalsAsked} asked",
@@ -105,6 +110,7 @@ public sealed class ChatSession : IAgentSession
     private readonly string _logKind;
     private readonly CancellationTokenSource _background = new();
     private readonly GraphMemory? _graph;
+    private readonly PdsaMemory? _pdsa;
     private SessionStore? _log;
 
     /// <summary>The running turn's own cancellation — Stop, from a pause, cancels this.</summary>
@@ -135,6 +141,9 @@ public sealed class ChatSession : IAgentSession
 
     /// <summary>The turn taught something and it was kept in the knowledge graph. Raised off the turn.</summary>
     public event Action<IReadOnlyList<Distilled>>? Learned;
+
+    /// <summary>An improvement cycle reached Act and was wired to its knowledge. Raised off the turn, after the distillation.</summary>
+    public event Action<PdsaClosing>? CycleClosed;
 
     /// <summary>
     /// Who picks when a design hinges on a choice. The REPL reads a line, the
@@ -185,6 +194,10 @@ public sealed class ChatSession : IAgentSession
         try { _graph = GraphMemory.Open(Workspace); }
         catch (InvalidOperationException) { _graph = null; }
 
+        // The improvement cycle lives in the same graph as the knowledge it
+        // produces — that is what lets a closed cycle be wired to it.
+        _pdsa = _graph is null ? null : new PdsaMemory(_graph.Graph);
+
         // Smart starts where the config left it, but only with a key to make it
         // work. Starting "on" with no key would fail on the first turn.
         _state = new SessionState(config.SmartMode && _smartAvailable);
@@ -199,7 +212,7 @@ public sealed class ChatSession : IAgentSession
             (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(config.WebTimeoutSeconds))),
             (ToolCatalog.ExecFamily, _shell));
 
-        _loop = new AgentLoop(_provider, _toolbelt, config.MaxSteps) { Streaming = streaming };
+        _loop = new AgentLoop(_provider, _toolbelt, config.MaxSteps) { Streaming = streaming, Root = _root };
         _loop.Reset(Workspace.MemoryForPrompt());
         _loop.ActivityStarted += what => ActivityStarted?.Invoke(what);
         _loop.StepCompleted += step =>
@@ -319,7 +332,8 @@ public sealed class ChatSession : IAgentSession
             _loop.Messages.Count, chars, Tokens.Estimate(_loop.Messages),
             Workspace.MemoryChars, Workspace.MemoryPath,
             snapshot.Counters, snapshot.ReadGrants,
-            _graph is null ? null : SafeStats());
+            _graph is null ? null : SafeStats(),
+            SafePdsaLine());
     }
 
     /// <summary>
@@ -450,6 +464,8 @@ public sealed class ChatSession : IAgentSession
         var prompt = line;
         IReadOnlySet<string>? families = null;
         var designed = false;
+        string? designText = null;
+        PdsaTurn? pdsa = null;
 
         // The task is (re)named from the request, in the background, as the turn
         // starts — so the header says "게시판 API 개발" seconds in, not minutes
@@ -494,9 +510,15 @@ public sealed class ChatSession : IAgentSession
                 if (design is { } plan)
                 {
                     prompt = prompt + Environment.NewLine + Environment.NewLine + plan;
+                    designText = plan;
                     designed = true;
                 }
             }
+
+            // Planning is the door into the improvement cycle: a design just
+            // made is a Plan, and otherwise the engine has to be sure this
+            // request is one before several turns get drawn into a cycle.
+            pdsa = await PdsaBeforeAsync(line, designed, ct);
         }
 
         var before = _loop.Messages.Count;
@@ -514,8 +536,89 @@ public sealed class ChatSession : IAgentSession
 
         _log?.Result(run);
         Remember(line, run);
-        if (_graph is not null && UsesGraph && _smartAvailable && _provider.Name != "echo") _ = LearnAsync(turnId, line, run);
+
+        if (pdsa is not null) await PdsaAfterAsync(pdsa, turnId, line, run, designText, ct);
+
+        // Learning runs off the turn, and a cycle must not be closed before
+        // its last lesson is stored — so the close rides behind the learning.
+        var learns = _graph is not null && UsesGraph && _smartAvailable && _provider.Name != "echo";
+        var closing = pdsa is { Closes: true } ? pdsa.Cycle : (long?)null;
+        if (learns || closing is not null) _ = LearnThenCloseAsync(turnId, line, run, learns, closing);
+
         return run;
+    }
+
+    // ---------------------------------------------------------------- pdsa
+
+    /// <summary>Which phase of which cycle this turn is, or null when PDSA has nothing to say about it.</summary>
+    private async Task<PdsaTurn?> PdsaBeforeAsync(string request, bool designed, CancellationToken ct)
+    {
+        if (_pdsa is null || !UsesPdsa) return null;
+
+        PdsaTurn? turn;
+        try
+        {
+            turn = await _pdsa.BeforeAsync(_router, request, designed, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Noted?.Invoke("improvement cycle unavailable: " + ex.Message);
+            return null;
+        }
+
+        if (turn is null) return null;
+
+        var verdict = turn.Opened
+            ? $"cycle #{turn.Cycle} opened at plan" + (turn.Reinforces > 0 ? $", reinforcing #{turn.Reinforces}" : "")
+            : $"cycle #{turn.Cycle} · {turn.Step}";
+        _log?.Decision("pdsa", turn.Decision, verdict);
+        Decided?.Invoke(new SmartNote("pdsa", turn.Decision, verdict));
+        return turn;
+    }
+
+    /// <summary>Writes the turn as its phase; a Study turn also gets the engine's verdict against the plan.</summary>
+    private async Task PdsaAfterAsync(PdsaTurn turn, string turnId, string request, AgentRun run, string? design, CancellationToken ct)
+    {
+        var note = _turnProgress.Count > 0 ? string.Join(", ", _turnProgress) : "(no tools)";
+        var outcome = run.Succeeded ? run.Text : $"stopped ({run.Reason}): {run.Text}";
+
+        try
+        {
+            var record = await _pdsa!.RecordAsync(_router, turn, turnId, request, note, outcome, design, ct);
+            if (record.Verdict is not { } judged) return;
+
+            var verdict = judged.Ok
+                ? $"cycle #{turn.Cycle}: the plan was {judged.Choice}"
+                : $"cycle #{turn.Cycle}: unjudged ({judged.Message})";
+            _log?.Decision("pdsa-study", judged, verdict);
+            Decided?.Invoke(new SmartNote("pdsa-study", judged, verdict));
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException)
+        {
+            // The record is bookkeeping; a turn that answered is not a failure
+            // because its phase could not be written.
+            Noted?.Invoke("improvement cycle: phase not recorded — " + ex.Message);
+        }
+    }
+
+    /// <summary>Off the turn: distil what it taught, then — for an Act turn — close the cycle onto that knowledge.</summary>
+    private async Task LearnThenCloseAsync(string turnId, string request, AgentRun run, bool learn, long? closing)
+    {
+        if (learn) await LearnAsync(turnId, request, run);
+        if (closing is not { } cycle || _pdsa is null) return;
+
+        try
+        {
+            var closed = _pdsa.Close(cycle);
+            var line = $"cycle #{cycle} closed ({closed.Verdict}) — taught {closed.Taught.Count}, built on {closed.BuiltOn.Count}";
+            _log?.Step(new AgentStep(0, "pdsa", line, true));
+            Noted?.Invoke("  ↳ " + line);
+            CycleClosed?.Invoke(closed);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Noted?.Invoke("improvement cycle: not closed — " + ex.Message);
+        }
     }
 
     // ------------------------------------------------------- knowledge graph
@@ -529,6 +632,13 @@ public sealed class ChatSession : IAgentSession
     private GraphStats? SafeStats()
     {
         try { return _graph!.Stats(); }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    private string? SafePdsaLine()
+    {
+        if (_pdsa is null) return null;
+        try { return _pdsa.StatusLine(); }
         catch (InvalidOperationException) { return null; }
     }
 
@@ -606,7 +716,7 @@ public sealed class ChatSession : IAgentSession
             "[wrap-up] This turn's step budget is used up. Do NOT call any tool now. In the user's language, " +
             "say: what was done this turn (files, commands, results), what is left or unverified, and the next " +
             "steps as a numbered list. Reply with the final envelope.",
-            ct, SmartRouter.FamiliesFor(Route.Answer));
+            ct, SmartRouter.FamiliesFor(Route.Answer), familiesAreFinal: true);
 
         return summary.Succeeded
             ? stopped with { Text = summary.Text, Streamed = summary.Streamed }
@@ -662,6 +772,9 @@ public sealed class ChatSession : IAgentSession
 
     /// <summary>Off for tests that script the engine: consulting and learning would consume its answers.</summary>
     internal bool UsesGraph { get; set; } = true;
+
+    /// <summary>Off for tests that script the engine: the step question and the Study verdict would consume its answers.</summary>
+    internal bool UsesPdsa { get; set; } = true;
 
     private async Task RetitleAsync(string request)
     {
@@ -726,6 +839,7 @@ public sealed class ChatSession : IAgentSession
         var step = new AgentStep(0, ReasoningSubtask.DesignTag, $"{strong} · {design.Length} chars", true, clock.ElapsedMilliseconds);
         _log?.Step(step);
         StepCompleted?.Invoke(step);
+        LogText(ReasoningSubtask.DesignTag, design);
 
         // The person follows along: the design's first lines, and — when it
         // hinges on a choice — the choice itself, before anything is built.
@@ -783,9 +897,26 @@ public sealed class ChatSession : IAgentSession
         var step = new AgentStep(0, ReasoningSubtask.Tag, $"{strong} · {reasoning.Length} chars", true, clock.ElapsedMilliseconds);
         _log?.Step(step);
         StepCompleted?.Invoke(step);
+        LogText(ReasoningSubtask.Tag, reasoning);
 
         // Back to the everyday model, with no tools: it has everything it needs.
-        return await _loop.RunAsync(ReasoningSubtask.FeedBack(strong, reasoning), ct, SmartRouter.FamiliesFor(Route.Answer));
+        return await _loop.RunAsync(ReasoningSubtask.FeedBack(strong, reasoning), ct,
+            SmartRouter.FamiliesFor(Route.Answer), familiesAreFinal: true);
+    }
+
+    /// <summary>
+    /// Writes a hand-off's whole text to the session file, and nowhere else.
+    ///
+    /// Measured (2026-09-24, the tetris session): a 17,788-character answer
+    /// from the reasoning model was logged as "qwen3.8-27b · 17788 chars" and
+    /// kept only inside the everyday model's context. The turn ended with two
+    /// paragraphs of summary, an empty folder, and the work recoverable from
+    /// nowhere. The step stays a one-liner for the screen; the file keeps it all.
+    /// </summary>
+    private void LogText(string tag, string text)
+    {
+        if (text.Length == 0) return;
+        _log?.Step(new AgentStep(0, tag + "-text", text, true));
     }
 
     // ------------------------------------------------------------- the gate

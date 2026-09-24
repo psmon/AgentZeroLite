@@ -30,6 +30,10 @@ What is in the box, one line each — the sections below go into each:
 - **Long-term memory as a graph** — after each turn the engine judges whether it
   taught anything; what it did is distilled into an embedded **Kùzu** graph with
   the engine's rationale attached, and consulted before any file is scanned.
+- **A PDSA improvement loop** — a planning request opens a Plan · Do · Study · Act
+  cycle in that same graph; the engine places each following turn in it, Study
+  judges the result against what Plan predicted, and Act wires the finished
+  cycle to the knowledge it taught and the knowledge it stood on.
 - **A background session** — `session start` runs one detached; `ask` sends a
   request from any shell and prints the turn as it happens. That is how the chat
   mode tests itself and how another agent collaborates with this one.
@@ -96,7 +100,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
 | `--smart` / `--basic` | On `run` and `chat`: route and escalate through the decision engine, or straight to the loop. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
-| `agent-one memory` | The workspace's knowledge graph: stats, `recent`, `helpful`, `search <words>`, `path <fragment>`, `query "<cypher>"`. |
+| `agent-one memory` | The workspace's knowledge graph: stats, `recent`, `helpful`, `search <words>`, `path <fragment>`, `pdsa`, `query "<cypher>"`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
 Shared flags for `run` and `chat` — each one overrides the stored config for
@@ -489,6 +493,65 @@ graph helps, and a miss on words is not a no.
 runs any Cypher. The graph needs Kùzu's shared library next to the binary
 (the build fetches it, the release archive carries it); without it the agent
 runs as before and the status block says `graph off`.
+
+### The improvement loop — Plan · Do · Study · Act
+
+Work that is planned runs as a **PDSA cycle**, recorded in the same graph as
+the knowledge — Deming's loop, with the third step **Study** ("what did we
+learn?") rather than Check ("did it pass?"). The shape comes from
+`akka-graph-loop`'s `PdsaWorkflow`; here one turn is one phase and one cycle
+spans several turns.
+
+```
+Cycle ──HAS_PHASE──▶ Phase ◀──RAN_IN── Turn      (which turn performed which step)
+  │  ──NEXT_CYCLE──▶ Cycle                       (the order they ran in)
+  │  ──REINFORCES──▶ Cycle                      (this one exists because that one fell short)
+  │  ──TAUGHT──▶ Knowledge                       (on closing: what it left behind)
+  └──BUILT_ON──▶ Knowledge                       (on closing: what it drew on)
+```
+
+**Planning is the door.** A turn the scope question sent to the stronger model
+for a design *is* a Plan, so it opens a cycle with no further question. With no
+design and no cycle running, the engine is asked which of the four steps the
+request is, and only a **confident** `plan` opens one — an unsure guess would
+drag the next several turns into a cycle nobody asked for. Everything else
+leaves the loop out of the way: "run the build" starts nothing.
+
+**While a cycle runs**, that same question places every turn, and the choice is
+followed without the confidence floor — a mislabelled phase costs a row, not an
+action. A *new* plan mid-cycle is the exception, because it starts the next
+cycle: the running one is abandoned and the new one `REINFORCES` it when its
+Study said `partial` or `unmet`.
+
+**Study asks what the plan predicted against what happened** — `met`,
+`partial` or `unmet` — and that verdict is the loop's only feedback edge. A
+cycle that acted without ever studying closes `unjudged`, not as a success.
+
+**Act closes the cycle onto knowledge**, and does it *after* the turn's
+distillation has finished — knowledge is learned off the turn, so closing
+first would wire up a cycle whose last lesson is not stored yet.
+
+```
+› 새 게시판 API 를 어떻게 구성하면 좋을까?
+  route: → workspace   scope: large — qwen3.8-27b designs first
+  pdsa:  cycle #3 opened at plan
+◆ src/Api 아래에 …
+
+› 좋아, 그대로 만들고 빌드까지 돌려봐
+  pdsa:  cycle #3 · do
+…
+› 테스트 돌려서 계획대로인지 봐줘
+  pdsa:  cycle #3 · study → the plan was partial
+…
+› 되는 데까지 커밋하고 남은 건 적어두자
+  pdsa:  cycle #3 · act
+    ↳ cycle #3 closed (partial) — taught 2, built on 1
+```
+
+`agent-one memory pdsa` prints the cycles with their phases and both knowledge
+lists; the status block carries one line
+(`pdsa  3 cycles · 9 phases · plan met 1/2 · 5 knowledge edges`). The loop needs
+the graph: without Kùzu it is off, like the graph itself.
 
 ### The workspace remembers
 
