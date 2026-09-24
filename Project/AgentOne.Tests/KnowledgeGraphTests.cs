@@ -232,7 +232,8 @@ public class GraphMemorySessionTests : IDisposable
         var config = new AgentConfig();
         config.TrySet("smartMode", smart ? "on" : "off", out _);
         config.TrySet("saveSessions", "false", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine, true) { NamesTasks = false };
+        // The improvement cycle has its own tests; here it would eat the scripted engine's answers.
+        return new ChatSession(config, _root, streaming: false, provider, engine, true) { NamesTasks = false, UsesPdsa = false };
     }
 
     private static async Task<bool> WaitForAsync(Func<bool> condition)

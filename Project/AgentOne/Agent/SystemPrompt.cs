@@ -52,6 +52,12 @@ public static class SystemPrompt
         sb.AppendLine("- When you finish a piece of work (files written, commands run), the \"final\" text says, in the");
         sb.AppendLine("  user's language: what was done, what is left or unverified, and 1–3 suggested next steps as a");
         sb.AppendLine("  numbered list. Never end with just \"done\".");
+        sb.AppendLine("- When the user asks for something to be MADE — a program, a page, a script, a document —");
+        sb.AppendLine("  the files are the deliverable. Write every one of them with write_file BEFORE you answer.");
+        sb.AppendLine("  Showing the code in your \"final\" text instead leaves the user with nothing on disk and nothing to run.");
+        sb.AppendLine("- NEVER say you created, wrote, updated or saved a file unless a write_file call for it");
+        sb.AppendLine("  actually succeeded in this turn. If a tool was refused, say so plainly instead of claiming");
+        sb.AppendLine("  the work is done.");
         sb.AppendLine("- write_file takes the WHOLE file as a JSON string: escape newlines as \\n and quotes as \\\".");
         sb.AppendLine("- Use forward slashes in paths and commands (src/app.py, ./run.ps1) — PowerShell accepts them, and a");
         sb.AppendLine("  backslash inside JSON starts an escape (\".\\run.ps1\" turns \\r into a carriage return).");

@@ -278,7 +278,14 @@ call (a planner-generated option set cost 12–15 s and rarely separated; a fixe
 one costs 0.3 s). **① Route**, before the loop: web / files / answer directly;
 a confident choice is *enforced* — `AgentLoop.RunAsync(…, families)` refuses a
 call outside the family rather than merely suggesting, because a small model
-treats a suggestion as one option among many. **② Escalate**, after the
+treats a suggestion as one option among many — but the enforcement **gives way
+to the model asking twice** (`AgentLoopGuards.RefuseFamily`): the first refusal
+stands, the second lets every tool through for the rest of the turn and logs a
+`route-overruled` step. Measured: "테트리스 웹게임 만들어" in an empty folder routed
+`answer_directly` at 0.77, both `write_file` calls were turned away, and the
+model then reported three files created with nothing on disk. A refused call is
+also un-recorded (`Guards.Forget`) so the retry is insistence, not repetition —
+otherwise the repeat nudge intercepts it before the family check ever runs. **② Escalate**, after the
 everyday model's draft: the engine sees the request, every tool result, the
 draft and *both model names*, and if it says the problem needs more,
 `Agent/ReasoningSubtask` hands the same material to the reasoning model (TUI
@@ -437,7 +444,25 @@ to `ChatSession.Chooser` — REPL reads a line, the window parks the turn, `run`
 takes the recommendation — and the pick rides into the feedback line. A turn
 stopped by MaxSteps/Repeat after tool work gets `WrapUpAsync`: one no-tools
 call for "done / left / next steps", the stop reason kept on the run. `maxSteps`
-defaults to 50. **A broken tool envelope is never an answer**: `ToolCall.Repair`
+defaults to 50. **An unwritten file is never a finished build**: a `final` is sent back once
+(step `unwritten`) when it carries ≥ 400 characters of fenced code and no
+`write_file` succeeded (`ShowsUnwrittenCode`), or when it **names files that are
+not on disk** (`MissingFilesNamed` — paths pulled from the answer, minus what
+this turn wrote, minus what already exists under `AgentLoop.Root`). The second
+check exists because the first was disarmed by one success: measured, a turn
+wrote `index.html` and then reported four files done, and the page loaded with
+three `ERR_FILE_NOT_FOUND`. It only runs for a turn that wrote or tried to write
+(`DidFileWork`) — a plan names files that do not exist yet, and that is a
+proposal, not a false report. The nudge is bounded by **progress, not a count**:
+measured, one nudge buys about one file (nudged after `index.html`, the model
+wrote `css/style.css` and then claimed all six were done, four missing), so it
+repeats while the write count keeps rising and stops the first time a nudge
+produces nothing. Both detectors key on fences and paths, not words,
+because the claim itself is in the user's language. The strong
+model's hand-offs are also written to the session file in full
+(`ChatSession.LogText`, entries `reasoning-text` / `design-text`) — 17,788
+characters of generated code were once logged as a length and lost. **A broken
+tool envelope is never an answer**: `ToolCall.Repair`
 escapes raw newlines/tabs and unknown backslash escapes inside JSON strings and
 retries the parse (gemma's `write_file` with real newlines, a grep with `\.`);
 what still fails gets the nudge, because `LooksLikeAnAnswer` refuses anything
@@ -489,6 +514,33 @@ not a no. `ChatSession.UsesGraph` is the test
 switch (like `NamesTasks`): consulting and learning would eat a scripted
 engine's answers. **Dispose is idempotent** — the graph tests dispose the
 session early to open the database themselves.
+
+**The PDSA loop** (`Graph/KnowledgeGraph.Pdsa.cs` the persistence,
+`Agent/PdsaMemory` the session-level use, two more fixed-option questions in
+`SmartRouter`, `agent-one memory pdsa` the view) — Deming's Plan · Do · Study ·
+Act — the loop itself, from the same `akka-graph-loop` (`PdsaWorkflow`) whose
+schema the knowledge graph already borrowed. It lives in the **same** `knowledge.kuzu` as the knowledge,
+because the point is the edge that a separate database could not hold:
+`Cycle -TAUGHT-> Knowledge` (what a finished cycle left behind) and
+`Cycle -BUILT_ON-> Knowledge` (what it drew on), beside
+`Cycle -HAS_PHASE-> Phase <-RAN_IN- Turn`, `NEXT_CYCLE` and `REINFORCES`.
+One turn is one phase and a cycle spans turns. **Planning is the door**: a turn
+the scope question sent to the strong model for a design *is* the Plan and opens
+a cycle with no question asked (`Decision.Called = false` records that); with no
+design and no cycle running, only a **confident** `plan` opens one — inside a
+running cycle the step choice is followed without the floor, since a mislabelled
+phase costs a row, not an action. A new plan mid-cycle starts the *next* cycle,
+abandoning the running one and adding `REINFORCES` when its Study said
+`partial`/`unmet` — the verdict, not an Act flag, is the feedback (Study, not
+Check). **Act closes the cycle after the turn's distillation**
+(`LearnThenCloseAsync`), never before: knowledge is learned off the turn, so
+closing first wires up a cycle whose last lesson is not stored yet. Knowledge
+learned inside a cycle counts as `TAUGHT` only, never also `BUILT_ON`.
+`ChatSession.UsesPdsa` is the test switch beside `UsesGraph` — every test that
+scripts the engine sets both, or the step question eats its answers. Tests:
+`PdsaCycleTests` (real Kùzu; the graph, `PdsaMemory`, and a session that opens a
+cycle on a plan and closes it onto what the turn taught). Design notes:
+`Project/AgentOne/docs/smart-mode-jev.md` §8-J.
 
 **The background session** (`Commands/SessionCommand`, `Agent/SessionServer`
 + `SessionClient`, `Services/SessionProtocol` + `SessionRegistry`): `session

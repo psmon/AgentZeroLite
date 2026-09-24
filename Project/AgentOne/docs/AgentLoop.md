@@ -109,6 +109,12 @@ budget 소진 → StopReason.MaxSteps
    │                needs_design → 추론 모델이 설계 → [design:<model>] 주입
    │                DECISION NEEDED: 로 시작하면 사람에게 선택을 묻는다
    ▼
+ ⑮ PDSA STEP      "이 요청은 Plan/Do/Study/Act 중 어느 칸인가?"
+   │                ③에서 설계했으면 묻지 않고 Plan — 그 턴이 곴 계획이다
+   │                사이클이 없으면 **확신 있는 plan** 만 새 사이클을 연다
+   │                돌고 있으면 choice 그대로 (단계를 잘못 붙여도 행 하나)
+   │                둘 다 아니면 PDSA 는 비켜선다
+   ▼
  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    run = _loop.RunAsync(prompt, ct, families)      ← §1 의 루프
      └ 명령 실행 시마다 ⑤ SAFETY 게이트 (§2.2)
@@ -125,13 +131,20 @@ budget 소진 → StopReason.MaxSteps
      한 번, 툴 없이: 한 것 / 남은 것 / 다음 단계
      ("[stopped: MaxSteps]" 만 남기고 끝내지 않는다)
    ▼
+ ⑯ PDSA PHASE     턴을 그 단계로 기록
+   │                plan  → expected 저장 (설계 본문이 있으면 그것)
+   │                study → "계획대로였나?" met/partial/unmet 판정 + actual
+   ▼
  ⑥ WORTH SAVING   "이 턴이 남길 게 있나?" → 증류해서 그래프에 Learn
    + 로그 기록 + memory.md 에 한 줄 (asked / did / outcome)
+   │
+   └─ act 턴이었으면 → 사이클 닫기 (TAUGHT / BUILT_ON 간선)
+      ↑ 증류 **뒤에** 닫는다 — 먼저 닫으면 마지막 교훈이 빠진다
 ```
 
 ### 2.1 스마트 모드 — 플래너가 아니다
 
-①②③④⑥ 은 전부 `IDecisionEngine`(Jev) 에 던지는 **고정 선택지 질문**이다.
+①②③④⑥⑮⑯ 은 전부 `IDecisionEngine`(Jev) 에 던지는 **고정 선택지 질문**이다.
 플래너 LLM 이 선택지를 생성하는 방식은 12~15초가 들고 거의 구분을 못 했다.
 고정 선택지는 0.3초다.
 

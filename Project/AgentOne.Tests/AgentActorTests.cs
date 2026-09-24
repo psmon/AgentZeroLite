@@ -40,7 +40,7 @@ public sealed class AgentLoopActorTests : TestKit, IDisposable
             config.TrySet("smartMode", smart ? "on" : "off", out _);
             config.TrySet("saveSessions", "false", out _);
             return new ChatSession(config, _root, streaming: false, provider, engine ?? new ScriptedDecisionEngine(), engine is not null)
-                { NamesTasks = false, UsesGraph = false };
+                { NamesTasks = false, UsesGraph = false, UsesPdsa = false };
         });
 
     /// <summary>The loop as a child of the probe, so Context.Parent is the probe.</summary>
@@ -202,7 +202,7 @@ public sealed class AgentBotActorTests : TestKit, IDisposable
         config.TrySet("smartMode", "off", out _);
         config.TrySet("saveSessions", "false", out _);
         return new ChatSession(config, _root, streaming: false, provider, new ScriptedDecisionEngine(), false)
-            { NamesTasks = false, UsesGraph = false };
+            { NamesTasks = false, UsesGraph = false, UsesPdsa = false };
     });
 
     [Fact]
@@ -276,7 +276,7 @@ public sealed class AgentGatewayTests : IDisposable
         config.TrySet("smartMode", "off", out _);
         config.TrySet("saveSessions", "false", out _);
         return new ChatSession(config, _root, streaming: false, provider, new ScriptedDecisionEngine(), false)
-            { NamesTasks = false, UsesGraph = false };
+            { NamesTasks = false, UsesGraph = false, UsesPdsa = false };
     }));
 
     [Fact]

@@ -60,8 +60,13 @@ public sealed class MemoryCommand
                 Console.WriteLine($"workspace  {workspace.Root}");
                 Console.WriteLine($"graph      {graph.Path}");
                 Console.WriteLine($"knowledge  {s.Knowledge} items · {s.Paths} paths · {s.Turns} turns · helped {s.Helped} times");
+                var c = graph.CycleStats();
+                Console.WriteLine($"cycles     {c.Cycles} PDSA cycles · {c.Phases} phases · plan met {c.Met}/{c.Judged} · {c.KnowledgeEdges} knowledge edges");
                 foreach (var (path, n) in graph.KnownPaths(10)) Console.WriteLine($"  {n,3} × {path}");
                 return 0;
+
+            case "pdsa" or "cycles":
+                return PrintCycles(graph, tail.Count > 0 && int.TryParse(tail[0], out var n0) ? n0 : 5);
 
             case "recent":
                 return Print(graph.Recent(tail.Count > 0 && int.TryParse(tail[0], out var n1) ? n1 : 10));
@@ -98,6 +103,38 @@ public sealed class MemoryCommand
         }
     }
 
+    /// <summary>
+    /// The improvement cycles, newest first: each phase on its own line, and
+    /// the knowledge a closed cycle is wired to — what it taught, and what it
+    /// stood on. That pair is the reason the cycles live in this graph.
+    /// </summary>
+    private static int PrintCycles(KnowledgeGraph graph, int limit)
+    {
+        var cycles = graph.RecentCycles(limit);
+        if (cycles.Count == 0)
+        {
+            Console.WriteLine("(no improvement cycle has run here yet — a planning request in smart mode starts one)");
+            return 0;
+        }
+
+        foreach (var cycle in cycles)
+        {
+            var verdict = cycle.Verdict.Length > 0 ? " · " + cycle.Verdict : "";
+            Console.WriteLine($"#{cycle.Id} [{cycle.Status}{verdict}] {cycle.Title}   ({cycle.Started})");
+
+            foreach (var phase in cycle.Phases)
+            {
+                var mark = phase.Verdict.Length > 0 ? $" → {phase.Verdict}" : "";
+                Console.WriteLine($"    {phase.Kind,-5} {phase.Note}{mark}");
+            }
+
+            foreach (var (relation, label) in new[] { ("TAUGHT", "taught"), ("BUILT_ON", "built on") })
+                foreach (var item in graph.CycleKnowledge(cycle.Id, relation))
+                    Console.WriteLine($"    {label,-8} ({item.Kind}) {item.Title}");
+        }
+        return 0;
+    }
+
     private static int Print(IReadOnlyList<KnowledgeItem> items)
     {
         if (items.Count == 0) { Console.WriteLine("(nothing)"); return 0; }
@@ -117,9 +154,12 @@ public sealed class MemoryCommand
             agent-one memory helpful [n]        Items that helped the most turns
             agent-one memory search <words…>    Items whose title or text mentions any of the words
             agent-one memory path <fragment>    Items about a file or folder
+            agent-one memory pdsa [n]           Improvement cycles: Plan/Do/Study/Act, and the knowledge each one
+                                                taught and built on
             agent-one memory query "<cypher>" [--columns n]
-                                                Any Cypher against the graph (tables: Knowledge, Turn, Rationale, Path;
-                                                rels: LEARNED, JUSTIFIED_BY, ABOUT, HELPED)
+                                                Any Cypher against the graph (tables: Knowledge, Turn, Rationale, Path,
+                                                Cycle, Phase; rels: LEARNED, JUSTIFIED_BY, ABOUT, HELPED, HAS_PHASE,
+                                                RAN_IN, NEXT_CYCLE, REINFORCES, TAUGHT, BUILT_ON)
             Options: -r/--root <dir>  the workspace (default: cwd)
 
             The graph fills itself: after each turn the decision engine judges whether
@@ -127,6 +167,10 @@ public sealed class MemoryCommand
             engine's judgement attached. Before a turn, the engine decides whether the
             graph can help and which query to run; what it finds reaches the model
             before any file is scanned.
+
+            A planning request opens a PDSA cycle; the turns after it are placed in
+            Plan/Do/Study/Act by the same engine, Study judges the result against what
+            Plan predicted, and Act closes the cycle onto the knowledge it produced.
             """);
     }
 }

@@ -40,7 +40,7 @@ public sealed class PauseTests : IDisposable
         config.TrySet("smartMode", "off", out _);
         config.TrySet("saveSessions", "false", out _);
         return new ChatSession(config, _root, streaming: false, provider, engine ?? new ScriptedDecisionEngine(), engine is not null)
-            { NamesTasks = false, UsesGraph = false };
+            { NamesTasks = false, UsesGraph = false, UsesPdsa = false };
     }
 
     /// <summary>Two steps, 300 ms each: paused during the first, the loop waits before the second.</summary>
