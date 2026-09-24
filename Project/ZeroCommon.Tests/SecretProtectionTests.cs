@@ -146,4 +146,59 @@ public sealed class SecretProtectionTests : IDisposable
         Assert.Equal("sk-openai", loaded.External.OpenAIApiKey);
         Assert.Equal("sk-lmstudio", loaded.External.LMStudioApiKey);
     }
+
+    // ── a sealed value is never handed off as the secret ──────────────────────
+    //
+    // The incident: a process that installs no protector (any headless one — the test
+    // host, a CLI) read the GUI's DPAPI-sealed llm-settings.json, and the passthrough
+    // returned the token unchanged, so "dpapi:v1:AQAAA..." was sent to the provider AS
+    // the API key. It came back inside an HTTP 401 error message, which put a value
+    // encrypted at rest onto the wire and into logs.
+
+    [Fact]
+    public void The_passthrough_reports_a_sealed_value_as_no_secret()
+    {
+        SecretProtection.Protector = new PassthroughSecretProtector();
+
+        // Plaintext still passes through — that is the whole point of the passthrough,
+        // and legacy files depend on it.
+        Assert.Equal("sk-abc123", SecretProtection.Unprotect("sk-abc123"));
+
+        // A token it cannot open is not a secret. ISecretProtector already required null
+        // here; the passthrough was the one implementation that ignored that.
+        Assert.Null(new PassthroughSecretProtector().Unprotect(SecretMarkers.Dpapi + "AQAAANCMnd8="));
+        Assert.Equal("", SecretProtection.Unprotect(SecretMarkers.Dpapi + "AQAAANCMnd8="));
+        Assert.Equal("", SecretProtection.Unprotect(SecretMarkers.AesGcm + "Zm9vYmFy"));
+    }
+
+    [Fact]
+    public void A_protector_handed_another_schemes_ciphertext_reports_no_secret()
+    {
+        // Both GUIs read the same settings file, so a file sealed on Windows can be
+        // opened on a mac where the AES-GCM protector is active. It does not recognise the
+        // marker and returns the token unchanged — which must not become the credential.
+        SecretProtection.Protector = new FakeMarkerProtector();
+        Assert.Equal("", SecretProtection.Unprotect(SecretMarkers.Dpapi + "AQAAANCMnd8="));
+    }
+
+    [Fact]
+    public void The_real_aes_gcm_protectors_output_is_recognised_as_sealed()
+    {
+        // Keeps SecretMarkers in step with the protector that lives in this assembly. The
+        // DPAPI one is asserted the same way from AgentTest, where it is visible.
+        var sealedValue = new AesGcmFileSecretProtector().Protect("sk-secret");
+        Assert.True(SecretMarkers.LooksSealed(sealedValue),
+            "AesGcmFileSecretProtector emits a marker SecretMarkers does not list — the " +
+            "guard in SecretProtection.Unprotect is off for this scheme.");
+    }
+
+    [Fact]
+    public void A_real_secret_survives_the_guard()
+    {
+        // The guard keys on the marker, so an ordinary key — including one that merely
+        // contains a colon — must be unaffected.
+        SecretProtection.Protector = new FakeMarkerProtector();
+        foreach (var key in new[] { "sk-abc123", "lm-studio:local", "dpapi", "aesg:v2" })
+            Assert.Equal(key, SecretProtection.Unprotect(SecretProtection.Protect(key)));
+    }
 }

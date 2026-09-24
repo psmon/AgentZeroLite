@@ -77,6 +77,19 @@ All message types live in one file: `Project/ZeroCommon/Actors/Messages.cs`. The
 
 **Agent vocabulary (M0013)** — the agent loop layer (`Project/ZeroCommon/Llm/Tools/`) uses canonical "agent loop" naming aligned with the Anthropic *Building effective agents* post + Claude Agent SDK: `IAgentLoop` (backend-agnostic contract), `LocalAgentLoop` / `ExternalAgentLoop` (LLamaSharp+GBNF / OpenAI-compat REST), `IAgentToolbelt` (side-effect surface), `AgentLoopRun` (one RunAsync result), `AgentLoopGuards` (repeat / hard-stop / transient-retry defenses). The actor wraps one `IAgentLoop` per session — **`AgentBotActor` is the UI gateway, `AgentLoopActor` is the agent**. Full vocabulary table at `harness/knowledge/_shared/agent-architecture.md`.
 
+**The tool chain's turn budget is a setting, in both hosts** — `LlmRuntimeSettings.AgentLoopMaxTurns`
+(default 12, clamped 1–200 by `ResolveAgentLoopMaxTurns`) reaches the loop as
+`AgentLoopOptions.MaxIterations`. Each host's `OptionsFactory` (WPF `AgentBotWindow`, Avalonia
+`AgentLoopWiring`) used to pass only the per-turn token cap and the temperature, so the budget was a
+constant nobody could reach and a long job could only end in "max iterations (12) reached without
+'done'". One turn is one model call plus the tool it asks for — a relay through another terminal
+(send + wait + read) spends three on its own, which is why the default is 12 rather than a handful.
+The stored default deliberately equals `AgentLoopOptions`' own and a test pins the two together, so a
+settings file written before the field existed behaves exactly as it did. The screens are
+Settings → LLM → *AIMODE Turns* (WPF) and Settings → LLM → *AGENT LOOP (AI MODE)* (Avalonia); both
+clamp through the settings object rather than repeating the bounds. The wearable host still runs the
+loop at its default — `wearable-settings.json` has no such key.
+
 Actor names sometimes contain user input (workspace names, terminal IDs). Route them through `ActorNameSanitizer` before constructing paths — Akka rejects characters like `/`, `:`, spaces.
 
 ### Akka shutdown quirk
@@ -174,7 +187,23 @@ ComboBox style is a full re-template (toggle + popup + item). That is Pitfall 6 
 `Foreground` setters alone leave the chrome and the popup drawn from `SystemColors`.
 
 ### Persistence
-EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude) are marked `IsBuiltIn = true` and must not be deletable from the UI.
+EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude, Codex — POSIX hosts get zsh/bash instead of the three Windows shells) are marked `IsBuiltIn = true` and must not be deletable from the UI. The three Windows shells come from the migration's `HasData`; the **agent CLI profiles are seeded at runtime and checked one at a time** (`EnsureDefaultCliDefinitions` + `AgentCliTools.All`), because a single "already seeded?" guard would see the Claude row every existing database has and never add a newly shipped built-in. Both agent profiles launch through **PowerShell 5** (`powershell.exe -NoExit -Command <tool>`) on Windows and zsh elsewhere — not the tool directly, so the tab survives the agent exiting. Whether the tool is actually installed is `AgentCliTools`' question, not the row's: see the Avalonia settings note below.
+
+**Credentials at rest.** API keys in `llm-settings.json` / `voice-settings.json` are sealed through
+`SecretProtection.Protector` (`ISecretProtector`): DPAPI on Windows (`dpapi:v1:`), AES-GCM elsewhere
+(`aesg:v1:`), and a plaintext passthrough until a host installs one. Two rules the code enforces and a
+reader should not have to rediscover:
+
+- **A value that still carries a marker after unprotecting is not a secret** — `SecretProtection.Unprotect`
+  returns `""` for it. A protector returns what it does not recognise unchanged, which is right for a legacy
+  plaintext key and badly wrong for another scheme's ciphertext. Measured: a process that installs no
+  protector read the GUI's sealed file and sent `dpapi:v1:AQAAA…` to LM Studio *as the API key*; the 401 it
+  got back quoted the token, so a value encrypted at rest reached the wire and the logs.
+- **Every process that reads those stores must install a protector.** WPF does it in `App.OnStartup`
+  *before* the `-cli` branch (the CLI loads settings too), Avalonia in `Program`, and `AgentTest` in a
+  module initializer so tests open the same file the GUI wrote. `ZeroWearable` does **not** — so an
+  External key configured in the GUI reads as "no key" on the watch host; it needs Ollama (no key) or its
+  own protector. That is a gap, not a design.
 
 ### Terminal
 One backend: **xterm.js in a WebView2**, driven by `ManagedConPtyHost` — our own pseudo-console over plain `kernel32` P/Invoke (`CreatePseudoConsole`, present since Windows 10 1809). The app therefore ships **no native terminal DLLs**; `conpty.dll`, `Microsoft.Terminal.Control.dll` and the `EasyWindowsTerminalControl` / `CI.Microsoft.*` packages are gone, and with them the hard-coded `$(NuGetPackageRoot)` copy step that failed silently on a version bump.
@@ -209,6 +238,15 @@ What differs from the WPF host, and why:
 - **Terminal**: xterm.js inside `NativeWebView`, served by `LocalAssetServer` (loopback, token path) because the Avalonia WebView cannot map a folder; the PTY is `ConPtyHost` (a copy of `ManagedConPtyHost`) on Windows and `PortaPtyHost` (Porta.Pty) on macOS behind ZeroCommon's `IPtyHost`/`XtermTerminalSession`. Two ConPTY facts the WPF copy never hit: a parent whose stdio is a pipe hands its std handles to the child (blanked around `CreateProcess`), and pipe EOF is not the exit signal (a process-handle watcher is).
 - **Split panes**: `WorkspaceLayout<T>` + one Canvas that positions every renderer over its pane slot — no native re-parenting. The stored `CliGroup.LayoutJson` is byte-identical to what WPF writes.
 - **CLI**: same request/response JSON as WPF over the pipe `AgentZeroLite.cli` (not WM_COPYDATA), so `-cli help agentzero` applies; extra verbs `bot-ask` and `layout`. Wrappers: `AgentZeroLite.ps1` / `AgentZeroLite.sh`.
+- **Agent CLI install lives in this host's settings** (`AgentCliTools` in ZeroCommon, the panel in
+  `SettingsViewModel`/`SettingsView`): selecting a definition that launches Claude or Codex probes PATH and,
+  when the tool is missing, installs it — `winget install --id Anthropic.ClaudeCode | OpenAI.Codex` on Windows,
+  `npm install -g @anthropic-ai/claude-code | @openai/codex` elsewhere. Three things the code explains and a
+  reader should not re-derive: the probe honours PATHEXT **plus `.ps1`** (PATHEXT omits it, but the built-ins run
+  the agent inside PowerShell, which resolves a script shim); a successful install is reported as "installed, but
+  restart" rather than plain "installed", because this process keeps the PATH it started with and the tabs it
+  spawns inherit it; and winget runs with `--disable-interactivity`, since its output is captured rather than
+  shown in a console and a prompt would hang forever instead of failing.
 - **Both GUIs share the SQLite file and the settings files** and refuse to run side by side (same single-instance mutex on Windows). Secrets: DPAPI on Windows, AES-GCM (`aesg:v1:`) elsewhere.
 - **Local LLM is Windows-only** (LLamaSharp DLLs); macOS uses External providers. Gemma 4's native tool-call syntax is converted to the JSON envelope by `GemmaNativeToolCall` (ZeroCommon, benefits both hosts).
 - CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-14, `.app` bundle via `macos/build-app.sh`); `release.yml` is untouched. macOS GUI checks need a person: `Docs/avalonia-v2/macos-smoke.md`.

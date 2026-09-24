@@ -30,6 +30,10 @@ internal static class AgentLoopWiring
             OptionsFactory: () =>
             {
                 var settings = LlmSettingsStore.Load();
+                // The turn budget belongs to the loop, not to a backend, so it is read
+                // from the persisted settings on both paths — LlmService.CurrentSettings
+                // mirrors the loaded model and says nothing about how long a chain may run.
+                var maxTurns = settings.ResolveAgentLoopMaxTurns();
                 if (settings.ActiveBackend == LlmActiveBackend.Local)
                 {
                     var s = LlmService.CurrentSettings;
@@ -38,14 +42,14 @@ internal static class AgentLoopWiring
                     var isVulkan = s.Backend == LocalLlmBackend.Vulkan;
                     var temp = (isLlama31 && isVulkan) ? 0.0f : s.Temperature;
                     var cap = Math.Max(256, s.AgentToolLoopMaxTokens);
-                    AppLogger.Log($"[AIMODE] options: backend=Local maxTokens={cap} temp={temp:0.00} family={entry.ChatFamily}");
-                    return new AgentLoopOptions { MaxTokensPerTurn = cap, Temperature = temp };
+                    AppLogger.Log($"[AIMODE] options: backend=Local maxTokens={cap} maxTurns={maxTurns} temp={temp:0.00} family={entry.ChatFamily}");
+                    return new AgentLoopOptions { MaxTokensPerTurn = cap, MaxIterations = maxTurns, Temperature = temp };
                 }
                 else
                 {
                     var cap = Math.Max(256, settings.External.MaxTokens);
-                    AppLogger.Log($"[AIMODE] options: backend=External provider={settings.External.Provider} model={settings.ResolveExternalModel()} maxTokens={cap} temp={settings.Temperature:0.00}");
-                    return new AgentLoopOptions { MaxTokensPerTurn = cap, Temperature = settings.Temperature };
+                    AppLogger.Log($"[AIMODE] options: backend=External provider={settings.External.Provider} model={settings.ResolveExternalModel()} maxTokens={cap} maxTurns={maxTurns} temp={settings.Temperature:0.00}");
+                    return new AgentLoopOptions { MaxTokensPerTurn = cap, MaxIterations = maxTurns, Temperature = settings.Temperature };
                 }
             },
             AgentLoopFactory: (opts, host) =>

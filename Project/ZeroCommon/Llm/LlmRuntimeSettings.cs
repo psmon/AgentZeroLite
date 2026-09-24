@@ -52,6 +52,42 @@ public sealed class LlmRuntimeSettings
     /// </remarks>
     public int AgentToolLoopMaxTokens { get; set; } = 2048;
 
+    /// <summary>
+    /// How many model turns the AI-mode agent loop may take before it gives up without a
+    /// <c>done</c> — the tool chain's length. One turn is one model call plus the tool
+    /// call it asks for, so a task that reads a file, runs a command and answers needs
+    /// three of them; a relay through another terminal (send + wait + read) needs three
+    /// on its own, which is why the loop's own default is 12 rather than a handful.
+    ///
+    /// <para>This used to be reachable only by editing code: both hosts built
+    /// <see cref="Tools.AgentLoopOptions"/> with the per-turn token cap and the
+    /// temperature and left the turn budget at its default, so a longer job could only
+    /// end in "max iterations (12) reached without 'done'". It is a setting because the
+    /// right number depends on the work, not on the model.</para>
+    ///
+    /// <para>Read it through <see cref="ResolveAgentLoopMaxTurns"/> — a hand-edited file
+    /// can hold 0 or 10 000, and neither should reach the loop.</para>
+    /// </summary>
+    public int AgentLoopMaxTurns { get; set; } = DefaultAgentLoopMaxTurns;
+
+    /// <summary>The loop's own default, mirrored here so the stored value starts where the code did.</summary>
+    public const int DefaultAgentLoopMaxTurns = 12;
+
+    /// <summary>One turn: the model answers and that answer must be the final one — no tool may run.</summary>
+    public const int MinAgentLoopMaxTurns = 1;
+
+    /// <summary>
+    /// An upper bound exists because a turn is a paid request and a loop that will not
+    /// converge spends the whole budget. 200 is far past any hand-driven task while still
+    /// being a number a runaway loop stops at.
+    /// </summary>
+    public const int MaxAgentLoopMaxTurns = 200;
+
+    /// <summary>The stored turn budget, clamped to what the loop can actually be run with.</summary>
+    public int ResolveAgentLoopMaxTurns() =>
+        Math.Clamp(AgentLoopMaxTurns <= 0 ? DefaultAgentLoopMaxTurns : AgentLoopMaxTurns,
+                   MinAgentLoopMaxTurns, MaxAgentLoopMaxTurns);
+
     public float Temperature { get; set; } = 0.7f;
 
     public int GpuLayerCount { get; set; } = 999;

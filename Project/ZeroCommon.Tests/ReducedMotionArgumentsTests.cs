@@ -15,6 +15,10 @@ public class ReducedMotionArgumentsTests
     [InlineData("C:/tools/codex.exe", null)]
     [InlineData("powershell.exe", "-NoExit -Command codex")]
     [InlineData("cmd.exe", "/k codex --search")]
+    // The POSIX built-in chains commands, so the tool is followed by a `;` rather than a
+    // space — which the check used to treat as part of the name, leaving the macOS rows
+    // unmatched.
+    [InlineData("/bin/zsh", "-l -c \"codex; exec zsh -l\"")]
     public void Resolve_FindsCodex_InTheExeOrTheArguments(string exe, string? args)
     {
         // The shipped definitions launch the agent through a shell, so the tool name

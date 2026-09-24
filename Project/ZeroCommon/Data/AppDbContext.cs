@@ -1,5 +1,6 @@
 using System.IO;
 using Agent.Common.Data.Entities;
+using Agent.Common.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -137,50 +138,87 @@ public class AppDbContext : DbContext
     }
 
     /// <summary>
-    /// Runtime seeding, on top of the migration's <c>HasData</c> rows. Windows: the
-    /// "Claude" profile (unchanged since before M0033). Other OSes (M0033): the
-    /// migrated rows are all <c>.exe</c> shells the launcher hides there, so a
-    /// <c>zsh</c> / <c>bash</c> / "Claude" trio is added once, without a migration —
-    /// the same table serves both hosts.
+    /// Runtime seeding, on top of the migration's <c>HasData</c> shells. Two layers, for
+    /// two different reasons.
+    ///
+    /// <para><b>Shells.</b> Windows gets CMD/PW5/PW7 from the migration. Other OSes
+    /// (M0033) would see three <c>.exe</c> rows the launcher hides, so a zsh/bash pair is
+    /// added once — no migration, because the same table serves both hosts and a Windows
+    /// database must not grow POSIX rows.</para>
+    ///
+    /// <para><b>Agent CLI profiles</b> (Claude, Codex) are checked <em>one by one</em>
+    /// rather than behind a single "did we seed yet?" flag. Every existing installation
+    /// already has Claude, so a guard that returned once it saw Claude would never add
+    /// Codex to any database in the field — the new built-in would only ever appear for
+    /// people who installed the app fresh.</para>
     /// </summary>
     internal static void EnsureDefaultCliDefinitions(AppDbContext db, bool? isWindows = null)
     {
         var windows = isWindows ?? OperatingSystem.IsWindows();
-        if (windows)
+        var changed = false;
+        var sort = db.CliDefinitions.Any() ? db.CliDefinitions.Max(d => d.SortOrder) : -1;
+
+        if (!windows)
         {
-            if (!db.CliDefinitions.Any(d => d.Name == "Claude"))
+            var hasPosixShell = db.CliDefinitions.AsEnumerable()
+                .Any(d => !d.IsRemote && !string.IsNullOrEmpty(d.ExePath)
+                          && !d.ExePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            if (!hasPosixShell)
             {
-                var maxSort = db.CliDefinitions.Any() ? db.CliDefinitions.Max(d => d.SortOrder) : -1;
-                db.CliDefinitions.Add(new CliDefinition
-                {
-                    Name = "Claude",
-                    ExePath = "powershell.exe",
-                    Arguments = "-NoExit -Command claude",
-                    IsBuiltIn = true,
-                    SortOrder = maxSort + 1,
-                });
-                db.SaveChanges();
+                Add(new CliDefinition { Name = "zsh", ExePath = "/bin/zsh", Arguments = "-l" });
+                Add(new CliDefinition { Name = "bash", ExePath = "/bin/bash", Arguments = "-l" });
             }
-            return;
         }
 
-        var hasPosixShell = db.CliDefinitions.AsEnumerable()
-            .Any(d => !d.IsRemote && !string.IsNullOrEmpty(d.ExePath)
-                      && !d.ExePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
-        if (hasPosixShell) return;
+        foreach (var profile in DefaultAgentCliProfiles(windows))
+        {
+            // Name alone is not the key: a row can exist for the other OS (an .exe
+            // definition on a mac), which this host hides — so it would be invisible and
+            // un-runnable while still suppressing the seed.
+            var exists = db.CliDefinitions.AsEnumerable().Any(d =>
+                string.Equals(d.Name, profile.Name, StringComparison.OrdinalIgnoreCase)
+                && TerminalLaunchPlanner.IsAvailableOnThisOs(d, windows));
+            if (!exists) Add(profile);
+        }
 
-        var sort = db.CliDefinitions.Any() ? db.CliDefinitions.Max(d => d.SortOrder) : -1;
-        db.CliDefinitions.AddRange(
-            new CliDefinition { Name = "zsh", ExePath = "/bin/zsh", Arguments = "-l", IsBuiltIn = true, SortOrder = ++sort },
-            new CliDefinition { Name = "bash", ExePath = "/bin/bash", Arguments = "-l", IsBuiltIn = true, SortOrder = ++sort },
-            new CliDefinition
-            {
-                Name = "Claude",
-                ExePath = "/bin/zsh",
-                Arguments = "-l -c \"claude; exec zsh -l\"",
-                IsBuiltIn = true,
-                SortOrder = ++sort,
-            });
-        db.SaveChanges();
+        if (changed) db.SaveChanges();
+
+        void Add(CliDefinition definition)
+        {
+            definition.IsBuiltIn = true;
+            definition.SortOrder = ++sort;   // appended in catalog order, after whatever is already there
+            db.CliDefinitions.Add(definition);
+            changed = true;
+        }
+    }
+
+    /// <summary>
+    /// The built-in agent CLI rows for this OS. Both launch through a shell rather than
+    /// invoking the agent directly: PowerShell 5 on Windows (<c>powershell.exe</c> — the
+    /// one shell every Windows install has, so the definition works before anyone has
+    /// installed PowerShell 7), zsh elsewhere. <c>-NoExit</c> / <c>exec zsh -l</c> keep
+    /// the shell alive when the agent quits, so the tab stays usable instead of closing
+    /// on exit. Whether the agent itself is installed is
+    /// <see cref="AgentCliTools"/>' question — a row for a missing tool is still the
+    /// right row, and the settings page offers to fetch it.
+    /// </summary>
+    private static IEnumerable<CliDefinition> DefaultAgentCliProfiles(bool windows)
+    {
+        foreach (var tool in AgentCliTools.All)
+        {
+            yield return windows
+                ? new CliDefinition
+                {
+                    Name = tool.Name,
+                    ExePath = "powershell.exe",
+                    Arguments = $"-NoExit -Command {tool.Command}",
+                }
+                : new CliDefinition
+                {
+                    Name = tool.Name,
+                    ExePath = "/bin/zsh",
+                    Arguments = $"-l -c \"{tool.Command}; exec zsh -l\"",
+                };
+        }
     }
 }

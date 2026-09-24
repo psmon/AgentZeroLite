@@ -98,6 +98,9 @@ public partial class SettingsPanel
         tbLlmContextSize.Text = s.ContextSize.ToString(CultureInfo.InvariantCulture);
         tbLlmMaxTokens.Text = s.MaxTokens.ToString(CultureInfo.InvariantCulture);
         tbLlmAgentLoopMaxTokens.Text = s.AgentToolLoopMaxTokens.ToString(CultureInfo.InvariantCulture);
+        // Resolved, not raw: a file written before this field existed holds 0, and the box
+        // must show the budget the loop will actually use rather than a meaningless zero.
+        tbLlmAgentLoopMaxTurns.Text = s.ResolveAgentLoopMaxTurns().ToString(CultureInfo.InvariantCulture);
         tbLlmTemperature.Text = s.Temperature.ToString("0.0#", CultureInfo.InvariantCulture);
         SelectGpuDeviceInUi(s.VulkanDeviceIndex);
         chkLlmFlashAttn.IsChecked = s.FlashAttention;
@@ -161,6 +164,7 @@ public partial class SettingsPanel
             var ctx = uint.Parse(tbLlmContextSize.Text, CultureInfo.InvariantCulture);
             var maxTok = int.Parse(tbLlmMaxTokens.Text, CultureInfo.InvariantCulture);
             var agentLoopMaxTok = int.Parse(tbLlmAgentLoopMaxTokens.Text, CultureInfo.InvariantCulture);
+            var agentLoopMaxTurns = int.Parse(tbLlmAgentLoopMaxTurns.Text, CultureInfo.InvariantCulture);
             var temp = float.Parse(tbLlmTemperature.Text, CultureInfo.InvariantCulture);
             var devIdx = ReadSelectedGpuDeviceIndex();
             // Load-then-patch: this tab only owns the LOCAL runtime dials, so we
@@ -176,6 +180,10 @@ public partial class SettingsPanel
             s.ContextSize = ctx;
             s.MaxTokens = maxTok;
             s.AgentToolLoopMaxTokens = agentLoopMaxTok;
+            // Clamped by the settings object, so this screen, the Avalonia one and a
+            // hand-edited file cannot disagree about the allowed range.
+            s.AgentLoopMaxTurns = agentLoopMaxTurns;
+            s.AgentLoopMaxTurns = s.ResolveAgentLoopMaxTurns();
             s.Temperature = temp;
             s.VulkanDeviceIndex = devIdx;
             s.FlashAttention = chkLlmFlashAttn.IsChecked == true;

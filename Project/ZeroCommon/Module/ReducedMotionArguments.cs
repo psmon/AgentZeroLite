@@ -35,36 +35,7 @@ public static class ReducedMotionArguments
     /// </param>
     public static string Resolve(string? exePath, string? arguments)
     {
-        return Mentions("codex") ? CodexFlag : "";
-
-        bool Mentions(string tool) =>
-            ContainsWord(exePath, tool) || ContainsWord(arguments, tool);
-    }
-
-    /// <summary>
-    /// Whether <paramref name="text"/> names this tool as a command rather than
-    /// merely containing the letters — so a path like <c>C:\codex-notes\run.cmd</c>
-    /// does not count, and neither does a directory that happens to be called after
-    /// it.
-    /// </summary>
-    private static bool ContainsWord(string? text, string tool)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return false;
-
-        foreach (var token in text.Split(new[] { ' ', '\t', '"', '\'' },
-                                         StringSplitOptions.RemoveEmptyEntries))
-        {
-            var name = token;
-
-            // Strip a path, then an extension: "C:\tools\codex.cmd" → "codex".
-            var slash = name.LastIndexOfAny(new[] { '\\', '/' });
-            if (slash >= 0) name = name[(slash + 1)..];
-            var dot = name.LastIndexOf('.');
-            if (dot > 0) name = name[..dot];
-
-            if (string.Equals(name, tool, StringComparison.OrdinalIgnoreCase)) return true;
-        }
-        return false;
+        return CliToolMention.Mentions(exePath, arguments, "codex") ? CodexFlag : "";
     }
 
     /// <summary>
