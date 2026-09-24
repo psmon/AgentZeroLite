@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="AgentZeroWpf.UI.Components.SettingsPanel"
+<UserControl x:Class="AgentZeroWpf.UI.Components.SettingsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:components="clr-namespace:AgentZeroWpf.UI.Components"
@@ -603,6 +603,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
                                     <TextBlock Text="Backend" Grid.Row="0" Grid.Column="0"
@@ -652,6 +653,20 @@
                                     <TextBox x:Name="tbLlmAgentLoopMaxTokens" Grid.Row="3" Grid.Column="1"
                                              Style="{StaticResource DarkTextBox}" Margin="0,3,12,3"/>
                                     <TextBlock Text="(per AIMODE turn)" Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="2"
+                                               Foreground="#7C7C8C" FontFamily="Consolas" FontSize="9"
+                                               VerticalAlignment="Center" Margin="0,3,0,3"/>
+
+                                    <!-- How LONG the tool chain may be, as opposed to how large one
+                                         turn may be. It sits in this panel for want of a neutral one,
+                                         but it is NOT a local-model dial: the same number bounds the
+                                         External loop too. -->
+                                    <TextBlock Text="AIMODE Turns" Grid.Row="4" Grid.Column="0"
+                                               Foreground="#9D87FF" FontFamily="Consolas" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,3,6,3"
+                                               ToolTip="How many model turns the AIMODE tool chain may take before it gives up. One turn is one model call plus the tool it asks for, so read-file + run-command + answer costs three. Default 12, range 1-200. Applies to BOTH backends (Local and External)."/>
+                                    <TextBox x:Name="tbLlmAgentLoopMaxTurns" Grid.Row="4" Grid.Column="1"
+                                             Style="{StaticResource DarkTextBox}" Margin="0,3,12,3"/>
+                                    <TextBlock Text="(tool chain length - both backends)" Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="2"
                                                Foreground="#7C7C8C" FontFamily="Consolas" FontSize="9"
                                                VerticalAlignment="Center" Margin="0,3,0,3"/>
                                 </Grid>

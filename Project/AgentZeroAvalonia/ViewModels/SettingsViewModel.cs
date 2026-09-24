@@ -147,6 +147,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _externalModel = "";
     [ObservableProperty] private decimal? _externalMaxTokens = 4096;
     [ObservableProperty] private decimal? _temperature = 0.7m;
+    [ObservableProperty] private decimal? _agentLoopMaxTurns = LlmRuntimeSettings.DefaultAgentLoopMaxTurns;
     [ObservableProperty] private string _openAIApiKey = "";
     [ObservableProperty] private string _openAIBaseUrl = "";
     [ObservableProperty] private string _lMStudioApiKey = "";
@@ -205,6 +206,7 @@ public partial class SettingsViewModel : ObservableObject
         ExternalModel = s.External.SelectedModel;
         ExternalMaxTokens = s.External.MaxTokens;
         Temperature = (decimal)s.Temperature;
+        AgentLoopMaxTurns = s.ResolveAgentLoopMaxTurns();
         OpenAIApiKey = s.External.OpenAIApiKey;
         OpenAIBaseUrl = s.External.OpenAIBaseUrl;
         LMStudioApiKey = s.External.LMStudioApiKey;
@@ -236,6 +238,10 @@ public partial class SettingsViewModel : ObservableObject
         s.External.SelectedModel = ExternalModel.Trim();
         s.External.MaxTokens = (int)Math.Clamp(ExternalMaxTokens ?? 4096, 256, 32768);
         s.Temperature = (float)Math.Clamp(Temperature ?? 0.7m, 0m, 2m);
+        // Assign, then let the settings object clamp it: one copy of the bounds, so the
+        // spinner and a hand-edited file cannot disagree about what is allowed.
+        s.AgentLoopMaxTurns = (int)(AgentLoopMaxTurns ?? LlmRuntimeSettings.DefaultAgentLoopMaxTurns);
+        s.AgentLoopMaxTurns = s.ResolveAgentLoopMaxTurns();
         s.External.OpenAIApiKey = OpenAIApiKey.Trim();
         s.External.OpenAIBaseUrl = OpenAIBaseUrl.Trim();
         s.External.LMStudioApiKey = LMStudioApiKey.Trim();
@@ -256,7 +262,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             var s = CollectLlm();
             LlmSettingsStore.Save(s);
-            LlmStatus = $"Saved · backend={s.ActiveBackend} · {(s.ActiveBackend == LlmActiveBackend.External ? s.External.Provider + " / " + s.ResolveExternalModel() : s.ModelId)} · keys are stored protected ({SecretProtection.Protector.GetType().Name}).";
+            LlmStatus = $"Saved · backend={s.ActiveBackend} · {(s.ActiveBackend == LlmActiveBackend.External ? s.External.Provider + " / " + s.ResolveExternalModel() : s.ModelId)} · tool chain up to {s.ResolveAgentLoopMaxTurns()} turns · keys are stored protected ({SecretProtection.Protector.GetType().Name}).";
             LocalStatus = LlmStatus;
             AppLogger.Log($"[Settings] LLM saved | {LlmStatus}");
         }
@@ -382,7 +388,156 @@ public partial class SettingsViewModel : ObservableObject
 
     public bool CanDeleteCli => SelectedCli is { IsBuiltIn: false, Id: > 0 };
 
-    partial void OnSelectedCliChanged(CliDefinitionItem? value) => OnPropertyChanged(nameof(CanDeleteCli));
+    partial void OnSelectedCliChanged(CliDefinitionItem? oldValue, CliDefinitionItem? newValue)
+    {
+        OnPropertyChanged(nameof(CanDeleteCli));
+
+        // The tool a definition drives is read out of its text, and that text is being
+        // edited right here — type "codex" into a new definition's arguments and the
+        // install panel should appear without reselecting the row.
+        if (oldValue is not null) oldValue.PropertyChanged -= OnSelectedCliFieldChanged;
+        if (newValue is not null) newValue.PropertyChanged += OnSelectedCliFieldChanged;
+        RefreshCliTool();
+    }
+
+    private void OnSelectedCliFieldChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(CliDefinitionItem.ExePath) or nameof(CliDefinitionItem.Arguments))
+            RefreshCliTool();
+    }
+
+    // ═══ Agent CLI install (Claude / Codex) ══════════════════════════════════
+    //
+    // A built-in definition is a shell plus an agent command, so the row can be perfectly
+    // valid while the agent itself was never installed — the tab then opens and prints
+    // "claude : The term 'claude' is not recognized", which reads as a broken app. This
+    // panel answers "is it there?" and, when it is not, fetches it the way each platform
+    // publishes: winget on Windows, npm elsewhere. AgentCliTools holds every rule; this
+    // is only its screen.
+
+    [ObservableProperty] private string _cliToolStatus = "";
+    [ObservableProperty] private string _installLog = "";
+    [ObservableProperty] private bool _isInstallingTool;
+
+    private AgentCliTool? _cliTool;
+
+    /// <summary>The agent CLI the selected definition drives, or null for a plain shell.</summary>
+    public AgentCliTool? CliTool
+    {
+        get => _cliTool;
+        private set
+        {
+            if (ReferenceEquals(_cliTool, value)) return;
+            _cliTool = value;
+            OnPropertyChanged(nameof(CliTool));
+            OnPropertyChanged(nameof(ShowCliTool));
+            OnPropertyChanged(nameof(CliToolName));
+            OnPropertyChanged(nameof(CanInstallCliTool));
+        }
+    }
+
+    public bool ShowCliTool => CliTool is not null;
+    public bool HasInstallLog => InstallLog.Length > 0;
+    public string CliToolName => CliTool?.Name ?? "";
+    public bool CanInstallCliTool => CliTool is not null && !IsInstallingTool;
+
+    partial void OnIsInstallingToolChanged(bool value) => OnPropertyChanged(nameof(CanInstallCliTool));
+    partial void OnInstallLogChanged(string value) => OnPropertyChanged(nameof(HasInstallLog));
+
+    private void RefreshCliTool()
+    {
+        var tool = AgentCliTools.Match(SelectedCli?.ExePath, SelectedCli?.Arguments);
+        var same = ReferenceEquals(tool, CliTool);
+        CliTool = tool;
+        if (tool is null) { CliToolStatus = ""; return; }
+        if (!same) InstallLog = "";
+        ProbeCliTool(tool);
+    }
+
+    private void ProbeCliTool(AgentCliTool tool)
+    {
+        try
+        {
+            var state = AgentCliTools.Probe(tool);
+            CliToolStatus = state switch
+            {
+                { Installed: true, OnProcessPath: true } => $"{tool.Name} is installed · {state.ResolvedPath}",
+                // Found, but this process started before it was on PATH — the tabs it
+                // launches inherit that stale PATH, so saying "installed" here would be
+                // followed by a tab that cannot find the command.
+                { Installed: true } => $"{tool.Name} is installed at {state.ResolvedPath}, but this app started before it was on PATH — restart AgentZero so new tabs can find it.",
+                _ => $"{tool.Name} was not found on PATH. Install it below, or see {tool.DocsUrl}",
+            };
+        }
+        catch (Exception ex)
+        {
+            CliToolStatus = $"Could not check for {tool.Name}: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void CheckCliTool()
+    {
+        if (CliTool is { } tool) ProbeCliTool(tool);
+    }
+
+    [RelayCommand]
+    private async Task InstallCliToolAsync()
+    {
+        if (CliTool is not { } tool || IsInstallingTool) return;
+
+        var plan = AgentCliTools.PlanInstall(tool);
+        InstallLog = plan.CanRun ? "$ " + plan.CommandLine + "\n" : plan.Problem + "\n";
+        if (!plan.CanRun)
+        {
+            CliToolStatus = plan.Problem!;
+            return;
+        }
+
+        IsInstallingTool = true;
+        CliToolStatus = $"Installing {tool.Name}…";
+        AppLogger.Log($"[Settings] agent CLI install | tool={tool.Name} cmd={plan.CommandLine}");
+        try
+        {
+            // The installer reports from its own threads; every line is posted to the UI
+            // thread rather than appended from there.
+            var exit = await AgentCliTools.RunInstallAsync(plan,
+                line => Dispatcher.UIThread.Post(() => AppendInstallLog(line)));
+
+            if (exit == 0)
+            {
+                ProbeCliTool(tool);
+                AppendInstallLog($"— {plan.Exe} finished.");
+            }
+            else
+            {
+                CliToolStatus = $"Installing {tool.Name} failed (exit {exit}). The log below is {plan.Exe}'s own output; {tool.DocsUrl} has the manual steps.";
+            }
+            AppLogger.Log($"[Settings] agent CLI install done | tool={tool.Name} exit={exit}");
+        }
+        catch (Exception ex)
+        {
+            CliToolStatus = $"Installing {tool.Name} failed: {ex.Message}";
+        }
+        finally
+        {
+            IsInstallingTool = false;
+        }
+    }
+
+    /// <summary>
+    /// Keep the tail of the installer's output. winget redraws a progress bar by
+    /// repeating the line, so an unbounded log grows by thousands of near-identical
+    /// lines during one download.
+    /// </summary>
+    private void AppendInstallLog(string line)
+    {
+        const int keepLines = 200;
+        var text = InstallLog + line + "\n";
+        var lines = text.Split('\n');
+        if (lines.Length > keepLines) text = string.Join("\n", lines[^keepLines..]);
+        InstallLog = text;
+    }
 
     private void LoadCli()
     {

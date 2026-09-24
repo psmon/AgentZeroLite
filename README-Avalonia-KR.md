@@ -83,6 +83,8 @@ macOS: *Avalonia host* 워크플로 실행에서 `AgentZeroLite-Avalonia-v<ver>-
 | AgentBot 도킹 페인 **및** 플로팅 창 (Ctrl+Shift+`) | ✅ | 뷰모델 하나에 뷰 둘. WPF와 같이 **하단 도크**(280px, 스플리터, 최대화 시 터미널 90px 유지), 활동바를 제외한 전 영역을 스팬. 오버레이가 아니라 형제 행이다 — macOS에서 터미널 네이티브 웹뷰 위에 그린 Avalonia 콘텐츠는 보이지 않는다. WPF의 나머지 하단 탭(OUTPUT/LOG/NOTE)은 미변환이라 탭 스트립은 없다 |
 | 툴벨트: 터미널, 파일, `find_files/open_file/stop_media`, 웹(headless) | ✅ | `WorkspaceToolHost` |
 | 설정: External LLM(+테스트), CLI 정의 CRUD, 터미널 외관(라이브) | ✅ | 로컬 LLM 섹션은 Windows에서만 |
+| 설정: 에이전트 CLI 설치(Claude, Codex) | ✅ Avalonia 전용 | 빌트인 행은 셸 + 에이전트 명령이라, 에이전트를 설치하지 않아도 행 자체는 유효하다 — 그러면 탭이 "claude : The term 'claude' is not recognized"를 뱉고, 앱이 고장난 것처럼 보인다. 그런 정의를 선택하면 PATH에 있는지 보여주고 설치를 제안한다: Windows는 **winget**(`Anthropic.ClaudeCode` / `OpenAI.Codex`), 그 외는 **npm -g**(`@anthropic-ai/claude-code` / `@openai/codex`). 규칙과 패키지는 `ZeroCommon/Services/AgentCliTools`에 있어 WPF가 사본 없이 그대로 채택할 수 있다 |
+| 설정: AI 모드 툴 체인 최대 턴 | ✅ (WPF에도 역이식) | `AgentLoopMaxTurns`(기본 12, 1–200으로 클램프) → `AgentLoopOptions.MaxIterations`. 두 호스트 모두 턴당 토큰 상한과 temperature만 넘기고 있어 턴 예산이 사실상 상수였고, 긴 작업은 "max iterations (12) reached without 'done'"로만 끝날 수 있었다. 여기서 만든 뒤 WPF의 `AgentBotWindow` + LLM 탭의 *AIMODE Turns* 로 적용했으므로, 설정 파일이 공유되는 만큼 두 호스트가 같은 값을 쓴다 |
 | CLI: status, terminal-list/send/key/read/wait/alias(`--alias`), layout, bot-chat, bot-ask, web, selftest | ✅ | 파이프 `AgentZeroLite.cli`; `.ps1` / `.sh` 래퍼 |
 | CI: windows-latest + macos-14, win-x64 zip, `.app` 번들 | ✅ | `.github/workflows/avalonia-build.yml` |
 | AgentBot 스킬: SkillSync, 스타터팩 임포트, `.agent-zero/` 캐시, 슬래시 자동완성 | ⏳ 미착수 | 하나의 의존 사슬 — SkillSync 없이는 슬래시 목록이 항상 비고, SkillSync는 Windows 전용 셸 탐색으로 Claude CLI를 구동한다 |

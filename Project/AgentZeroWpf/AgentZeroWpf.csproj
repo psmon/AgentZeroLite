@@ -61,6 +61,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- AgentTest installs Security/DpapiSettingsProtector so it can read the
+         DPAPI-sealed llm-settings.json the GUI writes; without it the test process runs
+         on the passthrough protector and cannot open the operator's own settings. The
+         protector stays internal — this is the seam, not a public API. -->
+    <InternalsVisibleTo Include="AgentTest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
     <!-- The wearable host (M0031). ReferenceOutputAssembly=false + SkipGetTargetFrameworkProperties
          because it targets net10.0-windows10.0.19041.0 (WinRT BLE) and a net10.0-windows project

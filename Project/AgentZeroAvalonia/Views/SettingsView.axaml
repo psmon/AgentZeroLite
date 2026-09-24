@@ -103,6 +103,22 @@
                     </StackPanel>
                     <TextBlock Classes="status" Text="{Binding LlmStatus}" />
 
+                    <!-- The loop is ours and the model is theirs, so this sits outside both
+                         backend groups: it applies whichever one is active. Bounds mirror
+                         LlmRuntimeSettings.Min/MaxAgentLoopMaxTurns, which clamp the stored
+                         value again for hand-edited files. -->
+                    <TextBlock Classes="h2" Text="AGENT LOOP (AI MODE)" />
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto">
+                        <TextBlock Classes="lbl" Grid.Row="0" Text="Tool chain turns" />
+                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <NumericUpDown Value="{Binding AgentLoopMaxTurns}" Minimum="1" Maximum="200" Increment="1" Width="160" />
+                            <Button Content="Save" Command="{Binding SaveLlmCommand}" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextDim}"
+                                   Text="One turn is one model call plus the tool it asks for, so reading a file, running a command and answering costs three. Raise it for long jobs — when the budget runs out the run ends with 'max iterations reached without done'. Applies to both backends." />
+                    </Grid>
+
                     <StackPanel IsVisible="{Binding LocalSupported}">
                         <TextBlock Classes="h2" Text="LOCAL MODEL (WINDOWS)" />
                         <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
@@ -178,6 +194,27 @@
                             <TextBlock Classes="lbl" Grid.Row="3" Text="" />
                             <CheckBox Grid.Row="3" Grid.Column="1" Content="Reduced motion (ask the CLI not to animate)" IsChecked="{Binding ReducedMotion}" />
                         </Grid>
+                        <!-- Agent CLI: is the tool this definition launches actually on the
+                             machine? A valid row for a missing program opens a tab that
+                             prints "not recognized", so the check and the fetch live next
+                             to the definition that needs them. Hidden for plain shells. -->
+                        <StackPanel DataContext="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext)}"
+                                    x:DataType="vm:SettingsViewModel" IsVisible="{Binding ShowCliTool}">
+                            <TextBlock Classes="h2" Text="{Binding CliToolName, StringFormat='AGENT CLI · {0}'}" />
+                            <TextBlock Classes="status" Margin="0,0,0,8" Text="{Binding CliToolStatus}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Check again" Command="{Binding CheckCliToolCommand}" />
+                                <Button Content="{Binding CliToolName, StringFormat='Install {0}'}"
+                                        Command="{Binding InstallCliToolCommand}"
+                                        IsEnabled="{Binding CanInstallCliTool}" />
+                                <TextBlock Classes="lbl" Text="working…" IsVisible="{Binding IsInstallingTool}" />
+                            </StackPanel>
+                            <TextBox Text="{Binding InstallLog}" IsVisible="{Binding HasInstallLog}"
+                                     IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                                     FontFamily="Cascadia Mono,Consolas,Menlo,monospace" FontSize="11"
+                                     Height="120" Margin="0,8,0,0" />
+                        </StackPanel>
+
                         <TextBlock Classes="h2" Text="REMOTE SHELL (SSH)" />
                         <Grid Classes="form" ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                               IsEnabled="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SshEditable}">

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -1256,6 +1256,10 @@ public partial class AgentBotWindow : Window
                 // (which mirrors the loaded model's runtime), External pulls
                 // from the persisted JSON because there's no "loaded" config.
                 var settings = Agent.Common.Llm.LlmSettingsStore.Load();
+                // The turn budget belongs to the loop, not to a backend, so it comes from
+                // the persisted settings on both paths — LlmService.CurrentSettings mirrors
+                // the loaded model and says nothing about how long a chain may run.
+                var maxTurns = settings.ResolveAgentLoopMaxTurns();
                 if (settings.ActiveBackend == Agent.Common.Llm.LlmActiveBackend.Local)
                 {
                     var s = LlmService.CurrentSettings;
@@ -1264,10 +1268,11 @@ public partial class AgentBotWindow : Window
                     var isVulkan = s.Backend == Agent.Common.Llm.LocalLlmBackend.Vulkan;
                     var effectiveTemp = (isLlama31 && isVulkan) ? 0.0f : s.Temperature;
                     var perTurnCap = Math.Max(256, s.AgentToolLoopMaxTokens);
-                    AppLogger.Log($"[AIMODE] options: backend=Local maxTokens={perTurnCap} temp={effectiveTemp:0.00} family={entry.ChatFamily}");
+                    AppLogger.Log($"[AIMODE] options: backend=Local maxTokens={perTurnCap} maxTurns={maxTurns} temp={effectiveTemp:0.00} family={entry.ChatFamily}");
                     return new Agent.Common.Llm.Tools.AgentLoopOptions
                     {
                         MaxTokensPerTurn = perTurnCap,
+                        MaxIterations = maxTurns,
                         Temperature = effectiveTemp,
                     };
                 }
@@ -1275,10 +1280,11 @@ public partial class AgentBotWindow : Window
                 {
                     var perTurnCap = Math.Max(256, settings.External.MaxTokens);
                     var effectiveTemp = settings.Temperature;
-                    AppLogger.Log($"[AIMODE] options: backend=External provider={settings.External.Provider} model={settings.ResolveExternalModel()} maxTokens={perTurnCap} temp={effectiveTemp:0.00}");
+                    AppLogger.Log($"[AIMODE] options: backend=External provider={settings.External.Provider} model={settings.ResolveExternalModel()} maxTokens={perTurnCap} maxTurns={maxTurns} temp={effectiveTemp:0.00}");
                     return new Agent.Common.Llm.Tools.AgentLoopOptions
                     {
                         MaxTokensPerTurn = perTurnCap,
+                        MaxIterations = maxTurns,
                         Temperature = effectiveTemp,
                     };
                 }
