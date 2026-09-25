@@ -109,6 +109,11 @@ public sealed class ChatSession : IAgentSession
     private readonly string _root;
     private readonly string _logKind;
     private readonly CancellationTokenSource _background = new();
+
+    /// <summary>Set inside the after-turn work; flows to what it awaits and never back to the caller.</summary>
+    private static readonly AsyncLocal<bool> AfterTurnScope = new();
+
+    public bool RaisingAfterTurn => AfterTurnScope.Value;
     private readonly GraphMemory? _graph;
     private readonly PdsaMemory? _pdsa;
     private SessionStore? _log;
@@ -604,6 +609,7 @@ public sealed class ChatSession : IAgentSession
     /// <summary>Off the turn: distil what it taught, then — for an Act turn — close the cycle onto that knowledge.</summary>
     private async Task LearnThenCloseAsync(string turnId, string request, AgentRun run, bool learn, long? closing)
     {
+        AfterTurnScope.Value = true;
         if (learn) await LearnAsync(turnId, request, run);
         if (closing is not { } cycle || _pdsa is null) return;
 

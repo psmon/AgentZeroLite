@@ -610,7 +610,16 @@ never the request words), `--detach` returns at once, `--jsonl` streams every
 event, and a summary line (`✓ done · time · steps · turn n`) ends on stderr.
 `--resume` (start / first ask) resumes the workspace's newest saved
 conversation. Approvals go to the first caller still attached; with nobody
-attached a command is refused, never left hanging.
+attached a command is refused, never left hanging. `op: cancel` (`session
+cancel`) ends only the running turn. **Late after-turn events are labelled, not
+dropped or mixed in**: `ChatSession.LearnThenCloseAsync` sets an `AsyncLocal`
+scope, `IAgentSession.RaisingAfterTurn` reads it inside a Noted/Decided handler,
+`AgentLoopActor` carries it as `AfterTurn` on the notice and `AgentGateway`
+re-exposes it around the raise — so the server sends them as `after` events and
+lists them in status (measured: "knowledge: nothing worth keeping" from turn 1
+used to print inside turn 2 as if it judged turn 2). A connection that drops
+mid-turn is re-attached by `ask` (`wait`); a session that died is reported as
+lost, not as a closed pipe.
 
 **A session belongs to its workspace** (`Services/WorkspaceStore`, under
 `~/.agent-one/workspaces/<name>-<sha1[10]>/`): `memory.md` gets one entry per

@@ -158,10 +158,17 @@ public sealed record AgentLoopResult(bool Success, string FinalMessage, int Turn
 public abstract record AgentLoopNotice;
 
 /// <summary>Smart mode decided something: route, scope, safety, escalation, graph, knowledge.</summary>
-public sealed record DecisionNotice(SmartNote Note) : AgentLoopNotice;
+public sealed record DecisionNotice(SmartNote Note) : AgentLoopNotice
+{
+    /// <summary>Raised by the previous turn's after-work (see <c>IAgentSession.RaisingAfterTurn</c>).</summary>
+    public bool AfterTurn { get; init; }
+}
 
 /// <summary>A one-line note: a read grant, an approval outcome, what the graph learned.</summary>
-public sealed record NoteNotice(string Text) : AgentLoopNotice;
+public sealed record NoteNotice(string Text) : AgentLoopNotice
+{
+    public bool AfterTurn { get; init; }
+}
 
 /// <summary>The task got a (new) name.</summary>
 public sealed record TitleNotice(string Title) : AgentLoopNotice;
@@ -170,7 +177,10 @@ public sealed record TitleNotice(string Title) : AgentLoopNotice;
 public sealed record DesignNotice(IReadOnlyList<string> Lines) : AgentLoopNotice;
 
 /// <summary>The turn taught something and the graph kept it.</summary>
-public sealed record LearnedNotice(IReadOnlyList<Distilled> Items) : AgentLoopNotice;
+public sealed record LearnedNotice(IReadOnlyList<Distilled> Items) : AgentLoopNotice
+{
+    public bool AfterTurn { get; init; }
+}
 
 /// <summary>The turn is parked until a person answers; ResolvePause with the same id continues it.</summary>
 public abstract record PersonNeeded(int PauseId);

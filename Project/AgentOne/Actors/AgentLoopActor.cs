@@ -257,11 +257,12 @@ public sealed class AgentLoopActor : ReceiveActor
         session.ActivityStarted += what => self.Tell(new ProgressInternal(AgentLoopPhase.Thinking, what, null));
         session.StepCompleted += step => self.Tell(new ProgressInternal(AgentLoopPhase.Acting, step.Tool, step));
         session.AnswerDelta += fragment => self.Tell(new ProgressInternal(AgentLoopPhase.Generating, fragment, null));
-        session.Decided += note => self.Tell(new NoticeInternal(new DecisionNotice(note)));
-        session.Noted += text => self.Tell(new NoticeInternal(new NoteNotice(text)));
+        // The after-turn flag is ambient on the raising thread, so it is read here and carried as data.
+        session.Decided += note => self.Tell(new NoticeInternal(new DecisionNotice(note) { AfterTurn = session.RaisingAfterTurn }));
+        session.Noted += text => self.Tell(new NoticeInternal(new NoteNotice(text) { AfterTurn = session.RaisingAfterTurn }));
         session.TitleChanged += title => self.Tell(new NoticeInternal(new TitleNotice(title)));
         session.DesignMade += lines => self.Tell(new NoticeInternal(new DesignNotice(lines)));
-        session.Learned += items => self.Tell(new NoticeInternal(new LearnedNotice(items)));
+        session.Learned += items => self.Tell(new NoticeInternal(new LearnedNotice(items) { AfterTurn = session.RaisingAfterTurn }));
 
         // The pause-for-a-person, from the pool thread the turn runs on: the
         // question goes through the mailbox, the answer comes back as

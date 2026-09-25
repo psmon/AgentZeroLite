@@ -91,7 +91,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 |---|---|
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
 | `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/status`, `/resume`, `/new`, `/reset`, `/exit`; Esc pauses a running turn. |
-| `agent-one session` | The one background session: `start` (detached, `--resume`), `status` (live progress), `wait`, `stop`, `selftest`. |
+| `agent-one session` | The one background session: `start` (detached, `--resume`), `status` (live progress), `wait`, `cancel`, `stop`, `selftest`. |
 | `agent-one ask <request>` | Send one request to the background session — starting it on first use — and print the turn. `chat --headless` is the same. `--detach`, `--yes`, `--json`, `--jsonl`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one setup` | Full-screen settings: connection, model, reasoning model, options, smart mode (`tui` still works as an alias). |
@@ -429,6 +429,7 @@ agent-one ask --yes "run the tests"                 # approve commands without a
 agent-one ask --detach "refactor the models"        # hand it over, return at once
 agent-one session status                            # state working · 41.2s · 3 steps · now: write_file
 agent-one session wait                              # attach, print the rest, then the summary line
+agent-one session cancel                            # end the running turn; the session and conversation stay
 agent-one ask --jsonl "…"                           # every event as a JSON line, the result last
 agent-one session stop
 agent-one ask --resume "where were we?"             # a new session that picks the last conversation up
@@ -451,7 +452,14 @@ concurrently and attach to the running turn; a caller that leaves — Ctrl+C, a
 tool-call timeout — does not stop it, and `session wait` attaches again (or,
 with nothing running, prints the last result). `status` answers while a turn
 runs: the request, how long, how many steps, what it is doing now. A second
-`ask` while one runs is refused with exit code **3** (busy), not queued. A
+`ask` while one runs is refused with exit code **3** (busy), not queued, and
+`session cancel` ends the running turn without ending the session. If the
+connection drops mid-turn, `ask` re-attaches by itself; if the session itself
+died, it says so (the request was lost — `ask --resume` carries on). What the
+previous turn does *after* its result — distilling knowledge, closing an
+improvement cycle — often lands during the next request; it is printed as
+`(after the previous turn — …)` and kept in `status`, never shown as the new
+turn's own verdict. A
 question comes back to the first caller still attached: a command to approve
 (`y`, or `--yes` up front) or a design choice to make (a number, Enter for the
 recommendation); with nobody attached a command is refused and a choice takes

@@ -132,6 +132,12 @@ public sealed class AskCommand
                 case "activity":
                     progress.Activity(e.Text);
                     break;
+                case "after":
+                    // The previous turn's after-work, landing now: labelled so it is not read as this turn's.
+                    progress.Stop();
+                    Console.Error.WriteLine($"(after the previous turn — {(e.Kind is "note" or null ? "" : e.Kind + ": ")}{e.Text.Trim()}{(e.Confidence is { } c ? $" · confidence {c:0.00}" : "")})");
+                    progress.Restart();
+                    break;
                 case "step":
                     if (e.Tool is not ("final" or "unwrapped")) progress.Done(e.Tool ?? "?", e.Ok ?? true);
                     break;
@@ -196,7 +202,21 @@ public sealed class AskCommand
         var request = wait
             ? new PipeRequest { Op = "wait" }
             : new PipeRequest { Op = "ask", Text = text, Yes = yes, Detach = detach };
-        var result = await SessionClient.SendAsync(record.Pipe, request, OnEvent, Answer, ct);
+
+        PipeEvent result;
+        try
+        {
+            result = await SessionClient.SendAsync(record.Pipe, request, OnEvent, Answer, ct);
+            if (!detach) result = await ReconnectAsync(result, record, OnEvent, Answer, chatty, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Leaving does not stop the turn; say so, and how to get it back or end it.
+            progress.Stop();
+            if (!json && !jsonl)
+                Console.Error.WriteLine("\n(left — the turn keeps running in the background session: `agent-one session wait` to follow it, `agent-one session cancel` to stop it)");
+            return 130;
+        }
         progress.Stop();
 
         var code = result switch
@@ -241,6 +261,33 @@ public sealed class AskCommand
 
         return code;
     }
+
+    /// <summary>
+    /// The connection dropped before the result, or the pipe was briefly not
+    /// there. While a session is alive under the registry, attach again with
+    /// `wait` — the turn runs in the session, so it may well still be going.
+    /// A session that restarted in between (new pid) no longer has the turn,
+    /// and that is said plainly instead of being shown as its last result.
+    /// </summary>
+    private static async Task<PipeEvent> ReconnectAsync(PipeEvent result, SessionRecord record,
+        Func<PipeEvent, Task> onEvent, Func<PipeEvent, Task<string>> answer, bool chatty, CancellationToken ct)
+    {
+        for (var attempt = 1; attempt <= ReconnectAttempts && result is { Event: "error", Kind: SessionClient.Disconnected or SessionClient.Unreachable }; attempt++)
+        {
+            await Task.Delay(ReconnectDelayMs * attempt, ct);
+            if (SessionRegistry.LoadAlive() is not { } now)
+                return new PipeEvent { Event = "error", Kind = "Ended", Text = $"the background session (pid {record.Pid}) ended mid-turn; the request was lost — `agent-one ask` starts a new session (--resume keeps the conversation)" };
+            if (now.Pid != record.Pid)
+                return new PipeEvent { Event = "error", Kind = "Restarted", Text = $"the background session restarted (pid {record.Pid} → {now.Pid}); the request was lost — ask again" };
+
+            if (chatty) Console.Error.WriteLine($"(connection lost — reattaching, try {attempt}/{ReconnectAttempts})");
+            result = await SessionClient.SendAsync(now.Pipe, new PipeRequest { Op = "wait" }, onEvent, answer, ct);
+        }
+        return result;
+    }
+
+    internal static int ReconnectAttempts { get; set; } = 5;
+    internal static int ReconnectDelayMs { get; set; } = 300;
 
     /// <summary>The one line a headless caller reads to know how the turn went and that it can carry on.</summary>
     internal static string Summary(PipeEvent result)

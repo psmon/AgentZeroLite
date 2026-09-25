@@ -35,6 +35,10 @@ public sealed class SessionServer
     private Turn? _turn;
     private PipeEvent? _last;
 
+    /// <summary>What the last turn's after-work reported (knowledge kept, cycle closed) — shown in status.</summary>
+    private readonly List<PipeEvent> _after = [];
+    private const int AfterKept = 12;
+
     public SessionServer(IAgentSession session, string pipeName)
     {
         _session = session;
@@ -48,8 +52,16 @@ public sealed class SessionServer
         _session.StepCompleted += step => Broadcast(t => { if (step.Tool is not ("final" or "unwrapped")) t.Steps++; },
             new PipeEvent { Event = "step", Tool = step.Tool, Ok = step.Ok, Text = step.Detail, ElapsedMs = step.ElapsedMs });
         _session.AnswerDelta += fragment => Broadcast(t => t.Streamed += fragment.Length, new PipeEvent { Event = "delta", Text = fragment });
-        _session.Noted += note => Broadcast(null, new PipeEvent { Event = "note", Text = note });
-        _session.Decided += note => Broadcast(null, new PipeEvent { Event = "decided", Kind = note.Kind, Text = note.Verdict, Confidence = note.Decision.Confidence, Ok = note.Decision.Ok });
+        _session.Noted += note =>
+        {
+            if (_session.RaisingAfterTurn) AfterTurn(new PipeEvent { Event = "after", Kind = "note", Text = note });
+            else Broadcast(null, new PipeEvent { Event = "note", Text = note });
+        };
+        _session.Decided += note =>
+        {
+            if (_session.RaisingAfterTurn) AfterTurn(new PipeEvent { Event = "after", Kind = note.Kind, Text = note.Verdict, Confidence = note.Decision.Confidence, Ok = note.Decision.Ok });
+            else Broadcast(null, new PipeEvent { Event = "decided", Kind = note.Kind, Text = note.Verdict, Confidence = note.Decision.Confidence, Ok = note.Decision.Ok });
+        };
         _session.TitleChanged += title => Broadcast(null, new PipeEvent { Event = "title", Text = title });
         _session.DesignMade += lines => Broadcast(null, new PipeEvent { Event = "design", Options = [.. lines] });
 
@@ -147,6 +159,10 @@ public sealed class SessionServer
 
             case "wait":
                 await WaitAsync(client, ct);
+                return;
+
+            case "cancel":
+                await client.SendAsync(Cancel());
                 return;
 
             case "ask":
@@ -292,6 +308,7 @@ public sealed class SessionServer
         {
             if (result.Event == "result") _last = result;
             if (ReferenceEquals(_turn, turn)) _turn = null;
+            _after.Clear();                       // what follows belongs to this turn
         }
         turn.Cancel.Dispose();
         turn.Done.TrySetResult(result);
@@ -314,6 +331,40 @@ public sealed class SessionServer
             // A client that is gone is forgotten; the turn does not notice.
             if (!client.TrySend(e)) Forget(client);
         }
+    }
+
+    /// <summary>
+    /// The previous turn's after-work reporting in. Kept for status, and shown
+    /// to whoever is attached now as an "after" event — labelled, so a late
+    /// "nothing worth keeping" does not read as a verdict on the new request.
+    /// </summary>
+    private void AfterTurn(PipeEvent e)
+    {
+        Client[] clients;
+        lock (_gate)
+        {
+            _after.Add(e);
+            if (_after.Count > AfterKept) _after.RemoveAt(0);
+            clients = _turn is { } turn ? [.. turn.Clients] : [];
+        }
+        foreach (var client in clients)
+            if (!client.TrySend(e)) Forget(client);
+    }
+
+    /// <summary>Ends the running turn — the session stays, and so does the conversation up to it.</summary>
+    private PipeEvent Cancel()
+    {
+        Turn? turn;
+        lock (_gate) turn = _turn;
+        if (turn is null) return new PipeEvent { Event = "result", Ok = true, Kind = "Idle", Text = "nothing is running" };
+
+        try { turn.Cancel.Cancel(); }
+        catch (ObjectDisposedException) { return new PipeEvent { Event = "result", Ok = true, Kind = "Idle", Text = "it had just finished" }; }
+        return new PipeEvent
+        {
+            Event = "result", Ok = true, Kind = "Cancelling", Request = turn.Text,
+            Text = $"cancelling \"{Clip(turn.Text, 60)}\" after {Seconds(turn.Clock.Elapsed)} — it stops at its next step"
+        };
     }
 
     private void Forget(Client client)
@@ -388,6 +439,11 @@ public sealed class SessionServer
             if (last is not null)
                 lines.Add($"last      {(last.Ok == true ? "✓" : "✗")} {last.Kind} · {Seconds(TimeSpan.FromMilliseconds(last.ElapsedMs ?? 0))} · \"{Clip(last.Request ?? "", 60)}\"");
         }
+
+        PipeEvent[] after;
+        lock (_gate) after = [.. _after];
+        foreach (var e in after)
+            lines.Add($"after     {(e.Kind is "note" or null ? "" : e.Kind + ": ")}{Clip(e.Text.Trim(), 90)}{(e.Confidence is { } c ? $" · {c:0.00}" : "")}");
 
         try { lines.AddRange(_session.Stats().Describe()); }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or AggregateException) { lines.Add("stats     unavailable: " + ex.Message); }

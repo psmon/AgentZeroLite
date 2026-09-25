@@ -29,6 +29,7 @@ public sealed class SessionCommand
             "stop" => await StopAsync(ct),
             "status" => await StatusAsync(ct),
             "wait" => await new AskCommand().WaitAsync(rest, ct),
+            "cancel" => await CancelAsync(ct),
             "selftest" => await SelfTestAsync(ct),
             _ => Unknown(sub)
         };
@@ -222,6 +223,20 @@ public sealed class SessionCommand
         return 0;
     }
 
+    private static async Task<int> CancelAsync(CancellationToken ct)
+    {
+        var record = SessionRegistry.LoadAlive();
+        if (record is null)
+        {
+            Console.WriteLine("no background session is running");
+            return 1;
+        }
+
+        var reply = await SessionClient.SendAsync(record.Pipe, new PipeRequest { Op = "cancel" }, null, null, ct);
+        Console.WriteLine(reply.Text);
+        return reply.Event == "result" ? 0 : 1;
+    }
+
     private static async Task<int> StatusAsync(CancellationToken ct)
     {
         var record = SessionRegistry.LoadAlive();
@@ -327,6 +342,7 @@ public sealed class SessionCommand
             agent-one session wait [--json|--jsonl] [-q]
                                                 Attach to the running turn and print it to the end; with none
                                                 running, print the last result
+            agent-one session cancel            Stop the running turn only — the session and its conversation stay
             agent-one session stop              End it (a running turn is cancelled)
             agent-one session selftest          Server + client in-process over a private pipe, echo provider
 
@@ -348,7 +364,10 @@ public sealed class SessionCommand
             (-r/--root), keeps its conversation between asks, and writes the same
             session log and workspace memory the chat window does. The turn runs in
             the session, not in the caller: a caller that leaves (Ctrl+C, a timeout)
-            does not stop it, and `session wait` picks it up again. Slash commands
+            does not stop it, and `session wait` picks it up again (`ask` itself
+            re-attaches when the connection drops; `session cancel` ends the turn).
+            What the previous turn's after-work reports late — knowledge kept, a
+            cycle closed — comes as an "after" line, never as the new turn's. Slash commands
             work through ask: /status, /new, /reset.
 
             Why: chat mode can be exercised with no terminal (the selftest, CI), and

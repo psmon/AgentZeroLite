@@ -53,6 +53,15 @@ public interface IAgentSession : IDisposable
     /// <summary>What the person typed during the pause: judged as resume / stop / refine, and applied.</summary>
     Task<PauseOutcome> ResumeAsync(string line, CancellationToken ct);
 
+    /// <summary>
+    /// True only while an event about the <i>previous</i> turn is being raised —
+    /// the knowledge it taught, the improvement cycle it closed — which runs off
+    /// the turn and can land in the middle of the next one. Read it inside a
+    /// Noted / Decided / Learned handler; a renderer that shows turns one at a
+    /// time uses it to keep a late line from reading as the new turn's.
+    /// </summary>
+    bool RaisingAfterTurn { get; }
+
     SessionStats Stats();
     bool TryToggleSmart(out string message);
     void Reset();
