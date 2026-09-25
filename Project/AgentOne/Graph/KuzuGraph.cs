@@ -56,6 +56,28 @@ public sealed class KuzuGraph : IDisposable
     }
 
     /// <summary>
+    /// Any Cypher, with its column names read from the result — for a person
+    /// or another agent typing a query, who should not have to say how many
+    /// columns it returns.
+    /// </summary>
+    public (string[] Columns, List<string[]> Rows) QueryTable(string cypher)
+    {
+        RunChecked(cypher, out var result);
+        var count = (int)kuzu_query_result_get_num_columns(ref result);
+        var names = new string[count];
+        for (var i = 0; i < count; i++)
+        {
+            if (kuzu_query_result_get_column_name(ref result, (ulong)i, out var ptr) == Success && ptr != IntPtr.Zero)
+            {
+                names[i] = Marshal.PtrToStringUTF8(ptr) ?? $"col{i}";
+                kuzu_destroy_string(ptr);
+            }
+            else names[i] = $"col{i}";
+        }
+        return (names, ReadRows(ref result, count));
+    }
+
+    /// <summary>
     /// An explicit transaction. Disposed without <see cref="Commit"/> it rolls
     /// back, so an exception midway leaves no half-written knowledge behind.
     /// </summary>

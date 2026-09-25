@@ -66,7 +66,7 @@ internal static class Program
                 "auth" => await new AuthCommand().ExecuteAsync(rest, cts.Token),
                 "jev" => await new JevCommand().ExecuteAsync(rest, cts.Token),
                 "tools" => new ToolsCommand().Execute(rest),
-                "memory" => new MemoryCommand().Execute(rest),
+                "memory" or "knowledge" => await new MemoryCommand().ExecuteAsync(rest, cts.Token),
                 "version" => PrintVersion(),
                 "home" => PrintHome(),
                 "help" => Help(rest),
@@ -115,7 +115,7 @@ internal static class Program
             case "auth": AuthCommand.PrintHelp(); return 0;
             case "jev": JevCommand.PrintHelp(); return 0;
             case "tools": ToolsCommand.PrintHelp(); return 0;
-            case "memory": MemoryCommand.PrintHelp(); return 0;
+            case "memory" or "knowledge": MemoryCommand.PrintHelp(); return 0;
             default:
                 Console.Error.WriteLine($"agent-one help: no such command '{args[0]}'");
                 return 2;
@@ -148,7 +148,8 @@ internal static class Program
               jev              Put a decision to TypeSafe / Jev (smart-mode bench)
               models           List what the configured endpoint can run
               tools            List the verbs the agent can call
-              memory           What the workspace's knowledge graph holds · search · Cypher
+              knowledge        The workspace's knowledge graph: init/update from its markdown (guidelines vs
+                               knowledge, judged by Jev) · guidelines · search · Cypher   (alias: memory)
               home             Print where agent-one keeps its files
               version          Print the version
               help <command>   Detailed help for one command

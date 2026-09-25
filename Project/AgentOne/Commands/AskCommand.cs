@@ -60,7 +60,7 @@ public sealed class AskCommand
             return 2;
         }
 
-        var text = string.Join(' ', options.Positional).Trim();
+        var text = UndoMsysPath(string.Join(' ', options.Positional).Trim(), Environment.GetEnvironmentVariable("MSYSTEM"));
         if (!wait)
         {
             if (text.Length == 0 && Console.IsInputRedirected)
@@ -289,6 +289,21 @@ public sealed class AskCommand
     internal static int ReconnectAttempts { get; set; } = 5;
     internal static int ReconnectDelayMs { get; set; } = 300;
 
+    /// <summary>
+    /// Git Bash (MSYS) rewrites an argument that starts with "/" into a Windows
+    /// path before the program sees it: measured, `ask "/knowledge update"`
+    /// arrived as "C:/Program Files/Git/knowledge update" and ran as a model
+    /// turn. Under MSYS only, a slash command that came back that way is put
+    /// back as typed. Anything else — a real path — is left alone.
+    /// </summary>
+    internal static string UndoMsysPath(string text, string? msystem)
+    {
+        if (string.IsNullOrEmpty(msystem)) return text;
+        var m = System.Text.RegularExpressions.Regex.Match(text,
+            @"^[A-Za-z]:/(?:[^/]+/)*?Git/(?<cmd>knowledge|cypher|status|new|reset)(?=\s|$)");
+        return m.Success ? "/" + m.Groups["cmd"].Value + text[m.Length..] : text;
+    }
+
     /// <summary>The one line a headless caller reads to know how the turn went and that it can carry on.</summary>
     internal static string Summary(PipeEvent result)
     {
@@ -298,7 +313,7 @@ public sealed class AskCommand
             SessionServer.Seconds(TimeSpan.FromMilliseconds(result.ElapsedMs ?? 0))
         };
         if (result.Steps is { } steps) parts.Add($"{steps} step{(steps == 1 ? "" : "s")}");
-        if (result.Turn is { } turn) parts.Add($"turn {turn}");
+        if (result.Turn is > 0 and var turn) parts.Add($"turn {turn}");
         return "── " + string.Join(" · ", parts) + " — `agent-one ask \"…\"` carries on";
     }
 

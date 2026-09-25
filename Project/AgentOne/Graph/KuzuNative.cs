@@ -87,6 +87,8 @@ internal static class KuzuNative
     [DllImport(Lib)] public static extern byte kuzu_query_result_has_next(ref QueryResult result);
     [DllImport(Lib)] public static extern int kuzu_query_result_get_next(ref QueryResult result, out FlatTuple outTuple);
     [DllImport(Lib)] public static extern void kuzu_query_result_destroy(ref QueryResult result);
+    [DllImport(Lib)] public static extern ulong kuzu_query_result_get_num_columns(ref QueryResult result);
+    [DllImport(Lib)] public static extern int kuzu_query_result_get_column_name(ref QueryResult result, ulong index, out IntPtr outColumnName);
 
     [DllImport(Lib)] public static extern int kuzu_flat_tuple_get_value(ref FlatTuple tuple, ulong index, out Value outValue);
 

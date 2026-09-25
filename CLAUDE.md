@@ -550,7 +550,21 @@ query and the keyword pass both find nothing the newest items go anyway
 (`recent (fallback)`) — the engine said the graph helps, and a miss on words is
 not a no. `ChatSession.UsesGraph` is the test
 switch (like `NamesTasks`): consulting and learning would eat a scripted
-engine's answers. **Dispose is idempotent** — the graph tests dispose the
+engine's answers. **`knowledge init|update|rebuild`** (`Agent/KnowledgeScanner`,
+`Graph/KnowledgeGraph.Docs.cs`) turns the workspace's Markdown into graph
+knowledge: sections split at ATX headings (not inside fences), each put to
+`SmartRouter.GuidelineOrKnowledgeAsync` (4 in flight; a word rule without a
+key), stored as ordinary `Knowledge` (`source = doc`, so recall finds them)
+with the verdict on the edge — `(Doc)-[:GUIDES|:INFORMS {confidence}]->` — and
+a Rationale. Incremental by content: Doc hash skips a file, section hash skips
+a section, ids are file + heading path + ordinal so an edit updates in place
+and keeps `uses`. The commands live in `ChatSession` (`/knowledge`, `/cypher`),
+not in a renderer, because the session holds Kùzu's one handle; the CLI opens
+the graph itself and forwards to the background session when it cannot.
+`KuzuGraph.QueryTable` reads column names from the result. Git Bash rewrites a
+leading "/" into its install path, so `AskCommand.UndoMsysPath` puts a
+converted slash command back (measured: `/knowledge update` reached the model
+as `C:/Program Files/Git/knowledge update`). **Dispose is idempotent** — the graph tests dispose the
 session early to open the database themselves.
 
 **The PDSA loop** (`Graph/KnowledgeGraph.Pdsa.cs` the persistence,

@@ -92,6 +92,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
 | `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/status`, `/resume`, `/new`, `/reset`, `/exit`; Esc pauses a running turn. |
 | `agent-one session` | The one background session: `start` (detached, `--resume`), `status` (live progress), `wait`, `cancel`, `stop`, `selftest`. |
+| `agent-one knowledge` | The knowledge graph (alias `memory`): `init` / `update` / `rebuild` from the workspace's markdown (guideline vs knowledge, judged by Jev), `guidelines`, `schema`, `query "<cypher>"`, `search`, `pdsa`. In chat: `/knowledge …`, `/cypher …`. |
 | `agent-one ask <request>` | Send one request to the background session — starting it on first use — and print the turn. `chat --headless` is the same. `--detach`, `--yes`, `--json`, `--jsonl`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one setup` | Full-screen settings: connection, model, reasoning model, options, smart mode (`tui` still works as an alias). |
@@ -518,6 +519,43 @@ graph helps, and a miss on words is not a no.
   ✓ run_command  (2.4s)
 ◆ 빌드 성공 …
 ```
+
+**The workspace's own documents go in too** — `agent-one knowledge init` (or
+`/knowledge init` in chat, `agent-one ask "/knowledge init"` headless) reads
+every Markdown file under the root, splits it at its headings, and puts each
+section to the decision engine: *is this a guideline — a rule for whoever
+works here — or knowledge — how things are?* The answer is the edge:
+
+```
+Doc ──GUIDES {confidence}──▶ Knowledge   (a guideline the document states)
+Doc ──INFORMS {confidence}──▶ Knowledge  (knowledge the document states)
+          Knowledge ──JUSTIFIED_BY──▶ Rationale · ──ABOUT──▶ Path(the file)
+```
+
+The sections are ordinary `Knowledge` nodes, so the recall before a turn finds
+them with no extra step. `knowledge update` is incremental by content: a file
+whose hash has not changed is skipped, inside a changed file only the sections
+whose text changed are judged again (an edited section keeps its node and its
+use count), and sections or files that are gone are removed; `rebuild` judges
+everything again, and a folder argument limits any of them. Measured on this
+repository: 335 files, 2,951 sections judged in 218 s; the next `update`, with
+nothing changed, took 0.3 s. Without a TypeSafe key a word rule (must / never /
+반드시 / 금지 …) classifies instead and each rationale says so.
+
+```bash
+agent-one knowledge init                    # build (the graph is created on first use)
+agent-one knowledge update docs             # only what changed, only under docs/
+agent-one knowledge guidelines 10           # the guidelines, strongest first
+agent-one knowledge schema                  # tables and relationships, for writing Cypher
+agent-one knowledge query "MATCH (d:Doc)-[:GUIDES]->(k:Knowledge) RETURN d.path, k.title LIMIT 20"
+agent-one ask "/cypher MATCH (d:Doc)-[e]->(k) RETURN label(e), count(*)"   # the same, through the session
+```
+
+`knowledge` and `memory` are one command. Kùzu allows one open handle per
+database, and a running background session holds it — then `knowledge
+init/update/guidelines/query` are sent to the session as `/knowledge …` and
+`/cypher …` rather than failing. `query` prints the result's own column names
+(`--columns n` keeps the old headerless output).
 
 `agent-one memory` shows what the graph holds; `memory query "MATCH (k:Knowledge)-[:ABOUT]->(p:Path) RETURN p.path, k.title"`
 runs any Cypher. The graph needs Kùzu's shared library next to the binary
