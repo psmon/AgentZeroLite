@@ -143,6 +143,96 @@ public class SessionPipeTests : IDisposable
     }
 
     [Fact]
+    public async Task ADetachedTurnRunsOnItsOwnAndWaitCollectsIt()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var provider = new ScriptedChatProvider(
+            """{"tool":"list_files","args":{}}""",
+            """{"tool":"final","args":{"text":"two files"}}""") { Delay = TimeSpan.FromMilliseconds(400) };
+        using var session = Session(provider);
+        var (server, running) = await StartAsync(session, _pipe, cts.Token);
+
+        var accepted = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "ask", Text = "what is here?", Detach = true }, null, null, cts.Token);
+        Assert.Equal("Accepted", accepted.Kind);
+        Assert.True(server.Busy);
+
+        // While it runs: status answers at once and says what is going on; a second ask is refused, not queued.
+        var status = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "status" }, null, null, cts.Token);
+        Assert.Contains("state     working", status.Text);
+        Assert.Contains("what is here?", status.Text);
+        var busy = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "ask", Text = "another" }, null, null, cts.Token);
+        Assert.Equal("error", busy.Event);
+        Assert.Equal("Busy", busy.Kind);
+
+        var events = new List<PipeEvent>();
+        var result = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "wait" },
+            e => { events.Add(e); return Task.CompletedTask; }, null, cts.Token);
+        Assert.Equal("attached", events[0].Event);
+        Assert.Equal("what is here?", events[0].Text);
+        Assert.Equal("two files", result.Text);
+        Assert.Equal(1, result.Turn);
+        Assert.Equal(1, result.Steps);
+        Assert.Equal("what is here?", result.Request);
+
+        // Idle: wait hands back the last result, and status says how it ended.
+        var again = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "wait" }, null, null, cts.Token);
+        Assert.Equal("two files", again.Text);
+        Assert.Contains("state     idle", (await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "status" }, null, null, cts.Token)).Text);
+
+        await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "stop" }, null, null, cts.Token);
+        await running.WaitAsync(TimeSpan.FromSeconds(5), cts.Token);
+    }
+
+    [Fact]
+    public async Task ACallerThatLeavesMidTurnDoesNotStopItAndTheNextAskCarriesOn()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var provider = new ScriptedChatProvider(
+            """{"tool":"final","args":{"text":"the answer is 42"}}""") { Delay = TimeSpan.FromMilliseconds(600) };
+        using var session = Session(provider);
+        var (server, running) = await StartAsync(session, _pipe, cts.Token);
+
+        // The caller gives up after 150 ms — a timeout, a Ctrl+C.
+        using (var impatient = new CancellationTokenSource(TimeSpan.FromMilliseconds(150)))
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                SessionClient.SendAsync(_pipe, new PipeRequest { Op = "ask", Text = "what is the answer?" }, null, null, impatient.Token));
+        }
+
+        var first = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "wait" }, null, null, cts.Token);
+        Assert.Equal("the answer is 42", first.Text);
+        Assert.Equal(true, first.Ok);
+
+        // The conversation carried on: the next turn is turn 2 and the model sees the first exchange.
+        var second = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "ask", Text = "say it again" }, null, null, cts.Token);
+        Assert.Equal(2, second.Turn);
+        Assert.Contains(provider.Calls[^1], m => m.Content.Contains("the answer is 42"));
+        Assert.False(server.Busy);
+
+        await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "stop" }, null, null, cts.Token);
+        await running.WaitAsync(TimeSpan.FromSeconds(5), cts.Token);
+    }
+
+    [Fact]
+    public async Task ACommandWithNobodyAttachedIsRefusedNotHung()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var session = Session(new ScriptedChatProvider(
+            """{"tool":"run_command","args":{"command":"echo nobody-here"}}""",
+            """{"tool":"final","args":{"text":"could not run it"}}"""));
+        var (_, running) = await StartAsync(session, _pipe, cts.Token);
+
+        await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "ask", Text = "run it", Detach = true }, null, null, cts.Token);
+        var result = await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "wait" }, null, null, cts.Token);
+
+        Assert.Equal("could not run it", result.Text);
+        Assert.Equal(0, session.Stats().Counters.ApprovalsGranted);
+
+        await SessionClient.SendAsync(_pipe, new PipeRequest { Op = "stop" }, null, null, cts.Token);
+        await running.WaitAsync(TimeSpan.FromSeconds(5), cts.Token);
+    }
+
+    [Fact]
     public async Task NoServerIsAnErrorEventNotAnException()
     {
         SessionClient.ConnectTimeoutMs = 300;

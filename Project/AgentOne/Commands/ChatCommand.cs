@@ -16,6 +16,11 @@ public sealed class ChatCommand
 {
     public async Task<int> ExecuteAsync(string[] args, CancellationToken ct)
     {
+        // Headless: the same conversation, kept by the background session
+        // (started on first use) and driven one request per invocation.
+        if (args.Contains("--headless"))
+            return await new AskCommand().ExecuteAsync([.. args.Where(a => a != "--headless")], ct);
+
         if (!AgentOptions.TryParse(args, out var options, out var error))
         {
             Console.Error.WriteLine($"agent-one chat: {error}");
@@ -251,6 +256,10 @@ public sealed class ChatCommand
 
             Options: the same as `agent-one run`, plus
               --plain      The line REPL even in a terminal
+              --headless "<request>"
+                           No window, no REPL: one request to the background session
+                           (started on first use, kept between calls) — the same as
+                           `agent-one ask`. Call it again to carry the conversation on.
 
             Keys (window):    Enter send · Shift+Tab basic/smart · F2 status
                               wheel or PageUp/PageDown scroll · Ctrl+End follow

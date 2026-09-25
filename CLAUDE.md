@@ -598,7 +598,19 @@ connection, which is how `Approver`/`Chooser` reach the CLI (`ask --yes`
 approves up front). `agent-one ask` is the REPL's printing over the client;
 `session selftest` runs both ends in-process on a private pipe with the echo
 provider — the release workflow runs it. Note `ask` used to alias `run`; it no
-longer does.
+longer does. **The turn belongs to the server, not the connection**
+(`SessionServer.Turn`): connections are served concurrently and *attach* to the
+running turn, so a caller that leaves (Ctrl+C, a tool timeout) does not stop it,
+`op: wait` (`session wait`) re-attaches or returns the last result, `status`
+answers mid-turn with request / elapsed / steps / activity, and a second ask is
+refused as `Busy` (exit 3) rather than queued. `ask` is also the headless chat
+(`chat --headless` routes to it): with no session it spawns one itself
+(`SessionCommand.SpawnAsync`, passing `AgentOptions.Flags` — the flags as typed,
+never the request words), `--detach` returns at once, `--jsonl` streams every
+event, and a summary line (`✓ done · time · steps · turn n`) ends on stderr.
+`--resume` (start / first ask) resumes the workspace's newest saved
+conversation. Approvals go to the first caller still attached; with nobody
+attached a command is refused, never left hanging.
 
 **A session belongs to its workspace** (`Services/WorkspaceStore`, under
 `~/.agent-one/workspaces/<name>-<sha1[10]>/`): `memory.md` gets one entry per
