@@ -18,7 +18,7 @@ A thin wrapper. It ships **no binary**: `postinstall` downloads the native
 its SHA256 against `checksums.txt`, and unpacks it next to the launcher. The npm
 version and the release tag are published together, so they cannot drift.
 
-Supported: `win-x64`, `linux-x64`, `osx-arm64`, `osx-x64` (Node ≥ 18).
+Supported: `win-x64`, `linux-x64`, `osx-arm64` (Node ≥ 18). Intel Macs (`osx-x64`) have no prebuilt binary — build from source.
 
 ## Configuration
 

@@ -67,9 +67,9 @@ jobs:
           - os: macos-14
             rid: osx-arm64
             archive: tar.gz
-          - os: macos-13
-            rid: osx-x64
-            archive: tar.gz
+          # osx-x64 (Intel Mac) is not built: the macos-13 runner pool it needed
+          # was retired, and CodeScan dropped it for the same reason. The npm
+          # installer says so on an Intel Mac instead of failing on a 404.
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -183,7 +183,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN not set — skipping npm publish (the GitHub Release is already up)."
+            # Visible on the run page, not buried in a log: the release is up, npm is not.
+            echo "::warning title=npm not published::NPM_TOKEN is not set on this repository — the GitHub Release is up, @webnori/agent-one was not published. gh secret set NPM_TOKEN, then re-run this job."
             exit 0
           fi
           npm version ${{ needs.version.outputs.version }} --no-git-tag-version

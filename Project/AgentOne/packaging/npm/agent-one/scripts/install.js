@@ -40,6 +40,13 @@ const rid = (() => {
     return die(`unsupported platform: ${process.platform}`);
 })();
 
+// Intel Macs are not built (the macOS x64 runners were retired); say so rather than 404.
+if (rid === 'osx-x64') {
+    die('no prebuilt binary for Intel Macs (osx-x64). Build from source: ' +
+        'dotnet publish Project/AgentOne/AgentOne.csproj -c Release -r osx-x64 ' +
+        '(https://github.com/psmon/AgentZeroLite/tree/main/Project/AgentOne)');
+}
+
 const ext = process.platform === 'win32' ? 'zip' : 'tar.gz';
 const asset = `agent-one-${rid}.${ext}`;
 
