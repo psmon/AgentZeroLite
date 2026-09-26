@@ -28,6 +28,8 @@ public sealed class SessionCommand
             "serve" => await ServeAsync(rest, ct),
             "stop" => await StopAsync(ct),
             "status" => await StatusAsync(ct),
+            "wait" => await new AskCommand().WaitAsync(rest, ct),
+            "cancel" => await CancelAsync(ct),
             "selftest" => await SelfTestAsync(ct),
             _ => Unknown(sub)
         };
@@ -37,7 +39,8 @@ public sealed class SessionCommand
 
     private static async Task<int> StartAsync(string[] args, CancellationToken ct)
     {
-        if (!AgentOptions.TryParse(args, out var options, out var error))
+        var passed = TakeResume(args, out _);
+        if (!AgentOptions.TryParse(passed, out var options, out var error))
         {
             Console.Error.WriteLine($"agent-one session start: {error}");
             return 2;
@@ -49,12 +52,27 @@ public sealed class SessionCommand
             return 1;
         }
 
-        var exe = Environment.ProcessPath;
-        if (exe is null)
+        var (record, failure) = await SpawnAsync(args, options.Root, ct);
+        if (record is null)
         {
-            Console.Error.WriteLine("agent-one session start: cannot find my own executable to spawn");
+            Console.Error.WriteLine("agent-one session start: " + failure);
             return 1;
         }
+
+        Console.WriteLine($"background session started (pid {record.Pid}) · root {record.Root} · {(record.Smart ? "smart" : "basic")}");
+        Console.WriteLine($"  ask it:   agent-one ask \"<request>\"     stop it: agent-one session stop");
+        Console.WriteLine($"  log:      {ServerLogPath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Spawns `session serve` with these arguments, detached, and waits for it
+    /// to record itself. `start` and an `ask` that finds no session both use it.
+    /// </summary>
+    internal static async Task<(SessionRecord? Record, string Failure)> SpawnAsync(string[] args, string root, CancellationToken ct)
+    {
+        var exe = Environment.ProcessPath;
+        if (exe is null) return (null, "cannot find my own executable to spawn");
 
         // The child gets the same options, verbatim, and runs `serve` — detached,
         // sharing no handle with this process (see DetachedProcess for the 3m55s
@@ -62,34 +80,29 @@ public sealed class SessionCommand
         Process child;
         try
         {
-            child = DetachedProcess.Start(exe, ["session", "serve", .. args], options.Root);
+            child = DetachedProcess.Start(exe, ["session", "serve", .. args], root);
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException)
         {
-            Console.Error.WriteLine("agent-one session start: could not spawn the server: " + ex.Message);
-            return 1;
+            return (null, "could not spawn the server: " + ex.Message);
         }
 
         // Wait for the server to write its record; it does so once the pipe is up.
         for (var i = 0; i < 100; i++)
         {
             await Task.Delay(100, ct);
-            if (SessionRegistry.Load() is { } record && record.Pid == child.Id)
-            {
-                Console.WriteLine($"background session started (pid {record.Pid}) · root {record.Root} · {(record.Smart ? "smart" : "basic")}");
-                Console.WriteLine($"  ask it:   agent-one ask \"<request>\"     stop it: agent-one session stop");
-                Console.WriteLine($"  log:      {ServerLogPath}");
-                return 0;
-            }
-            if (child.HasExited)
-            {
-                Console.Error.WriteLine($"agent-one session start: the server exited at once (code {child.ExitCode}) — see {ServerLogPath}");
-                return 1;
-            }
+            if (SessionRegistry.Load() is { } record && record.Pid == child.Id) return (record, "");
+            if (child.HasExited) return (null, $"the server exited at once (code {child.ExitCode}) — see {ServerLogPath}");
         }
 
-        Console.Error.WriteLine("agent-one session start: the server did not come up in 10 s — see " + ServerLogPath);
-        return 1;
+        return (null, "the server did not come up in 10 s — see " + ServerLogPath);
+    }
+
+    /// <summary>Lifts `--resume` out of the arguments; the rest are the chat options.</summary>
+    internal static string[] TakeResume(string[] args, out bool resume)
+    {
+        resume = args.Contains("--resume");
+        return [.. args.Where(a => a != "--resume")];
     }
 
     private static string ServerLogPath => Path.Combine(AppPaths.EnsureLogDir(), "session.log");
@@ -99,6 +112,7 @@ public sealed class SessionCommand
     /// <summary>The server process itself. Never run this by hand; `start` does.</summary>
     private static async Task<int> ServeAsync(string[] args, CancellationToken ct)
     {
+        args = TakeResume(args, out var resume);
         if (!AgentOptions.TryParse(args, out var options, out var error))
         {
             Console.Error.WriteLine($"agent-one session serve: {error}");
@@ -125,6 +139,8 @@ public sealed class SessionCommand
 
         using (session)
         {
+            if (resume) ResumeLatest(session);
+
             var pipe = SessionRegistry.PipeName();
             var server = new SessionServer(session, pipe);
 
@@ -149,6 +165,29 @@ public sealed class SessionCommand
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// `--resume`: pick the workspace's newest saved conversation back up, so a
+    /// session restarted after `stop` (or a crash) carries on where it was.
+    /// </summary>
+    private static void ResumeLatest(IAgentSession session)
+    {
+        try
+        {
+            var latest = session.ListSessions().FirstOrDefault(s => s.Turns > 0 && !string.Equals(s.Path, session.LogPath, StringComparison.OrdinalIgnoreCase));
+            if (latest is null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] resume: no earlier conversation in this workspace — starting fresh");
+                return;
+            }
+            session.Resume(latest.Path);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] resume: {latest.Path} · {latest.Turns} turns · {latest.Title}");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            Console.Error.WriteLine("resume failed: " + ex.Message);
+        }
     }
 
     // ------------------------------------------------------- stop / status
@@ -182,6 +221,20 @@ public sealed class SessionCommand
 
         SessionRegistry.Clear();
         return 0;
+    }
+
+    private static async Task<int> CancelAsync(CancellationToken ct)
+    {
+        var record = SessionRegistry.LoadAlive();
+        if (record is null)
+        {
+            Console.WriteLine("no background session is running");
+            return 1;
+        }
+
+        var reply = await SessionClient.SendAsync(record.Pipe, new PipeRequest { Op = "cancel" }, null, null, ct);
+        Console.WriteLine(reply.Text);
+        return reply.Event == "result" ? 0 : 1;
     }
 
     private static async Task<int> StatusAsync(CancellationToken ct)
@@ -281,20 +334,40 @@ public sealed class SessionCommand
     public static void PrintHelp()
     {
         Console.WriteLine("""
-            agent-one session start [options]   Start the one background session (detached), same options as `chat`
-            agent-one session status            Is one running, and its status block
-            agent-one session stop              End it
+            agent-one session start [options] [--resume]
+                                                Start the one background session (detached), same options as
+                                                `chat`; --resume picks the workspace's last conversation back up
+            agent-one session status            Is one running · what the running turn is doing (request,
+                                                elapsed, steps, now) or how the last one ended · its stats
+            agent-one session wait [--json|--jsonl] [-q]
+                                                Attach to the running turn and print it to the end; with none
+                                                running, print the last result
+            agent-one session cancel            Stop the running turn only — the session and its conversation stay
+            agent-one session stop              End it (a running turn is cancelled)
             agent-one session selftest          Server + client in-process over a private pipe, echo provider
 
-            agent-one ask "<request>" [--yes] [--json] [-q]
-                                                Send one request to the background session and print the
-                                                turn as the REPL would. A command needing approval is asked
-                                                here (or approved with --yes); a design choice is asked here
-                                                (or takes the recommendation when not interactive).
+            agent-one ask "<request>" [options]    (also: agent-one chat --headless "<request>")
+                                                Send one request to the background session — starting it first,
+                                                in this folder (or -r), when none runs — and print the turn:
+                                                progress on stderr, the answer on stdout, then one summary line
+                                                on stderr (✓ done · time · steps · turn n).
+              --detach      hand it over and return at once; `session wait` collects the result
+              --json        print the result event only       --jsonl  every event as it happens, result last
+              -y, --yes     approve commands without asking     -q       no progress, no summary
+              --no-start    fail instead of starting a session  --resume a session this call starts resumes the last conversation
+              chat options (-r, --smart, -m, …) apply only when this call starts the session.
+            A command needing approval is asked here (or approved with --yes; refused when nobody is
+            attached); a design choice is asked here (or takes the recommendation when not interactive).
+            Exit codes: 0 answered · 1 failed or stopped · 2 usage · 3 busy (a turn is already running).
 
             One session at a time. It belongs to the workspace it was started in
             (-r/--root), keeps its conversation between asks, and writes the same
-            session log and workspace memory the chat window does. Slash commands
+            session log and workspace memory the chat window does. The turn runs in
+            the session, not in the caller: a caller that leaves (Ctrl+C, a timeout)
+            does not stop it, and `session wait` picks it up again (`ask` itself
+            re-attaches when the connection drops; `session cancel` ends the turn).
+            What the previous turn's after-work reports late — knowledge kept, a
+            cycle closed — comes as an "after" line, never as the new turn's. Slash commands
             work through ask: /status, /new, /reset.
 
             Why: chat mode can be exercised with no terminal (the selftest, CI), and

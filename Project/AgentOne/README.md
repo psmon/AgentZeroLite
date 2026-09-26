@@ -91,8 +91,9 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 |---|---|
 | `agent-one run <prompt>` | Ask once, print the answer, exit. The prompt may also arrive on stdin. |
 | `agent-one chat` | The chat window: transcript above, your line at the bottom. `--plain` or a pipe gives the line REPL. `/status`, `/resume`, `/new`, `/reset`, `/exit`; Esc pauses a running turn. |
-| `agent-one session` | The one background session: `start` (detached), `status`, `stop`, `selftest`. |
-| `agent-one ask <request>` | Send one request to the background session and print the turn. `--yes`, `--json`. |
+| `agent-one session` | The one background session: `start` (detached, `--resume`), `status` (live progress), `wait`, `cancel`, `stop`, `selftest`. |
+| `agent-one knowledge` | The knowledge graph (alias `memory`): `init` / `update` / `rebuild` from the workspace's markdown (guideline vs knowledge, judged by Jev), `guidelines`, `schema`, `query "<cypher>"`, `search`, `pdsa`. In chat: `/knowledge …`, `/cypher …`. |
+| `agent-one ask <request>` | Send one request to the background session — starting it on first use — and print the turn. `chat --headless` is the same. `--detach`, `--yes`, `--json`, `--jsonl`. |
 | `agent-one config` | `show` / `get` / `set` / `path` / `reset` over `~/.agent-one/config.json`. |
 | `agent-one setup` | Full-screen settings: connection, model, reasoning model, options, smart mode (`tui` still works as an alias). |
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
@@ -421,28 +422,58 @@ fresh session with a new log file.
 ### A session in the background, driven from the CLI
 
 ```bash
-agent-one session start --smart -r ./myproject     # one detached process, one pipe
-agent-one ask "scaffold a FastAPI hello service"    # the turn, printed as the REPL would
+cd ./myproject
+agent-one ask "scaffold a FastAPI hello service"    # no session yet: starts one here, then the turn
+agent-one ask "now add a /health route"             # the same conversation, turn 2
+agent-one chat --headless "what did you change?"    # the same thing under chat's name
 agent-one ask --yes "run the tests"                 # approve commands without asking back
-agent-one ask --json "/status"                      # one JSON object: the result event
+agent-one ask --detach "refactor the models"        # hand it over, return at once
+agent-one session status                            # state working · 41.2s · 3 steps · now: write_file
+agent-one session wait                              # attach, print the rest, then the summary line
+agent-one session cancel                            # end the running turn; the session and conversation stay
+agent-one ask --jsonl "…"                           # every event as a JSON line, the result last
 agent-one session stop
+agent-one ask --resume "where were we?"             # a new session that picks the last conversation up
 ```
 
-`session start` spawns `agent-one` itself, detached, holding one `ChatSession`
-behind a local named pipe (`~/.agent-one/session.json` says where). `ask`
-connects, sends the request, and prints the turn's events as they happen —
-progress, tool steps, the streamed answer, decisions, the design's head — and
-is where a question comes back: a command to approve (`y`, or `--yes` up
-front) or a design choice to make (a number, Enter for the recommendation).
-The conversation, the log and the workspace memory are the same as the
-window's. One session at a time; a second `start` is refused while the first
-is alive, and a stale record from a crash is cleared.
+The first `ask` in a folder spawns `agent-one session serve` there (with any
+chat options it was given: `--smart`, `-m`, `-r` …), detached, holding one
+`ChatSession` behind a local named pipe (`~/.agent-one/session.json` says
+where); `session start` does the same explicitly. Every later `ask` carries
+the conversation on. `ask` prints the turn's events as they happen —
+progress on stderr, tool steps, the streamed answer on stdout, decisions, the
+design's head — and ends with one summary line on stderr:
+
+```
+── ✓ done · 8.1s · 1 step · turn 3 — `agent-one ask "…"` carries on
+```
+
+**The turn belongs to the session, not to the caller.** Connections are served
+concurrently and attach to the running turn; a caller that leaves — Ctrl+C, a
+tool-call timeout — does not stop it, and `session wait` attaches again (or,
+with nothing running, prints the last result). `status` answers while a turn
+runs: the request, how long, how many steps, what it is doing now. A second
+`ask` while one runs is refused with exit code **3** (busy), not queued, and
+`session cancel` ends the running turn without ending the session. If the
+connection drops mid-turn, `ask` re-attaches by itself; if the session itself
+died, it says so (the request was lost — `ask --resume` carries on). What the
+previous turn does *after* its result — distilling knowledge, closing an
+improvement cycle — often lands during the next request; it is printed as
+`(after the previous turn — …)` and kept in `status`, never shown as the new
+turn's own verdict. A
+question comes back to the first caller still attached: a command to approve
+(`y`, or `--yes` up front) or a design choice to make (a number, Enter for the
+recommendation); with nobody attached a command is refused and a choice takes
+the recommendation. The conversation, the log and the workspace memory are the
+same as the window's. One session at a time; a second `start` is refused while
+the first is alive, and a stale record from a crash is cleared. Exit codes:
+0 answered · 1 failed or stopped · 2 usage · 3 busy.
 
 Two reasons it exists: **chat mode can be self-tested with no terminal** —
 `agent-one session selftest` runs server and client in one process over a
 private pipe on the echo provider, and the release smoke test runs it on every
 artifact — and **another agent can drive this one** from a script, reading
-`--json` results or the event lines.
+`--json` results or the `--jsonl` event lines.
 
 ### Long-term memory as a graph
 
@@ -488,6 +519,43 @@ graph helps, and a miss on words is not a no.
   ✓ run_command  (2.4s)
 ◆ 빌드 성공 …
 ```
+
+**The workspace's own documents go in too** — `agent-one knowledge init` (or
+`/knowledge init` in chat, `agent-one ask "/knowledge init"` headless) reads
+every Markdown file under the root, splits it at its headings, and puts each
+section to the decision engine: *is this a guideline — a rule for whoever
+works here — or knowledge — how things are?* The answer is the edge:
+
+```
+Doc ──GUIDES {confidence}──▶ Knowledge   (a guideline the document states)
+Doc ──INFORMS {confidence}──▶ Knowledge  (knowledge the document states)
+          Knowledge ──JUSTIFIED_BY──▶ Rationale · ──ABOUT──▶ Path(the file)
+```
+
+The sections are ordinary `Knowledge` nodes, so the recall before a turn finds
+them with no extra step. `knowledge update` is incremental by content: a file
+whose hash has not changed is skipped, inside a changed file only the sections
+whose text changed are judged again (an edited section keeps its node and its
+use count), and sections or files that are gone are removed; `rebuild` judges
+everything again, and a folder argument limits any of them. Measured on this
+repository: 335 files, 2,951 sections judged in 218 s; the next `update`, with
+nothing changed, took 0.3 s. Without a TypeSafe key a word rule (must / never /
+반드시 / 금지 …) classifies instead and each rationale says so.
+
+```bash
+agent-one knowledge init                    # build (the graph is created on first use)
+agent-one knowledge update docs             # only what changed, only under docs/
+agent-one knowledge guidelines 10           # the guidelines, strongest first
+agent-one knowledge schema                  # tables and relationships, for writing Cypher
+agent-one knowledge query "MATCH (d:Doc)-[:GUIDES]->(k:Knowledge) RETURN d.path, k.title LIMIT 20"
+agent-one ask "/cypher MATCH (d:Doc)-[e]->(k) RETURN label(e), count(*)"   # the same, through the session
+```
+
+`knowledge` and `memory` are one command. Kùzu allows one open handle per
+database, and a running background session holds it — then `knowledge
+init/update/guidelines/query` are sent to the session as `/knowledge …` and
+`/cypher …` rather than failing. `query` prints the result's own column names
+(`--columns n` keeps the old headerless output).
 
 `agent-one memory` shows what the graph holds; `memory query "MATCH (k:Knowledge)-[:ABOUT]->(p:Path) RETURN p.path, k.title"`
 runs any Cypher. The graph needs Kùzu's shared library next to the binary

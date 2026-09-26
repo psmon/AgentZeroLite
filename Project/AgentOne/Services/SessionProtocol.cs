@@ -4,7 +4,8 @@ namespace AgentOne.Services;
 
 /// <summary>
 /// What a client sends the background session, one JSON object per line.
-/// "ask" runs a turn (slash commands included), "status" reads the stats,
+/// "ask" runs a turn (slash commands included), "wait" attaches to the running
+/// turn (or returns the last result), "status" reads the progress and stats,
 /// "stop" ends the session, "answer" replies to an "ask" or "choose" event
 /// the server raised mid-turn.
 /// </summary>
@@ -19,6 +20,10 @@ public sealed class PipeRequest
     /// <summary>ask: approve every command the gate would have asked about, without asking back.</summary>
     [JsonPropertyName("yes")]
     public bool Yes { get; set; }
+
+    /// <summary>ask: answer "Accepted" at once and let the turn run with nobody attached — `wait` collects it.</summary>
+    [JsonPropertyName("detach")]
+    public bool Detach { get; set; }
 }
 
 /// <summary>
@@ -28,7 +33,7 @@ public sealed class PipeRequest
 /// </summary>
 public sealed class PipeEvent
 {
-    /// <summary>activity · step · delta · note · decided · title · design · ask · choose · result · error</summary>
+    /// <summary>activity · step · delta · note · decided · title · design · ask · choose · attached · result · error</summary>
     [JsonPropertyName("event")]
     public string Event { get; set; } = "";
 
@@ -65,6 +70,18 @@ public sealed class PipeEvent
     /// <summary>result: how many characters of Text were already sent as deltas.</summary>
     [JsonPropertyName("streamed")]
     public int? Streamed { get; set; }
+
+    /// <summary>result / attached: the tool steps the turn has taken.</summary>
+    [JsonPropertyName("steps")]
+    public int? Steps { get; set; }
+
+    /// <summary>result: which turn of the session this was — 2 and up means the conversation carried on.</summary>
+    [JsonPropertyName("turn")]
+    public int? Turn { get; set; }
+
+    /// <summary>result: the request the turn answered, so `wait` and a detached caller can tell which one.</summary>
+    [JsonPropertyName("request")]
+    public string? Request { get; set; }
 }
 
 /// <summary>The one background session's whereabouts, in ~/.agent-one/session.json.</summary>

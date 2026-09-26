@@ -25,9 +25,17 @@ public sealed class AgentOptions
     /// <summary>Non-flag arguments, in order (for `run`, the prompt words).</summary>
     public List<string> Positional { get; } = [];
 
+    /// <summary>
+    /// Every flag as given, with its value — what `ask` hands `session start`
+    /// when it starts the background session itself, so the daemon runs with
+    /// exactly the overrides the person typed and none of the request words.
+    /// </summary>
+    public List<string> Flags { get; } = [];
+
     public static bool TryParse(string[] args, out AgentOptions options, out string error)
     {
-        options = new AgentOptions();
+        var parsed = new AgentOptions();
+        options = parsed;
         error = "";
 
         var config = ConfigStore.Load(out var warning);
@@ -36,7 +44,13 @@ public sealed class AgentOptions
         for (int i = 0; i < args.Length; i++)
         {
             var arg = args[i];
-            string? Next() => i + 1 < args.Length ? args[++i] : null;
+            string? Next()
+            {
+                if (i + 1 >= args.Length) return null;
+                parsed.Flags.Add(args[i + 1]);
+                return args[++i];
+            }
+            if (arg.StartsWith('-') && arg.Length > 1) parsed.Flags.Add(arg);
 
             switch (arg)
             {

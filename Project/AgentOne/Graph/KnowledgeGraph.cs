@@ -66,6 +66,7 @@ public sealed partial class KnowledgeGraph : IDisposable
             "CREATE REL TABLE HELPED(FROM Knowledge TO Turn, how STRING)");
 
         EnsurePdsaSchema();
+        EnsureDocSchema();
     }
 
     /// <summary>
@@ -229,6 +230,12 @@ public sealed partial class KnowledgeGraph : IDisposable
     public List<string[]> Query(string cypher, int columns)
     {
         lock (_gate) return _graph.Query(cypher, columns);
+    }
+
+    /// <summary>Raw Cypher with the column names the result carries — `memory query` and `/cypher`.</summary>
+    public (string[] Columns, List<string[]> Rows) QueryTable(string cypher)
+    {
+        lock (_gate) return _graph.QueryTable(cypher);
     }
 
     private IReadOnlyList<KnowledgeItem> Read(string cypher, IReadOnlyDictionary<string, object> parameters)

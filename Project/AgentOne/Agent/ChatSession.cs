@@ -109,6 +109,11 @@ public sealed class ChatSession : IAgentSession
     private readonly string _root;
     private readonly string _logKind;
     private readonly CancellationTokenSource _background = new();
+
+    /// <summary>Set inside the after-turn work; flows to what it awaits and never back to the caller.</summary>
+    private static readonly AsyncLocal<bool> AfterTurnScope = new();
+
+    public bool RaisingAfterTurn => AfterTurnScope.Value;
     private readonly GraphMemory? _graph;
     private readonly PdsaMemory? _pdsa;
     private SessionStore? _log;
@@ -354,6 +359,10 @@ public sealed class ChatSession : IAgentSession
         line = line.Trim();
         if (line.Length == 0) return null;
 
+        // Commands on the knowledge graph: the session holds the graph's one
+        // handle, so every face — window, REPL, `ask` — reaches it through here.
+        if (IsKnowledgeCommand(line)) return await KnowledgeCommandAsync(line, ct);
+
         // The turn runs on its own token, linked to the caller's, so a Stop
         // typed during a pause ends this turn and nothing else.
         using var turn = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -368,6 +377,61 @@ public sealed class ChatSession : IAgentSession
         {
             _turnCts = null;
             _loop.Pause.Clear();
+        }
+    }
+
+    // ------------------------------------------------------ knowledge graph commands
+
+    public static bool IsKnowledgeCommand(string line) =>
+        line is "/knowledge" or "/cypher" ||
+        line.StartsWith("/knowledge ", StringComparison.Ordinal) || line.StartsWith("/cypher ", StringComparison.Ordinal);
+
+    /// <summary>
+    /// /knowledge [status] · /knowledge init|update [folder] · /knowledge rebuild [folder]
+    /// · /knowledge guidelines [n|file] · /cypher &lt;query&gt;. Not a turn: nothing goes to
+    /// the model, the conversation and the session log are untouched.
+    /// </summary>
+    private async Task<AgentRun> KnowledgeCommandAsync(string line, CancellationToken ct)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        AgentRun Done(string text, bool ok = true) =>
+            new(ok ? StopReason.Final : StopReason.ProviderError, text, [], clock.Elapsed);
+
+        if (_graph is null)
+            return Done("the knowledge graph is off here — Kùzu's library (kuzu_shared.dll / libkuzu.so / libkuzu.dylib) is not next to the binary", ok: false);
+        var graph = _graph.Graph;
+
+        if (line.StartsWith("/cypher", StringComparison.Ordinal))
+        {
+            var cypher = line.Length > 7 ? line[7..].Trim() : "";
+            if (cypher.Length == 0) return Done("usage: /cypher <query>   e.g. /cypher MATCH (d:Doc)-[:GUIDES]->(k:Knowledge) RETURN d.path, k.title LIMIT 10", ok: false);
+            try { return Done(KnowledgeText.Table(graph.QueryTable(cypher))); }
+            catch (InvalidOperationException ex) { return Done(ex.Message, ok: false); }
+        }
+
+        var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).ToList();
+        var sub = words.Count > 0 ? words[0].ToLowerInvariant() : "status";
+        var argument = words.Count > 1 ? string.Join(' ', words.Skip(1)) : null;
+
+        switch (sub)
+        {
+            case "status":
+                return Done(string.Join("\n", KnowledgeText.Status(graph, Workspace.Root)));
+
+            case "init" or "update" or "rebuild":
+                if (argument is not null && !Directory.Exists(Path.Combine(_root, argument)))
+                    return Done($"no such folder under the workspace: {argument}", ok: false);
+                var scanner = new KnowledgeScanner(graph, _root, _smartAvailable ? _router : null);
+                var report = await scanner.ScanAsync(sub == "rebuild", argument, what => ActivityStarted?.Invoke(what), ct);
+                return Done(string.Join("\n", [$"knowledge {sub} · {Workspace.Root}", .. report.Describe(), "", .. KnowledgeText.Status(graph, Workspace.Root)]));
+
+            case "guidelines":
+                var limit = int.TryParse(argument, out var n) ? n : 20;
+                var fragment = argument is not null && !int.TryParse(argument, out _) ? argument : null;
+                return Done(KnowledgeText.Guidelines(graph.Guidelines(limit, fragment)));
+
+            default:
+                return Done(KnowledgeText.Usage, ok: false);
         }
     }
 
@@ -604,6 +668,7 @@ public sealed class ChatSession : IAgentSession
     /// <summary>Off the turn: distil what it taught, then — for an Act turn — close the cycle onto that knowledge.</summary>
     private async Task LearnThenCloseAsync(string turnId, string request, AgentRun run, bool learn, long? closing)
     {
+        AfterTurnScope.Value = true;
         if (learn) await LearnAsync(turnId, request, run);
         if (closing is not { } cycle || _pdsa is null) return;
 

@@ -266,6 +266,30 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         "Did this turn produce knowledge a future session in this project would be glad to have — something not obvious " +
         "from the files themselves, and not a passing detail?";
 
+    public const string GuidelineOption = "guideline";
+    public const string KnowledgeOption = "knowledge";
+
+    public const string GuidelineQuestion =
+        "This is one section of a Markdown document in a software project. Is it a GUIDELINE — an instruction for whoever " +
+        "works here — or KNOWLEDGE — a description of how things are?";
+
+    public static readonly DecisionOption[] GuidelineOptions =
+    [
+        new(GuidelineOption,
+            "A guideline: tells the reader what to do or not do when working in this project — a rule, a convention, a " +
+            "required procedure or order of steps, something to always or never do, a checklist to follow."),
+        new(KnowledgeOption,
+            "Knowledge: describes the project as it is — what exists and where, how it works, why it was built that way, " +
+            "what was measured or decided, reference tables, history, examples.")
+    ];
+
+    /// <summary>`knowledge init`: is this document section a rule to follow, or a description of how things are?</summary>
+    public Task<Decision> GuidelineOrKnowledgeAsync(string docPath, string heading, string text, CancellationToken ct)
+    {
+        var state = "Document: " + docPath + "\nSection: " + heading + "\n\n" + Clip(text, 1500);
+        return engine.ChooseAsync(state, GuidelineQuestion, GuidelineOptions, ct);
+    }
+
     public const string GraphHelpsQuestion =
         "Would looking up what this project's knowledge graph already knows help answer this request, before the agent " +
         "starts searching files or the web?";

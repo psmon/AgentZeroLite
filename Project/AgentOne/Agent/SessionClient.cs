@@ -15,6 +15,12 @@ public static class SessionClient
 {
     private static readonly UTF8Encoding NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
+    /// <summary>Error kind: nobody answered the pipe.</summary>
+    public const string Unreachable = "Unreachable";
+
+    /// <summary>Error kind: the pipe closed before the result — the server restarted, crashed, or was stopped.</summary>
+    public const string Disconnected = "Disconnected";
+
     /// <summary>How long to wait for the server to accept, before "no background session is listening".</summary>
     public static int ConnectTimeoutMs { get; set; } = 3000;
 
@@ -34,11 +40,11 @@ public static class SessionClient
         }
         catch (TimeoutException)
         {
-            return new PipeEvent { Event = "error", Text = "no background session is listening — start one with `agent-one session start`" };
+            return new PipeEvent { Event = "error", Kind = Unreachable, Text = "no background session is listening — start one with `agent-one session start`" };
         }
         catch (IOException ex)
         {
-            return new PipeEvent { Event = "error", Text = "could not reach the background session: " + ex.Message };
+            return new PipeEvent { Event = "error", Kind = Unreachable, Text = "could not reach the background session: " + ex.Message };
         }
 
         using var reader = new StreamReader(pipe, NoBom, false, 4096, leaveOpen: true);
@@ -49,7 +55,7 @@ public static class SessionClient
         while (true)
         {
             var line = await reader.ReadLineAsync(ct);
-            if (line is null) return new PipeEvent { Event = "error", Text = "the background session closed the connection" };
+            if (line is null) return new PipeEvent { Event = "error", Kind = Disconnected, Text = "the background session closed the connection" };
 
             var e = JsonSerializer.Deserialize(line, AgentOneWireJson.Default.PipeEvent);
             if (e is null) continue;

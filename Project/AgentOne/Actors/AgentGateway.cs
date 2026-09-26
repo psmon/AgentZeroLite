@@ -209,7 +209,19 @@ public sealed class AgentGateway : IAgentSession
         }
     }
 
+    /// <summary>Events are raised one at a time on the pump thread, so one field is enough to say which kind this is.</summary>
+    private volatile bool _raisingAfterTurn;
+
+    public bool RaisingAfterTurn => _raisingAfterTurn;
+
     private void OnNotice(AgentLoopNotice notice)
+    {
+        _raisingAfterTurn = notice is DecisionNotice { AfterTurn: true } or NoteNotice { AfterTurn: true } or LearnedNotice { AfterTurn: true };
+        try { Raise(notice); }
+        finally { _raisingAfterTurn = false; }
+    }
+
+    private void Raise(AgentLoopNotice notice)
     {
         switch (notice)
         {
