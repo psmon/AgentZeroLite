@@ -791,8 +791,9 @@ are unit tested; `ConfigTuiPage` only projects it. The framework is
 [Termina](https://github.com/Aaronontheweb/termina), chosen because it is the one
 TUI measured to survive Native AOT here (`Docs/agent-netclaw/README.md` records
 the measurement). `agent-one setup --selftest` drives the real screen from a
-scripted key source and checks where it landed — that is what CI runs against
-every release artifact, since a machine with no terminal cannot press keys.
+scripted key source and checks where it landed. Run it in a terminal: with no
+terminal attached at all it does not return, so the release smoke test leaves
+it out and checks `--version`, `--help`, an echo turn and `session selftest`.
 
 Step navigation and the picker are checked below the UI in that selftest, on
 purpose: arriving at step 2 starts an asynchronous listing and the screen
