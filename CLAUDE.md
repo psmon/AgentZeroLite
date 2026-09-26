@@ -254,8 +254,8 @@ What differs from the WPF host, and why:
 ### `Project/AgentOne` — a standalone CLI agent (`agent-one`), npm-bound
 
 A second, **independent** product in this repo: a cross-platform CLI agent that
-publishes as a Native AOT single binary (win-x64 / linux-x64 / osx-arm64 /
-osx-x64, ~22 MB with Akka.NET and Kùzu's loader inside, no runtime to install) and ships through npm as
+publishes as a Native AOT single binary (win-x64 / linux-x64 / osx-arm64 — no
+osx-x64 since the Intel macOS runners were retired; ~22 MB with Akka.NET and Kùzu's loader inside, no runtime to install) and ships through npm as
 `@webnori/agent-one`. Skeleton borrowed from `C:\code\psmon\CodeScan` — argv
 switch in `Program.cs` → `Commands/`, all state under `~/.agent-one/`
 (`Services/AppPaths`), `version.txt` MSBuild auto-bump, `packaging/npm/` wrapper

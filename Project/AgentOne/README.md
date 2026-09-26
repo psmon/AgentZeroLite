@@ -1046,7 +1046,8 @@ tag's version.
 ## Release & npm
 
 Tagging `agent-one-v0.1.0` runs `.github/workflows/agent-one-release.yml`: it
-runs the tests, builds the four RIDs (win-x64, linux-x64, osx-arm64, osx-x64),
+runs the tests, builds the three RIDs (win-x64, linux-x64, osx-arm64 — Intel
+Macs are not built since the macOS x64 runners were retired),
 smoke-tests each artifact, publishes the GitHub Release with `checksums.txt`,
 and publishes the npm wrapper stamped with the same version.
 
