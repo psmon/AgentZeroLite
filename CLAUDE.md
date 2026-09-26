@@ -308,7 +308,10 @@ AOT here — see `Docs/agent-netclaw/README.md`. The rules live in
 `Tui/ConfigTuiModel.cs`, a state machine over `ConsoleKeyInfo` with no terminal
 in it, so the steps and the key map are unit tested; the Termina page only
 projects it. `agent-one setup --selftest` drives the real screen from a scripted
-key source, and the release workflow runs it on every RID.
+key source — run it by hand in a terminal: with no terminal attached it never
+returns (measured on the first release tag: all three build jobs held 30 min),
+so the release smoke test is only `--version`, `--help`, one echo `run` and
+`session selftest`, under a 3-minute step timeout.
 
 **Smart mode** (`--smart`, or Shift+Tab in chat) asks `IDecisionEngine` (Jev)
 two fixed-option questions per turn, in `Agent/SmartRouter` — no planning LLM
