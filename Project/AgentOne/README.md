@@ -682,13 +682,99 @@ agent-one dashboard · C:\Users\me\.agent-one\workspaces
   Ctrl+C to stop
 ```
 
-| Tab | Shows |
-|---|---|
-| Overview | Every workspace under `~/.agent-one/workspaces/`: memory entries, sessions, knowledge / turns / files / PDSA cycles / scanned docs, last activity |
-| Memory | `memory.md` as one card per turn — asked, the tools that ran (failed ones marked), outcome — searchable; the raw file for one workspace |
-| Sessions | The transcripts as a timeline: prompts, tool steps with timings, the engine's decisions, results, the strong model's hand-offs |
-| Graph | The Kùzu graph drawn as nodes and edges. Toggle tables, highlight by text, click a node for its properties and neighbours, "Open in Cypher" |
-| Cypher | Any query, with presets and a history. Across all workspaces each row gains a leading `workspace` column, and a graph that fails is listed, not fatal |
+`t` is this run's access token, not something to type: the link carries it,
+the page sends it with every API call, and it lasts until Ctrl+C — the next
+run prints a new one. `--open` opens the link in the default browser.
+
+The sidebar picks the scope — **All workspaces**, or one project — and every
+tab follows it. The screenshots below are real records: five workspaces
+agent-one worked in (a board API, two Tetris builds, this repository, and one
+whose Markdown was scanned into the graph).
+
+#### Overview — where agent-one has been
+
+![Overview: tiles and one row per workspace](docs/images/dashboard-overview.png)
+
+One folder under `~/.agent-one/workspaces/` per `--root` agent-one has run
+in. What the numbers count:
+
+| Value | Counted from | Reads as |
+|---|---|---|
+| Memory entries | `## …` blocks in `memory.md` | finished turns — every turn writes one, judged or not |
+| Sessions | `sessions/*.jsonl` | conversations (`chat`, `run`, the background session) |
+| Knowledge | `Knowledge` nodes | what was judged worth keeping from turns, **plus** document sections from `knowledge init` — which is why a scanned repository shows 3,435 and a Tetris build 10 |
+| Turns in graph | `Turn` nodes | turns the graph knows about — fewer than memory entries, since a turn becomes a node only when the decision engine consults the graph for it or judges it worth keeping |
+| Files known | `Path` nodes | files some knowledge is `ABOUT` |
+| PDSA cycles / Docs scanned | `Cycle` / `Doc` nodes | improvement cycles opened by planning turns; Markdown files `knowledge init` read |
+
+The **Graph** column is `readable`, `busy` (a running chat or background
+session holds the database — see below), `none` (no graph yet) or `off` (no
+Kùzu library). A greyed row is a workspace whose folder no longer exists — its
+record outlives it; the sidebar can hide those. A green dot marks the
+workspace the background session is attached to.
+
+#### Memory — what each turn asked, did and ended with
+
+![Memory: one card per turn](docs/images/dashboard-memory.png)
+
+`memory.md` parsed back into cards, newest first (across workspaces when the
+scope is All, with a workspace chip). **asked** is the request's first line,
+**did** the tools that ran — a red ✗ is a call that failed — and **outcome**
+the start of the answer, or `stopped (reason)` when the loop gave up. The top
+card is the kind of thing this view is for: two `run_command` calls failed,
+then a `write_file`, and the outcome still opens with "complete". *memory.md*
+switches to the raw file.
+
+#### Sessions — the turn as it happened
+
+![Sessions: a transcript as a timeline](docs/images/dashboard-sessions.png)
+
+A transcript, step by step. Blue dots are prompts (with `smart` / `basic`),
+green are results, grey are tool steps with how long each took (click one to
+expand it), red is a failed step, and amber is the decision engine: which
+**route** it chose, how it sized the work (**scope**), whether the graph was
+consulted, whether the turn was worth keeping — each with its confidence and
+milliseconds. Here a request routed `work_in_workspace` at 0.96, was sized
+`needs_design` at 0.95, spent 530 s getting a 5,687-character design from the
+reasoning model — and then ended on a `final` that is a raw `grep` envelope
+rather than an answer. The memory card says "done"; the transcript says what
+actually came back.
+
+#### Graph — what was kept, and why
+
+![Graph: a knowledge node selected, its edges highlighted](docs/images/dashboard-graph.png)
+
+The Kùzu graph drawn as nodes (colour per table, size per number of edges)
+and edges. The chips toggle tables, the box highlights nodes by text, captions
+can be turned off, and the limit sets how many of each table's newest rows
+are drawn. Clicking a node lists its properties and every relationship; a
+relationship is clickable, and *Open in Cypher* writes the query for it.
+
+The selected node is one piece of knowledge, and its edges are the schema
+reading itself aloud: it is a `procedure` with keywords in both languages,
+`ABOUT` three files, `LEARNED` from the turn "제안대로진행", and
+`JUSTIFIED_BY` a Rationale captioned **`skip 0.31`** — the engine leaned
+*skip* but below the confidence floor, and an unsure skip keeps the item.
+`uses 0` means no later turn has been handed it yet; each `HELPED` edge would
+raise it.
+
+#### Cypher — ask across every graph
+
+![Cypher: turn → knowledge → rationale across all workspaces](docs/images/dashboard-cypher.png)
+
+Any query, run against the chosen workspace or all of them; across
+workspaces each row gains a leading `workspace` column, and a graph that
+rejects the query (an older one without a table, say) becomes one grouped
+line above the results instead of failing the rest. Presets cover the common
+questions (newest knowledge, most helpful, why it was kept, files, turns and
+what they taught, PDSA cycles, document guidelines, the table list); a
+history remembers what you ran, and *Copy CSV* takes the rows away.
+
+The query shown walks `Turn -LEARNED-> Knowledge -JUSTIFIED_BY-> Rationale` —
+what each turn taught and on what verdict. Every row in this sample reads
+`skip` between 0.31 and 0.49: everything in these graphs was kept because the
+engine was *unsure*, not because it said *save*. That is a finding about
+`jevConfidenceFloor`, and it takes one query to see.
 
 It is an **observer**, and built so it cannot become anything else:
 
