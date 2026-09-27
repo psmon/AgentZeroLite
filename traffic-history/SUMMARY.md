@@ -7,8 +7,8 @@ _Last snapshot: 2026-09-27 (UTC). Updated daily by `.github/workflows/traffic-sn
 | Metric | Total |
 |---|---|
 | Setup.exe | 51 |
-| win-x64.zip | 25 |
-| **Grand total** | **76** |
+| win-x64.zip | 31 |
+| **Grand total** | **82** |
 
 ## Views (all recorded days)
 
