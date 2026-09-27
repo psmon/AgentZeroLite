@@ -1,5 +1,13 @@
 # agent-one
 
+![agent-one: a request is routed, recalls what the project already knows, runs through the agent loop and its tools, may be escalated to a stronger model, and every turn is remembered](docs/images/agent-one-flow.png)
+
+<sub>How a turn flows. **Route**, **Recall** and **Escalate** are smart mode
+(`--smart`) — the decision engine's questions; basic mode goes straight to the
+agent loop. The shell tool always sits behind the approval gate, and the
+knowledge graph keeps only what a turn was judged to have taught. (Illustration
+generated with `gpt-image-2.5`.)</sub>
+
 A standalone CLI agent. Ask it something, it reads your workspace, writes
 files, runs commands behind a gate and answers — on Windows, macOS and Linux,
 from one native binary with no .NET runtime to install.
