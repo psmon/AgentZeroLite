@@ -1,14 +1,20 @@
 {
   "name": "@webnori/agent-one",
   "version": "0.0.0",
-  "description": "A standalone CLI agent: ask a question, it reads your workspace and answers. (npm wrapper around the prebuilt agent-one binary.)",
+  "description": "A coding agent for your terminal in one native binary: reads your code, writes files, runs commands behind an approval gate, and remembers each project in a knowledge graph. Works with any OpenAI-compatible model, hosted or local (Ollama, LM Studio, vLLM).",
   "keywords": [
     "agent",
     "cli",
     "llm",
     "openai-compatible",
     "ollama",
-    "tool-use"
+    "tool-use",
+    "coding-agent",
+    "ai-agent",
+    "terminal",
+    "local-llm",
+    "knowledge-graph",
+    "kuzu"
   ],
   "homepage": "https://github.com/psmon/AgentZeroLite/tree/main/Project/AgentOne",
   "bugs": {
