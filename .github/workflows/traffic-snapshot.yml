@@ -26,10 +26,13 @@ jobs:
 
       - name: Collect + merge traffic and download counts
         env:
-          # Traffic API needs push access; the default GITHUB_TOKEN has it for
-          # this repo. Set a TRAFFIC_TOKEN secret (repo PAT) only if you ever
-          # move this to a fork/org where the default token is insufficient.
-          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN || secrets.GITHUB_TOKEN }}
+          # Two tokens on purpose. Releases are public data, so the default
+          # GITHUB_TOKEN always reads them. The Traffic API needs a PAT
+          # (TRAFFIC_TOKEN) — and a PAT expires: on 2026-09-23 an expired one,
+          # used for every call, failed the releases read too and the job
+          # recorded nothing for four days. Now only views/clones depend on it.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRAFFIC_TOKEN: ${{ secrets.TRAFFIC_TOKEN || secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           set -uo pipefail
@@ -39,7 +42,7 @@ jobs:
           # --- views + clones: require a PAT (default GITHUB_TOKEN gets 403 on
           #     the Traffic API). If unavailable, warn and skip — downloads still
           #     record, and traffic turns on automatically once TRAFFIC_TOKEN is set.
-          if views_new=$(gh api "repos/$REPO/traffic/views" 2>/dev/null); then
+          if views_new=$(GH_TOKEN="$TRAFFIC_TOKEN" gh api "repos/$REPO/traffic/views" 2>/tmp/views.err); then
             [ -f traffic-history/views.json ] || echo '{}' > traffic-history/views.json
             jq --argjson new "$views_new" '
               reduce ($new.views[]?) as $v (.;
@@ -47,7 +50,7 @@ jobs:
             ' traffic-history/views.json > traffic-history/views.json.tmp
             mv traffic-history/views.json.tmp traffic-history/views.json
 
-            clones_new=$(gh api "repos/$REPO/traffic/clones")
+            clones_new=$(GH_TOKEN="$TRAFFIC_TOKEN" gh api "repos/$REPO/traffic/clones")
             [ -f traffic-history/clones.json ] || echo '{}' > traffic-history/clones.json
             jq --argjson new "$clones_new" '
               reduce ($new.clones[]?) as $c (.;
@@ -55,8 +58,11 @@ jobs:
             ' traffic-history/clones.json > traffic-history/clones.json.tmp
             mv traffic-history/clones.json.tmp traffic-history/clones.json
             echo "Traffic (views/clones) recorded."
+          elif grep -q 'HTTP 401' /tmp/views.err; then
+            # 401 = the token itself is dead (expired/revoked), not merely short of scope.
+            echo "::error::TRAFFIC_TOKEN was rejected (HTTP 401 — expired or revoked). Re-issue the PAT and run: gh secret set TRAFFIC_TOKEN. Recording downloads only."
           else
-            echo "::warning::Traffic API not accessible with the current token. Add a TRAFFIC_TOKEN secret (classic PAT with 'repo' scope) to record views/clones. Recording downloads only."
+            echo "::warning::Traffic API not accessible with the current token ($(head -c 200 /tmp/views.err)). Add a TRAFFIC_TOKEN secret (classic PAT with 'repo' scope) to record views/clones. Recording downloads only."
           fi
 
           # --- release downloads: cumulative totals, one row per run date ---
