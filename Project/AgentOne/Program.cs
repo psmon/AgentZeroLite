@@ -67,6 +67,7 @@ internal static class Program
                 "jev" => await new JevCommand().ExecuteAsync(rest, cts.Token),
                 "tools" => new ToolsCommand().Execute(rest),
                 "memory" or "knowledge" => await new MemoryCommand().ExecuteAsync(rest, cts.Token),
+                "dashboard" => await new DashboardCommand().ExecuteAsync(rest, cts.Token),
                 "version" => PrintVersion(),
                 "home" => PrintHome(),
                 "help" => Help(rest),
@@ -116,6 +117,7 @@ internal static class Program
             case "jev": JevCommand.PrintHelp(); return 0;
             case "tools": ToolsCommand.PrintHelp(); return 0;
             case "memory" or "knowledge": MemoryCommand.PrintHelp(); return 0;
+            case "dashboard": DashboardCommand.PrintHelp(); return 0;
             default:
                 Console.Error.WriteLine($"agent-one help: no such command '{args[0]}'");
                 return 2;
@@ -150,6 +152,7 @@ internal static class Program
               tools            List the verbs the agent can call
               knowledge        The workspace's knowledge graph: init/update from its markdown (guidelines vs
                                knowledge, judged by Jev) · guidelines · search · Cypher   (alias: memory)
+              dashboard        A local web page over every workspace's memory, sessions and graph (+ Cypher)
               home             Print where agent-one keeps its files
               version          Print the version
               help <command>   Detailed help for one command

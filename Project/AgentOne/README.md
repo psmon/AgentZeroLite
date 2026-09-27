@@ -102,6 +102,7 @@ agent-one run "이 폴더에 뭐가 있는지 알려줘"
 | `--smart` / `--basic` | On `run` and `chat`: route and escalate through the decision engine, or straight to the loop. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one memory` | The workspace's knowledge graph: stats, `recent`, `helpful`, `search <words>`, `path <fragment>`, `pdsa`, `query "<cypher>"`. |
+| `agent-one dashboard` | A local web page over everything agent-one left behind — every workspace's memory, sessions and knowledge graph, plus a Cypher box; one workspace or all of them. `--port`, `--open`. |
 | `agent-one home` | Where agent-one keeps its files. |
 
 Shared flags for `run` and `chat` — each one overrides the stored config for
@@ -664,6 +665,61 @@ renderers over one `ChatSession` — as is `run`, a single turn of the same
 session — so a turn routes, runs, judges its draft and escalates identically in
 all three. That is not an aesthetic choice: three copies of that logic would
 drift within a week.
+
+### Looking back: the dashboard
+
+`agent-one dashboard` starts a small web server on `127.0.0.1` and prints a
+link; click it and the browser shows what agent-one has recorded — for one
+workspace, or for all of them at once.
+
+```console
+$ agent-one dashboard
+agent-one dashboard · C:\Users\me\.agent-one\workspaces
+
+  http://127.0.0.1:8790/?t=770b6497aa6aad7b68f9babff03743b1
+
+  read-only · 127.0.0.1 only · the link carries this run's token
+  Ctrl+C to stop
+```
+
+| Tab | Shows |
+|---|---|
+| Overview | Every workspace under `~/.agent-one/workspaces/`: memory entries, sessions, knowledge / turns / files / PDSA cycles / scanned docs, last activity |
+| Memory | `memory.md` as one card per turn — asked, the tools that ran (failed ones marked), outcome — searchable; the raw file for one workspace |
+| Sessions | The transcripts as a timeline: prompts, tool steps with timings, the engine's decisions, results, the strong model's hand-offs |
+| Graph | The Kùzu graph drawn as nodes and edges. Toggle tables, highlight by text, click a node for its properties and neighbours, "Open in Cypher" |
+| Cypher | Any query, with presets and a history. Across all workspaces each row gains a leading `workspace` column, and a graph that fails is listed, not fatal |
+
+It is an **observer**, and built so it cannot become anything else:
+
+- **Read-only by the database, not by a filter.** Every graph is opened with
+  Kùzu's read-only flag, so `CREATE` / `DELETE` in the Cypher box is refused by
+  Kùzu itself ("Cannot execute write operations in a read-only database").
+  Files are only read.
+- **It never holds a graph.** Kùzu allows one writer per database across
+  processes, and a chat or background session in that workspace is that
+  writer — so the dashboard opens a graph per request and closes it again,
+  with a 64 MB buffer pool instead of Kùzu's share-of-RAM default (measured on
+  25 graphs: the workspace list went from 3.4 s to 1.2 s). A graph a running
+  session holds shows as **busy** until that session ends; the memory and
+  transcripts beside it still read normally.
+- **Three locks on the door.** The socket binds `127.0.0.1` only; every `/api`
+  call must carry the per-run token from the printed link, so another site
+  open in the same browser cannot read your history; and a request whose
+  `Host` is not the loopback is refused, which is what stops a DNS-rebinding
+  page from calling in under its own origin.
+- **Nothing to install or fetch.** The page is embedded in the binary and its
+  CSP allows no network but its own API; the graph layout is a small force
+  simulation in the page, not a CDN library.
+
+The schema is read from Kùzu's catalog (`show_tables`, `table_info`,
+`show_connection`) rather than written into the page, so a graph made by an
+older agent-one — before PDSA or document scanning — draws with the tables it
+has, and a table added later appears without a dashboard change. The server
+is a few hundred lines over `TcpListener` (`Dashboard/DashboardServer.cs`), not
+`HttpListener`, whose http.sys URL reservations make a non-admin listen on
+Windows depend on the machine. The default port is 8790; when it is taken, any
+free port is used and printed.
 
 ## Smart mode
 

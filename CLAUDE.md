@@ -597,6 +597,21 @@ scripts the engine sets both, or the step question eats its answers. Tests:
 cycle on a plan and closes it onto what the turn taught). Design notes:
 `Project/AgentOne/docs/smart-mode-jev.md` §8-J.
 
+**The dashboard** (`agent-one dashboard`, `Dashboard/`: `DashboardServer` the HTTP side,
+`DashboardData` the read side, `dashboard.html` embedded as `agent-one.dashboard.html`) is an
+observer over `~/.agent-one/workspaces/` — memory.md, session JSONL, the Kùzu graph and a Cypher
+box, per workspace or across all of them. Four things that keep it an observer and should stay so:
+graphs are opened with Kùzu's **read-only** flag (a write is refused by the database, not by a
+keyword filter) and **per request, then closed** — a chat or background session in that workspace
+is the one writer Kùzu allows, so holding a handle between requests would start the next run
+without its memory, and a held graph is shown as `busy` instead; the read-only open passes a 64 MB
+buffer pool because Kùzu's share-of-RAM default was most of the cost (25 graphs: 3.4 s → 1.2 s);
+the schema comes from the catalog (`show_tables` / `table_info` / `show_connection`), so older
+graphs without PDSA or Doc tables still draw; and the server is `TcpListener` on 127.0.0.1, not
+`HttpListener` (http.sys URL ACLs), with a per-run token on `/api` and a loopback `Host` check
+against DNS rebinding. It reads chunked request bodies too — HttpClient's JSON helpers send them,
+and a Content-Length-only reader answered 400 that looked like an empty result.
+
 **The background session** (`Commands/SessionCommand`, `Agent/SessionServer`
 + `SessionClient`, `Services/SessionProtocol` + `SessionRegistry`): `session
 start` spawns `agent-one session serve` detached through

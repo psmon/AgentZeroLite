@@ -145,7 +145,9 @@ macros to whichever terminal is in focus — nothing more, nothing less.
   resumable sessions, a **Kùzu knowledge graph** the engine fills and
   consults), runs as **the same `AgentBotActor` / `AgentLoopActor` pair** as
   the GUI's Bot mode on its own Akka.NET, and can be driven from any shell —
-  or by another agent — through a background session. See the
+  or by another agent — through a background session. `agent-one dashboard`
+  opens what it left behind — memory, transcripts, the graph, a Cypher box —
+  as a local, read-only web page. See the
   [agent-one section](#-agent-one--the-standalone-cli-agent) below and
   [Project/AgentOne/README.md](Project/AgentOne/README.md).
 - **One executable, one process** — single-instance guard, SQLite for config, zero
@@ -929,6 +931,7 @@ or ONNX — but it borrows the shape.
 | **Tools** | files (`list_files` `read_file` `find_files` `grep`), `write_file` inside the workspace root only, `web_search` / `web_read` (GETs), `run_command` (PowerShell / bash in the root). Writing and running are the *guarded* families: risky patterns always ask a person; otherwise the decision engine's `safe` must be confident, or you are asked. |
 | **Smart mode** | Before a turn the engine picks the tool family (enforced, not suggested), sizes workspace work (a *design* from the strong model first when it is big), and after the everyday model's draft decides whether the strong, slow **reasoning model** should take a second look. Two models, one fixed-question engine (TypeSafe *System One*, ~0.3 s per question), no planning LLM call. Measured notes in [`docs/smart-mode-jev.md`](Project/AgentOne/docs/smart-mode-jev.md). |
 | **Memory** | Per-workspace memory file (50 k chars, opens every session), saved sessions with `/resume` replaying the screen, a task title the model keeps. And a **knowledge graph** (embedded Kùzu, Cypher): after each turn the engine judges *worth keeping?*, the model distils 1–3 lines stored with the engine's rationale as a node, and before a turn the engine decides whether — and by which query — to consult it, before any file is scanned. `agent-one memory` opens it. |
+| **Dashboard** | `agent-one dashboard` prints a `127.0.0.1` link to a local web page over every workspace agent-one has worked in — one project or all of them: memory as one card per turn, session transcripts as a timeline (tool steps, the engine's decisions, results), the Kùzu graph drawn as nodes and edges, and a Cypher box that runs across every graph with a `workspace` column. An observer only: graphs open with Kùzu's read-only flag and are closed after each request so a running session keeps its writer; the API wants the per-run token in the link; the page is embedded in the binary and fetches nothing else. |
 | **Background session** | `agent-one session start` runs one detached session; `agent-one ask "…"` from any shell streams the turn's events and answers approvals on the same pipe. One at a time, `session stop` ends it. It is how chat mode tests itself on every release platform, and how another agent (a Claude tab in AgentZero, say) collaborates with agent-one. |
 | **Actors** | The conversation is `AgentBotActor` (gateway: callbacks, one turn at a time) over `AgentLoopActor` (owns the session, Idle ⇄ Running, exactly one result per start) — the vocabulary of `ZeroCommon/Actors/Messages.cs`, on an Akka.NET 1.6 nightly, inside the AOT binary. The window, the REPL, `run` and the pipe server are renderers over one gateway. |
 | **Pause** | Esc while a turn runs holds it at its next step; the next line you type is read as *resume*, *stop* or *refine* — a refinement goes in front of the model as `[the user, mid-turn] …`. |

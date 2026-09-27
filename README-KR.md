@@ -125,6 +125,8 @@ AgentZero Lite는 단순한 아이디어로 만들어진 Windows 데스크톱 �
   재개 가능한 세션, 엔진이 채우고 참고하는 **Kùzu 지식 그래프**), GUI Bot 모드와
   **같은 `AgentBotActor` / `AgentLoopActor` 쌍**을 자체 Akka.NET 위에서 돌리며,
   백그라운드 세션으로 어느 셸에서든 — 다른 에이전트가 — 구동할 수 있습니다.
+  `agent-one dashboard` 는 그렇게 남긴 흔적 — 메모리, 대화 기록, 그래프, Cypher
+  입력창 — 을 로컬 읽기 전용 웹 페이지로 보여 줍니다.
   아래 [agent-one 섹션](#-agent-one--독립-cli-에이전트)과
   [Project/AgentOne/README.md](Project/AgentOne/README.md) 참고.
 - **실행 파일 하나, 프로세스 하나** — 단일 인스턴스 가드, 설정은 SQLite, .NET 10
@@ -619,6 +621,7 @@ AgentZero Lite 는 데스크톱이고, **agent-one** 은 같은 생각을 어느
 | **도구** | 파일(`list_files` `read_file` `find_files` `grep`), 워크스페이스 루트 안에서만 `write_file`, `web_search` / `web_read`(GET 만), `run_command`(루트에서 PowerShell / bash). 쓰기와 실행은 *보호되는* 패밀리: 위험 패턴은 항상 사람에게 묻고, 그 외는 결정 엔진의 `safe` 가 확신할 때만 그냥 실행, 아니면 묻습니다. |
 | **스마트 모드** | 턴 앞에서 엔진이 도구 패밀리를 고르고(제안이 아니라 강제), 워크스페이스 작업의 규모를 재며(크면 상위 모델의 *설계* 부터), 일상 모델의 초안이 나온 뒤에는 느리고 강한 **추론 모델**이 한 번 더 봐야 하는지 결정합니다. 모델 둘, 고정 질문 엔진 하나(TypeSafe *System One*, 질문당 ~0.3 초), 계획용 LLM 호출 없음. 실측 기록은 [`docs/smart-mode-jev.md`](Project/AgentOne/docs/smart-mode-jev.md). |
 | **메모리** | 워크스페이스별 메모리 파일(50 k 자, 세션마다 열림), `/resume` 으로 화면까지 재연되는 저장 세션, 모델이 붙이는 작업 제목. 그리고 **지식 그래프**(임베디드 Kùzu, Cypher): 턴이 끝날 때마다 엔진이 *남길 가치가 있나?* 를 판단하고, 모델이 1~3 줄로 증류해 엔진의 근거를 노드로 붙여 저장하며, 턴 앞에서는 엔진이 그래프를 볼지 — 어떤 쿼리로 볼지 — 를 정해 파일을 뒤지기 전에 참고합니다. `agent-one memory` 로 들여다볼 수 있습니다. |
+| **대시보드** | `agent-one dashboard` 가 `127.0.0.1` 링크를 출력하고, 그 링크의 로컬 웹 페이지가 agent-one 이 작업한 모든 워크스페이스를 — 프로젝트 하나 또는 전체로 — 보여 줍니다: 메모리는 턴마다 카드 한 장, 세션 기록은 타임라인(도구 단계, 엔진의 판정, 결과), Kùzu 그래프는 노드와 엣지로 그리고, Cypher 입력창은 모든 그래프에 걸쳐 `workspace` 열을 붙여 실행합니다. 관찰 전용: 그래프는 Kùzu 의 읽기 전용 플래그로 열고 요청마다 닫아서 실행 중인 세션이 쓰기 핸들을 유지하며, API 는 링크에 담긴 실행별 토큰을 요구하고, 페이지는 바이너리에 내장되어 다른 것을 받아 오지 않습니다. |
 | **백그라운드 세션** | `agent-one session start` 가 세션 하나를 분리 실행하고, 어느 셸에서든 `agent-one ask "…"` 가 턴의 이벤트를 스트리밍하며 승인도 같은 파이프로 답합니다. 한 번에 하나, `session stop` 으로 끝. 릴리스 플랫폼마다 채팅 모드가 스스로를 테스트하는 방법이자, 다른 에이전트(예: AgentZero 의 Claude 탭)가 agent-one 과 협업하는 방법입니다. |
 | **액터** | 대화는 `AgentBotActor`(게이트웨이: 콜백, 한 번에 한 턴) 위의 `AgentLoopActor`(세션 소유, Idle ⇄ Running, 시작당 결과 정확히 하나) — `ZeroCommon/Actors/Messages.cs` 의 어휘 그대로, Akka.NET 1.6 나이틀리로, AOT 바이너리 안에서. 창, REPL, `run`, 파이프 서버는 게이트웨이 하나 위의 렌더러입니다. |
 | **일시중지** | 턴이 도는 중 Esc 를 누르면 다음 스텝 앞에서 멈추고, 다음에 친 한 줄을 *재개* / *중단* / *개선* 으로 읽습니다 — 개선이면 그 줄이 `[the user, mid-turn] …` 으로 모델 앞에 놓입니다. |

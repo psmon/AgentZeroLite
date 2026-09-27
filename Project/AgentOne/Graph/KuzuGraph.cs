@@ -15,10 +15,12 @@ public sealed class KuzuGraph : IDisposable
     private Connection _conn;
     private bool _disposed;
 
-    public KuzuGraph(string databasePath, bool readOnly = false)
+    /// <param name="bufferPoolBytes">0 keeps Kùzu's default (a share of RAM); a reader that opens many graphs briefly sets it small.</param>
+    public KuzuGraph(string databasePath, bool readOnly = false, ulong bufferPoolBytes = 0)
     {
         var config = kuzu_default_system_config();
         config.ReadOnly = readOnly;
+        if (bufferPoolBytes > 0) config.BufferPoolSize = bufferPoolBytes;
         if (kuzu_database_init(databasePath, config, out _db) != Success)
             throw new InvalidOperationException($"could not open the Kùzu database at {databasePath}");
         if (kuzu_connection_init(ref _db, out _conn) != Success)

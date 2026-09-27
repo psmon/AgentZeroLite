@@ -29,6 +29,12 @@
         <InternalsVisibleTo Include="AgentOne.Tests" />
     </ItemGroup>
 
+    <!-- The dashboard page (agent-one dashboard) travels inside the binary: no
+         files to ship next to it, nothing fetched from a CDN. -->
+    <ItemGroup>
+        <EmbeddedResource Include="Dashboard\dashboard.html" LogicalName="agent-one.dashboard.html" />
+    </ItemGroup>
+
     <ItemGroup>
         <!-- packaging/ is the npm wrapper (JS + docs); never compile it. -->
         <Compile Remove="packaging\**" />
