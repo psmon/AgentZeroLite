@@ -145,6 +145,7 @@ svg .edge.hi { stroke: var(--accent); stroke-width: 2; }
 svg .node circle { stroke: var(--panel); stroke-width: 1.5; cursor: pointer; vector-effect: non-scaling-stroke; }
 svg .node.hi circle { stroke: var(--text); stroke-width: 2.5; }
 svg .node.dim, svg .edge.dim { opacity: .15; }
+svg text.ws-label { font-weight: 650; font-size: 1.35em; fill: var(--muted); }
 
 textarea.cy { width: 100%; min-height: 110px; resize: vertical; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--code); font: 13px/1.5 var(--mono); }
 .empty { color: var(--muted); padding: 30px 0; text-align: center; }
@@ -427,18 +428,21 @@ const EXTRA = ["#5b7fa6", "#a65b8f", "#7a8f3a", "#3a8f8a", "#8f5b3a"];
 const colorOf = (label, labels) => PALETTE[label] || EXTRA[labels.indexOf(label) % EXTRA.length];
 
 async function graph(view) {
-  const limit = store.get("graphLimit", state.ws === "all" ? 40 : 150);
+  // All workspaces at once is many graphs' worth of nodes: its limit is kept apart and starts small.
+  const limitKey = state.ws === "all" ? "graphLimitAll" : "graphLimit";
+  const limit = store.get(limitKey, state.ws === "all" ? 25 : 150);
   const sel = h("select", { title: "Nodes per table" }, [25, 40, 80, 150, 300, 600].map(n => h("option", { value: n, selected: n === limit }, n + " per table")));
   const find = h("input", { type: "search", placeholder: "Highlight nodes matching…" });
   const captions = h("input", { type: "checkbox", checked: store.get("graphCaptions", true) });
   const info = h("span", { class: "muted" });
   const wrap = h("div", { class: "graph-wrap" });
   view.replaceChildren(h("div", { class: "bar" }, find, sel, h("label", { class: "muted" }, captions, " captions"), info), wrap);
-  sel.onchange = () => { store.set("graphLimit", +sel.value); renderView(); };
+  sel.onchange = () => { store.set(limitKey, +sel.value); renderView(); };
   captions.onchange = () => { store.set("graphCaptions", captions.checked); draw(); };
 
   wrap.replaceChildren(h("div", { class: "empty" }, "Reading the graph…"));
   const data = await api("/api/graph?" + q() + "&limit=" + limit);
+  if (!wrap.isConnected) return;   // the person moved on while it loaded
   const notes = [...data.notes.map(n => h("div", { class: "note warn" }, n))];
   if (data.truncated.length) notes.push(h("div", { class: "note" }, "Showing the newest " + limit + " per table for: " + data.truncated.join(", ") + ". Raise the limit or use Cypher for the rest."));
   view.insertBefore(h("div", null, notes), wrap);
@@ -450,15 +454,29 @@ async function graph(view) {
   const degree = new Map();
   for (const e of data.edges) { degree.set(e.from, (degree.get(e.from) || 0) + 1); degree.set(e.to, (degree.get(e.to) || 0) + 1); }
 
-  // Layout: a plain force simulation — repulsion, springs, a weak pull to the centre.
+  // Layout: a plain force simulation — repulsion, springs, a weak pull to a centre.
+  // Across workspaces each one gets its own centre on a ring: their graphs share
+  // no edges, and one shared centre mashed them into a single ball.
+  const wsIds = [...new Set(data.nodes.map(n => n.ws))];
+  const ring = wsIds.length > 1 ? 80 * Math.sqrt(data.nodes.length) : 0;
+  const centre = new Map(wsIds.map((w, i) => {
+    const a = 2 * Math.PI * i / wsIds.length - Math.PI / 2;
+    return [w, { x: ring * Math.cos(a), y: ring * Math.sin(a) }];
+  }));
   const nodes = data.nodes.map((n, i) => {
-    const a = i * 2.39996, r = 30 * Math.sqrt(i + 1);
-    return Object.assign(n, { x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0, r: 5 + Math.min(10, Math.sqrt(degree.get(n.id) || 0) * 2.2) });
+    const a = i * 2.39996, r = 30 * Math.sqrt(i / wsIds.length + 1), c = centre.get(n.ws);
+    return Object.assign(n, { x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r, vx: 0, vy: 0, r: 5 + Math.min(10, Math.sqrt(degree.get(n.id) || 0) * 2.2) });
   });
+  // With many nodes only the best-connected keep their caption until the view is zoomed in.
+  const CROWDED = 120, KEEP = 40, READABLE_ZOOM = 1.5;
+  const rank = new Map([...nodes].sort((a, b) => (degree.get(b.id) || 0) - (degree.get(a.id) || 0)).map((n, i) => [n, i]));
   const edges = data.edges.filter(e => byId.has(e.from) && byId.has(e.to)).map(e => Object.assign(e, { s: byId.get(e.from), t: byId.get(e.to) }));
 
-  const s = svg("svg", {}), root = svg("g", {}), gEdges = svg("g", {}), gNodes = svg("g", {});
-  root.append(gEdges, gNodes); s.append(root);
+  const s = svg("svg", {}), root = svg("g", {}), gEdges = svg("g", {}), gNodes = svg("g", {}), gWs = svg("g", {});
+  root.append(gEdges, gNodes, gWs); s.append(root);
+  const wsLabel = new Map(wsIds.length > 1 ? wsIds.map(w => {
+    const t = svg("text", { class: "ws-label", "text-anchor": "middle" }); t.textContent = wsName(w); gWs.append(t); return [w, t];
+  }) : []);
   const legend = h("div", { class: "legend" });
   const inspector = h("div", { class: "inspector" });
   wrap.replaceChildren(s, legend, inspector);
@@ -474,10 +492,14 @@ async function graph(view) {
     const vis = nodes.filter(n => !hidden.has(n.label));
     if (!vis.length) return;
     const xs = vis.map(n => n.x), ys = vis.map(n => n.y);
-    const minX = Math.min(...xs) - 40, maxX = Math.max(...xs) + 40, minY = Math.min(...ys) - 40, maxY = Math.max(...ys) + 40;
-    const w = wrap.clientWidth, hgt = wrap.clientHeight;
-    view2.k = Math.min(2, Math.max(0.1, Math.min(w / (maxX - minX), hgt / (maxY - minY))));
-    view2.x = w / 2 - view2.k * (minX + maxX) / 2; view2.y = hgt / 2 - view2.k * (minY + maxY) / 2;
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    // Margins in screen pixels, not graph units — zoomed out, a graph-unit margin
+    // shrinks to nothing. The top clears the legend chips and the workspace labels.
+    const side = 40, top = wsLabel.size ? 90 : 50, bottom = 30;
+    const w = wrap.clientWidth - 2 * side, hgt = wrap.clientHeight - top - bottom;
+    view2.k = Math.min(2, Math.max(0.05, Math.min(w / Math.max(1, maxX - minX), hgt / Math.max(1, maxY - minY))));
+    view2.x = side + w / 2 - view2.k * (minX + maxX) / 2;
+    view2.y = top + hgt / 2 - view2.k * (minY + maxY) / 2;
     applyView();
   }
 
@@ -494,6 +516,10 @@ async function graph(view) {
 
   function draw() {
     const term = find.value.trim().toLowerCase();
+    const shown = nodes.filter(n => !hidden.has(n.label));
+    const crowded = shown.length > CROWDED && view2.k < READABLE_ZOOM;
+    info.textContent = nodes.length + " nodes · " + edges.length + " edges" +
+      (captions.checked && crowded ? " · captions on the " + KEEP + " best-connected — zoom in for all" : "");
     const near = selected ? new Set([selected.id, ...edges.filter(e => e.s === selected || e.t === selected).flatMap(e => [e.s.id, e.t.id])]) : null;
     for (const n of nodes) {
       const g = groupOf.get(n);
@@ -502,7 +528,8 @@ async function graph(view) {
       const match = term && (n.caption + " " + Object.values(n.props).join(" ")).toLowerCase().includes(term);
       g.classList.toggle("hi", n === selected || !!match);
       g.classList.toggle("dim", (near && !near.has(n.id)) || (!!term && !match));
-      g.querySelector("text").style.display = captions.checked || n === selected || match ? "" : "none";
+      const labelled = n === selected || match || (near && near.has(n.id)) || (captions.checked && (!crowded || rank.get(n) < KEEP));
+      g.querySelector("text").style.display = labelled ? "" : "none";
     }
     for (const e of edges) {
       const l = lineOf.get(e);
@@ -511,24 +538,38 @@ async function graph(view) {
       const on = selected && (e.s === selected || e.t === selected);
       l.classList.toggle("hi", !!on); l.classList.toggle("dim", !!selected && !on);
     }
+    for (const [w, t] of wsLabel) {
+      const mine = shown.filter(n => n.ws === w);
+      t.style.display = mine.length ? "" : "none";
+      if (!mine.length) continue;
+      t.setAttribute("x", mine.reduce((sum, n) => sum + n.x, 0) / mine.length);
+      t.setAttribute("y", Math.min(...mine.map(n => n.y)) - 24 / view2.k);
+    }
   }
 
   let alpha = 1, frame = 0;
   function tick() {
     const vis = nodes.filter(n => !hidden.has(n.label));
-    for (let i = 0; i < vis.length; i++) {
-      const a = vis[i];
-      for (let j = i + 1; j < vis.length; j++) {
-        const b = vis[j];
-        let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
-        if (d2 > 90000) continue;
-        if (d2 < 1) { dx = Math.random() - .5; dy = Math.random() - .5; d2 = 1; }
-        const f = 900 * alpha / d2;
-        a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
+    // Repulsion only reaches 300 px, so each node looks at its own grid cell and
+    // the eight around it instead of every other node — a thousand nodes stay smooth.
+    const CELL = 300, grid = new Map(), cellOf = n => Math.floor(n.x / CELL) + "," + Math.floor(n.y / CELL);
+    for (const n of vis) { const k = cellOf(n); (grid.get(k) || grid.set(k, []).get(k)).push(n); }
+    for (const a of vis) {
+      const cx = Math.floor(a.x / CELL), cy = Math.floor(a.y / CELL);
+      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) {
+        for (const b of grid.get(gx + "," + gy) || []) {
+          if (b === a) continue;
+          let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+          if (d2 > 90000) continue;
+          if (d2 < 1) { dx = Math.random() - .5; dy = Math.random() - .5; d2 = 1; }
+          const f = 900 * alpha / d2;
+          a.vx += dx * f; a.vy += dy * f;   // b gets its push when it is "a"
+        }
       }
       // A node with no edges would otherwise drift to the rim and shrink everything else on fit.
-      const pull = degree.get(a.id) ? 0.006 : 0.03;
-      a.vx -= a.x * pull * alpha; a.vy -= a.y * pull * alpha;
+      // Several workspaces pull harder, or their clusters drift into each other.
+      const pull = (degree.get(a.id) ? 0.006 : 0.03) * (ring ? 2.5 : 1), c = centre.get(a.ws);
+      a.vx -= (a.x - c.x) * pull * alpha; a.vy -= (a.y - c.y) * pull * alpha;
     }
     for (const e of edges) {
       if (hidden.has(e.s.label) || hidden.has(e.t.label)) continue;
@@ -575,7 +616,7 @@ async function graph(view) {
     touched = true;
     const r = s.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
     const k = Math.min(4, Math.max(0.05, view2.k * Math.exp(-ev.deltaY * 0.0015)));
-    view2.x = mx - (mx - view2.x) * k / view2.k; view2.y = my - (my - view2.y) * k / view2.k; view2.k = k; applyView();
+    view2.x = mx - (mx - view2.x) * k / view2.k; view2.y = my - (my - view2.y) * k / view2.k; view2.k = k; applyView(); draw();
   }, { passive: false });
 
   function inspect(n) {
@@ -613,7 +654,6 @@ async function graph(view) {
     }, h("span", { class: "dot", style: "background:" + colorOf(l, labels) }), l + " " + nodes.filter(n => n.label === l).length)));
   }
   find.oninput = draw;
-  info.textContent = nodes.length + " nodes · " + edges.length + " edges";
   renderLegend();
   applyView(); fit(); reheat(1);
 }
