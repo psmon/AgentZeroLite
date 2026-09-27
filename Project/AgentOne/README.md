@@ -82,7 +82,7 @@ wire format, which is why there is only one provider):
 agent-one config set provider openai
 agent-one config set baseUrl http://localhost:11434/v1
 agent-one config set model qwen2.5-coder:7b
-agent-one run "이 폴더에 뭐가 있는지 알려줘"
+agent-one run "what is in this folder?"
 ```
 
 ## Commands
@@ -317,15 +317,15 @@ fails: it is not a preference, it is a dependency.
   agent-one chat · openai · google/gemma-4-e4b
   tools: files: C:\work\repo · web: the web (read-only: search and fetch)
 
-› MSA로 전환할 때 데이터 일관성은 어떻게 보장하지?
+› How do I keep data consistent when moving to microservices?
   route: → web  (confidence 0.91)
   ✓ web_search  (1.2s)
   ✓ web_read  (4.8s)
-◆ 사가 패턴과 이벤트 소싱으로 …
+◆ With the saga pattern and event sourcing …
 
   escalation: escalating to qwen/qwen3.8-27b  (confidence 0.83)
   ✓ reasoning  qwen/qwen3.8-27b · 2 913 chars  (24.1s)
-◆ MSA에서 데이터 일관성은 세 층위로 나눠 봐야 합니다 …
+◆ Data consistency across microservices has three layers to look at …
 
  done in 61.2s · 4 steps
 › ▌
@@ -352,12 +352,12 @@ decision engine reads the line (resume / stop / refine, one fixed question);
 without one a short word list does, in English and Korean.
 
 ```
-› 보드 API 만들어줘
+› build a board API
   ✓ write_file  (0.0s)
   … thinking about what came back            ← Esc
   ⏸ pausing at the next step — type to go on, 'stop' to abandon, or say what to change
-› 테스트도 같이 만들어
-  pause: refining: 테스트도 같이 만들어  (confidence 0.81)
+› write the tests too
+  pause: refining: write the tests too  (confidence 0.81)
   … thinking about what came back
   ✓ write_file  (0.0s)
 ```
@@ -374,7 +374,7 @@ The agent can **create files** and **run commands**, so "scaffold a FastAPI
 service and run its tests" is a request it can carry out, not just describe:
 
 ```
-› hello 라는 문구를 출력하는 파이썬 스크립트 hello.py 를 만들고 실행해서 결과를 확인해줘
+› write a Python script hello.py that prints hello, run it and check the output
   route: → workspace  (confidence 0.85)
   scope: small — going ahead  (confidence 1.00)
   ✓ write_file  (0.0s)
@@ -383,7 +383,7 @@ service and run its tests" is a request it can carry out, not just describe:
   in C:\work\scratch · not run unasked because: the decision engine judged it safe (confidence 0.37)
 approve (y/n) › y
   ✓ run_command  (1.2s)
-◆ hello.py 를 만들고 실행했습니다. 출력: hello
+◆ Created and ran hello.py. Output: hello
 ```
 
 Three rules hold whatever is asked:
@@ -512,13 +512,13 @@ anything, the newest few items go to the model anyway — the engine said the
 graph helps, and a miss on words is not a no.
 
 ```
-› 빌드가 되는지 확인해줘
+› check that it builds
   route: → workspace  (confidence 0.96)
   graph: consulted via by_keywords — 2 item(s)  (confidence 0.81)
     ↳ (procedure) Build command
     ↳ (fix) Missing entry point
   ✓ run_command  (2.4s)
-◆ 빌드 성공 …
+◆ Build succeeded …
 ```
 
 **The workspace's own documents go in too** — `agent-one knowledge init` (or
@@ -540,8 +540,8 @@ whose text changed are judged again (an edited section keeps its node and its
 use count), and sections or files that are gone are removed; `rebuild` judges
 everything again, and a folder argument limits any of them. Measured on this
 repository: 335 files, 2,951 sections judged in 218 s; the next `update`, with
-nothing changed, took 0.3 s. Without a TypeSafe key a word rule (must / never /
-반드시 / 금지 …) classifies instead and each rationale says so.
+nothing changed, took 0.3 s. Without a TypeSafe key a word rule (must / never,
+and the same words in Korean …) classifies instead and each rationale says so.
 
 ```bash
 agent-one knowledge init                    # build (the graph is created on first use)
@@ -601,18 +601,18 @@ distillation has finished — knowledge is learned off the turn, so closing
 first would wire up a cycle whose last lesson is not stored yet.
 
 ```
-› 새 게시판 API 를 어떻게 구성하면 좋을까?
+› How should the new board API be structured?
   route: → workspace   scope: large — qwen3.8-27b designs first
   pdsa:  cycle #3 opened at plan
-◆ src/Api 아래에 …
+◆ Under src/Api …
 
-› 좋아, 그대로 만들고 빌드까지 돌려봐
+› Good — build it that way and run the build
   pdsa:  cycle #3 · do
 …
-› 테스트 돌려서 계획대로인지 봐줘
+› Run the tests and see whether it went to plan
   pdsa:  cycle #3 · study → the plan was partial
 …
-› 되는 데까지 커밋하고 남은 건 적어두자
+› Commit what works and write down what is left
   pdsa:  cycle #3 · act
     ↳ cycle #3 closed (partial) — taught 2, built on 1
 ```
@@ -639,11 +639,11 @@ and the workspace keeps two things under `~/.agent-one/workspaces/<name>-<hash>/
 ```
 › /resume
   ── sessions in this workspace (newest first) · /resume <n> to pick one ──
-   1. 09-22 22:55 · 3 turns · 게시판 API 빌드 오류 수정  (this one)
-   2. 09-22 22:19 · 6 turns · 게시판 API 만들기
+   1. 09-22 22:55 · 3 turns · Fix the board API build errors  (this one)
+   2. 09-22 22:19 · 6 turns · Build the board API
 › /resume 2
-  ── resumed 20260922-221944-chat · 게시판 API 만들기 ──
-› 보드 api를 만들어죠
+  ── resumed 20260922-221944-chat · Build the board API ──
+› make the board api
   route: unsure (answer_directly), all tools stay available · confidence 0.58
   ✓ write_file  (24.3s)
   …
@@ -651,9 +651,9 @@ and the workspace keeps two things under `~/.agent-one/workspaces/<name>-<hash>/
 ```
 
 **The task's name** is made by the model from the request, in the background
-as the turn starts — so the header says "게시판 API 개발" seconds in, not
+as the turn starts — so the header says "Board API development" seconds in, not
 minutes later when a long build ends — and shown in the header, the status
-block, the resume list and the memory. A greeting ("안녕", "hi") is not a task
+block, the resume list and the memory. A greeting ("hello", "hi") is not a task
 and names nothing. With a TypeSafe key, each new request is first put to the
 decision engine as "same task or a new one?" (0.3 s), and the model is only
 asked for a new name when the task changed; without one, the task is named
@@ -689,7 +689,10 @@ run prints a new one. `--open` opens the link in the default browser.
 The sidebar picks the scope — **All workspaces**, or one project — and every
 tab follows it. The screenshots below are real records: five workspaces
 agent-one worked in (a board API, two Tetris builds, this repository, and one
-whose Markdown was scanned into the graph).
+whose Markdown was scanned into the graph). Those conversations were in
+Korean, so the Korean text in the Memory, Sessions, Graph and Cypher shots was
+translated into English with an image model (`gpt-image-2.5`); the header,
+sidebar, toolbars and every number are the original pixels.
 
 #### Overview — where agent-one has been
 
@@ -752,7 +755,7 @@ relationship is clickable, and *Open in Cypher* writes the query for it.
 
 The selected node is one piece of knowledge, and its edges are the schema
 reading itself aloud: it is a `procedure` with keywords in both languages,
-`ABOUT` three files, `LEARNED` from the turn "제안대로진행", and
+`ABOUT` three files, `LEARNED` from the turn "go ahead as proposed", and
 `JUSTIFIED_BY` a Rationale captioned **`skip 0.31`** — the engine leaned
 *skip* but below the confidence floor, and an unsure skip keeps the item.
 `uses 0` means no later turn has been handed it yet; each `HELPED` edge would
@@ -832,7 +835,7 @@ workspace, or answer directly. The chosen family is the *only* one the loop may
 use that turn: a call outside it is refused with a message, not run. A small
 model treats a suggestion as one option among many; a refusal it understands.
 Below the confidence floor nothing is restricted. Requests under ten characters
-("hi", "네") skip the engine entirely.
+("hi", "ok") skip the engine entirely.
 
 **② Escalate.** After the draft, the engine sees the request, everything the
 tools returned, the draft, and **which model wrote it and which one is on
@@ -844,16 +847,16 @@ writes the final answer — same voice, same language, borrowed thinking. A
 strong model that cannot be reached leaves the draft standing and says so.
 
 ```console
-[smart] > MSA로 전환할 때 데이터 일관성은 어떻게 보장하지?
+[smart] > How do I keep data consistent when moving to microservices?
 (route: → web · confidence 0.91)
 … searching the web for "MSA data consistency"
 ✓ web_search  (1.2s)
 ✓ web_read  (4.8s)
-사가 패턴과 이벤트 소싱으로 …
+With the saga pattern and event sourcing …
 (escalation: escalating to qwen/qwen3.8-27b · confidence 0.83)
 … reasoning with qwen/qwen3.8-27b
 ✓ reasoning  (24.1s)
-MSA에서 데이터 일관성은 세 층위로 나눠 봐야 합니다 …
+Data consistency across microservices has three layers to look at …
 ```
 
 **Shift+Tab** switches basic ↔ smart, and the header (or, in the REPL, the
