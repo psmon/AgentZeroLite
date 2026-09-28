@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for the Microsoft Store build of the Avalonia host (win-x64).
+  build-msix.ps1 fills the double-underscore placeholders: the identity values come from Partner Center
+  (Product management → Product identity) and must match it character for character.
+
+  Three choices here are load-bearing — read Docs/avalonia-v2/microsoft-store.md before
+  changing them:
+
+  * runFullTrust — AgentZero is a desktop app that hosts ConPTY terminals, named pipes and
+    a loopback asset server; none of that runs in an AppContainer.
+  * unvirtualizedResources + FileSystem/RegistryWriteVirtualization=disabled — by default an
+    MSIX app's writes to %LOCALAPPDATA% / %APPDATA% / HKCU are redirected into a private
+    per-package store, and so are the writes of every process it starts. That would (a) hide
+    agentZeroLite.db and the settings files from the WPF host and from `-cli` callers, and
+    (b) make `npm install -g` run from a terminal tab land in the package's private cache,
+    invisible to the user's other terminals and deleted on uninstall. It is a restricted
+    capability: Partner Center asks for a justification on every submission.
+  * appExecutionAlias AgentZeroLite.exe — so `AgentZeroLite.exe -cli …` works from any
+    shell, exactly as the docs and the agentzero-cli skill write it.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 desktop desktop6 rescap">
+
+  <Identity
+    Name="__IDENTITY_NAME__"
+    Publisher="__PUBLISHER__"
+    Version="__VERSION__"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>__DISPLAY_NAME__</DisplayName>
+    <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Windows-native multi-CLI shell for AI coding agents: terminal tabs for Claude, Codex and agent-one, split panes, workspaces and an on-device assistant.</Description>
+    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
+  </Properties>
+
+  <Dependencies>
+    <!-- 19041 (20H1): ConPTY, WebView2 and the desktop6 virtualization switches are all older
+         than this; it is also the oldest Windows 10 build still in service. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="AgentZeroLite" Executable="AgentZeroLite.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="__DISPLAY_NAME__"
+        Description="Multi-CLI shell for AI coding agents"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="AgentZeroLite.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="AgentZeroLite.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+  </Capabilities>
+</Package>

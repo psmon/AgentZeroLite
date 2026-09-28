@@ -479,3 +479,6 @@ Project/AgentOne/native/_cache/
 # (dotnet publish ... -o out/win-x64). One RID is ~122 MB and it carries
 # kuzu_shared.dll, so it must never reach a commit.
 /out/
+
+# Microsoft Store MSIX build output (Project/AgentZeroAvalonia/msix/build-msix.ps1)
+/publish-msix/

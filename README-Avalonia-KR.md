@@ -69,6 +69,11 @@ macOS: *Avalonia host* 워크플로 실행에서 `AgentZeroLite-Avalonia-v<ver>-
 `xattr -dr com.apple.quarantine AgentZeroLite.app`(ad-hoc 서명) 후 실행. CLI 래퍼는
 `AgentZeroLite.app/Contents/MacOS/AgentZeroLite.sh`. 손 점검표: [Docs/avalonia-v2/macos-smoke.md](Docs/avalonia-v2/macos-smoke.md).
 
+Microsoft Store(Windows): `Project/AgentZeroAvalonia/msix/build-msix.ps1` 가 MSIX(x64, 서명은 Store가 함)를 만든다.
+매니페스트가 AppData/HKCU 쓰기 가상화를 끄므로(`unvirtualizedResources`) DB·설정·터미널 탭에서 설치한 도구가 PC의
+나머지와 계속 공유된다 — 제출 때마다 Store 승인을 받는 제한된 기능이다. 절차, 로컬 점검, 붙여 넣을 등록 문구:
+[Docs/avalonia-v2/microsoft-store.md](Docs/avalonia-v2/microsoft-store.md).
+
 ## 변환 완료 목록
 
 | 영역 | 상태 | 비고 |
@@ -83,7 +88,8 @@ macOS: *Avalonia host* 워크플로 실행에서 `AgentZeroLite-Avalonia-v<ver>-
 | AgentBot 도킹 페인 **및** 플로팅 창 (Ctrl+Shift+`) | ✅ | 뷰모델 하나에 뷰 둘. WPF와 같이 **하단 도크**(280px, 스플리터, 최대화 시 터미널 90px 유지), 활동바를 제외한 전 영역을 스팬. 오버레이가 아니라 형제 행이다 — macOS에서 터미널 네이티브 웹뷰 위에 그린 Avalonia 콘텐츠는 보이지 않는다. WPF의 나머지 하단 탭(OUTPUT/LOG/NOTE)은 미변환이라 탭 스트립은 없다 |
 | 툴벨트: 터미널, 파일, `find_files/open_file/stop_media`, 웹(headless) | ✅ | `WorkspaceToolHost` |
 | 설정: External LLM(+테스트), CLI 정의 CRUD, 터미널 외관(라이브) | ✅ | 로컬 LLM 섹션은 Windows에서만 |
-| 설정: 에이전트 CLI 설치(Claude, Codex) | ✅ Avalonia 전용 | 빌트인 행은 셸 + 에이전트 명령이라, 에이전트를 설치하지 않아도 행 자체는 유효하다 — 그러면 탭이 "claude : The term 'claude' is not recognized"를 뱉고, 앱이 고장난 것처럼 보인다. 그런 정의를 선택하면 PATH에 있는지 보여주고 설치를 제안한다: Windows는 **winget**(`Anthropic.ClaudeCode` / `OpenAI.Codex`), 그 외는 **npm -g**(`@anthropic-ai/claude-code` / `@openai/codex`). 규칙과 패키지는 `ZeroCommon/Services/AgentCliTools`에 있어 WPF가 사본 없이 그대로 채택할 수 있다 |
+| 설정: 에이전트 CLI 설치(Claude, Codex, AgentOne) | ✅ 두 호스트 모두 | 빌트인 행은 셸 + 에이전트 명령이라, 에이전트를 설치하지 않아도 행 자체는 유효하다 — 그러면 탭이 "claude : The term 'claude' is not recognized"를 뱉고, 앱이 고장난 것처럼 보인다. 그런 정의를 선택하면 PATH에 있는지 보여주고 **모든 OS에서 npm -g**로 설치를 제안한다(`@anthropic-ai/claude-code` / `@openai/codex` / `@webnori/agent-one`). winget은 패키지가 릴리스보다 늦고 Windows 전용이라 뺐다. AgentOne 행은 `agent-one chat`으로 실행한다(인자 없는 `agent-one`은 도움말만 출력). 규칙과 패키지는 `ZeroCommon/Services/AgentCliTools`에 있고, WPF도 CLI Definitions 탭에 같은 패널을 채택했다 |
+| 앱 아이콘 | ✅ | WPF 호스트의 `agentzero.ico`를 프로젝트에 링크해 exe 아이콘과 창 아이콘으로 쓴다. `.app` 번들용 `macos/AgentZeroLite.icns`는 같은 파일에서 생성했다 |
 | 설정: AI 모드 툴 체인 최대 턴 | ✅ (WPF에도 역이식) | `AgentLoopMaxTurns`(기본 12, 1–200으로 클램프) → `AgentLoopOptions.MaxIterations`. 두 호스트 모두 턴당 토큰 상한과 temperature만 넘기고 있어 턴 예산이 사실상 상수였고, 긴 작업은 "max iterations (12) reached without 'done'"로만 끝날 수 있었다. 여기서 만든 뒤 WPF의 `AgentBotWindow` + LLM 탭의 *AIMODE Turns* 로 적용했으므로, 설정 파일이 공유되는 만큼 두 호스트가 같은 값을 쓴다 |
 | CLI: status, terminal-list/send/key/read/wait/alias(`--alias`), layout, bot-chat, bot-ask, web, selftest | ✅ | 파이프 `AgentZeroLite.cli`; `.ps1` / `.sh` 래퍼 |
 | CI: windows-latest + macos-14, win-x64 zip, `.app` 번들 | ✅ | `.github/workflows/avalonia-build.yml` |

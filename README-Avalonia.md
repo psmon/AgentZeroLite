@@ -70,6 +70,12 @@ macOS: download `AgentZeroLite-Avalonia-v<ver>-osx-arm64.zip` from the *Avalonia
 `xattr -dr com.apple.quarantine AgentZeroLite.app` (the bundle is ad-hoc signed) and open it. The CLI wrapper is
 `AgentZeroLite.app/Contents/MacOS/AgentZeroLite.sh`. Hand checklist: [Docs/avalonia-v2/macos-smoke.md](Docs/avalonia-v2/macos-smoke.md).
 
+Microsoft Store (Windows): `Project/AgentZeroAvalonia/msix/build-msix.ps1` builds the MSIX (x64, the Store signs
+it). The manifest turns AppData/HKCU write virtualization off (`unvirtualizedResources`) so the database, the
+settings and whatever terminal tabs install stay shared with the rest of the machine — a restricted capability
+the Store approves per submission. Procedure, local checks and paste-ready listing text (in Korean):
+[Docs/avalonia-v2/microsoft-store.md](Docs/avalonia-v2/microsoft-store.md).
+
 ## Converted so far
 
 | Area | Status | Notes |
@@ -84,7 +90,8 @@ macOS: download `AgentZeroLite-Avalonia-v<ver>-osx-arm64.zip` from the *Avalonia
 | AgentBot as a docked pane **and** a floating window (Ctrl+Shift+`) | ✅ | one view model, two views; docked along the **bottom** as in WPF (280px, splitter, maximize keeps a 90px sliver of terminal), spanning everything but the activity bar. A sibling row, never an overlay — an Avalonia surface drawn over the terminal's native web view is invisible on macOS. WPF's other bottom tabs (OUTPUT/LOG/NOTE) are not converted, so there is no tab strip |
 | Tool belt: terminals, files, `find_files/open_file/stop_media`, web (headless) | ✅ | `WorkspaceToolHost` |
 | Settings: External LLM (+ test), CLI definitions CRUD, terminal appearance (live) | ✅ | Local LLM section on Windows only |
-| Settings: agent CLI install (Claude, Codex) | ✅ Avalonia only | A built-in row is a shell plus an agent command, so it stays valid while the agent was never installed — the tab then prints "claude : The term 'claude' is not recognized", which reads as a broken app. Selecting such a definition shows whether the tool is on PATH and offers to fetch it: **winget** on Windows (`Anthropic.ClaudeCode` / `OpenAI.Codex`), **npm -g** elsewhere (`@anthropic-ai/claude-code` / `@openai/codex`). Rules and packages live in `ZeroCommon/Services/AgentCliTools` so WPF can adopt the panel without a second copy |
+| Settings: agent CLI install (Claude, Codex, AgentOne) | ✅ both hosts | A built-in row is a shell plus an agent command, so it stays valid while the agent was never installed — the tab then prints "claude : The term 'claude' is not recognized", which reads as a broken app. Selecting such a definition shows whether the tool is on PATH and offers to fetch it with **npm -g on every OS** (`@anthropic-ai/claude-code` / `@openai/codex` / `@webnori/agent-one`); winget was dropped because its packages lagged releases and exist for Windows only. AgentOne's row launches `agent-one chat` (bare `agent-one` prints help). Rules and packages live in `ZeroCommon/Services/AgentCliTools`; WPF adopted the same panel in its CLI Definitions tab |
+| App icon | ✅ | The WPF host's `agentzero.ico`, linked into the project as the exe icon and the window icon; `macos/AgentZeroLite.icns` is generated from the same file for the `.app` bundle |
 | Settings: AI-mode tool-chain turn budget | ✅ (also back-ported to WPF) | `AgentLoopMaxTurns` (default 12, clamped 1–200) → `AgentLoopOptions.MaxIterations`. Both hosts passed only the per-turn token cap and the temperature, leaving the budget a constant, so a long job could only end in "max iterations (12) reached without 'done'". Built here, then applied to WPF's `AgentBotWindow` + *AIMODE Turns* in its LLM tab, so the shared settings file means one number for both |
 | CLI: status, terminal-list/send/key/read/wait/alias (`--alias`), layout, bot-chat, bot-ask, web, selftest | ✅ | pipe `AgentZeroLite.cli`; `.ps1` / `.sh` wrappers |
 | Remote shell (SSH) definitions: composed `ssh` launch + stored-password autofill | ✅ Windows / ⏳ macOS | composition moved into `TerminalLaunchPlanner` (WPF composes at its own call sites, unchanged); autofill is `ZeroCommon/Services/SshPasswordWatcher`. The password column is shared with WPF, so this host seals it with `Security/SshPasswordVault` (same DPAPI entropy, no marker). On macOS remote definitions stay hidden — `ComposeArguments` only knows cmd/PowerShell wrappers |
