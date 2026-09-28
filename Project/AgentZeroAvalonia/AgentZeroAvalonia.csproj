@@ -18,6 +18,7 @@
     <Configurations>Debug;Release;AgentCLI</Configurations>
     <Platforms>AnyCPU</Platforms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\AgentZeroWpf\agentzero.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <!-- Hangul normalisation in SuperTonic and Korean paths need real globalization. -->
@@ -63,6 +64,11 @@
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Wasm\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\AgentZeroWpf\version.txt" Link="version.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The app icon is AgentZero's own, linked rather than copied so the two hosts
+         cannot drift: ApplicationIcon stamps the Windows exe (taskbar, desktop shortcut,
+         Explorer), the AvaloniaResource is what the windows show in their title bar.
+         macOS takes macos/AgentZeroLite.icns, made from the same file. -->
+    <AvaloniaResource Include="..\AgentZeroWpf\agentzero.ico" Link="Assets\agentzero.ico" />
     <None Update="AgentZeroLite.sh" CopyToOutputDirectory="PreserveNewest" />
     <None Update="AgentZeroLite.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

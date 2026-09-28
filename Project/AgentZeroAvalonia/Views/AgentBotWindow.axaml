@@ -5,6 +5,7 @@
         x:Class="AgentZeroAvalonia.Views.AgentBotWindow"
         x:DataType="vm:AgentBotViewModel"
         Title="AgentBot"
+        Icon="avares://AgentZeroLite/Assets/agentzero.ico"
         Width="420" Height="600" MinWidth="320" MinHeight="400"
         Background="{DynamicResource CyberBgPanel}"
         WindowStartupLocation="CenterOwner">

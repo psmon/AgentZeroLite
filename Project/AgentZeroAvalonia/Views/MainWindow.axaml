@@ -6,6 +6,7 @@
         x:DataType="vm:MainWindowViewModel"
         Width="1180" Height="760" MinWidth="820" MinHeight="520"
         Background="{DynamicResource CyberBgDeep}"
+        Icon="avares://AgentZeroLite/Assets/agentzero.ico"
         Title="AgentZero Lite">
 
     <Window.Styles>
