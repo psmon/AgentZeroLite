@@ -211,13 +211,13 @@ public class AppDbContext : DbContext
                 {
                     Name = tool.Name,
                     ExePath = "powershell.exe",
-                    Arguments = $"-NoExit -Command {tool.Command}",
+                    Arguments = $"-NoExit -Command {tool.Launch}",
                 }
                 : new CliDefinition
                 {
                     Name = tool.Name,
                     ExePath = "/bin/zsh",
-                    Arguments = $"-l -c \"{tool.Command}; exec zsh -l\"",
+                    Arguments = $"-l -c \"{tool.Launch}; exec zsh -l\"",
                 };
         }
     }

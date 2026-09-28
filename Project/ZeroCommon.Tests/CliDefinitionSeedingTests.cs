@@ -9,7 +9,7 @@ namespace ZeroCommon.Tests;
 /// <summary>
 /// The CLI definition table serves both hosts on both OSes. The migration seeds Windows
 /// shells (M0033); the runtime seed adds the POSIX shells once on a non-Windows host and
-/// the agent CLI profiles (Claude, Codex) on either — each checked on its own, so a
+/// the agent CLI profiles (Claude, Codex, AgentOne) on either — each checked on its own, so a
 /// database that predates a new built-in still gains it.
 /// </summary>
 [Trait("Category", "Persistence")]
@@ -39,20 +39,20 @@ public sealed class CliDefinitionSeedingTests : IDisposable
         using var db = Open();
         AppDbContext.EnsureDefaultCliDefinitions(db, isWindows: true);
         var names = db.CliDefinitions.OrderBy(d => d.SortOrder).Select(d => d.Name).ToList();
-        Assert.Equal(new[] { "CMD", "PW5", "PW7", "Claude", "Codex" }, names);
+        Assert.Equal(new[] { "CMD", "PW5", "PW7", "Claude", "Codex", "AgentOne" }, names);
 
-        foreach (var name in new[] { "Claude", "Codex" })
+        foreach (var (name, launch) in new[] { ("Claude", "claude"), ("Codex", "codex"), ("AgentOne", "agent-one chat") })
         {
             var row = db.CliDefinitions.Single(d => d.Name == name);
             // PowerShell 5 is the base: every Windows install has powershell.exe, so the
             // definition works before anyone installs PowerShell 7.
             Assert.Equal("powershell.exe", row.ExePath);
-            Assert.Equal("-NoExit -Command " + name.ToLowerInvariant(), row.Arguments);
+            Assert.Equal("-NoExit -Command " + launch, row.Arguments);
             Assert.True(row.IsBuiltIn);
         }
 
         AppDbContext.EnsureDefaultCliDefinitions(db, isWindows: true);
-        Assert.Equal(5, db.CliDefinitions.Count());
+        Assert.Equal(6, db.CliDefinitions.Count());
     }
 
     [Fact]
@@ -77,24 +77,41 @@ public sealed class CliDefinitionSeedingTests : IDisposable
     }
 
     [Fact]
+    public void A_database_from_before_agent_one_gains_it_launched_as_chat()
+    {
+        // Every installation in the field has Claude and Codex already; AgentOne must
+        // still appear, and as the chat agent — bare `agent-one` prints help and exits.
+        using var db = Open();
+        AppDbContext.EnsureDefaultCliDefinitions(db, isWindows: true);
+        db.CliDefinitions.Remove(db.CliDefinitions.Single(d => d.Name == "AgentOne"));
+        db.SaveChanges();
+
+        AppDbContext.EnsureDefaultCliDefinitions(db, isWindows: true);
+
+        var row = db.CliDefinitions.Single(d => d.Name == "AgentOne");
+        Assert.Equal("-NoExit -Command agent-one chat", row.Arguments);
+        Assert.Single(db.CliDefinitions.Where(d => d.Name == "Claude"));
+    }
+
+    [Fact]
     public void Posix_seed_adds_the_shells_and_both_agents_once_and_keeps_windows_rows()
     {
         using var db = Open();
         AppDbContext.EnsureDefaultCliDefinitions(db, isWindows: false);
         var posix = db.CliDefinitions.AsEnumerable().Where(d => !d.ExePath.EndsWith(".exe")).OrderBy(d => d.SortOrder).ToList();
-        Assert.Equal(new[] { "zsh", "bash", "Claude", "Codex" }, posix.Select(d => d.Name));
+        Assert.Equal(new[] { "zsh", "bash", "Claude", "Codex", "AgentOne" }, posix.Select(d => d.Name));
         Assert.All(posix, d => Assert.True(d.IsBuiltIn));
-        foreach (var name in new[] { "Claude", "Codex" })
+        foreach (var (name, launch) in new[] { ("Claude", "claude"), ("Codex", "codex"), ("AgentOne", "agent-one chat") })
         {
             var row = posix.Single(d => d.Name == name);
             Assert.Equal("/bin/zsh", row.ExePath);
             // `exec zsh -l` keeps the tab alive after the agent quits.
-            Assert.Contains(name.ToLowerInvariant() + "; exec zsh -l", row.Arguments!);
+            Assert.Contains(launch + "; exec zsh -l", row.Arguments!);
         }
-        Assert.Equal(7, db.CliDefinitions.Count());   // 3 migrated + 4 seeded
+        Assert.Equal(8, db.CliDefinitions.Count());   // 3 migrated + 5 seeded
 
         AppDbContext.EnsureDefaultCliDefinitions(db, isWindows: false);
-        Assert.Equal(7, db.CliDefinitions.Count());
+        Assert.Equal(8, db.CliDefinitions.Count());
     }
 
     [Fact]

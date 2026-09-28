@@ -396,7 +396,8 @@
                         </ListView>
                     </Border>
 
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0" HorizontalAlignment="Left">
+                    <StackPanel Grid.Row="1" Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0" HorizontalAlignment="Left">
                         <Button Content="+ ADD" Padding="12,6" Margin="0,0,6,0"
                                 FontFamily="Consolas" FontSize="11" FontWeight="Bold"
                                 Foreground="#00E5FF" Background="#2D2D30"
@@ -412,6 +413,38 @@
                                 Foreground="#D13438" Background="#2D2D30"
                                 BorderBrush="#3E3E42" BorderThickness="1"
                                 Cursor="Hand" Click="OnDeleteCliDef" IsEnabled="False"/>
+                    </StackPanel>
+
+                    <!-- Agent CLI install. A built-in row is a shell plus an agent command, so
+                         it can be valid while the agent was never installed — the tab then
+                         prints "'claude' is not recognized". This answers "is it there?" and
+                         installs it with npm when it is not (AgentCliTools holds the rules). -->
+                    <Border x:Name="pnlAgentCli" Visibility="Collapsed" Margin="0,10,0,0" Padding="10,8"
+                            BorderBrush="#3E3E42" BorderThickness="1" CornerRadius="2" Background="#1E1E1E">
+                        <StackPanel>
+                            <TextBlock x:Name="lblAgentCliTitle" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                       Foreground="#00E5FF" Text="AGENT CLI"/>
+                            <TextBlock x:Name="lblAgentCliStatus" FontFamily="Consolas" FontSize="11"
+                                       Foreground="#D4D4D4" TextWrapping="Wrap" Margin="0,4,0,6"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="btnAgentCliCheck" Content="CHECK" Padding="12,5" Margin="0,0,6,0"
+                                        FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                        Foreground="#D4D4D4" Background="#2D2D30"
+                                        BorderBrush="#3E3E42" BorderThickness="1"
+                                        Cursor="Hand" Click="OnAgentCliCheck"/>
+                                <Button x:Name="btnAgentCliInstall" Content="INSTALL (npm)" Padding="12,5"
+                                        FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                        Foreground="#00E5FF" Background="#2D2D30"
+                                        BorderBrush="#3E3E42" BorderThickness="1"
+                                        Cursor="Hand" Click="OnAgentCliInstall"/>
+                            </StackPanel>
+                            <TextBox x:Name="txtAgentCliLog" Visibility="Collapsed" Margin="0,6,0,0"
+                                     IsReadOnly="True" TextWrapping="Wrap" MaxHeight="140"
+                                     VerticalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas" FontSize="11"
+                                     Foreground="#A0A0A0" Background="#111111" BorderBrush="#3E3E42"/>
+                        </StackPanel>
+                    </Border>
                     </StackPanel>
 
                     <!-- Appearance. The backend selector that used to live here is

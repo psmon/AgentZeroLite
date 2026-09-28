@@ -202,6 +202,113 @@ public partial class SettingsPanel : UserControl
         var selected = lvCliDefs.SelectedItem as CliDefinition;
         btnEditCliDef.IsEnabled = selected is not null;
         btnDelCliDef.IsEnabled = selected is not null && !selected.IsBuiltIn;
+        RefreshAgentCli(selected);
+    }
+
+    // ═══ Agent CLI install (Claude / Codex / AgentOne) ═══════════════════════
+    //
+    // The same panel the Avalonia host has (SettingsViewModel): AgentCliTools decides
+    // which tool a row drives, whether it is on PATH, and the npm command that installs
+    // it; this is only the WPF screen over it.
+
+    private AgentCliTool? _agentCliTool;
+    private bool _agentCliInstalling;
+
+    private void RefreshAgentCli(CliDefinition? selected)
+    {
+        var tool = AgentCliTools.Match(selected);
+        if (!ReferenceEquals(tool, _agentCliTool))
+        {
+            txtAgentCliLog.Text = "";
+            txtAgentCliLog.Visibility = Visibility.Collapsed;
+        }
+        _agentCliTool = tool;
+        pnlAgentCli.Visibility = tool is null ? Visibility.Collapsed : Visibility.Visible;
+        if (tool is null) return;
+
+        lblAgentCliTitle.Text = $"AGENT CLI · {tool.Name.ToUpperInvariant()} · {tool.NpmPackage}";
+        btnAgentCliInstall.IsEnabled = !_agentCliInstalling;
+        ProbeAgentCli(tool);
+    }
+
+    private void ProbeAgentCli(AgentCliTool tool)
+    {
+        try
+        {
+            var state = AgentCliTools.Probe(tool);
+            lblAgentCliStatus.Text = state switch
+            {
+                { Installed: true, OnProcessPath: true } => $"{tool.Name} is installed · {state.ResolvedPath}",
+                // Found, but this process started before it was on PATH — the tabs it
+                // launches inherit that stale PATH, so "installed" alone would be followed
+                // by a tab that cannot find the command.
+                { Installed: true } => $"{tool.Name} is installed at {state.ResolvedPath}, but AgentZero started before it was on PATH — restart AgentZero so new tabs can find it.",
+                _ => $"{tool.Name} was not found on PATH. Install it with npm below, or see {tool.DocsUrl}",
+            };
+        }
+        catch (Exception ex)
+        {
+            lblAgentCliStatus.Text = $"Could not check for {tool.Name}: {ex.Message}";
+        }
+    }
+
+    private void OnAgentCliCheck(object sender, RoutedEventArgs e)
+    {
+        if (_agentCliTool is { } tool) ProbeAgentCli(tool);
+    }
+
+    private async void OnAgentCliInstall(object sender, RoutedEventArgs e)
+    {
+        if (_agentCliTool is not { } tool || _agentCliInstalling) return;
+
+        var plan = AgentCliTools.PlanInstall(tool);
+        txtAgentCliLog.Visibility = Visibility.Visible;
+        txtAgentCliLog.Text = plan.CanRun ? "$ " + plan.CommandLine + "\n" : plan.Problem + "\n";
+        if (!plan.CanRun)
+        {
+            lblAgentCliStatus.Text = plan.Problem!;
+            return;
+        }
+
+        _agentCliInstalling = true;
+        btnAgentCliInstall.IsEnabled = false;
+        lblAgentCliStatus.Text = $"Installing {tool.Name}…";
+        AppLogger.Log($"[Settings] agent CLI install | tool={tool.Name} cmd={plan.CommandLine}");
+        try
+        {
+            // npm reports from its own threads; every line is marshalled to the UI thread.
+            var exit = await AgentCliTools.RunInstallAsync(plan,
+                line => Dispatcher.BeginInvoke(() => AppendAgentCliLog(line)));
+
+            if (exit == 0)
+            {
+                ProbeAgentCli(tool);
+                AppendAgentCliLog($"— {plan.Installer} finished.");
+            }
+            else
+            {
+                lblAgentCliStatus.Text = $"Installing {tool.Name} failed (exit {exit}). The log below is {plan.Installer}'s own output; {tool.DocsUrl} has the manual steps.";
+            }
+            AppLogger.Log($"[Settings] agent CLI install done | tool={tool.Name} exit={exit}");
+        }
+        catch (Exception ex)
+        {
+            lblAgentCliStatus.Text = $"Installing {tool.Name} failed: {ex.Message}";
+        }
+        finally
+        {
+            _agentCliInstalling = false;
+            btnAgentCliInstall.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Keep the tail of the installer's output, and follow it.</summary>
+    private void AppendAgentCliLog(string line)
+    {
+        const int keepLines = 200;
+        var lines = (txtAgentCliLog.Text + line + "\n").Split('\n');
+        txtAgentCliLog.Text = lines.Length > keepLines ? string.Join("\n", lines[^keepLines..]) : string.Join("\n", lines);
+        txtAgentCliLog.ScrollToEnd();
     }
 
     private void OnAddCliDef(object sender, RoutedEventArgs e)

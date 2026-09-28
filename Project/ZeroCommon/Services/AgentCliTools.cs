@@ -5,28 +5,36 @@ using Agent.Common.Module;
 namespace Agent.Common.Services;
 
 /// <summary>
-/// One agent CLI the app ships a built-in definition for, and the two facts needed to
-/// put it on the machine: the winget package (Windows) and the npm package (everywhere
-/// else). The built-in rows launch these through a shell, so a definition can exist for
-/// a tool that was never installed — the tab then opens and prints
-/// "claude : The term 'claude' is not recognized", which looks like a broken app rather
-/// than a missing program. Naming the tool here is what lets the settings page say
+/// One agent CLI the app ships a built-in definition for, and what is needed to put it
+/// on the machine: its npm package. The built-in rows launch these through a shell, so a
+/// definition can exist for a tool that was never installed — the tab then opens and
+/// prints "claude : The term 'claude' is not recognized", which looks like a broken app
+/// rather than a missing program. Naming the tool here is what lets the settings page say
 /// which it is and offer to fetch it.
+///
+/// <para>npm is the one install route, on every OS. All three tools publish there first
+/// (the winget packages lagged releases and exist for Windows only), and one route means
+/// one probe, one error message, and an update command a person already knows.</para>
 /// </summary>
 /// <param name="Name">The built-in definition's name, and what the UI calls the tool.</param>
 /// <param name="Command">The executable the shell resolves through PATH.</param>
-/// <param name="WingetId">
-/// The winget package id, verified against the winget community repo rather than guessed —
-/// an id that does not exist fails with the same "no package found" as a typo.
+/// <param name="NpmPackage">The npm package the install runs <c>npm install -g</c> on.</param>
+/// <param name="DocsUrl">Where a person goes when the install fails.</param>
+/// <param name="LaunchArgs">
+/// What the built-in row passes after the command. Empty for tools whose bare command is
+/// the interactive agent; <c>chat</c> for agent-one, whose bare command prints its help —
+/// its full-screen agent is the <c>chat</c> verb.
 /// </param>
-/// <param name="NpmPackage">The npm package, which is the official install path off Windows.</param>
-/// <param name="DocsUrl">Where a person goes when both routes fail.</param>
 public sealed record AgentCliTool(
     string Name,
     string Command,
-    string WingetId,
     string NpmPackage,
-    string DocsUrl);
+    string DocsUrl,
+    string LaunchArgs = "")
+{
+    /// <summary>The command line a terminal tab runs: the command, then its launch arguments.</summary>
+    public string Launch => LaunchArgs.Length == 0 ? Command : Command + " " + LaunchArgs;
+}
 
 /// <summary>Where a tool was found, and whether the tabs this process launches can see it.</summary>
 /// <param name="Installed">A matching executable exists on one of the searched paths.</param>
@@ -45,20 +53,29 @@ public sealed record AgentCliToolState(bool Installed, string? ResolvedPath, boo
 
 /// <summary>
 /// What to run to install a tool, as data. The plan is built without running anything so
-/// the UI can show the exact command before a person agrees to it, and so the choice
-/// between winget and npm is unit-testable on a machine that has neither.
+/// the UI can show the exact command before a person agrees to it, and so the rules are
+/// unit-testable on a machine without npm.
 /// </summary>
-/// <param name="Exe">The installer to launch.</param>
+/// <param name="Exe">The process to launch.</param>
 /// <param name="Arguments">Its arguments.</param>
 /// <param name="Problem">
 /// Non-null when the plan cannot run here — the installer itself is missing. Naming it
-/// ("winget is not on PATH") is the difference between a fixable message and a silent
+/// ("npm is not available") is the difference between a fixable message and a silent
 /// "install failed".
 /// </param>
-public sealed record AgentCliInstallPlan(string Exe, string Arguments, string? Problem = null)
+/// <param name="Shown">
+/// The command as a person would type it, when that differs from <paramref name="Exe"/>
+/// plus <paramref name="Arguments"/>. On Windows npm is a <c>.cmd</c> shim, which a
+/// process launch without a shell cannot start, so the plan runs it through
+/// <c>cmd.exe</c> — and shows <c>npm install -g …</c> rather than the wrapper.
+/// </param>
+public sealed record AgentCliInstallPlan(string Exe, string Arguments, string? Problem = null, string? Shown = null)
 {
-    public string CommandLine => (Exe + " " + Arguments).Trim();
+    public string CommandLine => Shown ?? (Exe + " " + Arguments).Trim();
     public bool CanRun => Problem is null;
+
+    /// <summary>The installer's name for messages ("npm finished"), not the wrapper that runs it.</summary>
+    public string Installer => CommandLine.Split(' ', 2)[0];
 }
 
 /// <summary>
@@ -72,18 +89,28 @@ public static class AgentCliTools
     public static readonly AgentCliTool Claude = new(
         Name: "Claude",
         Command: "claude",
-        WingetId: "Anthropic.ClaudeCode",
         NpmPackage: "@anthropic-ai/claude-code",
         DocsUrl: "https://docs.claude.com/en/docs/claude-code/setup");
 
     public static readonly AgentCliTool Codex = new(
         Name: "Codex",
         Command: "codex",
-        WingetId: "OpenAI.Codex",
         NpmPackage: "@openai/codex",
         DocsUrl: "https://github.com/openai/codex");
 
-    public static IReadOnlyList<AgentCliTool> All { get; } = new[] { Claude, Codex };
+    /// <summary>
+    /// agent-one (<c>Project/AgentOne</c>) — this repository's own CLI agent, a native
+    /// binary shipped through npm. <c>chat</c> is what makes it an agent in the tab: the
+    /// bare command prints help and exits.
+    /// </summary>
+    public static readonly AgentCliTool AgentOne = new(
+        Name: "AgentOne",
+        Command: "agent-one",
+        NpmPackage: "@webnori/agent-one",
+        DocsUrl: "https://github.com/psmon/AgentZeroLite/tree/main/Project/AgentOne",
+        LaunchArgs: "chat");
+
+    public static IReadOnlyList<AgentCliTool> All { get; } = new[] { Claude, Codex, AgentOne };
 
     /// <summary>
     /// The tool a definition drives, or null for a plain shell. Matched on the same
@@ -146,8 +173,8 @@ public static class AgentCliTools
     }
 
     /// <summary>
-    /// PATH as the machine now has it, plus the bin folders winget shims and npm globals
-    /// land in. Read outside the process environment so an install done a moment ago is
+    /// PATH as the machine now has it, plus the bin folders npm globals land in (and
+    /// winget's links folder, for a tool someone installed that way by hand). Read outside the process environment so an install done a moment ago is
     /// visible without restarting the app.
     /// </summary>
     public static IEnumerable<string> FreshPathEntries(bool? isWindows = null)
@@ -223,40 +250,25 @@ public static class AgentCliTools
     // ── install ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// How to install this tool here: winget on Windows, npm elsewhere (the route both
-    /// projects publish for macOS and Linux). The prerequisite is probed so a machine
-    /// without the installer gets told which one is missing instead of an exit code.
+    /// How to install this tool here: <c>npm install -g</c>, on every OS. npm is probed
+    /// first so a machine without Node.js is told that, not handed an exit code.
     /// </summary>
     public static AgentCliInstallPlan PlanInstall(AgentCliTool tool, bool? isWindows = null)
     {
         var windows = isWindows ?? OperatingSystem.IsWindows();
-        var extensions = DefaultExtensions(windows);
-        var entries = FreshPathEntries(windows).ToList();
+        var shown = $"npm install -g {tool.NpmPackage}";
 
-        if (windows)
-        {
-            var problem = Locate("winget", entries, extensions) is null
-                ? "winget is not available. Install 'App Installer' from the Microsoft Store, or install "
-                  + tool.Name + " yourself: " + tool.DocsUrl
-                : null;
-
-            // --disable-interactivity matters because the output is captured, not shown in
-            // a console: a winget prompt would wait for a keystroke that can never
-            // arrive, and the install would hang instead of failing. The two --accept
-            // flags remove the agreements that would otherwise be that prompt.
-            return new AgentCliInstallPlan(
-                "winget",
-                $"install --id {tool.WingetId} --exact --source winget "
-                + "--accept-source-agreements --accept-package-agreements --disable-interactivity",
-                problem);
-        }
-
-        var npmMissing = Locate("npm", entries, extensions) is null
+        var problem = Locate("npm", FreshPathEntries(windows), DefaultExtensions(windows)) is null
             ? "npm is not available. Install Node.js (nodejs.org) first, or install "
               + tool.Name + " yourself: " + tool.DocsUrl
             : null;
 
-        return new AgentCliInstallPlan("npm", $"install -g {tool.NpmPackage}", npmMissing);
+        // Windows' npm is npm.cmd, and a launch without a shell (how the output gets
+        // captured) cannot start a batch file by bare name — so cmd runs it. /d skips
+        // AutoRun scripts that would print into the log; /s keeps the quoting literal.
+        return windows
+            ? new AgentCliInstallPlan("cmd.exe", $"/d /s /c \"{shown}\"", problem, Shown: shown)
+            : new AgentCliInstallPlan("npm", $"install -g {tool.NpmPackage}", problem);
     }
 
     /// <summary>

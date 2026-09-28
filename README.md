@@ -1044,7 +1044,9 @@ but the overlay stayed because it is the right shape for a settings screen):
 
 - **CLI Definitions** — register shells AgentZero can spawn (`cmd`, `pwsh`, `claude …`,
   custom entries). Built-ins cannot be deleted. New definitions appear in the `+` menu
-  of every workspace.
+  of every workspace. The built-in agents are **Claude**, **Codex** and **AgentOne**
+  (`agent-one chat`, this repository's own CLI agent); selecting one shows whether it
+  is installed and offers to install it with `npm install -g` when it is not.
 - **LLM** — local model picker (Gemma 4 / Nemotron) + external backend
   (OpenAI-compatible) toggle.
 - **Voice** — STT provider (WhisperLocal CPU/Vulkan, OpenAI Whisper, etc.) +

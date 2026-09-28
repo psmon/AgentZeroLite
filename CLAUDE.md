@@ -187,7 +187,7 @@ ComboBox style is a full re-template (toggle + popup + item). That is Pitfall 6 
 `Foreground` setters alone leave the chrome and the popup drawn from `SystemColors`.
 
 ### Persistence
-EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude, Codex — POSIX hosts get zsh/bash instead of the three Windows shells) are marked `IsBuiltIn = true` and must not be deletable from the UI. The three Windows shells come from the migration's `HasData`; the **agent CLI profiles are seeded at runtime and checked one at a time** (`EnsureDefaultCliDefinitions` + `AgentCliTools.All`), because a single "already seeded?" guard would see the Claude row every existing database has and never add a newly shipped built-in. Both agent profiles launch through **PowerShell 5** (`powershell.exe -NoExit -Command <tool>`) on Windows and zsh elsewhere — not the tool directly, so the tab survives the agent exiting. Whether the tool is actually installed is `AgentCliTools`' question, not the row's: see the Avalonia settings note below.
+EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude, Codex, AgentOne — POSIX hosts get zsh/bash instead of the three Windows shells) are marked `IsBuiltIn = true` and must not be deletable from the UI. The three Windows shells come from the migration's `HasData`; the **agent CLI profiles are seeded at runtime and checked one at a time** (`EnsureDefaultCliDefinitions` + `AgentCliTools.All`), because a single "already seeded?" guard would see the Claude row every existing database has and never add a newly shipped built-in. The agent profiles launch through **PowerShell 5** (`powershell.exe -NoExit -Command <tool>`) on Windows and zsh elsewhere — AgentOne as `agent-one chat` (`AgentCliTool.LaunchArgs`), because bare `agent-one` prints help and exits — not the tool directly, so the tab survives the agent exiting. Whether the tool is actually installed is `AgentCliTools`' question, not the row's: see the Avalonia settings note below.
 
 **Credentials at rest.** API keys in `llm-settings.json` / `voice-settings.json` are sealed through
 `SecretProtection.Protector` (`ISecretProtector`): DPAPI on Windows (`dpapi:v1:`), AES-GCM elsewhere
@@ -238,15 +238,22 @@ What differs from the WPF host, and why:
 - **Terminal**: xterm.js inside `NativeWebView`, served by `LocalAssetServer` (loopback, token path) because the Avalonia WebView cannot map a folder; the PTY is `ConPtyHost` (a copy of `ManagedConPtyHost`) on Windows and `PortaPtyHost` (Porta.Pty) on macOS behind ZeroCommon's `IPtyHost`/`XtermTerminalSession`. Two ConPTY facts the WPF copy never hit: a parent whose stdio is a pipe hands its std handles to the child (blanked around `CreateProcess`), and pipe EOF is not the exit signal (a process-handle watcher is).
 - **Split panes**: `WorkspaceLayout<T>` + one Canvas that positions every renderer over its pane slot — no native re-parenting. The stored `CliGroup.LayoutJson` is byte-identical to what WPF writes.
 - **CLI**: same request/response JSON as WPF over the pipe `AgentZeroLite.cli` (not WM_COPYDATA), so `-cli help agentzero` applies; extra verbs `bot-ask` and `layout`. Wrappers: `AgentZeroLite.ps1` / `AgentZeroLite.sh`.
-- **Agent CLI install lives in this host's settings** (`AgentCliTools` in ZeroCommon, the panel in
-  `SettingsViewModel`/`SettingsView`): selecting a definition that launches Claude or Codex probes PATH and,
-  when the tool is missing, installs it — `winget install --id Anthropic.ClaudeCode | OpenAI.Codex` on Windows,
-  `npm install -g @anthropic-ai/claude-code | @openai/codex` elsewhere. Three things the code explains and a
-  reader should not re-derive: the probe honours PATHEXT **plus `.ps1`** (PATHEXT omits it, but the built-ins run
-  the agent inside PowerShell, which resolves a script shim); a successful install is reported as "installed, but
-  restart" rather than plain "installed", because this process keeps the PATH it started with and the tabs it
-  spawns inherit it; and winget runs with `--disable-interactivity`, since its output is captured rather than
-  shown in a console and a prompt would hang forever instead of failing.
+- **Agent CLI install lives in both hosts' settings** (`AgentCliTools` in ZeroCommon; the panel is
+  `SettingsViewModel`/`SettingsView` here and the CLI Definitions tab of WPF's `SettingsPanel`): selecting a
+  definition that launches Claude, Codex or AgentOne probes PATH and, when the tool is missing, installs it with
+  **npm on every OS** — `npm install -g @anthropic-ai/claude-code | @openai/codex | @webnori/agent-one`. npm, not
+  winget: all three publish there first, winget's packages lagged releases and exist for Windows only, and one
+  route is one probe and one error message. Four things the code explains and a reader should not re-derive: the
+  probe honours PATHEXT **plus `.ps1`** (PATHEXT omits it, but the built-ins run the agent inside PowerShell, which
+  resolves a script shim); on Windows the plan runs `cmd.exe /d /s /c "npm install -g …"` and shows the plain
+  `npm` line (`AgentCliInstallPlan.Shown`), because npm is `npm.cmd` and a launch without a shell — needed to
+  capture the output — cannot start a batch file by bare name (measured: "file not found"); a successful install
+  is reported as "installed, but restart" rather than plain "installed", because this process keeps the PATH it
+  started with and the tabs it spawns inherit it; and stdin is closed, so anything that still prompts fails
+  instead of hanging.
+- **Icon**: the WPF host's `agentzero.ico`, linked (not copied) as `ApplicationIcon` and as the
+  `avares://AgentZeroLite/Assets/agentzero.ico` window icon; macOS gets `macos/AgentZeroLite.icns`, generated
+  from the same file, which `build-app.sh` and `Info.plist` already expected.
 - **Both GUIs share the SQLite file and the settings files** and refuse to run side by side (same single-instance mutex on Windows). Secrets: DPAPI on Windows, AES-GCM (`aesg:v1:`) elsewhere.
 - **Local LLM is Windows-only** (LLamaSharp DLLs); macOS uses External providers. Gemma 4's native tool-call syntax is converted to the JSON envelope by `GemmaNativeToolCall` (ZeroCommon, benefits both hosts).
 - CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-14, `.app` bundle via `macos/build-app.sh`); `release.yml` is untouched. macOS GUI checks need a person: `Docs/avalonia-v2/macos-smoke.md`.

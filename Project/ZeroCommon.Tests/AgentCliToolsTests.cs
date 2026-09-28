@@ -6,10 +6,9 @@ using Agent.Common.Services;
 namespace ZeroCommon.Tests;
 
 /// <summary>
-/// The rules behind "is Claude/Codex on this machine, and how would we put it there".
-/// All of it is pinned on a machine that has neither installer, because the choice
-/// between winget and npm is a decision about the OS, not about what happens to be
-/// present when the suite runs.
+/// The rules behind "is Claude/Codex/agent-one on this machine, and how would we put it
+/// there". All of it is pinned without npm being required, because what the plan says is
+/// a decision about the OS, not about what happens to be installed when the suite runs.
 /// </summary>
 [Trait("Category", "AgentCli")]
 public sealed class AgentCliToolsTests : IDisposable
@@ -30,6 +29,9 @@ public sealed class AgentCliToolsTests : IDisposable
     [InlineData("powershell.exe", "-NoExit -Command codex", "Codex")]
     [InlineData("/bin/zsh", "-l -c \"codex; exec zsh -l\"", "Codex")]
     [InlineData("claude", null, "Claude")]
+    [InlineData("powershell.exe", "-NoExit -Command agent-one chat", "AgentOne")]
+    [InlineData("/bin/zsh", "-l -c \"agent-one chat; exec zsh -l\"", "AgentOne")]
+    [InlineData("C:\\Users\\me\\AppData\\Roaming\\npm\\agent-one.cmd", "chat", "AgentOne")]
     public void A_definition_that_launches_an_agent_is_matched_to_it(string exe, string? args, string expected)
     {
         var tool = AgentCliTools.Match(new CliDefinition { ExePath = exe, Arguments = args });
@@ -41,7 +43,7 @@ public sealed class AgentCliToolsTests : IDisposable
     [InlineData("cmd.exe", null)]
     [InlineData("powershell.exe", null)]
     [InlineData("/bin/zsh", "-l")]
-    // A folder named after the tool is not the tool — offering to install winget packages
+    // A folder named after the tool is not the tool — offering to install a package
     // because a path contained the letters would be worse than offering nothing.
     [InlineData("powershell.exe", "-NoExit -Command C:\\codex-notes\\open.ps1")]
     public void A_plain_shell_is_matched_to_nothing(string exe, string? args)
@@ -50,16 +52,25 @@ public sealed class AgentCliToolsTests : IDisposable
     }
 
     [Fact]
-    public void Every_built_in_tool_names_a_package_for_both_routes()
+    public void Every_built_in_tool_names_its_npm_package_and_docs()
     {
-        Assert.NotEmpty(AgentCliTools.All);
+        Assert.Equal(new[] { "Claude", "Codex", "AgentOne" }, AgentCliTools.All.Select(t => t.Name));
         foreach (var tool in AgentCliTools.All)
         {
             Assert.False(string.IsNullOrWhiteSpace(tool.Command));
-            Assert.False(string.IsNullOrWhiteSpace(tool.WingetId));
-            Assert.StartsWith("@", tool.NpmPackage);     // both publish under a scope
-            Assert.StartsWith("https://", tool.DocsUrl); // the fallback when neither route works
+            Assert.StartsWith("@", tool.NpmPackage);     // all three publish under a scope
+            Assert.StartsWith("https://", tool.DocsUrl); // the fallback when the install fails
         }
+    }
+
+    [Fact]
+    public void Agent_one_launches_as_chat_and_the_others_bare()
+    {
+        // Bare `agent-one` prints help and exits; the agent a tab wants is `agent-one chat`.
+        Assert.Equal("agent-one chat", AgentCliTools.AgentOne.Launch);
+        Assert.Equal("@webnori/agent-one", AgentCliTools.AgentOne.NpmPackage);
+        Assert.Equal("claude", AgentCliTools.Claude.Launch);
+        Assert.Equal("codex", AgentCliTools.Codex.Launch);
     }
 
     // ── locating the executable ──────────────────────────────────────────────
@@ -67,8 +78,8 @@ public sealed class AgentCliToolsTests : IDisposable
     [Fact]
     public void Locate_finds_a_command_by_extension_on_the_given_path()
     {
-        // npm writes a .cmd shim and winget an .exe, so the probe must try both rather
-        // than assuming the shape of the install that happened.
+        // npm writes a .cmd shim and other installers an .exe, so the probe must try both
+        // rather than assuming the shape of the install that happened.
         File.WriteAllText(Path.Combine(_dir, "codex.cmd"), "");
         var found = AgentCliTools.Locate("codex", new[] { _dir }, new[] { ".exe", ".cmd" });
         Assert.Equal(Path.Combine(_dir, "codex.cmd"), found);
@@ -112,25 +123,30 @@ public sealed class AgentCliToolsTests : IDisposable
 
     // ── the install plan ─────────────────────────────────────────────────────
 
-    [Fact]
-    public void Windows_installs_through_winget_with_the_verified_package_id()
+    [Theory]
+    [InlineData("Claude", "@anthropic-ai/claude-code")]
+    [InlineData("Codex", "@openai/codex")]
+    [InlineData("AgentOne", "@webnori/agent-one")]
+    public void Windows_installs_through_npm_run_by_cmd_but_shown_as_npm(string name, string package)
     {
-        var plan = AgentCliTools.PlanInstall(AgentCliTools.Codex, isWindows: true);
-        Assert.Equal("winget", plan.Exe);
-        Assert.Contains("--id OpenAI.Codex", plan.Arguments);
-        Assert.Contains("--exact", plan.Arguments);
-        // Output is captured rather than shown in a console, so an interactive prompt
-        // would hang the install forever instead of failing.
-        Assert.Contains("--disable-interactivity", plan.Arguments);
-        Assert.Contains("--accept-package-agreements", plan.Arguments);
+        // npm.cmd is a batch file: a launch without a shell cannot start it by bare name,
+        // so cmd runs it — and the screen shows the command a person would type.
+        var tool = AgentCliTools.All.Single(t => t.Name == name);
+        var plan = AgentCliTools.PlanInstall(tool, isWindows: true);
+        Assert.Equal("cmd.exe", plan.Exe);
+        Assert.Equal($"/d /s /c \"npm install -g {package}\"", plan.Arguments);
+        Assert.Equal($"npm install -g {package}", plan.CommandLine);
+        Assert.Equal("npm", plan.Installer);
     }
 
     [Fact]
-    public void Other_platforms_install_through_npm()
+    public void Other_platforms_install_through_npm_directly()
     {
         var plan = AgentCliTools.PlanInstall(AgentCliTools.Claude, isWindows: false);
         Assert.Equal("npm", plan.Exe);
         Assert.Equal("install -g @anthropic-ai/claude-code", plan.Arguments);
+        Assert.Equal("npm install -g @anthropic-ai/claude-code", plan.CommandLine);
+        Assert.Equal("npm", plan.Installer);
     }
 
     [Fact]
@@ -147,7 +163,7 @@ public sealed class AgentCliToolsTests : IDisposable
         foreach (var plan in plans)
         {
             if (plan.CanRun) continue;
-            Assert.Contains(plan.Exe, plan.Problem!);
+            Assert.Contains(plan.Installer, plan.Problem!);   // "npm", not the cmd.exe wrapper
             Assert.Contains(AgentCliTools.Claude.DocsUrl, plan.Problem!);
         }
     }
@@ -155,13 +171,13 @@ public sealed class AgentCliToolsTests : IDisposable
     [Fact]
     public async Task Running_an_unusable_plan_reports_the_problem_and_starts_nothing()
     {
-        var plan = new AgentCliInstallPlan("winget", "install --id X", Problem: "winget is not available.");
+        var plan = new AgentCliInstallPlan("npm", "install -g X", Problem: "npm is not available.");
         var lines = new List<string>();
 
         var exit = await AgentCliTools.RunInstallAsync(plan, lines.Add);
 
         Assert.Equal(-1, exit);
-        Assert.Equal(new[] { "winget is not available." }, lines);
+        Assert.Equal(new[] { "npm is not available." }, lines);
     }
 
     [Fact]

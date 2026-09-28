@@ -406,14 +406,14 @@ public partial class SettingsViewModel : ObservableObject
             RefreshCliTool();
     }
 
-    // ═══ Agent CLI install (Claude / Codex) ══════════════════════════════════
+    // ═══ Agent CLI install (Claude / Codex / AgentOne) ═══════════════════════
     //
     // A built-in definition is a shell plus an agent command, so the row can be perfectly
     // valid while the agent itself was never installed — the tab then opens and prints
     // "claude : The term 'claude' is not recognized", which reads as a broken app. This
-    // panel answers "is it there?" and, when it is not, fetches it the way each platform
-    // publishes: winget on Windows, npm elsewhere. AgentCliTools holds every rule; this
-    // is only its screen.
+    // panel answers "is it there?" and, when it is not, fetches it with npm — the one
+    // route all three publish on every OS. AgentCliTools holds every rule; this is only
+    // its screen.
 
     [ObservableProperty] private string _cliToolStatus = "";
     [ObservableProperty] private string _installLog = "";
@@ -507,11 +507,11 @@ public partial class SettingsViewModel : ObservableObject
             if (exit == 0)
             {
                 ProbeCliTool(tool);
-                AppendInstallLog($"— {plan.Exe} finished.");
+                AppendInstallLog($"— {plan.Installer} finished.");
             }
             else
             {
-                CliToolStatus = $"Installing {tool.Name} failed (exit {exit}). The log below is {plan.Exe}'s own output; {tool.DocsUrl} has the manual steps.";
+                CliToolStatus = $"Installing {tool.Name} failed (exit {exit}). The log below is {plan.Installer}'s own output; {tool.DocsUrl} has the manual steps.";
             }
             AppLogger.Log($"[Settings] agent CLI install done | tool={tool.Name} exit={exit}");
         }
@@ -526,8 +526,8 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Keep the tail of the installer's output. winget redraws a progress bar by
-    /// repeating the line, so an unbounded log grows by thousands of near-identical
+    /// Keep the tail of the installer's output. An installer that redraws a progress bar
+    /// by repeating the line would otherwise grow the log by thousands of near-identical
     /// lines during one download.
     /// </summary>
     private void AppendInstallLog(string line)

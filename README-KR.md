@@ -803,7 +803,9 @@ tmp/os-cli/
 
 - **CLI Definitions** — AgentZero가 실행할 셸(`cmd`, `pwsh`, `claude …`, 커스텀)을
   등록합니다. 내장 항목은 삭제 불가. 새로 추가하면 모든 워크스페이스의 `+` 메뉴에
-  나타납니다.
+  나타납니다. 내장 에이전트는 **Claude**, **Codex**, **AgentOne**(`agent-one chat`,
+  이 저장소의 CLI 에이전트)이며, 하나를 선택하면 설치 여부를 보여주고 없으면
+  `npm install -g`로 설치를 제안합니다.
 - **LLM** — 로컬 모델 선택(Gemma 4 / Nemotron) + 외부 백엔드(OpenAI 호환) 토글.
 - **Voice** — STT 프로바이더(WhisperLocal CPU/Vulkan, OpenAI Whisper 등) + 언어 +
   GPU 디바이스 + VAD 민감도. voice-note가 그대로 상속받는 값입니다.
