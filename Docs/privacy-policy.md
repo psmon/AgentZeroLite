@@ -1,6 +1,6 @@
 # AgentZero Lite — Privacy Policy
 
-_Last updated: 2026-09-28. Draft — review before publishing._
+_Last updated: 2026-09-28._
 
 AgentZero Lite ("the app") is a desktop shell for command-line AI tools. It is open
 source: <https://github.com/psmon/AgentZeroLite>.
