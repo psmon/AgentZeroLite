@@ -455,6 +455,46 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         return decision.Ok && decision.Choice == NewTask;
     }
 
+    // -------------------------------------------------------- claims
+
+    public const string ClaimsBacked = "backed";
+    public const string UnbackedChange = "unbacked_change";
+    public const string UnbackedRun = "unbacked_run";
+
+    public const string ClaimQuestion =
+        "Does the answer present work as done that the tool calls listed do not show? Judge by the list alone, " +
+        "not by how confident the answer sounds.";
+
+    public static readonly DecisionOption[] ClaimOptions =
+    [
+        new(ClaimsBacked,
+            "Everything the answer presents as done is shown by a successful tool call in the list — or the answer " +
+            "does not present any change or run as done: it explains, analyses, reports what it read, proposes or plans."),
+        new(UnbackedChange,
+            "The answer presents a file or project as created, written, edited, fixed, applied or saved, but no " +
+            "successful write_file in the list shows it."),
+        new(UnbackedRun,
+            "The answer reports running a command, a build or tests, or states their results (passed, failed, output, " +
+            "counts), but no successful run_command in the list shows it.")
+    ];
+
+    /// <summary>
+    /// Whether the answer claims work the turn's tool calls do not show.
+    /// Measured (2026-09-29): with no tool called, the answer reported a test
+    /// project created and "unit tests performed", the strong model polished it
+    /// into a completion report, and three false facts were learned from it.
+    /// Language-neutral checks see paths and fences; the claim itself is in the
+    /// user's language, which is what the engine can read.
+    /// </summary>
+    /// <param name="did">The turn's tool calls, one per line, each marked ok or failed.</param>
+    public async Task<Decision> ClaimAsync(string request, string did, string answer, CancellationToken ct)
+    {
+        var state = "Request:\n" + request
+                    + "\n\nTool calls this turn:\n" + (did.Length == 0 ? "(none — no tool was called)" : did)
+                    + "\n\nAnswer:\n" + Clip(answer, DraftChars);
+        return await engine.ChooseAsync(state, ClaimQuestion, ClaimOptions, ct);
+    }
+
     // -------------------------------------------------------- escalation
 
     /// <param name="material">Everything the tools returned this turn, or empty.</param>

@@ -312,7 +312,7 @@ public class PdsaSessionTests : IDisposable
         var config = new AgentConfig();
         config.TrySet("smartMode", "on", out _);
         config.TrySet("saveSessions", "false", out _);
-        return new ChatSession(config, _root, streaming: false, provider, engine, true) { NamesTasks = false };
+        return new ChatSession(config, _root, streaming: false, provider, engine, true) { NamesTasks = false, ChecksClaims = false };
     }
 
     private static async Task<bool> WaitForAsync(Func<bool> condition)

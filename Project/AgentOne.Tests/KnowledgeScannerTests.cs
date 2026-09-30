@@ -230,7 +230,7 @@ public class KnowledgeChatCommandTests : IDisposable
         config.TrySet("saveSessions", "false", out _);
         var provider = new ScriptedChatProvider("""{"tool":"final","args":{"text":"model"}}""");
         using var session = new ChatSession(config, _root, streaming: false, provider, new ContentEngine(), smartAvailable: true)
-            { NamesTasks = false, UsesGraph = false, UsesPdsa = false };
+            { NamesTasks = false, UsesGraph = false, UsesPdsa = false, ChecksClaims = false };
 
         var activity = new List<string>();
         session.ActivityStarted += a => activity.Add(a);

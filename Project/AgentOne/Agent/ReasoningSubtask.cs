@@ -32,7 +32,9 @@ public static partial class ReasoningSubtask
         $"({basicModel}). The assistant drafted an answer and gathered material with read-only tools; both follow. " +
         "Think the problem through carefully and write a complete, well-reasoned answer in the user's language. " +
         "Plain prose or markdown — no JSON, no tool calls. Where the material is insufficient, say what is missing " +
-        "rather than guessing. Do not mention the assistant, the draft, or this hand-off.";
+        "rather than guessing. Only the material shows what was actually done: if the draft says files were created " +
+        "or changed, or commands or tests were run, and the material does not show it, say it has not been done — " +
+        "never restate it as done. Do not mention the assistant, the draft, or this hand-off.";
 
     public static string Request(string request, string material, string draft) =>
         "Request:\n" + request +
@@ -57,10 +59,17 @@ public static partial class ReasoningSubtask
 
     // ------------------------------------------------------------- design
 
-    public static string DesignSystemPrompt(string basicModel, string shell) =>
+    /// <param name="shellHints">What the everyday model gets wrong in that shell (<see cref="Tools.ShellInfo.Hints"/>).</param>
+    public static string DesignSystemPrompt(string basicModel, string shell, string shellHints = "") =>
         "You are the stronger model designing work that a small, fast assistant " +
         $"({basicModel}) will then carry out with these tools: read/list/find/grep files, write_file(path, content), " +
         $"and run_command (one {shell} command, in the project folder). " +
+        (shellHints.Length > 0 ? $"Write every command for that shell. {shellHints} " : "") +
+        // Measured (2026-09-30): asked for a worktree, the design put every file
+        // under ../phase-1/ — outside the root, where write_file is refused — and
+        // the build that followed wrote nothing.
+        "write_file can only write inside the project root: every file you plan must be under it — never ../, an " +
+        "absolute path, or another worktree or clone. If the request needs work elsewhere, say so as a step for the user. " +
         "Produce an implementation design, not the implementation: the file layout (every path relative to the " +
         "project root), what each file is responsible for, the commands to run and in what order, and the checks " +
         "that prove it works. Be concrete and short — a numbered list of steps the assistant can follow one by one. " +
@@ -78,10 +87,10 @@ public static partial class ReasoningSubtask
     /// <summary>The design pass: the strong model plans, the everyday model will build.</summary>
     public static async Task<string> DesignAsync(
         IChatProvider reasoning, string basicModel, string shell, string request, string context,
-        CancellationToken ct, Action<int>? onProgress = null)
+        CancellationToken ct, Action<int>? onProgress = null, string shellHints = "")
     {
         return await CompleteAsync(reasoning,
-            [ChatMessage.System(DesignSystemPrompt(basicModel, shell)), ChatMessage.User(DesignRequest(request, context))],
+            [ChatMessage.System(DesignSystemPrompt(basicModel, shell, shellHints)), ChatMessage.User(DesignRequest(request, context))],
             ct, onProgress);
     }
 

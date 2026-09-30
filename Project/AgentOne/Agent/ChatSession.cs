@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using AgentOne.Graph;
 using AgentOne.Llm;
 using AgentOne.Llm.Decision;
@@ -93,7 +94,7 @@ public sealed record SessionStats(
 /// back into that memory, logs under the workspace, and can resume any of the
 /// workspace's saved sessions.
 /// </summary>
-public sealed class ChatSession : IAgentSession
+public sealed partial class ChatSession : IAgentSession
 {
     private readonly IChatProvider _provider;
     private readonly IChatProvider? _reasoning;
@@ -218,6 +219,8 @@ public sealed class ChatSession : IAgentSession
             (ToolCatalog.ExecFamily, _shell));
 
         _loop = new AgentLoop(_provider, _toolbelt, config.MaxSteps) { Streaming = streaming, Root = _root };
+        _loop.OnStall = async (stall, retries, ct) =>
+            await AskAfterStallAsync(_config.Model, stall, retries, [StopTurnOption], ct) == 0;
         _loop.Reset(Workspace.MemoryForPrompt());
         _loop.ActivityStarted += what => ActivityStarted?.Invoke(what);
         _loop.StepCompleted += step =>
@@ -525,9 +528,23 @@ public sealed class ChatSession : IAgentSession
         var turnId = $"{_log?.Id ?? "session"}-{turnNumber}";
 
         var smart = snapshot.Smart && SmartRouter.Applies(line);
-        var prompt = line;
+
+        // "3번 수행" means item 3 of the last answer. Measured (2026-09-30): the
+        // router saw only the words, routed answer_directly, and the model read
+        // "3번 수행 이제 필요없음" as "don't" — the file stayed. The item goes
+        // into the request both the router and the model see.
+        var asked = line;
+        if (ResolveReference(line) is { } reference)
+        {
+            asked = line + "\n\n" + reference;
+            _log?.Step(new AgentStep(0, "reference", reference, true));
+        }
+        _loop.Request = line;
+
+        var prompt = asked;
         IReadOnlySet<string>? families = null;
         var designed = false;
+        var stopped = false;
         string? designText = null;
         PdsaTurn? pdsa = null;
 
@@ -538,7 +555,7 @@ public sealed class ChatSession : IAgentSession
 
         if (smart)
         {
-            var route = await _router.RouteAsync(line, Digest(), ct);
+            var route = await _router.RouteAsync(asked, Digest(), ct);
             var verdict = route.Steers ? $"→ {RouteName(route.Route!.Value)}"
                 : route.Decision.Ok ? $"unsure ({route.Decision.Choice}), all tools stay available"
                 : $"unavailable ({route.Decision.Message})";
@@ -547,7 +564,7 @@ public sealed class ChatSession : IAgentSession
 
             if (route.Steers)
             {
-                prompt = route.Guidance(line);
+                prompt = route.Guidance(asked);
                 families = route.Families;
             }
 
@@ -570,7 +587,16 @@ public sealed class ChatSession : IAgentSession
             var mayBuild = !route.Steers || route.Route == Route.Files;
             if (_reasoning is not null && mayBuild)
             {
-                var design = await MaybeDesignAsync(line, ct);
+                var (design, stop) = await MaybeDesignAsync(line, ct);
+                if (stop)
+                {
+                    // The person chose to end the turn at the stalled design.
+                    // Cancelling the turn's own token lets the loop return
+                    // Cancelled on its first step, so the turn still ends the
+                    // usual way — logged, remembered — with nothing built.
+                    _turnCts?.Cancel();
+                    stopped = true;
+                }
                 if (design is { } plan)
                 {
                     prompt = prompt + Environment.NewLine + Environment.NewLine + plan;
@@ -582,15 +608,23 @@ public sealed class ChatSession : IAgentSession
             // Planning is the door into the improvement cycle: a design just
             // made is a Plan, and otherwise the engine has to be sure this
             // request is one before several turns get drawn into a cycle.
-            pdsa = await PdsaBeforeAsync(line, designed, ct);
+            if (!stopped) pdsa = await PdsaBeforeAsync(line, designed, ct);
         }
 
         var before = _loop.Messages.Count;
         var run = await _loop.RunAsync(prompt, ct, families);
 
+        // Before anything builds on the answer, hold its report against what the
+        // tools actually did. A turn that had to be sent back is not escalated:
+        // measured, the strong model polished an unbacked "tests performed"
+        // into a completion report — it sees the draft, not the disk.
+        var checkedClaims = false;
+        if (smart && run.Succeeded && ChecksClaims)
+            (run, checkedClaims) = await CheckClaimsAsync(line, run, ct);
+
         // A designed build already had the strong model's thinking; judging its
         // report against the same model again would be a second slow pass for nothing.
-        if (smart && run.Succeeded && _reasoning is not null && !designed)
+        if (smart && run.Succeeded && _reasoning is not null && !designed && !checkedClaims && run.Unverified is null)
             run = await MaybeEscalateAsync(line, before, run, ct);
 
         // A turn that ran out of budget mid-work must not end on "[stopped: MaxSteps]"
@@ -605,7 +639,11 @@ public sealed class ChatSession : IAgentSession
 
         // Learning runs off the turn, and a cycle must not be closed before
         // its last lesson is stored — so the close rides behind the learning.
-        var learns = _graph is not null && UsesGraph && _smartAvailable && _provider.Name != "echo";
+        // An unverified turn teaches nothing: its report is exactly what must
+        // not become a fact the next turn is handed as [graph memory].
+        var learns = _graph is not null && UsesGraph && _smartAvailable && _provider.Name != "echo" && run.Unverified is null;
+        if (run.Unverified is not null && _graph is not null && UsesGraph)
+            Noted?.Invoke("knowledge: not learned from this turn — its report is unverified");
         var closing = pdsa is { Closes: true } ? pdsa.Cycle : (long?)null;
         if (learns || closing is not null) _ = LearnThenCloseAsync(turnId, line, run, learns, closing);
 
@@ -809,6 +847,11 @@ public sealed class ChatSession : IAgentSession
             ? Clip(run.Text.Replace("\r", "").Replace('\n', ' '), 300)
             : $"stopped ({run.Reason}): {Clip(run.Text.Replace('\n', ' '), 200)}";
 
+        // memory.md opens every later session's prompt. A report that did not
+        // hold is kept as a warning, not as what happened.
+        if (run.Unverified is { } unverified)
+            outcome = $"UNVERIFIED — {unverified}. The answer said: {Clip(run.Text.Replace("\r", "").Replace('\n', ' '), 200)}";
+
         var sb = new StringBuilder();
         sb.Append("## ").Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm")).Append(" · ")
           .AppendLine(Title ?? WorkspaceStore.FirstLine(request, 60));
@@ -841,6 +884,9 @@ public sealed class ChatSession : IAgentSession
     /// <summary>Off for tests that script the engine: the step question and the Study verdict would consume its answers.</summary>
     internal bool UsesPdsa { get; set; } = true;
 
+    /// <summary>Off for tests that script the engine: the claim question after a turn would consume its answers.</summary>
+    internal bool ChecksClaims { get; set; } = true;
+
     private async Task RetitleAsync(string request)
     {
         if (!NamesTasks || _logKind != "chat" || _provider.Name == "echo") return;
@@ -868,7 +914,7 @@ public sealed class ChatSession : IAgentSession
     }
 
     /// <summary>The scope question, and the design pass when it says so. Null when the everyday model just goes ahead.</summary>
-    private async Task<string?> MaybeDesignAsync(string request, CancellationToken ct)
+    private async Task<(string? Design, bool Stop)> MaybeDesignAsync(string request, CancellationToken ct)
     {
         var scope = await _router.ScopeAsync(request, Digest(), ct);
         var strong = _config.ReasoningModel;
@@ -879,26 +925,48 @@ public sealed class ChatSession : IAgentSession
         _log?.Decision("scope", scope.Decision, verdict);
         Decided?.Invoke(new SmartNote("scope", scope.Decision, verdict));
 
-        if (!scope.NeedsDesign) return null;
+        if (!scope.NeedsDesign) return (null, false);
 
         ActivityStarted?.Invoke($"designing with {strong}");
         var clock = Stopwatch.StartNew();
 
         string design;
-        try
+        for (var retries = 0; ; retries++)
         {
-            design = await ReasoningSubtask.DesignAsync(_reasoning!, _config.Model, Shell, request, Digest(), ct,
-                received => ActivityStarted?.Invoke($"designing with {strong} · {received:N0} chars so far"));
-        }
-        catch (ChatProviderException ex)
-        {
-            var failed = new AgentStep(0, ReasoningSubtask.DesignTag, $"{strong} failed: {ex.Message} — building without a design", false, clock.ElapsedMilliseconds);
-            _log?.Step(failed);
-            StepCompleted?.Invoke(failed);
-            return null;
+            try
+            {
+                design = await ReasoningSubtask.DesignAsync(_reasoning!, _config.Model, Shell, request, Digest(), ct,
+                    received => ActivityStarted?.Invoke($"designing with {strong} · {received:N0} chars so far"),
+                    Tools.ShellInfo.Current.Hints);
+                break;
+            }
+            catch (ChatProviderStalledException ex)
+            {
+                // A stall says nothing about the request, so the design is not
+                // given up on quietly: the person decides — the same request
+                // again, go on without it, or end the turn here.
+                var pick = await AskAfterStallAsync(strong, ex, retries, [BuildWithoutDesignOption, StopTurnOption], ct);
+                var stalled = new AgentStep(0, ReasoningSubtask.DesignTag,
+                    $"{strong} stalled: {ex.Message} — " + (pick == 0 ? "retrying" : pick == 1 ? "building without a design" : "turn stopped"),
+                    false, clock.ElapsedMilliseconds);
+                _log?.Step(stalled);
+                StepCompleted?.Invoke(stalled);
+                if (pick == 1) return (null, false);
+                if (pick == 2) return (null, true);
+
+                ActivityStarted?.Invoke($"designing with {strong} · retry {retries + 1}");
+                clock.Restart();
+            }
+            catch (ChatProviderException ex)
+            {
+                var failed = new AgentStep(0, ReasoningSubtask.DesignTag, $"{strong} failed: {ex.Message} — building without a design", false, clock.ElapsedMilliseconds);
+                _log?.Step(failed);
+                StepCompleted?.Invoke(failed);
+                return (null, false);
+            }
         }
 
-        if (design.Length == 0) return null;
+        if (design.Length == 0) return (null, false);
 
         _state.CountDesign();
         var step = new AgentStep(0, ReasoningSubtask.DesignTag, $"{strong} · {design.Length} chars", true, clock.ElapsedMilliseconds);
@@ -922,16 +990,142 @@ public sealed class ChatSession : IAgentSession
             _log?.Step(new AgentStep(0, "decision", chosen, true));
         }
 
-        return ReasoningSubtask.DesignFeedBack(strong, body, chosen);
+        return (ReasoningSubtask.DesignFeedBack(strong, body, chosen), false);
     }
+
+    // ------------------------------------------------------------ claims
+
+    /// <summary>
+    /// Holds the answer's report against the turn's tool calls. Asked only when
+    /// something is missing from the record — no successful write, or no
+    /// successful command — since a turn that did both has nothing the engine
+    /// could catch that the loop's file check would not. The engine's verdict
+    /// is taken only where the record agrees: "unbacked change" with a
+    /// successful write_file in hand is not acted on, and the same for runs.
+    /// On a contradiction the model gets one correction pass with every tool;
+    /// if the record still does not back the report, the answer carries a
+    /// warning and the run is marked <see cref="AgentRun.Unverified"/>.
+    /// </summary>
+    /// <returns>The run to use, and whether a correction pass was needed.</returns>
+    private async Task<(AgentRun Run, bool Corrected)> CheckClaimsAsync(string request, AgentRun run, CancellationToken ct)
+    {
+        var what = await UnbackedClaimAsync(request, run, ct);
+        if (what is null) return (run, false);
+
+        var (claim, tool) = what.Value;
+        var sentBack = new AgentStep(0, "unbacked", $"the answer reports {claim}, but no {tool} succeeded this turn — sent back once", false);
+        _log?.Step(sentBack);
+        StepCompleted?.Invoke(sentBack);
+        ActivityStarted?.Invoke("checking the report against what the tools did");
+
+        var fix = await _loop.RunAsync(
+            $"[check] Your answer says {claim}, but no {tool} call succeeded in this turn — so it did not happen. " +
+            "Either do it now with the tools, or answer again and say plainly, in the user's language, what has NOT " +
+            "been done. If it was done in an earlier turn, look with a tool (read_file, list_files) before saying so. " +
+            "Never report a change or a result that a tool did not produce.",
+            ct);
+
+        var merged = fix with { Steps = [.. run.Steps, sentBack, .. fix.Steps], Elapsed = run.Elapsed + fix.Elapsed };
+        if (!fix.Succeeded || fix.Unverified is not null) return (merged, true);
+
+        var still = await UnbackedClaimAsync(request, merged, ct);
+        if (still is null) return (merged, true);
+
+        var note = $"unverified: the answer reports {still.Value.Claim}, but no {still.Value.Tool} succeeded in this turn";
+        var flagged = new AgentStep(0, "unverified", note, false);
+        _log?.Step(flagged);
+        StepCompleted?.Invoke(flagged);
+        return (merged with { Steps = [.. merged.Steps, flagged], Text = merged.Text + "\n\n⚠ " + note, Unverified = $"reports {still.Value.Claim} with no {still.Value.Tool}" }, true);
+    }
+
+    /// <summary>What the answer claims that the record does not show, or null when nothing is missing or the engine cannot say.</summary>
+    private async Task<(string Claim, string Tool)?> UnbackedClaimAsync(string request, AgentRun run, CancellationToken ct)
+    {
+        var wrote = run.Steps.Any(s => s.Ok && s.Tool == "write_file");
+        var ran = run.Steps.Any(s => s.Ok && s.Tool == "run_command");
+        if (wrote && ran) return null;
+
+        var did = string.Join("\n", run.Steps
+            .Where(s => s.Tool is not ("final" or "unwrapped" or "(unparsed)"))
+            .Select(s => $"- {s.Tool} ({(s.Ok ? "ok" : "failed")}): {WorkspaceStore.FirstLine(s.Detail, 120)}"));
+
+        var judged = await _router.ClaimAsync(request, did, run.Text, ct);
+        (string, string)? contradiction = judged is { Ok: true, Choice: SmartRouter.UnbackedChange } && !wrote ? ("files created or changed", "write_file")
+            : judged is { Ok: true, Choice: SmartRouter.UnbackedRun } && !ran ? ("commands, builds or tests run", "run_command")
+            : null;
+
+        var verdict = contradiction is { } c ? $"reports {c.Item1} with no {c.Item2}"
+            : judged.Ok ? "the report matches the tool calls"
+            : $"unavailable ({judged.Message})";
+        _log?.Decision("claims", judged, verdict);
+        Decided?.Invoke(new SmartNote("claims", judged, verdict));
+        return contradiction;
+    }
+
+    // ------------------------------------------------------------ stalls
+
+    internal const string RetryOption = "retry — send the same request again";
+    internal const string StopTurnOption = "stop the turn";
+    internal const string BuildWithoutDesignOption = "go on without a design";
+    internal const string KeepDraftOption = "keep the draft";
+
+    /// <summary>
+    /// Retries recommended before the recommendation turns to giving up. It
+    /// bounds only the unattended case — `run`, or a background session nobody
+    /// is attached to, takes the recommendation — so a dead endpoint cannot
+    /// keep a turn retrying forever; a person may still pick retry every time.
+    /// </summary>
+    internal const int UnattendedStallRetries = 2;
+
+    /// <summary>
+    /// A model went quiet. Puts retry and the caller's alternatives to the
+    /// person through <see cref="Chooser"/> and returns the index picked:
+    /// 0 is retry, 1.. are <paramref name="alternatives"/> in order. Nothing
+    /// before the stalled call is thrown away — a retry sends the same messages.
+    /// </summary>
+    private async Task<int> AskAfterStallAsync(string model, ChatProviderStalledException stall, int retries,
+        IReadOnlyList<string> alternatives, CancellationToken ct)
+    {
+        string[] options = [RetryOption, .. alternatives];
+        var recommended = retries < UnattendedStallRetries ? 0 : options.Length - 1;
+        var ask = new ChoiceRequest(
+            $"{model} stalled — {stall.Message}" + (retries > 0 ? $" (retried {retries}x)" : ""),
+            options, recommended);
+
+        var picked = Chooser is null ? options[recommended] : ask.Resolve(await Chooser(ask, ct));
+        var index = Array.IndexOf(options, picked);
+        if (index < 0) index = recommended;   // a free-text answer: take the recommendation
+
+        Noted?.Invoke($"{model} stalled: {options[index]}");
+        return index;
+    }
+
+    /// <summary>Requests and drafts under these lengths, with no tool material, are never escalated.</summary>
+    internal const int ShortRequestChars = 60, ShortDraftChars = 200;
+
+    internal static bool IsShortExchange(string request, string material, string draft) =>
+        material.Length == 0 && request.Trim().Length < ShortRequestChars && draft.Trim().Length < ShortDraftChars;
 
     private async Task<AgentRun> MaybeEscalateAsync(string request, int messagesBefore, AgentRun draft, CancellationToken ct)
     {
         var material = ToolResultsSince(messagesBefore);
+
         var judged = await _router.EscalateAsync(request, material, draft.Text, ct);
+
+        // Escalation normally follows the engine's choice alone (see
+        // SmartRouter.EscalateAsync). A short reply to a short remark, with
+        // nothing gathered, has to clear the floor as well. Measured
+        // (2026-09-30): "3번 수행 이제 필요없음" → a two-line acknowledgement
+        // went to the strong model at 0.14 and cost 31 s to come back the same.
+        // Not skipped outright: "17×23?" is short too, and arithmetic is
+        // exactly what the second look is for.
+        var shortExchange = IsShortExchange(request, material, draft.Text);
+        if (judged.Escalate && shortExchange && judged.Decision.Confidence < _config.JevConfidenceFloor)
+            judged = judged with { Escalate = false };
 
         var strong = _config.ReasoningModel;
         var verdict = judged.Escalate ? $"escalating to {strong}"
+            : judged.Decision is { Ok: true, Choice: SmartRouter.EscalateOption } ? $"keeping the draft — a short exchange, and the engine was unsure"
             : judged.Decision.Ok ? "keeping the draft"
             : $"unavailable ({judged.Decision.Message}), keeping the draft";
         _log?.Decision("escalation", judged.Decision, verdict);
@@ -944,19 +1138,35 @@ public sealed class ChatSession : IAgentSession
         var clock = Stopwatch.StartNew();
 
         string reasoning;
-        try
+        for (var retries = 0; ; retries++)
         {
-            reasoning = await ReasoningSubtask.RunAsync(_reasoning!, _config.Model, request, material, draft.Text, ct,
-                received => ActivityStarted?.Invoke($"reasoning with {strong} · {received:N0} chars so far"));
-        }
-        catch (ChatProviderException ex)
-        {
-            // The strong model is an upgrade, not a dependency: when it cannot be
-            // reached the draft stands, and the step says why.
-            var failed = new AgentStep(0, ReasoningSubtask.Tag, $"{strong} failed: {ex.Message} — keeping the draft", false, clock.ElapsedMilliseconds);
-            _log?.Step(failed);
-            StepCompleted?.Invoke(failed);
-            return draft;
+            try
+            {
+                reasoning = await ReasoningSubtask.RunAsync(_reasoning!, _config.Model, request, material, draft.Text, ct,
+                    received => ActivityStarted?.Invoke($"reasoning with {strong} · {received:N0} chars so far"));
+                break;
+            }
+            catch (ChatProviderStalledException ex)
+            {
+                var again = await AskAfterStallAsync(strong, ex, retries, [KeepDraftOption], ct) == 0;
+                var stalled = new AgentStep(0, ReasoningSubtask.Tag,
+                    $"{strong} stalled: {ex.Message} — " + (again ? "retrying" : "keeping the draft"), false, clock.ElapsedMilliseconds);
+                _log?.Step(stalled);
+                StepCompleted?.Invoke(stalled);
+                if (!again) return draft;
+
+                ActivityStarted?.Invoke($"reasoning with {strong} · retry {retries + 1}");
+                clock.Restart();
+            }
+            catch (ChatProviderException ex)
+            {
+                // The strong model is an upgrade, not a dependency: when it cannot be
+                // reached the draft stands, and the step says why.
+                var failed = new AgentStep(0, ReasoningSubtask.Tag, $"{strong} failed: {ex.Message} — keeping the draft", false, clock.ElapsedMilliseconds);
+                _log?.Step(failed);
+                StepCompleted?.Invoke(failed);
+                return draft;
+            }
         }
 
         var step = new AgentStep(0, ReasoningSubtask.Tag, $"{strong} · {reasoning.Length} chars", true, clock.ElapsedMilliseconds);
@@ -1105,9 +1315,67 @@ public sealed class ChatSession : IAgentSession
         lines.Reverse();
         var digest = string.Join('\n', lines.Take(8));
 
+        // The last answer, with its numbered list: a follow-up like "3번 해줘"
+        // or "go with 2" means nothing without it, and the router used to see
+        // only the questions.
+        if (LastAnswer() is { Length: > 0 } answer)
+        {
+            var head = answer.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+            var answerLines = new List<string> { "- your last answer: " + Clip(head, 100) };
+            answerLines.AddRange(NumberedItems(answer).Take(9).Select(item => $"    {item.Number}. {Clip(item.Text, 100)}"));
+            digest = string.Join('\n', answerLines) + (digest.Length > 0 ? "\n" + digest : "");
+        }
+
         if (Title is { } title) digest = $"- the session's task: {title}\n" + digest;
         return digest;
     }
+
+    // ------------------------------------------------------------ references
+
+    /// <summary>The text of the model's last answer in this conversation, or null.</summary>
+    internal string? LastAnswer()
+    {
+        for (var i = _loop.Messages.Count - 1; i >= 0; i--)
+        {
+            var message = _loop.Messages[i];
+            if (message.Role != "assistant") continue;
+            if (!ToolCall.TryParse(message.Content, out var call, out _)) return message.Content.Trim();   // prose taken as the answer
+            if (call.IsFinal) return call.Arg("text");
+        }
+        return null;
+    }
+
+    /// <summary>The lines of a numbered list ("1. …", "2) …"), in order.</summary>
+    internal static IReadOnlyList<(int Number, string Text)> NumberedItems(string text) =>
+        NumberedLine().Matches(text)
+            .Select(m => (int.Parse(m.Groups[1].Value), m.Groups[2].Value.Trim().Trim('*').Trim()))
+            .ToList();
+
+    /// <summary>
+    /// When the request points at an item of the last answer by number — "3번",
+    /// "#3", "option 3", "step 3" — the item itself, as a note for the router
+    /// and the model. Null when there is no such reference or no such item.
+    /// </summary>
+    internal string? ResolveReference(string request)
+    {
+        var match = NumberReference().Match(request);
+        if (!match.Success) return null;
+        var number = int.Parse(match.Groups.Cast<Group>().Skip(1).First(g => g.Success).Value);
+
+        if (LastAnswer() is not { } answer) return null;
+        var item = NumberedItems(answer).FirstOrDefault(i => i.Number == number);
+        if (item.Text is null) return null;
+
+        return $"[reference] \"{match.Value.Trim()}\" is item {number} of your previous answer: \"{Clip(item.Text, 300)}\". " +
+               "Decide from the user's words whether they want it done now. If that is not clear — above all when it " +
+               "would delete, overwrite or undo something — do not guess either way: ask one short question in \"final\".";
+    }
+
+    [GeneratedRegex(@"^\s*(\d{1,2})[.)]\s+(.+)$", RegexOptions.Multiline)]
+    private static partial Regex NumberedLine();
+
+    [GeneratedRegex(@"(?<![\d.])(\d{1,2})\s*번|#\s?(\d{1,2})\b|\b(?:number|no\.|option|item|step|choice)\s*(\d{1,2})\b", RegexOptions.IgnoreCase)]
+    private static partial Regex NumberReference();
 
     private bool _disposed;
 

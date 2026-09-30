@@ -40,6 +40,7 @@ public static partial class CommandRisk
         (PermissionsWide(), "changes permissions or ownership recursively"),
         (PipedInstaller(), "runs code downloaded from the network without looking at it"),
         (DestructiveGit(), "rewrites or discards git history (force-push, hard reset, clean)"),
+        (GitConfigWrite(), "changes git configuration — identity, remotes or hooks — for every commit in this repository and its worktrees"),
         (SchedulingAndPolicy(), "changes scheduled tasks, cron, or the execution policy"),
         (NetworkAndFirewall(), "changes users, network or firewall settings"),
         (ForkBomb(), "fork bomb"),
@@ -75,6 +76,14 @@ public static partial class CommandRisk
 
     [GeneratedRegex(@"\bgit\s+(push\b[^\n]*(--force|-f\b)|reset\s+--hard|clean\s+-[a-z]*[fx]|branch\s+-D|filter-branch|push\b[^\n]*--delete)", RegexOptions.IgnoreCase)]
     private static partial Regex DestructiveGit();
+
+    // Measured (2026-09-30): setting up a worktree, the model ran
+    // `git config user.name "Phase 1"` in the repository itself; the engine called
+    // it safe, and every later commit there would have been authored "Phase 1".
+    // Reads (`git config user.name`, --get, --list) stay ungated: a key with no
+    // value after it asks, a key with one sets.
+    [GeneratedRegex(@"\bgit\s+(?:-C\s+\S+\s+)*config\b(?:\s+--(?:global|system|local|worktree)\b|\s+--file\s+\S+)*\s+(?:--(?:unset|unset-all|add|replace-all|remove-section|rename-section|edit)\b|-e\b|(?!-)[\w.-]+\s+(?![;&|])\S)", RegexOptions.IgnoreCase)]
+    private static partial Regex GitConfigWrite();
 
     [GeneratedRegex(@"\b(schtasks|crontab\s+-r|crontab\s+-e|Set-ExecutionPolicy|Register-ScheduledTask|launchctl\s+(load|unload)|systemctl\s+(enable|disable|mask))\b", RegexOptions.IgnoreCase)]
     private static partial Regex SchedulingAndPolicy();

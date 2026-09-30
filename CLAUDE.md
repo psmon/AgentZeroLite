@@ -704,6 +704,75 @@ the `text` field out of the JSON envelope as it arrives, and deliberately stream
 **nothing** for a tool call, because `grep` also has a `text` argument and
 printing a search pattern as the answer would be a plausible-looking lie.
 
+**A silent stream is a stall, and a stall is offered again, not dropped.**
+`HttpClient.Timeout` stops at the headers when a stream reads them first, so
+`StreamAsync` keeps its own idle clock (`timeoutSeconds`, restarted by every
+line) — measured: a design call got headers and then nothing, and the chat sat
+36 minutes with the socket open. Silence and request timeouts throw
+`ChatProviderStalledException`; `AgentLoop.OnStall`, the design pass and the
+escalation put **retry** (the same messages, so the step restarts from just
+before it stalled) and their alternatives to `ChatSession.Chooser`. The design
+never quietly builds without its plan on a stall. Unattended (`run`, a
+background session nobody is attached to) the recommendation is retry twice
+(`UnattendedStallRetries`), then the last option, so a dead endpoint cannot
+retry forever. Tests: `StallRetryTests`.
+
+**A report is held against the tool record before anything builds on it.**
+Measured (2026-09-29): asked to write and run unit tests, the model called no
+tool and reported a created `.csproj` and "tests performed"; the strong model
+polished it, and three false facts were learned and fed back as `[graph
+memory]`. The file check never ran — a no-tool turn is exempt (a plan names
+files that do not exist yet) and `.csproj` was not an extension it knew. Now:
+answers taken as prose or decoded from a broken envelope go through the same
+final checks as a clean final (they used to return early); files still missing
+after the nudges are appended as `⚠ not on disk: …` (a fact, not a verdict — a
+path matcher cannot tell "created hello.py" from "runs hello.py"); and in smart
+mode `ChatSession.CheckClaimsAsync` asks Jev `SmartRouter.ClaimAsync`
+(backed / unbacked_change / unbacked_run) whenever the turn lacks a successful
+`write_file` or `run_command`. The verdict counts only where the record agrees
+(unbacked_change with a write in hand is ignored). A contradiction gets one
+`[check]` correction pass with every tool; if the report still does not hold,
+the answer carries `⚠ unverified` and `AgentRun.Unverified` is set — such a turn
+is not escalated, not learned from, and is written to memory.md as
+`UNVERIFIED`. The reasoning prompt also says only the material shows what was
+done. `ChatSession.ChecksClaims` is the test switch beside `UsesGraph` /
+`UsesPdsa` — a test that scripts the engine sets all three. Tests:
+`ClaimCheckTests`.
+
+Four things one worktree turn (2026-09-30) taught, tests in `PhaseOneFixesTests`:
+**the shell is detected, not named** — `Tools/ShellInfo` probes the shell
+run_command will start (pwsh / Windows PowerShell / bash / sh, with its version)
+once per process, `ShellToolbelt` starts that same `Exe`, and `Describe` +
+`Hints` go into the system prompt, the design prompt and the safety question
+(`mkdir -p a b c` failed three times under pwsh 7.5, and PowerShell 5.1 has no
+`&&`); **Gemma 4's native call syntax is a tool call** —
+`<|tool_call>call:write_file{args:{content:<|"|>…<|"|>,path:"…"}}<tool_call|>`
+(bare keys, `<|"|>`-fenced strings) is converted by `Agent/GemmaNativeCall`
+inside `ToolCall.TryParse`, and one that does not parse is a parse failure,
+never an answer (two write_files were shown as prose and nothing was written;
+ZeroCommon's `GemmaNativeToolCall` takes JSON args only); **writing git
+configuration always asks a person** (`CommandRisk` `GitConfigWrite`: the engine
+called `git config user.name "Phase 1"` safe, and it rewrote this repository's
+commit identity; reads stay ungated); **plans stay under the root** — the system
+and design prompts say write_file cannot leave it (a design put every file
+under `../phase-1/`).
+
+**A follow-up is read against the last answer** (`FollowUpTests`). Measured: after
+an answer ending "3. … delete count_files.ps1", "3번 수행 이제 필요없음" was routed
+answer_directly (the router's `Digest()` held only the user's questions), the model
+read it as "don't", the file stayed, and a two-line acknowledgement was escalated
+for 31 s. Now `Digest()` opens with the last answer and its numbered list;
+`ChatSession.ResolveReference` turns "N번" / "#N" / "option N" into a
+`[reference]` note naming the item — added to what the router and the model see,
+and telling the model to ask one short question rather than guess when it is
+unclear, above all for a delete or overwrite; an escalation of a short exchange
+(`IsShortExchange`: no tool material, request < 60, draft < 200 chars) must clear
+`jevConfidenceFloor` — not skipped outright, since "17×23?" is short too; and
+`AgentLoop.WrongScript` sends a final back once when the request is in a
+non-Latin script (Korean, Japanese, Chinese, Russian, Arabic, Thai) the answer
+does not contain at all — `AgentLoop.Request` carries the person's words, because
+the prompt a run gets is often English guidance or a `[check]`.
+
 ## Documentation pairs — update both languages together
 
 Three READMEs exist in two languages, and a change to one is not done until

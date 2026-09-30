@@ -49,6 +49,15 @@ public sealed class ToolCall
 
         if (string.IsNullOrWhiteSpace(raw)) { error = "empty model reply"; return false; }
 
+        // Gemma's native call syntax is a tool call, never an answer: convert it,
+        // or fail loudly so the loop asks for the envelope instead of showing it.
+        if (GemmaNativeCall.Contains(raw))
+        {
+            if (GemmaNativeCall.TryConvert(raw, out var converted) && TryParseJson(converted, call, out error)) return true;
+            error = "the reply used the <|tool_call> syntax, which could not be read — use the JSON envelope";
+            return false;
+        }
+
         var json = ExtractFirstJsonObject(raw);
         if (json is null) { error = "no JSON object found in model reply"; return false; }
 
@@ -68,7 +77,8 @@ public sealed class ToolCall
     public static bool LooksLikeEnvelope(string raw)
     {
         var text = raw.TrimStart();
-        return text.StartsWith('{') && text.Contains("\"tool\"", StringComparison.Ordinal);
+        return GemmaNativeCall.Contains(text)
+               || text.StartsWith('{') && text.Contains("\"tool\"", StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -80,7 +80,7 @@ public static class ToolCatalog
             """{"tool":"write_file","args":{"path":"src/app.py","content":"print('hi')\n"}}"""),
 
         new("run_command", ExecFamily,
-            "Run ONE shell command in the workspace root (PowerShell on Windows, bash elsewhere) and get its output and exit code. " +
+            "Run ONE shell command in the workspace root (the shell named in the rules above) and get its output and exit code. " +
             "A risky command is put to the user first and may be declined.",
             ["command"],
             """{"tool":"run_command","args":{"command":"dotnet build"}}"""),

@@ -48,6 +48,21 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     /// <summary>The pause between steps: the person holds the loop here, and may hand it a refinement on resume.</summary>
     public PauseGate Pause { get; } = new();
 
+    /// <summary>
+    /// The person's own words for this turn — the language the answer must be
+    /// in. The prompt a run gets is often not them: route guidance, a [check]
+    /// or a [wrap-up] is English written by us. Null: the run's own prompt.
+    /// </summary>
+    public string? Request { get; set; }
+
+    /// <summary>
+    /// Asked when the model went quiet mid-step, with the stall and how many
+    /// times this step has already been retried. True sends the same messages
+    /// again — the step restarts from just before it stalled, nothing earlier
+    /// is lost; false ends the turn as a provider error. Null never retries.
+    /// </summary>
+    public Func<ChatProviderStalledException, int, CancellationToken, Task<bool>>? OnStall { get; set; }
+
     public void Reset(string? memory = null)
     {
         if (memory is not null) _memory = memory;
@@ -100,6 +115,7 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
 
         // Paths this turn actually put on disk, to check the answer against.
         var wrote = new List<string>();
+        var languageNudged = false;
 
         for (int step = 1; step <= maxSteps; step++)
         {
@@ -121,31 +137,53 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
             var stepClock = Stopwatch.StartNew();
 
             string raw;
-            var streamer = new FinalAnswerStreamer();
+            FinalAnswerStreamer streamer;
 
-            try
+            for (var retries = 0; ; retries++)
             {
-                Action<string>? onDelta = null;
-                if (Streaming && AnswerDelta is not null)
+                // A fresh streamer per attempt: what a stalled attempt showed is
+                // not part of the reply the retry will write.
+                streamer = new FinalAnswerStreamer();
+                try
                 {
-                    onDelta = fragment =>
+                    Action<string>? onDelta = null;
+                    if (Streaming && AnswerDelta is not null)
                     {
-                        var visible = streamer.Push(fragment);
-                        if (visible.Length > 0) AnswerDelta?.Invoke(visible);
-                    };
+                        var current = streamer;
+                        onDelta = fragment =>
+                        {
+                            var visible = current.Push(fragment);
+                            if (visible.Length > 0) AnswerDelta?.Invoke(visible);
+                        };
+                    }
+
+                    raw = await provider.CompleteAsync(_messages, ct, onDelta);
+                    break;
                 }
+                catch (OperationCanceledException)
+                {
+                    return Finish(StopReason.Cancelled, "cancelled", steps, sw);
+                }
+                catch (ChatProviderStalledException ex)
+                {
+                    bool again;
+                    try { again = OnStall is not null && await OnStall(ex, retries, ct); }
+                    catch (OperationCanceledException) { return Finish(StopReason.Cancelled, "cancelled", steps, sw); }
 
-                raw = await provider.CompleteAsync(_messages, ct, onDelta);
-            }
-            catch (OperationCanceledException)
-            {
-                return Finish(StopReason.Cancelled, "cancelled", steps, sw);
-            }
-            catch (ChatProviderException ex)
-            {
-                return Finish(StopReason.ProviderError, ex.Message, steps, sw);
+                    Emit(steps, step, "stalled", again ? $"{ex.Message} — retrying the step" : ex.Message,
+                        ok: false, stepClock.ElapsedMilliseconds);
+                    if (!again) return Finish(StopReason.ProviderError, ex.Message, steps, sw);
+
+                    ActivityStarted?.Invoke($"retrying after a stall ({retries + 1})");
+                    stepClock.Restart();
+                }
+                catch (ChatProviderException ex)
+                {
+                    return Finish(StopReason.ProviderError, ex.Message, steps, sw);
+                }
             }
 
+            string? unwrapped = null;
             if (!ToolCall.TryParse(raw, out var call, out var parseError))
             {
                 // A reply with no envelope is usually the answer, not a mistake:
@@ -159,40 +197,40 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                 // whole thing as prose would print the braces to the user, and
                 // print the answer twice (the stream had already decoded the text
                 // field). The lenient decoder the stream uses gets it out.
+                //
+                // Either way it is an answer, and it goes through the same checks
+                // as a clean final below. It used to return from here directly,
+                // so a small model that dropped its JSON skipped every check.
                 if (TryDecodeBrokenFinal(raw, out var decoded))
                 {
                     Emit(steps, step, "unwrapped",
                         $"final envelope was not valid JSON; decoded its text ({decoded.Length} chars)",
                         ok: true, stepClock.ElapsedMilliseconds);
-                    Emit(steps, step, ToolCall.FinalTool, decoded, ok: true);
-                    _messages.Add(ChatMessage.Assistant(raw));
-                    return Finish(StopReason.Final, decoded, steps, sw, streamer.Visible);
+                    unwrapped = decoded;
                 }
-
-                if (LooksLikeAnAnswer(raw, steps))
+                else if (LooksLikeAnAnswer(raw, steps))
                 {
-                    var prose = raw.Trim();
+                    unwrapped = raw.Trim();
                     Emit(steps, step, "unwrapped",
-                        $"prose accepted as the answer ({prose.Length} chars, after {ToolStepsSoFar(steps)} tool steps)",
+                        $"prose accepted as the answer ({unwrapped.Length} chars, after {ToolStepsSoFar(steps)} tool steps)",
                         ok: true, stepClock.ElapsedMilliseconds);
-                    Emit(steps, step, ToolCall.FinalTool, prose, ok: true);
-                    _messages.Add(ChatMessage.Assistant(raw));
-                    return Finish(StopReason.Final, prose, steps, sw, streamer.Visible);
                 }
+                else
+                {
+                    Emit(steps, step, "(unparsed)", parseError, ok: false, stepClock.ElapsedMilliseconds);
+                    if (!guards.TryConsumeParseNudge())
+                        return Finish(StopReason.ParseFailure, $"model never produced a valid envelope ({parseError})", steps, sw);
 
-                Emit(steps, step, "(unparsed)", parseError, ok: false, stepClock.ElapsedMilliseconds);
-                if (!guards.TryConsumeParseNudge())
-                    return Finish(StopReason.ParseFailure, $"model never produced a valid envelope ({parseError})", steps, sw);
-
-                _messages.Add(ChatMessage.Assistant(raw));
-                _messages.Add(ChatMessage.User(
-                    $"[error] {parseError}. Reply with ONE JSON object only, e.g. {ToolCall.Final("your answer").ToJson()}"));
-                continue;
+                    _messages.Add(ChatMessage.Assistant(raw));
+                    _messages.Add(ChatMessage.User(
+                        $"[error] {parseError}. Reply with ONE JSON object only, e.g. {ToolCall.Final("your answer").ToJson()}"));
+                    continue;
+                }
             }
 
-            if (call.IsFinal)
+            if (unwrapped is not null || call!.IsFinal)
             {
-                var answer = call.Arg("text");
+                var answer = unwrapped ?? call!.Arg("text");
 
                 // Two shapes of the same lie, both measured on 2026-09-24.
                 //
@@ -211,7 +249,15 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                 // names the files it is proposing, and none of them exist yet;
                 // that is what a plan is, not a false claim. A turn that wrote
                 // or tried to write is reporting, and a report is checkable.
-                var missing = DidAnyWork(steps) ? MissingFilesNamed(answer, wrote) : [];
+                //
+                // A turn that called no tool at all stays exempt here: a plan and
+                // a false report look the same to a path matcher. Measured
+                // (2026-09-29), that is where a lie got through — "created
+                // WebAutomationTests.csproj and ran the tests" with no tool
+                // called — so smart mode asks the decision engine, which reads
+                // the claim itself (ChatSession.CheckClaimsAsync).
+                var worked = DidAnyWork(steps);
+                var missing = worked ? MissingFilesNamed(answer, wrote) : [];
                 if ((missing.Count > 0 || ShowsUnwrittenCode(answer, steps)) && guards.TryConsumeUnwrittenNudge(wrote.Count))
                 {
                     var why = missing.Count > 0
@@ -234,6 +280,37 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                           + "file, the WHOLE file as the content), then answer. If the user only wanted to SEE the "
                           + "code and not have it saved, reply with \"final\" again and say so plainly."));
                     continue;
+                }
+
+                // Asked in Korean, answered in English — measured (2026-09-30)
+                // with the rule already in the prompt. Scripts are compared, not
+                // languages: a Hangul request whose answer has no Hangul at all
+                // is wrong whatever the words. Once per run; code and paths in
+                // an answer are Latin in every language, so only a script the
+                // answer lacks entirely counts.
+                if (!languageNudged && WrongScript(Request ?? userPrompt, answer) is { } language)
+                {
+                    languageNudged = true;
+                    Emit(steps, step, "language", $"the user wrote in {language}; the answer is not", ok: false, stepClock.ElapsedMilliseconds);
+                    _messages.Add(ChatMessage.Assistant(raw));
+                    _messages.Add(ChatMessage.User(
+                        $"[check] The user wrote in {language}, so the answer must be in {language}. Reply with the same " +
+                        $"\"final\" answer written in {language} — keep every fact, file name and command exactly as it is."));
+                    continue;
+                }
+
+                // The nudges are spent and files the answer names are still not
+                // there. The answer goes out — but no longer clean: the person
+                // sees which files are missing. It is a fact, not a verdict: a
+                // path matcher cannot tell "created hello.py" from "runs
+                // hello.py", so whether the report is false is left to the
+                // claim check, which reads the words (ChatSession.CheckClaimsAsync).
+                var stillMissing = worked ? MissingFilesNamed(answer, wrote) : [];
+                if (stillMissing.Count > 0)
+                {
+                    var note = "not on disk: " + string.Join(", ", stillMissing);
+                    Emit(steps, step, "missing", note, ok: false);
+                    answer += "\n\n⚠ " + note;
                 }
 
                 Emit(steps, step, ToolCall.FinalTool, answer, ok: true, stepClock.ElapsedMilliseconds);
@@ -419,7 +496,9 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     private static string Normalize(string path) =>
         path.Trim().Trim('`', '"', '\'', '(', ')', ',', ';', ':', '.').Replace('\\', '/').TrimStart('.', '/');
 
-    [GeneratedRegex(@"(?:[\w.\-]+/)*[\w.\-]+\.(?:html?|css|js|mjs|cjs|jsx|ts|tsx|json|py|cs|java|kt|go|rs|rb|php|c|cpp|h|hpp|md|txt|ya?ml|toml|sql|sh|ps1|bat)\b",
+    // csproj/sln/props/targets/xaml: measured, a claimed WebAutomationTests.csproj
+    // passed unseen because the extension was not on this list.
+    [GeneratedRegex(@"(?:[\w.\-]+/)*[\w.\-]+\.(?:html?|css|js|mjs|cjs|jsx|ts|tsx|json|py|cs|csproj|sln|slnx|props|targets|xaml|java|kt|go|rs|rb|php|c|cpp|h|hpp|md|txt|ya?ml|toml|sql|sh|ps1|bat)\b",
         RegexOptions.IgnoreCase)]
     private static partial Regex FileLike();
 
@@ -437,7 +516,48 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     /// skipped and the fabrication went out with the evidence in its hand.
     /// </summary>
     private static bool DidAnyWork(List<AgentStep> steps) =>
-        steps.Any(s => s.Tool is not (ToolCall.FinalTool or "unwrapped" or "(unparsed)" or "unwritten" or "route-overruled"));
+        steps.Any(s => s.Tool is not (ToolCall.FinalTool or "unwrapped" or "(unparsed)" or "unwritten" or "missing" or "stalled" or "route-overruled"));
+
+    /// <summary>
+    /// The request's language, named, when the request is written in a
+    /// non-Latin script and the answer contains none of it. Null otherwise —
+    /// including for a Latin-script request, where the words would have to be
+    /// read to tell English from German, and for answers too short to judge.
+    /// </summary>
+    internal static string? WrongScript(string request, string answer)
+    {
+        var (script, share) = DominantScript(request);
+        if (script is null || share < 0.3) return null;
+        if (answer.Count(char.IsLetter) < 40) return null;
+        return answer.Any(c => ScriptOf(c) == script) ? null : script;
+    }
+
+    private static (string? Script, double Share) DominantScript(string text)
+    {
+        var letters = 0;
+        var counts = new Dictionary<string, int>();
+        foreach (var c in text)
+        {
+            if (!char.IsLetter(c)) continue;
+            letters++;
+            if (ScriptOf(c) is { } script) counts[script] = counts.GetValueOrDefault(script) + 1;
+        }
+        if (letters == 0 || counts.Count == 0) return (null, 0);
+        var top = counts.MaxBy(kv => kv.Value);
+        return (top.Key, (double)top.Value / letters);
+    }
+
+    /// <summary>The non-Latin script a letter belongs to, by the name the model is told; null for Latin and the rest.</summary>
+    private static string? ScriptOf(char c) => c switch
+    {
+        >= '가' and <= '힣' or >= 'ᄀ' and <= 'ᇿ' or >= '㄰' and <= '㆏' => "Korean",
+        >= '぀' and <= 'ヿ' => "Japanese",
+        >= '一' and <= '鿿' => "Chinese",
+        >= 'Ѐ' and <= 'ӿ' => "Russian",
+        >= '؀' and <= 'ۿ' => "Arabic",
+        >= '฀' and <= '๿' => "Thai",
+        _ => null
+    };
 
     /// <summary>Fenced code in an answer below this many characters is an illustration, not a deliverable.</summary>
     public const int UnwrittenCodeMinChars = 400;

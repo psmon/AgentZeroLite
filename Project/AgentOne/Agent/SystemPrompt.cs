@@ -61,6 +61,10 @@ public static class SystemPrompt
         sb.AppendLine("- write_file takes the WHOLE file as a JSON string: escape newlines as \\n and quotes as \\\".");
         sb.AppendLine("- Use forward slashes in paths and commands (src/app.py, ./run.ps1) — PowerShell accepts them, and a");
         sb.AppendLine("  backslash inside JSON starts an escape (\".\\run.ps1\" turns \\r into a carriage return).");
+        sb.AppendLine("- write_file can only write inside the workspace root. Never plan or write a file outside it —");
+        sb.AppendLine("  not ../, not an absolute path, not another worktree or clone: those writes are refused.");
+        var shell = ShellInfo.Current;
+        sb.AppendLine($"- run_command runs in {shell.Describe}. {shell.Hints}");
         sb.AppendLine();
         sb.AppendLine("Tools:");
 

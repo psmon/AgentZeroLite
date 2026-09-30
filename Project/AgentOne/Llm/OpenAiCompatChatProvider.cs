@@ -24,6 +24,9 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
 
     public string Name => "openai";
 
+    /// <summary>How long a stream may go silent before it counts as stalled. Null: the request timeout. Tests shorten it.</summary>
+    internal TimeSpan? StreamIdleTimeout { get; set; }
+
     public OpenAiCompatChatProvider(AgentConfig config, HttpMessageHandler? handler = null)
     {
         _model = config.Model;
@@ -68,7 +71,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new ChatProviderException($"request to {_http.BaseAddress}chat/completions timed out");
+            throw new ChatProviderStalledException($"{_http.BaseAddress}chat/completions did not answer within {_http.Timeout.TotalSeconds:0}s");
         }
         catch (HttpRequestException ex)
         {
@@ -128,7 +131,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new ChatProviderException($"request to {_http.BaseAddress}chat/completions timed out");
+            throw new ChatProviderStalledException($"{_http.BaseAddress}chat/completions did not answer within {_http.Timeout.TotalSeconds:0}s");
         }
         catch (HttpRequestException ex)
         {
@@ -145,21 +148,42 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
 
             var whole = new System.Text.StringBuilder();
 
-            using var stream = await response.Content.ReadAsStreamAsync(ct);
-            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+            // HttpClient.Timeout stops at the headers when they are read first, so
+            // the body has no clock of its own. Measured (2026-09-29): a design
+            // call got its headers, then nothing, and the chat sat for 36 minutes
+            // with the socket open and no way out but Ctrl+C. Every line —
+            // keep-alive comments included — restarts this timer; silence for a
+            // whole timeout ends the read as a stall, which callers can retry.
+            var idleLimit = StreamIdleTimeout ?? _http.Timeout;
+            using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            idle.CancelAfter(idleLimit);
 
-            while (await reader.ReadLineAsync(ct) is { } line)
+            try
             {
-                if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+                using var stream = await response.Content.ReadAsStreamAsync(idle.Token);
+                using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
 
-                var payload = line[5..].Trim();
-                if (payload.Length == 0 || payload == "[DONE]") continue;
+                while (await reader.ReadLineAsync(idle.Token) is { } line)
+                {
+                    idle.CancelAfter(idleLimit);
 
-                var piece = ChunkContent(payload);
-                if (piece.Length == 0) continue;
+                    if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
 
-                whole.Append(piece);
-                onDelta(piece);
+                    var payload = line[5..].Trim();
+                    if (payload.Length == 0 || payload == "[DONE]") continue;
+
+                    var piece = ChunkContent(payload);
+                    if (piece.Length == 0) continue;
+
+                    whole.Append(piece);
+                    onDelta(piece);
+                }
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                throw new ChatProviderStalledException(
+                    $"{_http.BaseAddress}chat/completions stopped sending for {idleLimit.TotalSeconds:0}s " +
+                    $"({whole.Length:N0} chars received)", whole.Length);
             }
 
             if (whole.Length == 0)

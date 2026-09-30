@@ -21,5 +21,18 @@ public interface IChatProvider
 }
 
 /// <summary>A provider-side failure the CLI should report as a clean error, not a stack trace.</summary>
-public sealed class ChatProviderException(string message, Exception? inner = null)
+public class ChatProviderException(string message, Exception? inner = null)
     : Exception(message, inner);
+
+/// <summary>
+/// The provider went quiet: no answer, or a stream that stopped sending, for
+/// longer than the timeout. Unlike a refusal or a bad key this says nothing
+/// about the request, so the same call may well succeed if it is sent again —
+/// which is why callers offer a retry instead of treating it as final.
+/// </summary>
+public sealed class ChatProviderStalledException(string message, int receivedChars = 0, Exception? inner = null)
+    : ChatProviderException(message, inner)
+{
+    /// <summary>How much of the reply had arrived before it stopped; 0 when nothing came.</summary>
+    public int ReceivedChars { get; } = receivedChars;
+}

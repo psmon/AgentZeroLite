@@ -233,7 +233,7 @@ public class GraphMemorySessionTests : IDisposable
         config.TrySet("smartMode", smart ? "on" : "off", out _);
         config.TrySet("saveSessions", "false", out _);
         // The improvement cycle has its own tests; here it would eat the scripted engine's answers.
-        return new ChatSession(config, _root, streaming: false, provider, engine, true) { NamesTasks = false, UsesPdsa = false };
+        return new ChatSession(config, _root, streaming: false, provider, engine, true) { NamesTasks = false, UsesPdsa = false, ChecksClaims = false };
     }
 
     private static async Task<bool> WaitForAsync(Func<bool> condition)

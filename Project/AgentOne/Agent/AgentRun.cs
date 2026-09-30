@@ -40,6 +40,14 @@ public sealed record AgentRun(
 
     public bool Succeeded => Reason == StopReason.Final;
 
+    /// <summary>
+    /// What the answer reports as done that no tool call in the turn backs up,
+    /// after the model was told and still did not fix it. Null for a turn whose
+    /// report holds. A turn carrying it is not escalated, not learned from, and
+    /// is remembered as unverified — a false report must not become a fact.
+    /// </summary>
+    public string? Unverified { get; init; }
+
     /// <summary>Process exit code: 0 only for a run that actually answered.</summary>
     public int ExitCode => Reason switch
     {

@@ -14,7 +14,8 @@ public readonly record struct GateVerdict(bool Allowed, string Reason)
 
 /// <summary>
 /// The one verb that runs something: <c>run_command</c>, through the
-/// platform's own shell — PowerShell on Windows, bash (or sh) elsewhere —
+/// platform's own shell — PowerShell on Windows, bash (or sh) elsewhere, as
+/// detected by <see cref="ShellInfo"/> —
 /// with the workspace root as its working directory. Nothing runs without the
 /// <see cref="Gate"/> saying so; the belt itself never decides that. Output is
 /// captured, capped, and handed back with the exit code, and a command that
@@ -34,8 +35,8 @@ public sealed class ShellToolbelt(string root, TimeSpan timeout) : IToolbelt
 
     public string Scope => $"{ShellName} in the workspace root";
 
-    /// <summary>The shell this machine gets: the one its operator already uses.</summary>
-    public static string ShellName => OperatingSystem.IsWindows() ? "PowerShell" : "bash";
+    /// <summary>The shell this machine gets, named with its version — see <see cref="ShellInfo"/>.</summary>
+    public static string ShellName => ShellInfo.Current.Describe;
 
     public async Task<ToolResult> InvokeAsync(ToolCall call, CancellationToken ct)
     {
@@ -117,8 +118,7 @@ public sealed class ShellToolbelt(string root, TimeSpan timeout) : IToolbelt
             // Windows PowerShell 5 writes in the console code page; ask it for
             // UTF-8 first, or Korean output comes back as question marks.
             var utf8 = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ";
-            var exe = Exists("pwsh") ? "pwsh" : "powershell";
-            var info = new ProcessStartInfo(exe);
+            var info = new ProcessStartInfo(ShellInfo.Current.Exe);
             info.ArgumentList.Add("-NoProfile");
             info.ArgumentList.Add("-NonInteractive");
             info.ArgumentList.Add("-ExecutionPolicy");
@@ -128,21 +128,10 @@ public sealed class ShellToolbelt(string root, TimeSpan timeout) : IToolbelt
             return info;
         }
 
-        var shell = File.Exists("/bin/bash") ? "/bin/bash" : "/bin/sh";
-        var posix = new ProcessStartInfo(shell);
+        var posix = new ProcessStartInfo(ShellInfo.Current.Exe);
         posix.ArgumentList.Add("-c");
         posix.ArgumentList.Add(command);
         return posix;
-    }
-
-    private static bool Exists(string exe)
-    {
-        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-        foreach (var dir in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (File.Exists(Path.Combine(dir, exe + ".exe")) || File.Exists(Path.Combine(dir, exe))) return true;
-        }
-        return false;
     }
 
     private static void TryKill(Process process)
