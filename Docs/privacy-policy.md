@@ -39,4 +39,4 @@ The app is a developer tool and is not directed at children.
 
 ## Contact
 
-Questions: open an issue at <https://github.com/psmon/AgentZeroLite/issues>.
+Questions: email <psmon@live.co.kr> or open an issue at <https://github.com/psmon/AgentZeroLite/issues>.

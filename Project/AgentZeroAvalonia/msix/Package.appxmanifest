@@ -4,29 +4,29 @@
   build-msix.ps1 fills the double-underscore placeholders: the identity values come from Partner Center
   (Product management → Product identity) and must match it character for character.
 
-  Three choices here are load-bearing — read Docs/avalonia-v2/microsoft-store.md before
+  Two choices here are load-bearing — read Docs/avalonia-v2/microsoft-store.md before
   changing them:
 
   * runFullTrust — AgentZero is a desktop app that hosts ConPTY terminals, named pipes and
     a loopback asset server; none of that runs in an AppContainer.
-  * unvirtualizedResources + FileSystem/RegistryWriteVirtualization=disabled — by default an
-    MSIX app's writes to %LOCALAPPDATA% / %APPDATA% / HKCU are redirected into a private
-    per-package store, and so are the writes of every process it starts. That would (a) hide
-    agentZeroLite.db and the settings files from the WPF host and from `-cli` callers, and
-    (b) make `npm install -g` run from a terminal tab land in the package's private cache,
-    invisible to the user's other terminals and deleted on uninstall. It is a restricted
-    capability: Partner Center asks for a justification on every submission.
   * appExecutionAlias AgentZeroLite.exe — so `AgentZeroLite.exe -cli …` works from any
     shell, exactly as the docs and the agentzero-cli skill write it.
+
+  What is deliberately NOT here: unvirtualizedResources. The first submission declared it
+  (AppData/HKCU write virtualization off) and certification denied it (policy 10.6.3,
+  2026-09-30). Without it the app's own new files under AppData live in the package's
+  private store — fine for the Store edition — and the tools a terminal tab runs (npm,
+  node, claude, git…) are kept out of that store a different way: the processes the app
+  starts are created with the desktop-app breakaway policy (DesktopAppBreakaway in
+  ZeroCommon), so *their* children run outside the package and write the real AppData.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 desktop desktop6 rescap">
+  IgnorableNamespaces="uap uap3 desktop rescap">
 
   <Identity
     Name="__IDENTITY_NAME__"
@@ -39,12 +39,10 @@
     <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <Description>Windows-native multi-CLI shell for AI coding agents: terminal tabs for Claude, Codex and agent-one, split panes, workspaces and an on-device assistant.</Description>
-    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
-    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
   </Properties>
 
   <Dependencies>
-    <!-- 19041 (20H1): ConPTY, WebView2 and the desktop6 virtualization switches are all older
+    <!-- 19041 (20H1): ConPTY, WebView2 and the desktop-app breakaway policy are all older
          than this; it is also the oldest Windows 10 build still in service. -->
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
@@ -76,6 +74,5 @@
   <Capabilities>
     <Capability Name="internetClient" />
     <rescap:Capability Name="runFullTrust" />
-    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>

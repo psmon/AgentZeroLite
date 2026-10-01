@@ -30,6 +30,7 @@ internal sealed class ConPtyHost : IPtyHost
 
     private IntPtr _hPC = IntPtr.Zero;          // pseudo-console handle
     private IntPtr _attrList = IntPtr.Zero;      // proc-thread attribute list
+    private IntPtr _breakawayPolicy = IntPtr.Zero; // DWORD the desktop-app policy attribute points at (Store build only)
     private IntPtr _inWrite = IntPtr.Zero;       // our end of stdin (we write)
     private IntPtr _outRead = IntPtr.Zero;       // our end of stdout (we read)
     private SafeFileHandle? _processHandle;
@@ -81,18 +82,33 @@ internal sealed class ConPtyHost : IPtyHost
             Native.CloseHandle(inRead);
             Native.CloseHandle(outWrite);
 
-            // Build the proc-thread attribute list carrying the pseudo-console.
+            // Build the proc-thread attribute list carrying the pseudo-console — and, in the
+            // Store (MSIX) build, the desktop-app breakaway policy, so the shell and the tools
+            // it runs (npm -g, node, claude, git…) write the real AppData rather than the
+            // package's private store (see DesktopAppBreakaway).
+            var breakaway = DesktopAppBreakaway.IsPackagedProcess();
+            var attrCount = breakaway ? 2 : 1;
             var lpSize = IntPtr.Zero;
-            Native.InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref lpSize);
+            Native.InitializeProcThreadAttributeList(IntPtr.Zero, attrCount, 0, ref lpSize);
             Diagnostics += $" | attrListSize={lpSize}";
             _attrList = Marshal.AllocHGlobal(lpSize);
-            if (!Native.InitializeProcThreadAttributeList(_attrList, 1, 0, ref lpSize))
+            if (!Native.InitializeProcThreadAttributeList(_attrList, attrCount, 0, ref lpSize))
                 throw new InvalidOperationException($"InitializeProcThreadAttributeList failed: {Marshal.GetLastWin32Error()}");
             if (!Native.UpdateProcThreadAttribute(
                     _attrList, 0,
                     (IntPtr)Native.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
                     _hPC, (IntPtr)IntPtr.Size, IntPtr.Zero, IntPtr.Zero))
                 throw new InvalidOperationException($"UpdateProcThreadAttribute failed: {Marshal.GetLastWin32Error()}");
+            if (breakaway)
+            {
+                _breakawayPolicy = DesktopAppBreakaway.AllocPolicyValue();
+                if (!Native.UpdateProcThreadAttribute(
+                        _attrList, 0,
+                        (IntPtr)DesktopAppBreakaway.ProcThreadAttributeDesktopAppPolicy,
+                        _breakawayPolicy, (IntPtr)sizeof(uint), IntPtr.Zero, IntPtr.Zero))
+                    throw new InvalidOperationException($"UpdateProcThreadAttribute(desktop app policy) failed: {Marshal.GetLastWin32Error()}");
+                Diagnostics += " | breakaway";
+            }
             Diagnostics += " | attrOK";
 
             var startupInfo = new Native.STARTUPINFOEX();
@@ -280,6 +296,11 @@ internal sealed class ConPtyHost : IPtyHost
                 try { Native.DeleteProcThreadAttributeList(_attrList); } catch { }
                 try { Marshal.FreeHGlobal(_attrList); } catch { }
                 _attrList = IntPtr.Zero;
+            }
+            if (_breakawayPolicy != IntPtr.Zero)
+            {
+                try { Marshal.FreeHGlobal(_breakawayPolicy); } catch { }
+                _breakawayPolicy = IntPtr.Zero;
             }
 
             try { _processHandle?.Dispose(); } catch { }

@@ -289,6 +289,14 @@ public static class AgentCliTools
             return -1;
         }
 
+        // Store (MSIX) build: a process started the ordinary way would run inside the
+        // package, and the global install would land in the package's private AppData store
+        // instead of %APPDATA%\npm — invisible to every other terminal. DesktopAppBreakaway
+        // starts it outside instead.
+        if (DesktopAppBreakaway.IsPackagedProcess())
+            return await DesktopAppBreakaway.RunCapturedAsync(
+                $"\"{plan.Exe}\" {plan.Arguments}", onOutput, cancellationToken).ConfigureAwait(false);
+
         var psi = new ProcessStartInfo(plan.Exe, plan.Arguments)
         {
             UseShellExecute = false,

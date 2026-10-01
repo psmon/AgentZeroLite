@@ -10,6 +10,12 @@ Avalonia 호스트(`Project/AgentZeroAvalonia`)의 Windows 빌드를 Microsoft S
 
 ---
 
+> **2026-09-30 1차 제출 반려 → 방식 변경.** `unvirtualizedResources` 요청이 정책 10.6.3으로 거부됐다.
+> 그래서 매니페스트에서 이 기능과 가상화 해제 설정을 **뺐고**, 대신 앱이 띄우는 프로세스(터미널 탭의 셸, 설정의
+> 설치 명령)를 Windows의 **desktop app breakaway** 정책으로 만들어 패키지 밖에서 돌게 했다
+> (`ZeroCommon/Services/DesktopAppBreakaway.cs`). 아래 §0의 "가상화를 끄는" 설명은 1차 제출 당시의 기록이다 —
+> 지금 기준은 §6.
+
 ## 0. 결정: MSIX로 제출한다 (EXE/MSI 아님)
 
 | | MSIX (선택) | EXE/MSI (Inno Setup 설치 파일) |
@@ -157,6 +163,32 @@ cd Project\AgentZeroAvalonia\msix
 - **CI 자동화(후속)**: `avalonia-build.yml`에 MSIX 빌드를 붙이고, `msstore` CLI(Microsoft Store Developer CLI)로
   제출을 자동화할 수 있다. 첫 제출은 수동으로 하고 규칙이 굳으면 붙이는 것을 권장.
 - **arm64(후속)**: 지금은 x64만. arm64 publish를 더하면 `.msixbundle`로 묶는다.
+
+## 6. 1차 반려와 2차 방식 (2026-09-30 ~)
+
+반려 리포트(10.6.3 Capabilities): *"unvirtualizedResources 요청은 제공된 정보로는 거부. 기능을 빼고 다시 제출하거나,
+새/보강된 사유로 재검토를 요청하라. 유효한 지원 연락처 또는 개발자 웹사이트 URL을 포함할 것."*
+
+선택: **기능 제거 + 앱 수정.**
+
+| 무엇 | 어떻게 |
+|---|---|
+| 매니페스트 | `unvirtualizedResources`, `desktop6:*WriteVirtualization` 제거. `runFullTrust`·실행 별칭은 유지 |
+| 터미널 탭 | `ConPtyHost`가 패키지로 실행 중일 때 의사 콘솔 속성 옆에 `PROC_THREAD_ATTRIBUTE_DESKTOP_APP_POLICY = ENABLE_PROCESS_TREE`를 넣는다 |
+| 설정의 설치 버튼 | `AgentCliTools.RunInstallAsync`가 패키지 실행 시 `DesktopAppBreakaway.RunCapturedAsync`(같은 속성 + 출력 캡처)로 돌린다 |
+| 패키지가 아닐 때 | 아무것도 바뀌지 않음 (`IsPackagedProcess()` = false — 일반 설치판, WPF, 테스트) |
+| 지원 연락처 | Partner Center 지원 연락처 칸 = `psmon@live.co.kr`, 웹사이트 = 저장소. Issues URL은 설명과 개인정보 처리방침에 |
+
+실측 (Windows 11 26200, 개발자 모드 등록 패키지, 가상화 기능 없이):
+
+| 실험 | 셸 자신이 만든 새 폴더 | 셸이 띄운 cmd가 만든 새 폴더 |
+|---|---|---|
+| breakaway 속성으로 만든 cmd | ✅ 실제 경로 | ✅ 실제 경로 |
+| 속성 없음(대조군) | ❌ 패키지 저장소 | ❌ 패키지 저장소 |
+| **실제 패키지 앱의 터미널 탭** (`layout add` → `terminal-send`) | ✅ 실제 경로 | ✅ 실제 경로(`%APPDATA%`) |
+
+남는 차이: 스토어판 **앱 자신이 새로 만드는** AppData 파일은 패키지 저장소에 들어간다. 기존 파일(이미 설치된 PC의
+DB·설정)은 제자리에서 수정되므로 계속 공유된다 — 새 PC에서만 스토어판 데이터가 따로 놓인다.
 
 ## 참고
 
