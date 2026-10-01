@@ -208,7 +208,7 @@ public partial class SettingsPanel : UserControl
     // ═══ Agent CLI install (Claude / Codex / AgentOne) ═══════════════════════
     //
     // The same panel the Avalonia host has (SettingsViewModel): AgentCliTools decides
-    // which tool a row drives, whether it is on PATH, and the npm command that installs
+    // which tool a row drives, whether it is on PATH, and the command that installs
     // it; this is only the WPF screen over it.
 
     private AgentCliTool? _agentCliTool;
@@ -226,7 +226,7 @@ public partial class SettingsPanel : UserControl
         pnlAgentCli.Visibility = tool is null ? Visibility.Collapsed : Visibility.Visible;
         if (tool is null) return;
 
-        lblAgentCliTitle.Text = $"AGENT CLI · {tool.Name.ToUpperInvariant()} · {tool.NpmPackage}";
+        lblAgentCliTitle.Text = $"AGENT CLI · {tool.Name.ToUpperInvariant()} · {tool.InstallRoute}";
         btnAgentCliInstall.IsEnabled = !_agentCliInstalling;
         ProbeAgentCli(tool);
     }
@@ -243,7 +243,7 @@ public partial class SettingsPanel : UserControl
                 // launches inherit that stale PATH, so "installed" alone would be followed
                 // by a tab that cannot find the command.
                 { Installed: true } => $"{tool.Name} is installed at {state.ResolvedPath}, but AgentZero started before it was on PATH — restart AgentZero so new tabs can find it.",
-                _ => $"{tool.Name} was not found on PATH. Install it with npm below, or see {tool.DocsUrl}",
+                _ => $"{tool.Name} was not found on PATH. Install it below, or see {tool.DocsUrl}",
             };
         }
         catch (Exception ex)
@@ -276,7 +276,7 @@ public partial class SettingsPanel : UserControl
         AppLogger.Log($"[Settings] agent CLI install | tool={tool.Name} cmd={plan.CommandLine}");
         try
         {
-            // npm reports from its own threads; every line is marshalled to the UI thread.
+            // The installer reports from its own threads; every line is marshalled to the UI thread.
             var exit = await AgentCliTools.RunInstallAsync(plan,
                 line => Dispatcher.BeginInvoke(() => AppendAgentCliLog(line)));
 

@@ -411,8 +411,8 @@ public partial class SettingsViewModel : ObservableObject
     // A built-in definition is a shell plus an agent command, so the row can be perfectly
     // valid while the agent itself was never installed — the tab then opens and prints
     // "claude : The term 'claude' is not recognized", which reads as a broken app. This
-    // panel answers "is it there?" and, when it is not, fetches it with npm — the one
-    // route all three publish on every OS. AgentCliTools holds every rule; this is only
+    // panel answers "is it there?" and, when it is not, fetches it — with npm, or with the
+    // vendor script for a tool that is not on npm. AgentCliTools holds every rule; this is only
     // its screen.
 
     [ObservableProperty] private string _cliToolStatus = "";

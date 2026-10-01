@@ -6,34 +6,43 @@ namespace Agent.Common.Services;
 
 /// <summary>
 /// One agent CLI the app ships a built-in definition for, and what is needed to put it
-/// on the machine: its npm package. The built-in rows launch these through a shell, so a
-/// definition can exist for a tool that was never installed — the tab then opens and
-/// prints "claude : The term 'claude' is not recognized", which looks like a broken app
-/// rather than a missing program. Naming the tool here is what lets the settings page say
-/// which it is and offer to fetch it.
+/// on the machine. The built-in rows launch these through a shell, so a definition can
+/// exist for a tool that was never installed — the tab then opens and prints
+/// "claude : The term 'claude' is not recognized", which looks like a broken app rather
+/// than a missing program. Naming the tool here is what lets the settings page say which
+/// it is and offer to fetch it.
 ///
-/// <para>npm is the one install route, on every OS. All three tools publish there first
-/// (the winget packages lagged releases and exist for Windows only), and one route means
-/// one probe, one error message, and an update command a person already knows.</para>
+/// <para>Two install routes, decided by the tool's publisher rather than by us: an npm
+/// package (Claude, Codex, agent-one — the winget packages lagged releases and exist for
+/// Windows only, so npm is the route on every OS for these), or the vendor's own install
+/// script when the tool is not on npm (netclaw). Exactly one of
+/// <paramref name="NpmPackage"/> and the two scripts is set.</para>
 /// </summary>
 /// <param name="Name">The built-in definition's name, and what the UI calls the tool.</param>
 /// <param name="Command">The executable the shell resolves through PATH.</param>
-/// <param name="NpmPackage">The npm package the install runs <c>npm install -g</c> on.</param>
+/// <param name="NpmPackage">The npm package the install runs <c>npm install -g</c> on, or null for a script install.</param>
 /// <param name="DocsUrl">Where a person goes when the install fails.</param>
 /// <param name="LaunchArgs">
 /// What the built-in row passes after the command. Empty for tools whose bare command is
-/// the interactive agent; <c>chat</c> for agent-one, whose bare command prints its help —
-/// its full-screen agent is the <c>chat</c> verb.
+/// the interactive agent; <c>chat</c> for agent-one and netclaw, whose bare command prints
+/// help (or manages a daemon) — their interactive agent is the <c>chat</c> verb.
 /// </param>
+/// <param name="WindowsInstallScript">The vendor's PowerShell one-liner, run as typed.</param>
+/// <param name="PosixInstallScript">The vendor's shell one-liner for macOS / Linux, run by bash.</param>
 public sealed record AgentCliTool(
     string Name,
     string Command,
-    string NpmPackage,
+    string? NpmPackage,
     string DocsUrl,
-    string LaunchArgs = "")
+    string LaunchArgs = "",
+    string? WindowsInstallScript = null,
+    string? PosixInstallScript = null)
 {
     /// <summary>The command line a terminal tab runs: the command, then its launch arguments.</summary>
     public string Launch => LaunchArgs.Length == 0 ? Command : Command + " " + LaunchArgs;
+
+    /// <summary>How it is installed, for the settings screen: the npm package or "install script".</summary>
+    public string InstallRoute => NpmPackage ?? "install script";
 }
 
 /// <summary>Where a tool was found, and whether the tabs this process launches can see it.</summary>
@@ -69,13 +78,14 @@ public sealed record AgentCliToolState(bool Installed, string? ResolvedPath, boo
 /// process launch without a shell cannot start, so the plan runs it through
 /// <c>cmd.exe</c> — and shows <c>npm install -g …</c> rather than the wrapper.
 /// </param>
-public sealed record AgentCliInstallPlan(string Exe, string Arguments, string? Problem = null, string? Shown = null)
+/// <param name="InstallerName">What messages call the installer when the command's first word would not say it ("netclaw installer", not "iwr").</param>
+public sealed record AgentCliInstallPlan(string Exe, string Arguments, string? Problem = null, string? Shown = null, string? InstallerName = null)
 {
     public string CommandLine => Shown ?? (Exe + " " + Arguments).Trim();
     public bool CanRun => Problem is null;
 
     /// <summary>The installer's name for messages ("npm finished"), not the wrapper that runs it.</summary>
-    public string Installer => CommandLine.Split(' ', 2)[0];
+    public string Installer => InstallerName ?? CommandLine.Split(' ', 2)[0];
 }
 
 /// <summary>
@@ -110,7 +120,22 @@ public static class AgentCliTools
         DocsUrl: "https://github.com/psmon/AgentZeroLite/tree/main/Project/AgentOne",
         LaunchArgs: "chat");
 
-    public static IReadOnlyList<AgentCliTool> All { get; } = new[] { Claude, Codex, AgentOne };
+    /// <summary>
+    /// netclaw (netclaw.dev) — a self-hosted .NET agent. Not on npm: the vendor's installer
+    /// puts <c>netclaw.exe</c> in <c>%LOCALAPPDATA%\Programs\netclaw</c> (<c>~/.netclaw/bin</c>
+    /// elsewhere) and prepends it to the user PATH, no admin. <c>chat</c> is its interactive
+    /// mode; the bare command is the CLI for init / daemon / config.
+    /// </summary>
+    public static readonly AgentCliTool Netclaw = new(
+        Name: "Netclaw",
+        Command: "netclaw",
+        NpmPackage: null,
+        DocsUrl: "https://netclaw.dev/",
+        LaunchArgs: "chat",
+        WindowsInstallScript: "iwr -useb https://releases.netclaw.dev/install.ps1 | iex",
+        PosixInstallScript: "curl -sSL https://releases.netclaw.dev/install.sh | bash");
+
+    public static IReadOnlyList<AgentCliTool> All { get; } = new[] { Claude, Codex, AgentOne, Netclaw };
 
     /// <summary>
     /// The tool a definition drives, or null for a plain shell. Matched on the same
@@ -206,6 +231,7 @@ public static class AgentCliTools
 
                 yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WinGet", "Links");
                 yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "npm");
+                yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "netclaw");
                 yield return Path.Combine(home, ".local", "bin");
             }
             else
@@ -214,6 +240,7 @@ public static class AgentCliTools
                 yield return "/usr/local/bin";
                 yield return Path.Combine(home, ".local", "bin");
                 yield return Path.Combine(home, ".npm-global", "bin");
+                yield return Path.Combine(home, ".netclaw", "bin");
             }
         }
     }
@@ -250,12 +277,14 @@ public static class AgentCliTools
     // ── install ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// How to install this tool here: <c>npm install -g</c>, on every OS. npm is probed
-    /// first so a machine without Node.js is told that, not handed an exit code.
+    /// How to install this tool here: <c>npm install -g</c> on every OS for an npm tool —
+    /// npm is probed first so a machine without Node.js is told that, not handed an exit
+    /// code — or the vendor's own script for one that is not on npm.
     /// </summary>
     public static AgentCliInstallPlan PlanInstall(AgentCliTool tool, bool? isWindows = null)
     {
         var windows = isWindows ?? OperatingSystem.IsWindows();
+        if (tool.NpmPackage is null) return PlanScriptInstall(tool, windows);
         var shown = $"npm install -g {tool.NpmPackage}";
 
         var problem = Locate("npm", FreshPathEntries(windows), DefaultExtensions(windows)) is null
@@ -269,6 +298,31 @@ public static class AgentCliTools
         return windows
             ? new AgentCliInstallPlan("cmd.exe", $"/d /s /c \"{shown}\"", problem, Shown: shown)
             : new AgentCliInstallPlan("npm", $"install -g {tool.NpmPackage}", problem);
+    }
+
+    /// <summary>
+    /// The vendor's one-liner, run the way its docs say to type it: Windows PowerShell 5
+    /// (every Windows has it) with -ExecutionPolicy Bypass for this one process only, or
+    /// bash elsewhere. The screen shows the one-liner itself, so a person agreeing to the
+    /// install sees exactly the command the vendor publishes.
+    /// </summary>
+    private static AgentCliInstallPlan PlanScriptInstall(AgentCliTool tool, bool windows)
+    {
+        var installer = tool.Name + " installer";
+        var script = windows ? tool.WindowsInstallScript : tool.PosixInstallScript;
+        if (string.IsNullOrWhiteSpace(script))
+            return new AgentCliInstallPlan("", "", $"No installer is published for this OS. Install {tool.Name} yourself: {tool.DocsUrl}",
+                InstallerName: installer);
+
+        if (windows)
+            return new AgentCliInstallPlan("powershell.exe",
+                $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"{script}\"",
+                Shown: script, InstallerName: installer);
+
+        var curlMissing = script.Contains("curl ") && Locate("curl", FreshPathEntries(false), DefaultExtensions(false)) is null
+            ? $"curl is not available. Install curl first, or install {tool.Name} yourself: {tool.DocsUrl}"
+            : null;
+        return new AgentCliInstallPlan("/bin/bash", $"-c \"{script}\"", curlMissing, Shown: script, InstallerName: installer);
     }
 
     /// <summary>

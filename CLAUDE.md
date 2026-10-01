@@ -187,7 +187,7 @@ ComboBox style is a full re-template (toggle + popup + item). That is Pitfall 6 
 `Foreground` setters alone leave the chrome and the popup drawn from `SystemColors`.
 
 ### Persistence
-EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude, Codex, AgentOne — POSIX hosts get zsh/bash instead of the three Windows shells) are marked `IsBuiltIn = true` and must not be deletable from the UI. The three Windows shells come from the migration's `HasData`; the **agent CLI profiles are seeded at runtime and checked one at a time** (`EnsureDefaultCliDefinitions` + `AgentCliTools.All`), because a single "already seeded?" guard would see the Claude row every existing database has and never add a newly shipped built-in. The agent profiles launch through **PowerShell 5** (`powershell.exe -NoExit -Command <tool>`) on Windows and zsh elsewhere — AgentOne as `agent-one chat` (`AgentCliTool.LaunchArgs`), because bare `agent-one` prints help and exits — not the tool directly, so the tab survives the agent exiting. Whether the tool is actually installed is `AgentCliTools`' question, not the row's: see the Avalonia settings note below.
+EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude, Codex, AgentOne, Netclaw — POSIX hosts get zsh/bash instead of the three Windows shells) are marked `IsBuiltIn = true` and must not be deletable from the UI. The three Windows shells come from the migration's `HasData`; the **agent CLI profiles are seeded at runtime and checked one at a time** (`EnsureDefaultCliDefinitions` + `AgentCliTools.All`), because a single "already seeded?" guard would see the Claude row every existing database has and never add a newly shipped built-in. The agent profiles launch through **PowerShell 5** (`powershell.exe -NoExit -Command <tool>`) on Windows and zsh elsewhere — AgentOne as `agent-one chat` and Netclaw as `netclaw chat` (`AgentCliTool.LaunchArgs`), because their bare commands print help (or manage a daemon) instead of opening the agent — not the tool directly, so the tab survives the agent exiting. Whether the tool is actually installed is `AgentCliTools`' question, not the row's: see the Avalonia settings note below.
 
 **Credentials at rest.** API keys in `llm-settings.json` / `voice-settings.json` are sealed through
 `SecretProtection.Protector` (`ISecretProtector`): DPAPI on Windows (`dpapi:v1:`), AES-GCM elsewhere
@@ -240,10 +240,12 @@ What differs from the WPF host, and why:
 - **CLI**: same request/response JSON as WPF over the pipe `AgentZeroLite.cli` (not WM_COPYDATA), so `-cli help agentzero` applies; extra verbs `bot-ask` and `layout`. Wrappers: `AgentZeroLite.ps1` / `AgentZeroLite.sh`.
 - **Agent CLI install lives in both hosts' settings** (`AgentCliTools` in ZeroCommon; the panel is
   `SettingsViewModel`/`SettingsView` here and the CLI Definitions tab of WPF's `SettingsPanel`): selecting a
-  definition that launches Claude, Codex or AgentOne probes PATH and, when the tool is missing, installs it with
-  **npm on every OS** — `npm install -g @anthropic-ai/claude-code | @openai/codex | @webnori/agent-one`. npm, not
-  winget: all three publish there first, winget's packages lagged releases and exist for Windows only, and one
-  route is one probe and one error message. Four things the code explains and a reader should not re-derive: the
+  definition that launches Claude, Codex, AgentOne or Netclaw probes PATH and, when the tool is missing, installs it
+  — **npm on every OS** for the npm tools (`npm install -g @anthropic-ai/claude-code | @openai/codex |
+  @webnori/agent-one`; not winget, whose packages lagged releases and exist for Windows only), and **the vendor's
+  one-liner** for Netclaw, which is not on npm (`iwr -useb https://releases.netclaw.dev/install.ps1 | iex` through
+  `powershell.exe -ExecutionPolicy Bypass`, `curl … install.sh | bash` elsewhere; it lands in
+  `%LOCALAPPDATA%\Programs\netclaw` / `~/.netclaw/bin`, both in the probe's fresh-PATH list). Four things the code explains and a reader should not re-derive: the
   probe honours PATHEXT **plus `.ps1`** (PATHEXT omits it, but the built-ins run the agent inside PowerShell, which
   resolves a script shim); on Windows the plan runs `cmd.exe /d /s /c "npm install -g …"` and shows the plain
   `npm` line (`AgentCliInstallPlan.Shown`), because npm is `npm.cmd` and a launch without a shell — needed to

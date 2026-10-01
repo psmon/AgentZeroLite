@@ -32,6 +32,8 @@ public sealed class AgentCliToolsTests : IDisposable
     [InlineData("powershell.exe", "-NoExit -Command agent-one chat", "AgentOne")]
     [InlineData("/bin/zsh", "-l -c \"agent-one chat; exec zsh -l\"", "AgentOne")]
     [InlineData("C:\\Users\\me\\AppData\\Roaming\\npm\\agent-one.cmd", "chat", "AgentOne")]
+    [InlineData("powershell.exe", "-NoExit -Command netclaw chat", "Netclaw")]
+    [InlineData("/bin/zsh", "-l -c \"netclaw chat; exec zsh -l\"", "Netclaw")]
     public void A_definition_that_launches_an_agent_is_matched_to_it(string exe, string? args, string expected)
     {
         var tool = AgentCliTools.Match(new CliDefinition { ExePath = exe, Arguments = args });
@@ -52,15 +54,49 @@ public sealed class AgentCliToolsTests : IDisposable
     }
 
     [Fact]
-    public void Every_built_in_tool_names_its_npm_package_and_docs()
+    public void Every_built_in_tool_names_exactly_one_install_route_and_docs()
     {
-        Assert.Equal(new[] { "Claude", "Codex", "AgentOne" }, AgentCliTools.All.Select(t => t.Name));
+        Assert.Equal(new[] { "Claude", "Codex", "AgentOne", "Netclaw" }, AgentCliTools.All.Select(t => t.Name));
         foreach (var tool in AgentCliTools.All)
         {
             Assert.False(string.IsNullOrWhiteSpace(tool.Command));
-            Assert.StartsWith("@", tool.NpmPackage);     // all three publish under a scope
             Assert.StartsWith("https://", tool.DocsUrl); // the fallback when the install fails
+            if (tool.NpmPackage is not null)
+            {
+                Assert.StartsWith("@", tool.NpmPackage);   // the npm tools publish under a scope
+                Assert.Null(tool.WindowsInstallScript);
+                Assert.Null(tool.PosixInstallScript);
+            }
+            else
+            {
+                // Not on npm: the vendor's scripts, for both OS families the app runs on.
+                Assert.False(string.IsNullOrWhiteSpace(tool.WindowsInstallScript));
+                Assert.False(string.IsNullOrWhiteSpace(tool.PosixInstallScript));
+            }
         }
+    }
+
+    [Fact]
+    public void Netclaw_launches_as_chat_and_installs_with_the_vendor_script()
+    {
+        var netclaw = AgentCliTools.Netclaw;
+        Assert.Equal("netclaw chat", netclaw.Launch);
+        Assert.Null(netclaw.NpmPackage);
+        Assert.Equal("install script", netclaw.InstallRoute);
+
+        var win = AgentCliTools.PlanInstall(netclaw, isWindows: true);
+        Assert.True(win.CanRun);   // Windows PowerShell 5 is on every Windows
+        Assert.Equal("powershell.exe", win.Exe);
+        Assert.Contains("-ExecutionPolicy Bypass", win.Arguments);
+        Assert.Contains("iwr -useb https://releases.netclaw.dev/install.ps1 | iex", win.Arguments);
+        // The screen shows the one-liner the vendor publishes, not the wrapper.
+        Assert.Equal("iwr -useb https://releases.netclaw.dev/install.ps1 | iex", win.CommandLine);
+        Assert.Equal("Netclaw installer", win.Installer);
+
+        var posix = AgentCliTools.PlanInstall(netclaw, isWindows: false);
+        Assert.Equal("/bin/bash", posix.Exe);
+        Assert.Equal("curl -sSL https://releases.netclaw.dev/install.sh | bash", posix.CommandLine);
+        Assert.Equal("Netclaw installer", posix.Installer);
     }
 
     [Fact]
