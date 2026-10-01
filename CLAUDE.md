@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 응답 언어 — 한국어
+
+사용자에게 하는 모든 응답(설명, 진행 보고, 질문, 선택지)은 **한국어**로 작성한다. 코드, 커밋 메시지,
+코드 주석, 영문 문서(README.md 등 영문 쪽 짝)는 기존 관례대로 영어를 유지하고, 한국어 문서는 한국어로 쓴다.
+
 ## Build & test
 
 Target framework is **.NET 10** (preview). The WPF host is `net10.0-windows`; shared logic (`ZeroCommon`) is `net10.0` and must remain WPF/Win32-free so its headless xUnit suite can run. The wearable host (`ZeroWearable`) is the one exception: `net10.0-windows10.0.19041.0`, because the BLE central is WinRT.
