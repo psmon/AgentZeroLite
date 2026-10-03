@@ -43,7 +43,10 @@ MSIX로 제출한다(Store가 무료로 서명·호스팅·자동 업데이트).
 2. **앱 이름 예약** — Partner Center → Apps and games → New product → **MSIX or PWA app** → `AgentZero Lite`.
 3. **패키지 ID 값** — 예약한 앱 → Product management → **Product identity** 의 세 값(Name, Publisher,
    PublisherDisplayName)을 `.secret/msstore-identity.json`(git 제외)에 그대로 적는다. 대소문자·공백까지 일치해야 한다.
-4. **개인정보 처리방침 URL** — 앱이 인터넷에 연결하므로 필수: `Docs/privacy-policy.md`의 GitHub 주소.
+4. **개인정보 처리방침 URL** — 앱이 인터넷에 연결하므로 필수: **GitHub Pages의 HTML 페이지**
+   https://psmon.github.io/AgentZeroLite/Home/privacy-policy.html
+   (원본은 `Docs/privacy-policy.md`, 페이지는 `Home/privacy-policy.html`. GitHub의 `blob/…` 파일 보기 URL은
+   "작동하는 웹 페이지가 아니다"로 반려됐다 — §6.)
 5. **로컬 검증 환경**(§3) — Windows SDK(10.0.26100), **설정 → 시스템 → 개발자용 → 개발자 모드 켜기**,
    WACK 실행용 관리자 PowerShell.
 
@@ -58,7 +61,7 @@ MSIX로 제출한다(Store가 무료로 서명·호스팅·자동 업데이트).
 | `Project/AgentZeroAvalonia/msix/build-msix.ps1` | publish(win-x64 self-contained) → 스테이징 → ID 채우기(`.secret/msstore-identity.json`) → `makepri` → `makeappx pack`. `-Register`(개발자 모드 제자리 등록, `stage-dev` 폴더), `-Sign`(테스트 인증서 서명) |
 | `Project/AgentZeroAvalonia/msix/store-listing/` | 스토어 등록 문구(`listing.md`), 300×300 로고, 스크린샷 |
 | `Project/ZeroCommon/Services/DesktopAppBreakaway.cs` | 패키지 실행 감지 + breakaway 속성 + 설치 명령 실행기 (§0) |
-| `Docs/privacy-policy.md` | 개인정보 처리방침 |
+| `Docs/privacy-policy.md` → `Home/privacy-policy.html` | 개인정보 처리방침 원본 → GitHub Pages로 게시되는 페이지 (둘을 함께 고칠 것. 배포: `doc-v*` 태그 또는 Pages 워크플로 수동 실행) |
 | `.gitignore` | `/publish-msix/` (빌드 산출물), `/.secret/` |
 
 **버전 규칙**: Store는 4자리 버전에서 첫 자리 0 금지, 마지막 자리 0 고정. 앱이 `0.x`라 MSIX 버전은
@@ -161,6 +164,16 @@ cd Project\AgentZeroAvalonia\msix
 
 1차 방식의 로컬 실측(참고): 가상화 해제 패키지에서는 새 폴더가 실제 경로에, 같은 패키지에서 가상화 설정만 뺀 대조군에서는
 `LocalCache\Local`·`LocalCache\Roaming`으로 숨겨졌다 — 이 대조 실험이 2차 방식 검증의 바탕이 됐다.
+
+### 2차 제출 반려 (2026-10-02 심사)
+
+반려 리포트(10.5.1 Personal Information - Privacy Policy): *"개인정보 처리방침 링크가 작동하는 웹 페이지로 연결되지
+않는다."* — 제공한 URL은 `https://github.com/psmon/AgentZeroLite/blob/main/Docs/privacy-policy.md`(GitHub의 저장소 파일
+보기). 우리 쪽에서는 200이 나왔지만 심사 환경에서는 정식 웹 페이지로 인정되지 않았다. **제한된 기능에 대한 지적은 없었다**
+(`unvirtualizedResources` 제거 + breakaway 방식은 통과한 것으로 보인다).
+
+대응: 같은 내용을 HTML 페이지(`Home/privacy-policy.html`)로 만들어 GitHub Pages에 게시하고 URL을 교체, 같은 패키지
+(1.25.1.0)로 3차 제출.
 
 ## 참고
 

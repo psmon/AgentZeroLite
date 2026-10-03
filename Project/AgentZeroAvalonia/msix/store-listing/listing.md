@@ -40,7 +40,8 @@ terminal, AI agent, Claude Code, Codex, developer tools, CLI, LLM
 Developer tools
 
 ## Privacy policy URL
-https://github.com/psmon/AgentZeroLite/blob/main/Docs/privacy-policy.md
+https://psmon.github.io/AgentZeroLite/Home/privacy-policy.html
+(a real web page on GitHub Pages — submission 2 was rejected for the github.com/…/blob/… file view)
 
 ## Website / support
 - Website: https://github.com/psmon/AgentZeroLite
