@@ -1,5 +1,11 @@
 [
   {
+    "tag": "agent-one-v0.7.0",
+    "published": "2026-10-03T07:13:36Z",
+    "setup": 0,
+    "zip": 2
+  },
+  {
     "tag": "agent-one-v0.6.1",
     "published": "2026-09-27T10:07:17Z",
     "setup": 0,
