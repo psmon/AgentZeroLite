@@ -216,7 +216,12 @@ public sealed partial class ChatSession : IAgentSession
             (ToolCatalog.FilesFamily, _files),
             (ToolCatalog.EditFamily, _files),
             (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(config.WebTimeoutSeconds))),
-            (ToolCatalog.ExecFamily, _shell));
+            (ToolCatalog.ExecFamily, _shell),
+            // Counted like smart mode's own questions, and judged against the person's words.
+            (ToolCatalog.DecideFamily, new DecisionToolbelt(_smartAvailable ? _engine : null, config.JevConfidenceFloor)
+            {
+                Request = () => _loop?.Request
+            }));
 
         _loop = new AgentLoop(_provider, _toolbelt, config.MaxSteps) { Streaming = streaming, Root = _root };
         _loop.OnStall = async (stall, retries, ct) =>

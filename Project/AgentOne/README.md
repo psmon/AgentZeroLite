@@ -107,6 +107,7 @@ agent-one run "what is in this folder?"
 | `agent-one models` | List what the configured endpoint can run (`*` marks the configured one). Exit 1 if it refuses or lists nothing. |
 | `agent-one auth` | `show` / `set` / `check` / `clear` / `import`. `--jev` addresses the TypeSafe key, `--reasoning` the strong model's. |
 | `agent-one jev` | `check` / `choose` — put a decision to TypeSafe and see the distribution. |
+| `agent-one decide` | The same engine as a plain command for scripts and other agents: question + options in, **one JSON object** out (`choice`, `confidence`, `confident`, every option's probability). Exit 0 decided · 1 engine failed · 2 bad request. |
 | `--smart` / `--basic` | On `run` and `chat`: route and escalate through the decision engine, or straight to the loop. |
 | `agent-one tools` | `list` / `show <name>` / `prompt`. |
 | `agent-one memory` | The workspace's knowledge graph: stats, `recent`, `helpful`, `search <words>`, `path <fragment>`, `pdsa`, `query "<cypher>"`. |
@@ -897,6 +898,26 @@ distribution
 connection setup and says almost nothing. Fewer than two options never reaches
 the network: there is nothing to decide.
 
+`agent-one decide` is the same call as a contract, for scripts and for other
+agents — `jev choose` is read by a person, `decide` is parsed by a program.
+One JSON object on stdout for every outcome, failures included (`ok:false`),
+non-ASCII left readable, and an exit code that separates "the engine could not"
+(1) from "the request was wrong" (2):
+
+```console
+$ agent-one decide "Tests fail only on Windows paths; one Path.Combine call."     -q "Which fix?" -o patch="change the one call" -o rewrite="replace the path module"
+{"ok":true,"question":"Which fix?","choice":"patch","choiceDescription":"change the one call",
+ "confidence":0.99,"confident":true,"floor":0.6,"ranked":[{"name":"patch",…,"probability":1},…],
+ "message":"jev-1.13.0 · 406 ms · 360+31 tokens","elapsedMs":406,"called":true}
+
+$ echo '{"question":"Ship today?","context":"2 flaky tests","options":{"ship":"release now","wait":"fix the flakes first"}}'     | agent-one decide --input -
+```
+
+Options are read the same way the agent's `decide` tool reads them
+(`DecisionInput`): `-o name=desc` pairs, `--options "a: x; b: y"` (or one per
+line), or JSON — an object, or an array of strings or `{name, description}`.
+`confident` is `confidence ≥ --floor` (default `jevConfidenceFloor`).
+
 ### Keys
 
 | Key | Does |
@@ -1004,9 +1025,10 @@ renderers hold. Inside the session, the turn is:
 
 ### Tools
 
-Six read-only verbs, and two that change things — each of those behind its own
-gate: the path sandbox for `write_file`, the command gate for `run_command`. A
-test keeps every verb that writes or runs inside those two families.
+Six read-only verbs, one that only asks for a judgment, and two that change
+things — each of those behind its own gate: the path sandbox for `write_file`,
+the command gate for `run_command`. A test keeps every verb that writes or runs
+inside those two families.
 
 | Verb | Does |
 |---|---|
@@ -1018,6 +1040,7 @@ test keeps every verb that writes or runs inside those two families.
 | `web_read(url)` | Fetch one page and return its readable text, truncated at 24 000 characters. |
 | `write_file(path, content)` | Create or overwrite a file **under the root only**, folders created as needed. Always the whole file: a partial-edit verb needs the model to quote the old text exactly, which small models get wrong. |
 | `run_command(command)` | One shell command in the root — PowerShell on Windows, bash (or sh) elsewhere — output and exit code back, killed past `commandTimeoutSeconds`. Runs only when the gate says so. |
+| `decide(question, options, context)` | Put a judgment call to Jev: one of 2–12 options, with its confidence and the whole distribution. The engine also sees the person's request, not only the model's summary. Smart mode asks Jev questions the code chose; this one the model chooses, mid-turn. It touches nothing, so a smart-mode route never rules it out; with no TypeSafe key it answers "unavailable" and the model decides alone. Same code path as `agent-one decide`. |
 
 The file verbs all resolve paths against `--root` and refuse anything that lands
 outside it. `grep` skips files over 2 MB and anything containing a NUL byte, and

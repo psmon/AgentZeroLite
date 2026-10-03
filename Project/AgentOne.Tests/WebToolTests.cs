@@ -169,7 +169,8 @@ public class CompositeToolbeltTests
             (ToolCatalog.FilesFamily, files),
             (ToolCatalog.EditFamily, files),
             (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(5))),
-            (ToolCatalog.ExecFamily, new ShellToolbelt(root, TimeSpan.FromSeconds(5))));
+            (ToolCatalog.ExecFamily, new ShellToolbelt(root, TimeSpan.FromSeconds(5))),
+            (ToolCatalog.DecideFamily, new DecisionToolbelt(null, 0.6)));
     }
 
     [Fact]

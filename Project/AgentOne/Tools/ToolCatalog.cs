@@ -34,6 +34,17 @@ public static class ToolCatalog
     /// </summary>
     public static readonly string[] GuardedFamilies = [EditFamily, ExecFamily];
 
+    /// <summary>Asks the decision engine (Jev) to judge between options. Touches nothing.</summary>
+    public const string DecideFamily = "decide";
+
+    /// <summary>
+    /// Families a smart-mode route never rules out: a judgment call reads and
+    /// changes nothing, so refusing it on a web or answer-directly turn would
+    /// only take away the model's way of checking itself.
+    /// </summary>
+    public static bool IsRouteExempt(string family) =>
+        string.Equals(family, DecideFamily, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>The family a verb belongs to, or null for a verb the catalog does not know.</summary>
     public static string? FamilyOf(string tool)
     {
@@ -84,6 +95,14 @@ public static class ToolCatalog
             "A risky command is put to the user first and may be declined.",
             ["command"],
             """{"tool":"run_command","args":{"command":"dotnet build"}}"""),
+
+        new("decide", DecideFamily,
+            "Put a judgment call to the decision engine (Jev): it picks one of 2-12 options and says how sure it is. " +
+            "Use it when a choice between options you already have is genuinely unclear — which approach, which file, " +
+            "whether the work is done. It judges what you give it in 'context'; it looks nothing up. " +
+            "options: one per line, or separated by ';', each name: description.",
+            ["question", "options", "context"],
+            """{"tool":"decide","args":{"question":"Which fix should be applied?","options":"patch: change the one failing call; rewrite: replace the module","context":"The test fails only on Windows paths."}}"""),
 
         new("final", LoopFamily,
             "Answer the user and end the run. Use it as soon as you can answer.",

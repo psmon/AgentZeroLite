@@ -168,8 +168,8 @@ public sealed class JevCommand
 
             The state may also arrive on stdin. Exit 1 if the service refused.
 
-            Smart mode is not built yet — this is the bench for judging whether the
-            answers and the confidence are good enough to act on automatically.
+            This is the bench a person reads. For scripts and other agents, use
+            `agent-one decide` — same engine, one JSON object out.
 
             Example:
               agent-one jev choose "The user asked how to build this repository." \

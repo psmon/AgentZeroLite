@@ -65,6 +65,7 @@ internal static class Program
                 "models" => await new ModelsCommand().ExecuteAsync(rest, cts.Token),
                 "auth" => await new AuthCommand().ExecuteAsync(rest, cts.Token),
                 "jev" => await new JevCommand().ExecuteAsync(rest, cts.Token),
+                "decide" => await new DecideCommand().ExecuteAsync(rest, cts.Token),
                 "tools" => new ToolsCommand().Execute(rest),
                 "memory" or "knowledge" => await new MemoryCommand().ExecuteAsync(rest, cts.Token),
                 "dashboard" => await new DashboardCommand().ExecuteAsync(rest, cts.Token),
@@ -115,6 +116,7 @@ internal static class Program
             case "models": ModelsCommand.PrintHelp(); return 0;
             case "auth": AuthCommand.PrintHelp(); return 0;
             case "jev": JevCommand.PrintHelp(); return 0;
+            case "decide": DecideCommand.PrintHelp(); return 0;
             case "tools": ToolsCommand.PrintHelp(); return 0;
             case "memory" or "knowledge": MemoryCommand.PrintHelp(); return 0;
             case "dashboard": DashboardCommand.PrintHelp(); return 0;
@@ -148,6 +150,7 @@ internal static class Program
               config           Show or change settings from the command line (~/.agent-one/config.json)
               auth             Store or inspect the API keys
               jev              Put a decision to TypeSafe / Jev (smart-mode bench)
+              decide           Ask Jev to choose between options — one JSON object out, for scripts and other agents
               models           List what the configured endpoint can run
               tools            List the verbs the agent can call
               knowledge        The workspace's knowledge graph: init/update from its markdown (guidelines vs

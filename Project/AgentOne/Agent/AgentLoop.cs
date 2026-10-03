@@ -347,7 +347,8 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
             ActivityStarted?.Invoke(Describe(call));
 
             ToolResult result;
-            if (allowed is not null && ToolCatalog.FamilyOf(call.Tool) is { } family && !allowed.Contains(family))
+            if (allowed is not null && ToolCatalog.FamilyOf(call.Tool) is { } family && !allowed.Contains(family)
+                && !(ToolCatalog.IsRouteExempt(family) && !familiesAreFinal))
             {
                 if (!familiesAreFinal && guards.RefuseFamily())
                 {
@@ -607,6 +608,7 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
         "list_files" => $"listing {call.Arg("path", ".")}",
         "find_files" => $"finding {call.Arg("pattern")}",
         "grep" => $"searching files for \"{call.Arg("text")}\"",
+        "decide" => $"asking Jev: {call.Arg("question")}",
         _ => call.Tool
     };
 

@@ -479,13 +479,20 @@ Three things that are easy to break here:
   (`.github/workflows/agent-one-release.yml`, tag `agent-one-v*`) handles both and
   smoke-tests each artifact before it reaches the release page.
 
-Tools come in four families routed by `CompositeToolbelt` from each `ToolSpec`'s
+Tools come in five families routed by `CompositeToolbelt` from each `ToolSpec`'s
 `Family`: **files** (`list_files`, `read_file`, `find_files`, `grep`) and
 **edit** (`write_file`, whole file, folders created) — both on
 `LocalFileToolbelt`, sandboxed to `--root` and resolved through symlinks before
 the containment check; **web** (`web_search`, `web_read`), GETs only; and
 **exec** (`run_command`, `ShellToolbelt`: PowerShell on Windows, bash/sh
-elsewhere, cwd = root, killed past `commandTimeoutSeconds`). The two families
+elsewhere, cwd = root, killed past `commandTimeoutSeconds`); and **decide**
+(`decide`, `Tools/DecisionToolbelt`: the model puts a judgment call to Jev
+mid-turn — choice, confidence, distribution — judged against the person's words,
+not only the model's summary; it touches nothing, so `ToolCatalog.IsRouteExempt`
+keeps a smart-mode route from ruling it out). `agent-one decide` is the same
+call as a command for scripts and other agents — one JSON object out, exit 0/1/2
+— and shares the option reader and result shape (`Llm/Decision/DecisionInput`)
+with the tool, so the two cannot disagree. The two families
 that change something are `ToolCatalog.GuardedFamilies`, and a test keeps every
 writing/running verb inside them. **Writes never leave the root**; a folder the
 user names by absolute path (`Tools/PathGrants`) is granted for *reading* only,
