@@ -71,9 +71,11 @@ macOS: download `AgentZeroLite-Avalonia-v<ver>-osx-arm64.zip` from the *Avalonia
 `AgentZeroLite.app/Contents/MacOS/AgentZeroLite.sh`. Hand checklist: [Docs/avalonia-v2/macos-smoke.md](Docs/avalonia-v2/macos-smoke.md).
 
 Microsoft Store (Windows): `Project/AgentZeroAvalonia/msix/build-msix.ps1` builds the MSIX (x64, the Store signs
-it). The manifest turns AppData/HKCU write virtualization off (`unvirtualizedResources`) so the database, the
-settings and whatever terminal tabs install stay shared with the rest of the machine — a restricted capability
-the Store approves per submission. Procedure, local checks and paste-ready listing text (in Korean):
+it). The Store edition keeps its own data (database, settings) isolated in the package — by design; it does
+not share them with the regular install — while terminal tabs and the settings installer start their processes
+with the desktop-app breakaway policy (`DesktopAppBreakaway`), so whatever the user installs or runs there
+(npm -g, claude, git…) lands in the real profile. The only restricted capability is `runFullTrust`.
+Procedure, local checks and paste-ready listing text (in Korean):
 [Docs/avalonia-v2/microsoft-store.md](Docs/avalonia-v2/microsoft-store.md).
 
 ## Converted so far

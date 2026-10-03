@@ -70,8 +70,10 @@ macOS: *Avalonia host* 워크플로 실행에서 `AgentZeroLite-Avalonia-v<ver>-
 `AgentZeroLite.app/Contents/MacOS/AgentZeroLite.sh`. 손 점검표: [Docs/avalonia-v2/macos-smoke.md](Docs/avalonia-v2/macos-smoke.md).
 
 Microsoft Store(Windows): `Project/AgentZeroAvalonia/msix/build-msix.ps1` 가 MSIX(x64, 서명은 Store가 함)를 만든다.
-매니페스트가 AppData/HKCU 쓰기 가상화를 끄므로(`unvirtualizedResources`) DB·설정·터미널 탭에서 설치한 도구가 PC의
-나머지와 계속 공유된다 — 제출 때마다 Store 승인을 받는 제한된 기능이다. 절차, 로컬 점검, 붙여 넣을 등록 문구:
+스토어판은 자기 데이터(DB·설정)를 패키지 안에 격리해서 쓴다 — 의도된 동작이며 일반 설치판과 공유하지 않는다. 대신
+터미널 탭과 설정의 설치 버튼은 desktop app breakaway 정책(`DesktopAppBreakaway`)으로 프로세스를 띄우므로, 사용자가
+거기서 설치·실행한 것(npm -g, claude, git…)은 실제 사용자 환경에 남는다. 제한된 기능은 `runFullTrust` 하나뿐이다.
+절차, 로컬 점검, 붙여 넣을 등록 문구:
 [Docs/avalonia-v2/microsoft-store.md](Docs/avalonia-v2/microsoft-store.md).
 
 ## 변환 완료 목록

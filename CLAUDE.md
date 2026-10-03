@@ -262,6 +262,12 @@ What differs from the WPF host, and why:
   `avares://AgentZeroLite/Assets/agentzero.ico` window icon; macOS gets `macos/AgentZeroLite.icns`, generated
   from the same file, which `build-app.sh` and `Info.plist` already expected.
 - **Both GUIs share the SQLite file and the settings files** and refuse to run side by side (same single-instance mutex on Windows). Secrets: DPAPI on Windows, AES-GCM (`aesg:v1:`) elsewhere.
+- **The Microsoft Store (MSIX) edition does not share them, by design.** Its own new AppData files stay in the
+  package's private store; do not try to "fix" that with `unvirtualizedResources` — certification denied it
+  (10.6.3) and the sharing was never needed. What must not be isolated is what the user runs: terminal tabs and the
+  settings installer create their processes with the desktop-app breakaway policy (`ZeroCommon/Services/
+  DesktopAppBreakaway.cs`, applied only when `IsPackagedProcess()`), so npm -g / claude / git write the real
+  profile. Packaging, verification and submission history: `Docs/avalonia-v2/microsoft-store.md`.
 - **Local LLM is Windows-only** (LLamaSharp DLLs); macOS uses External providers. Gemma 4's native tool-call syntax is converted to the JSON envelope by `GemmaNativeToolCall` (ZeroCommon, benefits both hosts).
 - CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-14, `.app` bundle via `macos/build-app.sh`); `release.yml` is untouched. macOS GUI checks need a person: `Docs/avalonia-v2/macos-smoke.md`.
 
