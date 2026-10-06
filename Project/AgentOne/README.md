@@ -1025,9 +1025,10 @@ renderers hold. Inside the session, the turn is:
 
 ### Tools
 
-Six read-only verbs, one that only asks for a judgment, and two that change
-things — each of those behind its own gate: the path sandbox for `write_file`,
-the command gate for `run_command`. A test keeps every verb that writes or runs
+Six read-only verbs, one that only asks for a judgment, and the verbs that
+change things — each family behind its own gate: the path sandbox for
+`write_file`, the command gate for `run_command` (its `process_*` companions
+only look at and stop what that gate already let run). A test keeps every verb that writes or runs
 inside those two families.
 
 | Verb | Does |
@@ -1039,7 +1040,9 @@ inside those two families.
 | `web_search(query, count)` | Search the web. Titles, URLs and snippets. |
 | `web_read(url)` | Fetch one page and return its readable text, truncated at 24 000 characters. |
 | `write_file(path, content)` | Create or overwrite a file **under the root only**, folders created as needed. Always the whole file: a partial-edit verb needs the model to quote the old text exactly, which small models get wrong. |
-| `run_command(command)` | One shell command in the root — PowerShell on Windows, bash (or sh) elsewhere — output and exit code back, killed past `commandTimeoutSeconds`. Runs only when the gate says so. |
+| `run_command(command, background)` | One shell command in the root — PowerShell on Windows, bash (or sh) elsewhere — output and exit code back. Runs only when the gate says so. Past `commandTimeoutSeconds` the person is asked: wait more, leave it in the background, or stop it. A server or watcher (`background: true`, or detected) is asked about **before** it starts — background, smoke run, or not at all — and returns once it says it is up. |
+| `process_status(id)` | What this session started: every process (no id), or one with its state, address and newest output. |
+| `process_stop(id)` | Stop a process this session started, and everything it started. |
 | `decide(question, options, context)` | Put a judgment call to Jev: one of 2–12 options, with its confidence and the whole distribution. The engine also sees the person's request, not only the model's summary. Smart mode asks Jev questions the code chose; this one the model chooses, mid-turn. It touches nothing, so a smart-mode route never rules it out; with no TypeSafe key it answers "unavailable" and the model decides alone. Same code path as `agent-one decide`. |
 
 The file verbs all resolve paths against `--root` and refuse anything that lands
@@ -1070,6 +1073,24 @@ one thing to parse, and a small model has one format to learn. The parser is
 deliberately tolerant — fenced JSON, a "Sure!" preamble and numeric argument
 values all still parse — because none of that is worth failing a run over.
 
+**Processes are owned by actors, not by the turn.** Every command becomes a
+`ProcessActor` (`Processes/`) under the loop — `/user/bot/loop/procs/proc-p1`,
+`proc-p2`, … — which owns the OS process, reads its output in chunks (never
+`ReadToEnd`), and walks Running → Ready → Exited / Killed / Failed. The turn
+watches it the way a parent watches a child: it is **told** the moment the
+process ends or a service is up (`ProcessChanged` to a subscribed observer), it
+**asks again** every 15 s otherwise and shows the newest line on the status
+line, and it decides what an overrun means — the process never decides for the
+turn, and the turn never blocks on the process. Stopping kills the whole tree
+from a snapshot taken first, plus a Windows Job Object; stopping the loop stops
+what it started. A background service's ready and end reach the person as notes
+whenever they happen. Measured (2026-10-06): before this, `python app.py` (Flask,
+`debug=True`) ran as a one-shot command; the timeout's kill missed the reloader
+child, which held the output pipe, and the turn waited on it for 44 minutes.
+Two kills each missed it on their own — the Python install manager's alias
+breaks away from a job, and `Process.Kill(entireProcessTree)` loses a grandchild
+once its parent is dead — which is why `ProcessTree` reads the table first.
+
 Three guards end a run that is going nowhere: the **step budget**
 (`--max-steps`), the **repeat guard** (the same call twice gets one corrective
 nudge, then stops), and the **parse budget** (two unparseable replies get a
@@ -1085,6 +1106,7 @@ nudge each). Every stop is reported with its reason rather than a silent hang.
 | `Agent/` | the loop, the envelope (`ToolCall`), the guards, the system prompt, the session (`ChatSession`) |
 | `Llm/` | `IChatProvider`, the echo provider, the OpenAI-compatible client |
 | `Tools/` | `ToolCatalog` (what the model is told), the belts that run it, and `Tools/Web/` (fetch, search parsing, HTML→text) |
+| `Processes/` | the process sub-agent: `ProcessSupervisorActor` + one `ProcessActor` per command, the `ProcessSupervisor` facade the shell belt waits through, long-running detection (`CommandLifetime`), tree kill (`ProcessTree`, `JobObject`) |
 | `Tui/` | the settings screen — testable model, Termina page/viewmodel, host wiring |
 | `Services/` | `~/.agent-one/` paths, config, session JSONL, JSON source-gen contexts |
 | `packaging/npm/` | the npm wrapper that downloads a release binary |

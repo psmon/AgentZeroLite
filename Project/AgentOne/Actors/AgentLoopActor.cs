@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Akka.Actor;
 using AgentOne.Agent;
 using AgentOne.Llm;
+using AgentOne.Processes;
 
 namespace AgentOne.Actors;
 
@@ -252,6 +253,11 @@ public sealed class AgentLoopActor : ReceiveActor
             _failure = ex.Message;
             return false;
         }
+
+        // Every command the session runs is owned by a ProcessActor under this
+        // actor (/user/bot/loop/procs/proc-pN): the turn watches and asks, it
+        // never holds a process — and stopping the loop stops what it started.
+        session.UseProcesses(ProcessSupervisor.Under(Context));
 
         var self = _self;
         session.ActivityStarted += what => self.Tell(new ProgressInternal(AgentLoopPhase.Thinking, what, null));

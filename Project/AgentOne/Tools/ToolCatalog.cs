@@ -92,9 +92,21 @@ public static class ToolCatalog
 
         new("run_command", ExecFamily,
             "Run ONE shell command in the workspace root (the shell named in the rules above) and get its output and exit code. " +
-            "A risky command is put to the user first and may be declined.",
-            ["command"],
+            "A risky command is put to the user first and may be declined. " +
+            "Anything that keeps running — a dev server, a watcher — needs \"background\":\"true\" (it is also detected): " +
+            "it starts in the background, the step returns once it is up, and process_status / process_stop manage it.",
+            ["command", "background"],
             """{"tool":"run_command","args":{"command":"dotnet build"}}"""),
+
+        new("process_status", ExecFamily,
+            "List the processes this session started (no id), or one process's state, address and newest output.",
+            ["id"],
+            """{"tool":"process_status","args":{"id":"p1"}}"""),
+
+        new("process_stop", ExecFamily,
+            "Stop a process this session started, and everything it started.",
+            ["id"],
+            """{"tool":"process_stop","args":{"id":"p1"}}"""),
 
         new("decide", DecideFamily,
             "Put a judgment call to the decision engine (Jev): it picks one of 2-12 options and says how sure it is. " +

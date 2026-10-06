@@ -777,6 +777,28 @@ commit identity; reads stay ungated); **plans stay under the root** — the syst
 and design prompts say write_file cannot leave it (a design put every file
 under `../phase-1/`).
 
+**Commands run under a process sub-agent, never on the turn** (`Processes/`,
+`ProcessSupervisorTests`). Measured (2026-10-06, board-web): `python app.py`
+(Flask, `debug=True`) ran as a one-shot `run_command`; at the timeout the tree
+kill missed the reloader child, which kept port 5000 and the output pipe, and
+`ShellToolbelt` awaited `ReadToEnd` on that pipe for 44 minutes with no event.
+Now every command is a `ProcessActor` under `ProcessSupervisorActor`
+(`/user/bot/loop/procs/proc-pN`; a session without the actor pair gets its own
+system via `ProcessSupervisor.Standalone`). The actor owns the process, reads
+output in chunks, treats the **exit** as the end (pipes get 1 s, then whatever
+still holds them is killed — `PipeHeld`), and tells the supervisor on ready/end;
+the supervisor relays to subscribers. The belt waits through the facade —
+`WaitAsync` returns on the observer's signal or after the check-in (15 s) with a
+fresh snapshot — reports check-ins as activity, and at `commandTimeoutSeconds`
+puts **wait / background / stop** to `ChatSession.Chooser` (unattended: stop).
+`CommandLifetime` flags servers and watchers (also a script run directly that
+contains `app.run(`, `.listen(`…) and asks **background / smoke / skip** before
+starting; `process_status` / `process_stop` are exec-family verbs. Kill =
+`ProcessTree` snapshot of descendants **first**, then Job Object terminate, then
+each pid — measured: the Python install manager's `python.exe` alias breaks away
+from the job, and `Process.Kill(entireProcessTree)` loses a grandchild once its
+parent is dead (it compares the dead parent's start time).
+
 **A follow-up is read against the last answer** (`FollowUpTests`). Measured: after
 an answer ending "3. … delete count_files.ps1", "3번 수행 이제 필요없음" was routed
 answer_directly (the router's `Digest()` held only the user's questions), the model

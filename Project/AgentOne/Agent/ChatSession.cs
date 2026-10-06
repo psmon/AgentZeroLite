@@ -5,6 +5,7 @@ using AgentOne.Graph;
 using AgentOne.Llm;
 using AgentOne.Llm.Decision;
 using AgentOne.Services;
+using AgentOne.Processes;
 using AgentOne.Tools;
 
 namespace AgentOne.Agent;
@@ -210,7 +211,9 @@ public sealed partial class ChatSession : IAgentSession
         _engine = new CountingEngine(engine, _state);
 
         _files = new LocalFileToolbelt(_root);
-        _shell = new ShellToolbelt(_root, TimeSpan.FromSeconds(config.CommandTimeoutSeconds)) { Gate = GateAsync };
+        _shell = new ShellToolbelt(_root, TimeSpan.FromSeconds(config.CommandTimeoutSeconds)) { Gate = GateAsync, Choose = ChooseIndexAsync };
+        _shell.Activity += what => ActivityStarted?.Invoke(what);
+        _shell.ProcessChanged += OnProcessChanged;
 
         _toolbelt = new CompositeToolbelt(
             (ToolCatalog.FilesFamily, _files),
@@ -1254,6 +1257,52 @@ public sealed partial class ChatSession : IAgentSession
         return granted
             ? GateVerdict.Allow("approved by the user")
             : GateVerdict.Deny($"the user declined to run it — {reason}. Do not retry it; explain, or do it another way.");
+    }
+
+    // ---------------------------------------------------------- processes
+
+    /// <summary>
+    /// Runs this session's commands under <paramref name="processes"/> — the
+    /// loop actor's <c>procs</c> child — instead of a supervisor of its own.
+    /// Called once, before the first turn.
+    /// </summary>
+    public void UseProcesses(ProcessSupervisor processes) => _shell.UseProcesses(processes);
+
+    /// <summary>Every process this session started and still remembers, newest last. Empty when none was started.</summary>
+    public async Task<IReadOnlyList<ProcessSnapshot>> ProcessesAsync(CancellationToken ct = default) =>
+        _shell.HasProcesses ? await _shell.Processes.ListAsync(ct) : [];
+
+    /// <summary>
+    /// A choice about a running command (how to run a server, what to do with
+    /// one that overran), put to the person through <see cref="Chooser"/>.
+    /// Returns the index picked; no chooser, or a free-text answer, takes the
+    /// recommendation.
+    /// </summary>
+    private async Task<int> ChooseIndexAsync(ChoiceRequest ask, CancellationToken ct)
+    {
+        var picked = Chooser is null ? ask.Options[ask.Recommended] : ask.Resolve(await Chooser(ask, ct));
+        var index = ask.Options.ToList().IndexOf(picked);
+        if (index < 0) index = ask.Recommended;
+
+        var choice = ask.Options[index];
+        var cut = choice.IndexOf(" — ", StringComparison.Ordinal);
+        _log?.Step(new AgentStep(0, "process-choice", $"{ask.Question} → {choice}", true));
+        Noted?.Invoke($"process: {(cut > 0 ? choice[..cut] : choice)}");
+        return index;
+    }
+
+    /// <summary>A background process came up or ended — the person hears it whenever it happens, mid-turn or not.</summary>
+    private void OnProcessChanged(ProcessSnapshot snap)
+    {
+        var what = snap.State switch
+        {
+            ProcessState.Ready => "is up" + (snap.Url is null ? "" : $" at {snap.Url}"),
+            ProcessState.Killed => "was stopped",
+            _ => $"ended (exit {snap.ExitCode?.ToString() ?? "?"})" + (snap.LastLine.Length > 0 ? $" · last: {snap.LastLine}" : ""),
+        };
+        var text = $"process {snap.Id} {what} — {snap.Command}";
+        _log?.Step(new AgentStep(0, "process", text, snap.State != ProcessState.Exited || snap.ExitCode == 0));
+        Noted?.Invoke(text);
     }
 
     // ------------------------------------------------------------ grants
