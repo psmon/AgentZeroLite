@@ -175,6 +175,19 @@ cd Project\AgentZeroAvalonia\msix
 대응: 같은 내용을 HTML 페이지(`Home/privacy-policy.html`)로 만들어 GitHub Pages에 게시하고 URL을 교체, 같은 패키지
 (1.25.1.0)로 3차 제출.
 
+### 3차 제출 반려 (2026-10-05 심사)
+
+반려 리포트(11.16 Live Generative AI Content): *"사용자 입력을 AI로 처리해 AI 모델이 만든 출력을 새 콘텐츠로 보여 주는
+제품으로 보인다. 생성형 AI가 들어간 제품은 부적절한 AI 생성 결과를 사용자가 신고할 수단(예: Report an Issue)을
+제공해야 한다."* (테스트 기기 Lenovo ThinkPad 450s) — **개인정보 처리방침과 제한된 기능에 대한 지적은 없었다**(2차 대응은 통과).
+리포트 말미대로 정책이 바뀌면 이전 제출도 새 기준으로 다시 검사된다.
+
+대응: AgentBot의 AI 답변 말풍선마다 **⚑ Report** 버튼 → "Report this AI answer" 패널(사유 4종 + 메모) → 답변을 인용한
+메일(지원 연락처) 또는 GitHub 이슈를 **미리 채워서** 연다. 서버가 없으므로 보내는 것은 사용자다. 로직은 ZeroCommon
+`Llm/AiContentReport`(WPF 봇 창도 같은 것을 쓸 수 있게), UI는 `AiReportViewModel` + `AgentBotView`. 버튼은 패널 제목
+줄에 둔다 — 봇 창이 낮으면 아래 둔 버튼이 스크롤 밖으로 숨는 것을 실측했다. 인증 메모에 버튼 위치와 모델 없이 확인하는
+방법(`-cli bot-chat`)을 적고, `1.25.2.0`으로 4차 제출(2026-10-07).
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>

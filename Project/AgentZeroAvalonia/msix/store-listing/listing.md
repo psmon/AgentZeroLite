@@ -74,6 +74,14 @@ tabs (Claude Code, Codex, agent-one, netclaw) require those tools to be installe
 CLI Definitions shows their status and offers an install (npm, which requires Node.js, or
 netclaw's own install script).
 
+About generative AI content (policy 11.16): every answer the built-in assistant (AgentBot)
+writes carries a "⚑ Report" button on its bubble. It opens a "Report this AI answer" panel
+— category (inappropriate or offensive / harmful or dangerous / wrong or misleading / other),
+an optional note — and sends the report, with the answer quoted, as a pre-filled e-mail to
+the support contact or as a pre-filled GitHub issue; the user reviews and sends it. To see
+it without configuring a model, any message delivered to the assistant shows the button,
+e.g. from a terminal: AgentZeroLite.exe -cli bot-chat "sample answer" --from AgentBot
+
 About write virtualization: this package does not declare unvirtualizedResources. The
 app's own new files under AppData stay in the package's private store. Terminal tabs and
 the Settings install are started with the desktop-app breakaway process policy

@@ -134,6 +134,14 @@
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="Foreground" Value="{DynamicResource CyberTealBrush}" />
         </Style>
+        <Style Selector="Button.report">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
         <Style Selector="Thumb.inputresize">
             <Setter Property="Background" Value="{DynamicResource BorderColor}" />
             <Setter Property="Cursor" Value="SizeNorthSouth" />
@@ -267,6 +275,12 @@
                                 <StackPanel>
                                     <DockPanel IsVisible="{Binding !IsSystem}">
                                         <TextBlock DockPanel.Dock="Right" Classes="label" Text="{Binding TimeLabel}" />
+                                        <Button DockPanel.Dock="Right" Classes="report" Content="⚑ Report"
+                                                IsVisible="{Binding CanReport}"
+                                                ToolTip.Tip="Report this AI answer (inappropriate, harmful or wrong)"
+                                                AutomationProperties.Name="Report this AI answer"
+                                                Command="{Binding $parent[ItemsControl].((vm:AgentBotViewModel)DataContext).ReportAnswerCommand}"
+                                                CommandParameter="{Binding}" />
                                         <TextBlock Classes="label" Text="{Binding Label}" />
                                     </DockPanel>
                                     <SelectableTextBlock Classes="body" Text="{Binding Text}"
@@ -289,6 +303,34 @@
                     IsVisible="{Binding ModeToast, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <TextBlock Text="{Binding ModeToast}" FontSize="11" FontWeight="Bold"
                            Foreground="{DynamicResource CyberCyanBrush}" />
+            </Border>
+
+            <!-- Report-an-answer panel (Microsoft Store policy 11.16) -->
+            <!-- Fills the transcript area and scrolls, so a short bot pane never pushes it over the composer. -->
+            <Border Classes="toast" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ZIndex="101"
+                    Margin="0" Padding="10,8" ClipToBounds="True" IsVisible="{Binding Report.IsOpen}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="6" DataContext="{Binding Report}" x:DataType="vm:AiReportViewModel">
+                    <!-- The actions sit on the title row so they are visible in the shortest bot pane. -->
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                            <Button Content="Send by e-mail" FontSize="11" Command="{Binding SendEmailCommand}" />
+                            <Button Content="Open GitHub issue" FontSize="11" Command="{Binding OpenIssueCommand}" />
+                            <Button Content="Cancel" FontSize="11" Command="{Binding CancelCommand}" />
+                        </StackPanel>
+                        <TextBlock Text="REPORT THIS AI ANSWER" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource CyberCyanBrush}" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Preview}" FontSize="11" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextDim}" />
+                    <ComboBox ItemsSource="{Binding CategoryNames}" SelectedIndex="{Binding CategoryIndex}"
+                              FontSize="11" HorizontalAlignment="Stretch" />
+                    <TextBox Text="{Binding Note}" PlaceholderText="What is wrong with it? (optional)"
+                             AcceptsReturn="True" TextWrapping="Wrap" FontSize="11" MinHeight="32" MaxHeight="100" />
+                    <TextBlock FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}"
+                               Text="Opens a pre-filled e-mail or GitHub issue with this answer quoted. Nothing is sent until you send it." />
+                </StackPanel>
+                </ScrollViewer>
             </Border>
 
             <!-- Approval toast -->

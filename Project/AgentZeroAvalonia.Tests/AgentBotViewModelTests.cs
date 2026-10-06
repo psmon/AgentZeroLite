@@ -261,4 +261,43 @@ public class AgentBotViewModelTests
         for (var i = 0; i < 200 && !condition(); i++) Thread.Sleep(5);
         return condition();
     }
+
+    [Fact]
+    public void Every_ai_answer_can_be_reported_and_the_report_opens_prefilled()
+    {
+        // Microsoft Store policy 11.16: a means to report AI-generated content.
+        var vm = new AgentBotViewModel();
+        string? opened = null;
+        vm.Report.OpenUri = u => opened = u;
+        vm.Report.ModelName = () => "test-model";
+
+        vm.ApplyResult(new AgentLoopResult(true, "an answer to report", 1, 10));
+        var answer = vm.Items.First(i => i.IsBot);
+        Assert.True(answer.CanReport);
+        Assert.DoesNotContain(vm.Items, i => !i.IsBot && i.CanReport);
+
+        vm.ReportAnswerCommand.Execute(answer);
+        Assert.True(vm.Report.IsOpen);
+        vm.Report.CategoryIndex = 1;
+        vm.Report.Note = "dangerous advice";
+        vm.Report.SendEmailCommand.Execute(null);
+
+        Assert.False(vm.Report.IsOpen);
+        Assert.NotNull(opened);
+        Assert.StartsWith("mailto:", opened);
+        var decoded = Uri.UnescapeDataString(opened!);
+        Assert.Contains("an answer to report", decoded);
+        Assert.Contains("dangerous advice", decoded);
+        Assert.Contains("Harmful or dangerous", decoded);
+        Assert.Contains("test-model", decoded);
+        Assert.Contains("review it and send it", vm.StatusLine);
+    }
+
+    [Fact]
+    public void A_user_bubble_cannot_be_reported()
+    {
+        var vm = new AgentBotViewModel();
+        vm.ReportAnswerCommand.Execute(new ChatItem(ChatItemKind.User, "You", "my own words"));
+        Assert.False(vm.Report.IsOpen);
+    }
 }

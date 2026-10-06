@@ -47,6 +47,9 @@ public partial class ChatItem : ObservableObject
 
     public bool IsUser => Kind == ChatItemKind.User;
     public bool IsBot => Kind == ChatItemKind.Bot;
+
+    /// <summary>An answer the person can report (Store policy 11.16) — every bot bubble.</summary>
+    public bool CanReport => IsBot;
     public bool IsSystem => Kind == ChatItemKind.System;
     public bool IsTool => Kind == ChatItemKind.Tool;
     public bool IsProgress => Kind == ChatItemKind.Progress;
@@ -90,6 +93,9 @@ public partial class AgentBotViewModel : ObservableObject
 
     /// <summary>The approval overlay. Owned here so the pane and the floating window share it.</summary>
     public ApprovalToastViewModel Approval { get; }
+
+    /// <summary>The "report this answer" panel (Microsoft Store policy 11.16).</summary>
+    public AiReportViewModel Report { get; } = new();
 
     /// <summary>Hooks the shell provides: the active terminal, its label, the workspace list, the active folder.</summary>
     public Func<ITerminalSession?>? ActiveSession { get; set; }
@@ -138,6 +144,10 @@ public partial class AgentBotViewModel : ObservableObject
     {
         Approval = new ApprovalToastViewModel { Post = a => Post(a) };
         Approval.OptionSelected += OnApprovalOptionSelected;
+        Report.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(AiReportViewModel.SentMessage) && Report.SentMessage is { } sent) StatusLine = sent;
+        };
     }
 
     /// <summary>The delay box, clamped. Invalid text keeps the previous value, as in the WPF host.</summary>
@@ -337,6 +347,13 @@ public partial class AgentBotViewModel : ObservableObject
             return;
         }
         Add(ChatItemKind.Url, ActiveSessionLabel?.Invoke() ?? "Terminal", evt.Url, url: evt.Url);
+    }
+
+    /// <summary>Opens the report panel for one AI answer.</summary>
+    [RelayCommand]
+    public void ReportAnswer(ChatItem? item)
+    {
+        if (item is { CanReport: true }) Report.Open(item.Text);
     }
 
     /// <summary>Opens a URL bubble's link in the OS browser.</summary>

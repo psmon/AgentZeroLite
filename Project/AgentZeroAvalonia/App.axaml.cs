@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Agent.Common;
 using Agent.Common.Data;
+using Agent.Common.Llm;
 using Agent.Common.Platform;
 using AgentZeroAvalonia.Actors;
 using AgentZeroAvalonia.Cli;
@@ -66,6 +67,16 @@ public partial class App : Application
             {
                 try { desktop.MainWindow?.Launcher.LaunchUriAsync(new Uri(url)); }
                 catch (Exception ex) { AppLogger.Log($"[Bot] open url failed: {ex.GetType().Name}: {ex.Message}"); }
+            };
+
+            // Store policy 11.16: every AI answer can be reported — mail client or browser.
+            vm.Bot.Report.OpenUri = vm.Bot.OpenUrl;
+            vm.Bot.Report.ModelName = () =>
+            {
+                var s = LlmSettingsStore.Load();
+                return s.ActiveBackend == LlmActiveBackend.External
+                    ? $"{s.External.Provider} · {s.ResolveExternalModel()}"
+                    : $"local · {s.ModelId}";
             };
 
             var router = new CliCommandRouter(desktop)
