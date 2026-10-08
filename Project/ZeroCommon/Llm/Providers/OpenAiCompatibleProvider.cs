@@ -67,7 +67,7 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider, IDisposable
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct = default)
     {
-        var body = BuildRequestBody(request, stream: false);
+        var body = BuildRequestBody(_providerName, request, stream: false);
         var resp = await PostJsonAsync("/v1/chat/completions", body, ct);
         using var doc = JsonDocument.Parse(resp);
 
@@ -94,7 +94,7 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider, IDisposable
     public async IAsyncEnumerable<LlmStreamChunk> StreamAsync(LlmRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var body = BuildRequestBody(request, stream: true);
+        var body = BuildRequestBody(_providerName, request, stream: true);
         var jsonBody = JsonSerializer.Serialize(body, JsonOpts);
 
         using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions")
@@ -149,8 +149,14 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider, IDisposable
         }
     }
 
-    private static Dictionary<string, object> BuildRequestBody(LlmRequest request, bool stream)
+    // OpenAI's reasoning models (gpt-5*, o1/o3/o4*) answer 400 to `max_tokens` ("Use
+    // 'max_completion_tokens' instead") and to any temperature but the default 1. Measured
+    // 2026-10-09: gpt-5-mini and o4-mini refused both, gpt-4o-mini took either name. So
+    // OpenAI always gets `max_completion_tokens`, and a reasoning model gets no temperature.
+    // LM Studio and Ollama keep `max_tokens` — that is the name their servers document.
+    internal static Dictionary<string, object> BuildRequestBody(string providerName, LlmRequest request, bool stream)
     {
+        var isOpenAi = providerName == ExternalProviderNames.OpenAI;
         var body = new Dictionary<string, object>
         {
             ["model"] = request.Model,
@@ -161,9 +167,19 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider, IDisposable
             }).ToList(),
             ["stream"] = stream,
         };
-        if (request.Temperature.HasValue) body["temperature"] = request.Temperature.Value;
-        if (request.MaxTokens.HasValue) body["max_tokens"] = request.MaxTokens.Value;
+        if (request.Temperature.HasValue && !(isOpenAi && IsOpenAiReasoningModel(request.Model)))
+            body["temperature"] = request.Temperature.Value;
+        if (request.MaxTokens.HasValue)
+            body[isOpenAi ? "max_completion_tokens" : "max_tokens"] = request.MaxTokens.Value;
         return body;
+    }
+
+    internal static bool IsOpenAiReasoningModel(string? model)
+    {
+        if (string.IsNullOrEmpty(model)) return false;
+        var m = model.ToLowerInvariant();
+        if (m.StartsWith("gpt-5", StringComparison.Ordinal)) return !m.Contains("-chat");
+        return m.Length > 1 && m[0] == 'o' && char.IsDigit(m[1]);
     }
 
     private async Task<string> PostJsonAsync(string path, object body, CancellationToken ct)
