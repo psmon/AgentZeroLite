@@ -1,7 +1,7 @@
 # AgentZero Lite (Avalonia) — Microsoft Store 등록 가이드
 
 Avalonia 호스트(`Project/AgentZeroAvalonia`)의 Windows 빌드를 Microsoft Store에 올리는 절차와 설계.
-**현재 기준(2차 제출, 2026-10-02~)** 으로 쓰여 있고, 1차 제출과 반려의 기록은 §6에 있다.
+**현재 기준(2차 제출, 2026-10-02~)** 으로 쓰여 있고, 1차 제출과 반려의 기록, 공개 후 업데이트(5차~)는 §6에 있다.
 
 > 2026-09 기준으로 확인한 사실: 개인·회사 개발자 계정 모두 등록비 무료(정부 신분증 + 셀피 인증),
 > MSIX 제출은 Store가 Microsoft 인증서로 다시 서명하므로 코드 서명 인증서가 필요 없음,
@@ -125,7 +125,8 @@ cd Project\AgentZeroAvalonia\msix
 ## 4. Partner Center 제출
 
 1. **Packages** — (b)의 `.msix` 업로드. 장치 패밀리: Desktop만. 자동화(CDP 파일 주입)는 기존 패키지와 이름이
-   겹치면 멈추므로, 교체할 때는 버전을 올리고 직접 끌어다 놓는 것이 안전하다.
+   겹치면 멈추므로, 교체할 때는 버전을 올리고 직접 끌어다 놓는 것이 안전하다. 자동화한다면 Playwright
+   `setInputFiles`가 아니라 CDP `DOM.setFileInputFiles`로(50 MB 제한, §6 5차 제출).
 2. **Properties** — Category: *Developer tools / Utilities*. Privacy policy URL: §1-4. 웹사이트 = 저장소,
    지원 연락처 = `psmon@live.co.kr`(심사자가 직접 연락처를 요구했다). 생성형 AI 기능 선언 체크.
 3. **Age ratings** — IARC 설문. "다운로드 외 콘텐츠 접근"(웹·AI 생성 텍스트)만 예. 결과 3+ / Everyone.
@@ -197,6 +198,31 @@ PFN `webnori.AgentZeroLite_7kv8x6xnmh6y0`. Store 딥링크·웹 URL은 공개가
 다음 제출 때 기억할 것: Partner Center의 패키지 업로드 화면은 112 MB MSIX에서 "Analyzing package"로 30분 넘게 멈춘 채
 저장 버튼을 막았다 — 새로고침하면 패키지는 이미 서버에 있고 저장이 풀린다. 저장 후에는 개요 화면에서 이전 버전이
 목록에서 빠졌는지 확인한다(첫 저장은 반영되지 않았다).
+
+### 5차 제출 — 첫 업데이트 (1.25.3.0, 2026-10-09)
+
+공개된 앱의 첫 업데이트. 내용은 OpenAI 추론 모델(gpt-5·o 계열)에서 최대 토큰 설정이 400을 내던 문제의 수정
+(ZeroCommon `OpenAiCompatibleProvider`: OpenAI에는 `max_completion_tokens`, 추론 모델에는 temperature 생략).
+업데이트 절차: 개요 화면 **Start update** → 새 Submission(이전 제출의 속성·등록 정보·연령 등급이 그대로 복사됨) →
+Packages에 새 MSIX → Store listings(English)의 *What's new in this version* → **Submit for certification**.
+나머지 항목은 Unchanged로 둔다. 인증 통과 후 **Publish now**를 눌러야 공개된다.
+
+이번에 확인한 것:
+
+- **버전이 version.txt에서 나오는 값보다 낮을 수 있다.** `version.txt`가 `0.25.1`인 채로 4차 제출을
+  `-Version 1.25.2.0`으로 손으로 올렸기 때문에, 자동 값(`1.25.1.0`)은 이미 공개된 버전보다 낮았다. 이번에는
+  `-Version 1.25.3.0`으로 빌드하고, 같은 날 WPF 릴리스를 `v0.25.3`으로 찍어 둘을 다시 맞췄다
+  (WPF `0.25.x` = MSIX `1.25.x.0`). 다음 제출부터는 `version.txt`를 올리고 `-Version` 없이 빌드하면 된다.
+- **Playwright(CDP 접속)로는 50 MB 넘는 파일을 넣을 수 없다** — `setInputFiles`가 "Cannot transfer files larger
+  than 50Mb to a browser not co-located with the server"로 거부한다. 같은 PC의 브라우저라면 CDP
+  `DOM.setFileInputFiles`(Runtime.evaluate로 `input[type=file]`의 objectId를 얻어 경로만 넘김)로 112 MB가
+  45초 만에 올라가고 바로 Validated가 됐다. 이번에는 "Analyzing package"에서 멈추지 않았다.
+- **이전 패키지는 직접 지우지 않아도 된다.** 더 높은 버전이 같은 고객을 덮으면 Packages 화면이 이전 패키지에
+  "This package will be removed after you save this page"를 붙이고, 저장하면 빠진다(이번에는 첫 저장에 반영됐다).
+  그 화면의 **Remove** 버튼은 *새* 패키지에 붙어 있으니 누르지 않는다.
+- 로그인은 사람이 한다: 자동화 전용 프로필의 Edge를 `--remote-debugging-port`로 띄우고, 로그인 후
+  `chromium.connectOverCDP`로 붙었다. 개요 화면의 섹션 링크는 클릭보다 `submissions/<id>/packages` 같은 URL로
+  바로 가는 편이 안정적이었다.
 
 ## 참고
 
