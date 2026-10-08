@@ -52,6 +52,10 @@ public static class Program
         // receives the identical bytes - see HostLog for why that matters.
         var logPath = HostLog.Install(Arg(args, "--log"));
 
+        // Before any store is loaded: the GUI seals API keys with DPAPI, and without a
+        // protector a sealed key reads as "no key" — the provider is then called bare.
+        global::Agent.Common.Security.SecretProtection.Protector = new Security.DpapiSettingsProtector();
+
         var settingsPath = Arg(args, "--config") ?? WearableSettingsStore.DefaultFilePath;
         var settings = WearableSettingsStore.Load(settingsPath);
 

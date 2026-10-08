@@ -206,9 +206,9 @@ reader should not have to rediscover:
   got back quoted the token, so a value encrypted at rest reached the wire and the logs.
 - **Every process that reads those stores must install a protector.** WPF does it in `App.OnStartup`
   *before* the `-cli` branch (the CLI loads settings too), Avalonia in `Program`, and `AgentTest` in a
-  module initializer so tests open the same file the GUI wrote. `ZeroWearable` does **not** — so an
-  External key configured in the GUI reads as "no key" on the watch host; it needs Ollama (no key) or its
-  own protector. That is a gap, not a design.
+  module initializer so tests open the same file the GUI wrote, and `ZeroWearable` at the top of `Program.Main`
+  (its own `Security/DpapiSettingsProtector`, same marker and entropy). Before that the watch host ran on the
+  passthrough, a GUI-sealed LM Studio key read as "no key", and every question got 401 "none was provided".
 
 ### Terminal
 One backend: **xterm.js in a WebView2**, driven by `ManagedConPtyHost` — our own pseudo-console over plain `kernel32` P/Invoke (`CreatePseudoConsole`, present since Windows 10 1809). The app therefore ships **no native terminal DLLs**; `conpty.dll`, `Microsoft.Terminal.Control.dll` and the `EasyWindowsTerminalControl` / `CI.Microsoft.*` packages are gone, and with them the hard-coded `$(NuGetPackageRoot)` copy step that failed silently on a version bump.
