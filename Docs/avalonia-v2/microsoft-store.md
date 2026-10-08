@@ -188,6 +188,16 @@ cd Project\AgentZeroAvalonia\msix
 줄에 둔다 — 봇 창이 낮으면 아래 둔 버튼이 스크롤 밖으로 숨는 것을 실측했다. 인증 메모에 버튼 위치와 모델 없이 확인하는
 방법(`-cli bot-chat`)을 적고, `1.25.2.0`으로 4차 제출(2026-10-07).
 
+### 4차 제출 통과 (2026-10-08)
+
+`1.25.2.0` 인증 통과 → Publishing. 네 번의 반려 사유가 모두 해소됐다: 10.6.3(`unvirtualizedResources` 제거 +
+breakaway), 10.5.1(개인정보 처리방침을 GitHub Pages HTML로), 11.16(AI 답변 신고). Store ID `9NRHDFMD38H7`,
+PFN `webnori.AgentZeroLite_7kv8x6xnmh6y0`. Store 딥링크·웹 URL은 공개가 끝나야 생긴다.
+
+다음 제출 때 기억할 것: Partner Center의 패키지 업로드 화면은 112 MB MSIX에서 "Analyzing package"로 30분 넘게 멈춘 채
+저장 버튼을 막았다 — 새로고침하면 패키지는 이미 서버에 있고 저장이 풀린다. 저장 후에는 개요 화면에서 이전 버전이
+목록에서 빠졌는지 확인한다(첫 저장은 반영되지 않았다).
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>
