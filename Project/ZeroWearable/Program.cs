@@ -307,6 +307,15 @@ public static class Program
             Console.Error.WriteLine($"[voice/error] unavailable: {voice.Status}");
             return 3;
         }
+        if (HasFlag(args, "--pc"))
+        {
+            // The watch's "PC" answer mode, without a watch: full rate, this machine's speakers.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var (wav, length) = voice.SynthesizeWav(text, Arg(args, "--voice"), Arg(args, "--lang"));
+            Console.WriteLine($"synthesized {length.TotalSeconds:0.0} s in {sw.ElapsedMilliseconds} ms - playing on the PC");
+            new PcSpeaker().PlayAsync(wav, length, CancellationToken.None).GetAwaiter().GetResult();
+            return 0;
+        }
         var outPath = Arg(args, "--out") ?? "speak.wav";
         var speech = voice.Synthesize(text, 0, Arg(args, "--voice"), Arg(args, "--lang"));
         File.WriteAllBytes(outPath, DeviceAudio.ToWav(speech.Pcm16));

@@ -130,6 +130,14 @@ namespaces stay unambiguous — and its Settings → Voice edits the voice/ear t
 Windows only; the Store MSIX leaves it out (`-p:IncludeWearableHost=false`) until BLE in the package
 has been through certification.
 
+**Where an answer is spoken is the watch's choice, per request.** AskBot's pill cycles off -> watch -> PC
+and every `text` / `voice` request carries `"out":"off|watch|pc"` beside the old `"tts"` bool (still
+sent, so an older host reads PC as text only). `ChatActor.ReadOutput` decides; "pc" synthesizes at the
+model's full rate (`WearableVoice.SynthesizeWav`) and plays on this machine through `PcSpeaker` (winmm,
+SND_ASYNC so a newer question or `cancel` stops it). The host advertises `"pcOut":true` in `hostinfo`; the
+watch offers PC only then. `AgentZeroWearable.exe --speak "…" --pc` plays the same path without a watch.
+Wire contract: the firmware repo's `akka/PROTOCOL.md` ("Where the answer is spoken").
+
 **Nothing model-shaped is configured twice.** The host reads AgentZero's own stores and
 loads the bundles the app already installed:
 

@@ -116,6 +116,24 @@ public sealed class WearableVoice : IDisposable
         return new Speech(frames, DeviceAudio.DurationMs(pcm), DeviceAudio.TargetRate, pcm);
     }
 
+    /// <summary>
+    /// The same synthesis at the model's own rate, as a WAV for the PC's speakers — no 16 kHz
+    /// resample and no ADPCM, because nothing has to cross the BLE link.
+    /// </summary>
+    public (byte[] Wav, TimeSpan Length) SynthesizeWav(string text, string? voice = null, string? language = null,
+        CancellationToken ct = default)
+    {
+        if (!Available) throw new InvalidOperationException($"voice unavailable: {Status}");
+        var synth = EnsureLoaded();
+        var voiceId = string.IsNullOrWhiteSpace(voice) ? VoiceId : voice!;
+        var lang = string.IsNullOrWhiteSpace(language) ? LanguageId : language!;
+        var style = Style(voiceId);
+        ct.ThrowIfCancellationRequested();
+        var samples = synth.Synthesize(text, lang, style, Steps, Speed);
+        var decoded = new WavPcm.Decoded(samples, synth.SampleRate);
+        return (WavPcm.ToWav(decoded), TimeSpan.FromSeconds(decoded.DurationSeconds));
+    }
+
     private SuperTonicSynthesizer EnsureLoaded()
     {
         if (_synth is not null) return _synth;

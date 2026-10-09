@@ -61,7 +61,8 @@ public sealed class ChatActor : UntypedActor
     {
         public int Conversation = 1;
         public int RunningRequest;
-        public bool WantsVoice;
+        /// <summary>Where the spoken answer goes: nowhere, the watch's speaker, or this PC's.</summary>
+        public SpeechOutput Output;
 
         /// <summary>What the device called itself in "hello": "askbot" for the Akka app,
         /// "chat-app" for the BLE one. It decides which brain answers.</summary>
@@ -86,6 +87,31 @@ public sealed class ChatActor : UntypedActor
     }
 
     private readonly Dictionary<string, Device> _devices = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The answer mode the watch picks per request. "out" carries it ("off" | "watch" | "pc");
+    /// a device that predates it sends only the "tts" bool, which still means off / watch.
+    /// </summary>
+    public enum SpeechOutput { Off, Watch, Pc }
+
+    /// <summary>The PC's speakers, for devices in "pc" mode. One clip at a time, newest wins.</summary>
+    private readonly PcSpeaker _pcSpeaker = new();
+
+    internal static SpeechOutput ReadOutput(JsonElement root)
+    {
+        if (root.TryGetProperty("out", out var output) && output.ValueKind == JsonValueKind.String)
+        {
+            switch (output.GetString()?.ToLowerInvariant())
+            {
+                case "pc": return SpeechOutput.Pc;
+                case "watch": return SpeechOutput.Watch;
+                case "off": return SpeechOutput.Off;
+            }
+        }
+        return root.TryGetProperty("tts", out var tts) && tts.ValueKind == JsonValueKind.True
+            ? SpeechOutput.Watch
+            : SpeechOutput.Off;
+    }
 
     /// <summary>
     /// The device behind the sender is gone - the BLE link dropped, or the peer terminated.
@@ -244,6 +270,9 @@ public sealed class ChatActor : UntypedActor
                         // The device only offers the voice toggle when the host can
                         // actually speak, same rule as the BLE app.
                         writer.WriteBoolean("tts", _voice?.Available == true);
+                        // The watch offers its third answer mode (speak on the PC) only when
+                        // this host says it can; an older host never sends the field.
+                        writer.WriteBoolean("pcOut", _voice?.Available == true);
                         if (_voice?.Available == true)
                         {
                             writer.WriteString("voice", _voice.VoiceId);
@@ -274,7 +303,7 @@ public sealed class ChatActor : UntypedActor
                     {
                         // Unsolicited answer: the device renders and speaks it the same
                         // way it would an answer to its own question.
-                        device.WantsVoice = _voice?.Available == true;
+                        device.Output = _voice?.Available == true ? SpeechOutput.Watch : SpeechOutput.Off;
                         Complete(new Answered(key, 0, _announce, sender));
                     }
                     break;
@@ -284,8 +313,7 @@ public sealed class ChatActor : UntypedActor
                                  textElement.ValueKind == JsonValueKind.String
                         ? textElement.GetString() ?? ""
                         : "";
-                    device.WantsVoice = root.TryGetProperty("tts", out var tts) &&
-                                        tts.ValueKind == JsonValueKind.True;
+                    device.Output = ReadOutput(root);
                     ReadOutputPrefs(device, root);
                     StartRequest(key, device, id, prompt, sender);
                     break;
@@ -462,8 +490,13 @@ public sealed class ChatActor : UntypedActor
         _log.Info("answered #{0} in {1} chunk(s), {2} chars: {3}", answered.RequestId, chunks.Count,
             text.Length, Head(text, 200));
 
-        if (device.WantsVoice && _voice?.Available == true && text.Length > 0)
-            StartSpeech(answered.Key, device, answered.RequestId, text, answered.Target);
+        if (_voice?.Available == true && text.Length > 0)
+        {
+            if (device.Output == SpeechOutput.Watch)
+                StartSpeech(answered.Key, device, answered.RequestId, text, answered.Target);
+            else if (device.Output == SpeechOutput.Pc)
+                StartPcSpeech(device, answered.RequestId, text);
+        }
     }
 
     /// <summary>
@@ -501,6 +534,40 @@ public sealed class ChatActor : UntypedActor
             {
                 if (cancel?.IsCancellationRequested != true)
                     self.Tell(new SpeechFailed(key, requestId, ex.Message, target));
+            }
+        });
+    }
+
+    /// <summary>
+    /// "pc" mode: synthesize at full rate and play on this machine's speakers. Nothing goes
+    /// to the watch — it already has the text, and in this mode it was told not to expect
+    /// audio. Cancelled by the same token as the request, so a newer question (or the
+    /// watch's cancel) stops the speech too.
+    /// </summary>
+    private void StartPcSpeech(Device device, int requestId, string text)
+    {
+        var voice = _voice!;
+        var cancel = device.Cancel?.Token ?? CancellationToken.None;
+        var voiceId = device.Voice;
+        var language = device.OutLanguage;
+        var log = _log;
+        _ = Task.Run(async () =>
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var (wav, length) = voice.SynthesizeWav(text, voiceId, language, cancel);
+                log.Info("speaking #{0} on the PC as {1}/{2}: {3:0.0} s of audio, synthesized in {4} ms",
+                    requestId, voiceId ?? voice.VoiceId, language ?? voice.LanguageId, length.TotalSeconds, sw.ElapsedMilliseconds);
+                await _pcSpeaker.PlayAsync(wav, length, cancel);
+            }
+            catch (OperationCanceledException)
+            {
+                // a newer question, or the watch cancelled
+            }
+            catch (Exception ex)
+            {
+                log.Warning("PC speech #{0} failed: {1}", requestId, ex.Message);
             }
         });
     }
@@ -565,7 +632,7 @@ public sealed class ChatActor : UntypedActor
                                  lang.ValueKind == JsonValueKind.String
             ? lang.GetString()
             : null;
-        device.WantsVoice = root.TryGetProperty("tts", out var tts) && tts.ValueKind == JsonValueKind.True;
+        device.Output = ReadOutput(root);
         ReadOutputPrefs(device, root);
 
         _log.Info("capture #{0} started (in {1}, out {2}/{3})", id, device.CaptureLanguage ?? "auto",
