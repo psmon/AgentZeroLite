@@ -65,7 +65,7 @@ Get-CimInstance Win32_PnPEntity |
 검증 환경: **ESP-IDF v5.5.5** (`C:\esp\v5.5.5`), Python 3.12 venv.
 
 ```powershell
-cd C:\code\psmon\Arduino\project\samples\claude_hud_amoled
+cd C:\code\psmon\AgentZeroLite\Project\ZeroWearableDevice\firmware   # 2026-10-09 이 저장소로 영입 (AskBot 전용 빌드)
 . .\idf-env.ps1                       # IDF_TOOLS_PATH / venv 고정 + export.ps1
 idf.py set-target esp32s3             # 최초 1회만
 idf.py -p COM7 build flash monitor    # COM 번호는 §1 로 확인한 값

@@ -1,0 +1,110 @@
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+# 128 KB, not the 4 KB this started with. The allocator hands internal RAM to
+# ordinary allocations until only the reserve is left, and WiFi's many small buffers
+# took it down to ~7 KB - at which point the LCD could no longer get an internal DMA
+# buffer for a flush and the screen froze mid-redraw. The BSP flushes through a
+# PSRAM draw buffer of buffer_height 50, i.e. 466*50*2 = 46.6 KB per transfer, so the
+# reserve has to keep a contiguous block of at least that much available.
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=131072
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_FREERTOS_HZ=1000
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+CONFIG_LV_OS_FREERTOS=y
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_CLIB_STRING=y
+CONFIG_LV_USE_CLIB_SPRINTF=y
+CONFIG_LV_DEF_REFR_PERIOD=15
+CONFIG_LV_OBJ_STYLE_CACHE=y
+CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
+CONFIG_ESP_BROOKESIA_ENABLE_AI_FRAMEWORK=n
+CONFIG_ESP_BROOKESIA_GUI_ENABLE_ANIM_PLAYER=n
+CONFIG_ESP_BROOKESIA_ENABLE_SERVICES=n
+CONFIG_ESP_BROOKESIA_SYSTEMS_ENABLE_SPEAKER=n
+CONFIG_BOOST_MATH_ENABLED=n
+CONFIG_BOOST_SERIALIZATION_ENABLED=n
+CONFIG_LV_USE_LOG=y
+CONFIG_LV_LOG_PRINTF=y
+CONFIG_LV_FONT_MONTSERRAT_8=y
+CONFIG_LV_FONT_MONTSERRAT_10=y
+CONFIG_LV_FONT_MONTSERRAT_12=y
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_18=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_MONTSERRAT_22=y
+CONFIG_LV_FONT_MONTSERRAT_24=y
+CONFIG_LV_FONT_MONTSERRAT_26=y
+CONFIG_LV_FONT_MONTSERRAT_28=y
+CONFIG_LV_FONT_MONTSERRAT_30=y
+CONFIG_LV_FONT_MONTSERRAT_32=y
+CONFIG_LV_FONT_MONTSERRAT_34=y
+CONFIG_LV_FONT_MONTSERRAT_36=y
+CONFIG_LV_FONT_MONTSERRAT_38=y
+CONFIG_LV_FONT_MONTSERRAT_40=y
+CONFIG_LV_FONT_MONTSERRAT_42=y
+CONFIG_LV_FONT_MONTSERRAT_44=y
+CONFIG_LV_FONT_FMT_TXT_LARGE=y
+CONFIG_LV_USE_FONT_COMPRESSED=y
+CONFIG_LV_USE_SNAPSHOT=y
+CONFIG_LV_BUILD_EXAMPLES=n
+
+# ---- claude_hud additions ----
+# Console on the native USB-Serial-JTAG (COM7) so `idf.py monitor` shows logs.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+# Bluetooth only: BLE (NimBLE) Nordic UART Service is the single transport.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=512
+# The chat app's line and frame hooks run on the NimBLE host task, on top of the
+# 600-byte reassembly buffer, cJSON parsing and log formatting. 4 KB overflowed.
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=8192
+# NimBLE logs every notify at INFO; audio streaming makes that unreadable.
+CONFIG_BT_NIMBLE_LOG_LEVEL_WARNING=y
+
+# Monospace 8x16 font for the CREW tile ASCII characters
+CONFIG_LV_FONT_UNSCII_16=y
+
+# WiFi memory tuning, for the AskBot app (the other apps are BLE-only).
+# Bringing WiFi up with stock buffer counts starved the internal DMA heap and the
+# LCD stopped being able to flush:
+#   spi_master: setup_dma_priv_buffer: Failed to allocate priv TX buffer
+#   esp_lvgl:bridge_v9: Draw bitmap failed: ESP_ERR_NO_MEM
+# LVGL's draw buffer lives in PSRAM, so every flush needs a temporary internal
+# DMA buffer - which WiFi had eaten. Push WiFi/LWIP into PSRAM and trim the counts.
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=16
+# WiFi code stays in flash instead of IRAM: ~35 KB of internal RAM back, and our
+# traffic (a few hundred 484-byte frames) does not need the throughput.
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=2880
+CONFIG_LWIP_TCP_WND_DEFAULT=2880
+
+# AskBot speaks at full volume by default (its volume is build-time only, no NVS).
+CONFIG_ASKBOT_VOLUME=100
+
+# AgentZero build profile: the watch is AskBot's. Chat and the Claude HUD stay in the
+# tree (menuconfig -> AgentZero watch apps) but are not registered, so their tasks,
+# buffers and screens never take memory from AskBot. Set to y to bring one back.
+# CONFIG_WATCH_APP_CHAT is not set
+# CONFIG_WATCH_APP_CLAUDE_HUD is not set

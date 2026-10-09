@@ -1,0 +1,50 @@
+# No WiFi settings here (or needed at all): the Akka PDUs ride the BLE link, relayed
+# by pc/ble_akka_bridge.py. The Settings app still owns a WiFi service for anything
+# that wants IP later, and it stays off while no SSID is configured.
+menu "AskBot (Akka remoting app)"
+
+    config ASKBOT_LOCAL_HOST
+        string "Host name this device advertises in the handshake"
+        default "askbot-ble"
+        help
+            Cosmetic but required: Akka refuses to serialise an address without a host
+            and a port. Nothing dials it - the peer answers down the BLE tunnel the
+            device opened, because akka.remote.use-passive-connections is on.
+
+    config ASKBOT_HOST_IP
+        string "AskBot.Host address, as the PC-side bridge sees it"
+        default "192.168.0.10"
+        help
+            Must equal what the host advertises (its --host argument, i.e.
+            akka.remote.dot-netty.tcp.public-hostname). With the BLE bridge the host and
+            the bridge are the same machine, so 127.0.0.1 is exactly right.
+
+    config ASKBOT_HOST_PORT
+        int "AskBot.Host port"
+        default 2552
+
+    config ASKBOT_HOST_SYSTEM
+        string "Host ActorSystem name"
+        default "AskBot"
+
+    config ASKBOT_LOCAL_SYSTEM
+        string "This device's ActorSystem name"
+        default "askbot-device"
+
+    config ASKBOT_LOCAL_PORT
+        int "Port this device advertises"
+        default 2553
+        help
+            Advertised in the handshake only. Nothing dials it while the host keeps
+            akka.remote.use-passive-connections = on (its default), which is what
+            lets the device work without a listening socket.
+
+    config ASKBOT_VOLUME
+        int "Speaker volume for spoken answers (0-100)"
+        default 100
+        range 0 100
+        help
+            The host synthesises answers with SuperTonic and streams them as IMA ADPCM
+            at 16 kHz. Only used when the answer mode is "Text + voice".
+
+endmenu

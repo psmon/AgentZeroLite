@@ -1,0 +1,7 @@
+version: 0.1.0
+description: Settings app - speaker volume, microphone gain, display brightness and the chat answer mode
+dependencies:
+  brookesia_core:
+    public: true
+  waveshare/esp32_s3_touch_amoled_1_75c:
+    version: "^3.0.0"

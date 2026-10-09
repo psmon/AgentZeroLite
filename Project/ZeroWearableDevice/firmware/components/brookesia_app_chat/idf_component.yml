@@ -1,0 +1,8 @@
+version: 0.1.0
+description: Voice chat app - hold-to-talk mic streamed over BLE to the PC host (STT + chat CLI), answer shown on screen
+dependencies:
+  brookesia_core:
+    public: true
+  waveshare/esp32_s3_touch_amoled_1_75c:
+    version: "^3.0.0"
+  espressif/esp_codec_dev: "*"

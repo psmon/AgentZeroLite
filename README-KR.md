@@ -219,6 +219,7 @@ GUI 의 Bot 모드를 같은 눈으로 읽을 수 있습니다.
 | **AgentZeroAvalonia** | `Project/AgentZeroAvalonia/` | Exe (net10.0, Avalonia, Win+macOS) | `AgentZeroAvalonia.*` |
 | **AgentOne**         | `Project/AgentOne/`           | Exe (net10.0, Native AOT, `agent-one`) | `AgentOne.*` |
 | **AgentOne.Tests**   | `Project/AgentOne.Tests/`     | xUnit (net10.0, 헤드리스)     | `AgentOne.Tests.*`   |
+| **ZeroWearableDevice** | `Project/ZeroWearableDevice/` | ESP-IDF 펌웨어 (C++, ESP32-S3) | — (.NET 아님)     |
 
 참조 관계: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`, 그리고
 `ZeroWearable → ZeroCommon`. **AgentOne 은 아무것도 참조하지 않고 참조되지도
@@ -227,7 +228,9 @@ GUI 의 Bot 모드를 같은 눈으로 읽을 수 있습니다.
 있어야 합니다. **ZeroWearable은 의도적으로 별도 프로세스**입니다 — BLE 센트럴이
 WinRT라 Windows SDK 타겟 프레임워크가 필요하고, GUI를 거기로 옮길 수는 없기 때문입니다.
 시계의 단일 BLE 링크를 이 프로세스가 소유합니다 —
-[웨어러블 기기 문서](Docs/wearable-device.kr.md) 참고.
+[웨어러블 기기 문서](Docs/wearable-device.kr.md) 참고. **ZeroWearableDevice**는 시계의
+펌웨어입니다 — ESP-IDF, `idf.py`로 빌드하며 아무도 참조하지 않습니다.
+[⌚ 웨어러블](#-웨어러블--손목-위의-askbot) 참고.
 
 ---
 
@@ -593,6 +596,36 @@ mAP 가 약간 떨어집니다 — 명확한 악기 (피아노, 드럼, 기타, 
 
 ---
 
+## ⌚ 웨어러블 — 손목 위의 AskBot
+
+AgentZero는 시계에서도 돌아갑니다: **Waveshare ESP32-S3-Touch-AMOLED-1.75C**(466×466 원형 AMOLED,
+ESP32-S3R8, 스피커 + 마이크, BLE). 양쪽 절반이 모두 이 저장소에 있습니다.
+
+| 절반 | 위치 | 무엇인가 |
+| --- | --- | --- |
+| PC 호스트 | [`Project/ZeroWearable`](Project/ZeroWearable) | `AgentZeroWearable.exe` — BLE 링크를 소유하고, 시계를 위해 AgentZero의 에이전트 루프를 돌리며, Supertonic으로 말하고 Whisper로 듣습니다. WPF 또는 Avalonia 호스트의 **Wearable** 페이지에서 시작 |
+| 펌웨어 | [`Project/ZeroWearableDevice`](Project/ZeroWearableDevice/README-KR.md) | 보드용 ESP-IDF 프로젝트. AskBot이 함께 컴파일하는 Akka.NET 리모팅 클라이언트와 통신 규약(`PROTOCOL.md`) 포함 |
+
+- **AskBot**은 PDU를 BLE로 터널링하는 진짜 Akka 리모팅 피어입니다. 음성이나 텍스트로 물으면
+  Settings → LLM에 설정한 브레인(로컬 또는 OpenAI 호환 모델)이 답하고, 허용 폴더 안의 파일 도구와
+  웹 도구를 씁니다.
+- **답을 어디서 말할지**는 시계에서 고릅니다: 텍스트만 → 시계에서 음성 → **PC 스피커**에서 음성.
+  목소리와 귀는 Settings → Voice — 데스크톱과 같은 설정입니다.
+- **빌드는 AskBot에 집중합니다.** 보드가 작아 Chat과 Claude HUD 앱은 빌드 옵션이며 기본은 꺼짐입니다.
+  그 덕에 AskBot의 내부 DMA RAM이 약 65 KB 늘었습니다(여유 98 KB → 163 KB).
+- 펌웨어는 이미 설치된 ESP-IDF(`C:\esp\v5.5.5`)로 빌드하며 아무것도 내려받지 않습니다:
+
+```powershell
+cd Project\ZeroWearableDevice\firmware
+. .\idf-env.ps1
+idf.py -p COM7 build flash monitor
+```
+
+보드·앱·메모리·빌드 상세: [Project/ZeroWearableDevice](Project/ZeroWearableDevice/README-KR.md) ·
+USB·포트·링크 양쪽 디버깅: [Docs/wearable-device.kr.md](Docs/wearable-device.kr.md).
+
+---
+
 ## 🧭 agent-one — 독립 CLI 에이전트
 
 ```console
@@ -883,12 +916,14 @@ v1.0까지 불안정한 것으로 간주됩니다.
 생성해 복사한 뒤 PNG를 다시 뽑으세요. 그림 속 *AkkaHost*는 `ZeroWearable`이 이식되어 나온
 원본이며, 여기서는 `AgentZeroWearable.exe`로 배포됩니다.</sub>
 
-AgentZero Lite는 웨어러블과 대화하고, **이 저장소에는 PC 쪽만** 있습니다.
-펌웨어는 별도 프로젝트입니다.
+AgentZero Lite는 웨어러블과 대화하며, 이제 **양쪽 절반이 모두 이 저장소에** 있습니다 — PC
+호스트는 `Project/ZeroWearable`, AMOLED-1.75C 펌웨어는 `Project/ZeroWearableDevice`
+([⌚ 웨어러블](#-웨어러블--손목-위의-askbot) 참고). 펌웨어는 형제 저장소에서 이 보드에 필요한 만큼만
+영입했습니다.
 
 | 저장소 | 무엇인가 |
 | --- | --- |
-| [**psmon/Arduino**](https://github.com/psmon/Arduino) | 기기 펌웨어 — 하나의 ESP32-S3 앱이 시계의 **Claude HUD** · **Chat** · **AskBot** 화면을 단일 BLE 링크로 동시에 서비스. 초기 보드 샘플도 함께 있으며, 펌웨어 리뷰용 자체 하네스(`device-resource-warden`, `ble-contract-sentinel`)를 가짐 |
+| [**psmon/Arduino**](https://github.com/psmon/Arduino) | 펌웨어의 출처이자, 다른 보드와 샘플(LCD-1.28, 참조용 .NET 호스트, PC 쪽 HUD 브리지)이 계속 있는 곳. 펌웨어 리뷰용 자체 하네스(`device-resource-warden`, `ble-contract-sentinel`)를 가짐 |
 
 USB로 기기를 빌드·플래시·디버깅하는 방법 — 포트 판별, arduino-cli · ESP-IDF 두 경로,
 호스트와 기기 로그를 나란히 읽는 방법, 그리고 **아두이노 계열이 아닌** 보드를 들일 때의

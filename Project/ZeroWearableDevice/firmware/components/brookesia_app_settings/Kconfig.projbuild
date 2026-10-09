@@ -1,0 +1,15 @@
+menu "Device WiFi (global, owned by the Settings app)"
+
+    config DEVICE_WIFI_SSID
+        string "Default WiFi SSID"
+        default ""
+        help
+            Used on a fresh device; whatever is stored in NVS wins. Empty means WiFi
+            stays off, which is the right default for the BLE-only apps. Note the
+            ESP32-S3 radio is 2.4 GHz only - a 5 GHz SSID will never associate.
+
+    config DEVICE_WIFI_PASSWORD
+        string "Default WiFi password"
+        default ""
+
+endmenu

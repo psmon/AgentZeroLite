@@ -240,6 +240,7 @@ The same two-actor shape, with the same message names, runs inside
 | **AgentZeroAvalonia**    | `Project/AgentZeroAvalonia/`| Exe (net10.0, Avalonia, Win+macOS)| `AgentZeroAvalonia.*`|
 | **AgentOne**             | `Project/AgentOne/`         | Exe (net10.0, Native AOT, `agent-one`) | `AgentOne.*`  |
 | **AgentOne.Tests**       | `Project/AgentOne.Tests/`   | xUnit (net10.0, headless)        | `AgentOne.Tests.*`   |
+| **ZeroWearableDevice**   | `Project/ZeroWearableDevice/` | ESP-IDF firmware (C++, ESP32-S3) | — (not .NET)       |
 
 Reference graph: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`, and
 `ZeroWearable → ZeroCommon`. **AgentOne references nothing and nothing references
@@ -247,7 +248,9 @@ it** — it is a second product that shares the repo and the actor vocabulary, n
 the code. Anything without WPF / Win32 dependencies belongs in
 ZeroCommon. **ZeroWearable** is a second process on purpose — its BLE central is WinRT and
 needs a Windows-SDK target framework, which the GUI must not move to. It owns the watch's
-single BLE link; see [Wearable device](Docs/wearable-device.md).
+single BLE link; see [Wearable device](Docs/wearable-device.md). **ZeroWearableDevice** is the
+watch's firmware — ESP-IDF, built with `idf.py`, referenced by nothing; see
+[⌚ Wearable](#-wearable--askbot-on-your-wrist).
 
 ---
 
@@ -903,6 +906,38 @@ Project/AgentZeroWpf/
 
 ---
 
+## ⌚ Wearable — AskBot on your wrist
+
+AgentZero runs on a watch too: a **Waveshare ESP32-S3-Touch-AMOLED-1.75C** (466×466 round
+AMOLED, ESP32-S3R8, speaker + microphone, BLE). Both halves live in this repo:
+
+| Half | Where | What it is |
+| --- | --- | --- |
+| PC host | [`Project/ZeroWearable`](Project/ZeroWearable) | `AgentZeroWearable.exe` — owns the BLE link, runs AgentZero's agent loop for the watch, speaks with Supertonic and listens with Whisper. Started from the **Wearable** page of the WPF or Avalonia host |
+| Firmware | [`Project/ZeroWearableDevice`](Project/ZeroWearableDevice/README.md) | ESP-IDF project for the board, with the Akka.NET remoting client AskBot compiles in and the wire contract (`PROTOCOL.md`) |
+
+- **AskBot** is a real Akka remoting peer whose PDUs are tunnelled over BLE. Ask by voice or text;
+  the answer comes from the brain set in Settings → LLM (local or any OpenAI-compatible model),
+  with file tools inside allow-listed folders and web tools.
+- **Where the answer is spoken** is chosen on the watch: text only → spoken on the watch → spoken
+  on the **PC's speakers**. The voice and the ear are Settings → Voice — the same settings the
+  desktop uses.
+- **The build is AskBot's.** The board is small, so the Chat and Claude HUD apps are build
+  options, off by default; that gave AskBot ~65 KB more internal DMA RAM (98 KB → 163 KB free).
+- The firmware builds with the ESP-IDF that is already installed (`C:\esp\v5.5.5`) and downloads
+  nothing:
+
+```powershell
+cd Project\ZeroWearableDevice\firmware
+. .\idf-env.ps1
+idf.py -p COM7 build flash monitor
+```
+
+Board, apps, memory and build details: [Project/ZeroWearableDevice](Project/ZeroWearableDevice/README.md) ·
+USB, ports and debugging across the link: [Docs/wearable-device.md](Docs/wearable-device.md).
+
+---
+
 ## 🧭 agent-one — the standalone CLI agent
 
 ```console
@@ -1138,12 +1173,14 @@ across and re-render the PNG, rather than editing either copy here. The host it 
 *AkkaHost* is the project `ZeroWearable` was ported from; here it ships as
 `AgentZeroWearable.exe`.</sub>
 
-AgentZero Lite talks to a wearable, and **only the PC half lives here.** The firmware is a
-separate project:
+AgentZero Lite talks to a wearable, and **both halves now live here** — the PC host in
+`Project/ZeroWearable`, the AMOLED-1.75C firmware in `Project/ZeroWearableDevice` (see
+[⌚ Wearable](#-wearable--askbot-on-your-wrist)). The firmware was imported from the sibling repo,
+taking only what this board needs:
 
 | Repo | What it is |
 | --- | --- |
-| [**psmon/Arduino**](https://github.com/psmon/Arduino) | The device firmware — a single ESP32-S3 app serving the watch's **Claude HUD**, **Chat** and **AskBot** screens over one BLE link, plus the earlier board samples. Has its own harness for firmware review (`device-resource-warden`, `ble-contract-sentinel`) |
+| [**psmon/Arduino**](https://github.com/psmon/Arduino) | Where the firmware came from, and still the home of the other boards and samples (LCD-1.28, the reference .NET host, the PC-side HUD bridge). Has its own harness for firmware review (`device-resource-warden`, `ble-contract-sentinel`) |
 
 Building, flashing and debugging a device over USB — port discovery, the arduino-cli and
 ESP-IDF paths, reading the host and device logs side by side, and the checklist for bringing

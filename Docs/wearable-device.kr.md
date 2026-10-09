@@ -9,7 +9,7 @@ AgentZero Lite는 웨어러블과 BLE로 대화합니다. **이 저장소에는 
 | 절반 | 저장소 | 산출물 |
 | --- | --- | --- |
 | PC 호스트 | 이 저장소 — `Project/ZeroWearable` | `AgentZeroWearable.exe` |
-| 기기 펌웨어 | [**psmon/Arduino**](https://github.com/psmon/Arduino) | 보드에 플래시하는 `.bin` |
+| 기기 펌웨어 | 이 저장소 — [`Project/ZeroWearableDevice`](../Project/ZeroWearableDevice/README-KR.md) ([psmon/Arduino](https://github.com/psmon/Arduino)에서 영입, 다른 보드는 그쪽에 남음) | 보드에 플래시하는 `.bin` |
 
 > 펌웨어 저장소는 현재 아두이노 계열 보드 위주지만, 이 문서의 구조는 그것을 전제하지
 > 않습니다 — §5가 **계열 무관**하게 새 기기를 들이는 체크리스트입니다.
@@ -19,8 +19,10 @@ AgentZero Lite는 웨어러블과 BLE로 대화합니다. **이 저장소에는 
 ## 1. 어떤 기기인가
 
 기준 기기는 **Waveshare ESP32-S3 Touch AMOLED 1.75"** 이고,
-`project/samples/claude_hud_amoled` 펌웨어 하나가 **단일 BLE 링크로 세 앱을 동시에**
-서비스합니다.
+`Project/ZeroWearableDevice/firmware` 펌웨어 하나의 앱들이 **BLE 링크 하나를 함께** 씁니다.
+AgentZero 빌드는 **AskBot만** 싣습니다 — Chat과 Claude HUD는 빌드 옵션(`CONFIG_WATCH_APP_*`)이고
+기본은 꺼짐이며, 그 덕에 AskBot의 내부 DMA RAM이 약 65 KB 늘었습니다(시작 시 여유 98 KB → 163 KB).
+호스트는 여전히 셋 모두를 서비스합니다.
 
 | 시계 쪽 앱 | 프로토콜 | 호스트 쪽 담당 |
 | --- | --- | --- |
@@ -62,9 +64,8 @@ Get-CimInstance Win32_PnPEntity |
 **ESP-IDF** — HUD/Chat/AskBot 펌웨어:
 
 ```powershell
-cd C:\code\psmon\Arduino\project\samples\claude_hud_amoled
+cd Project\ZeroWearableDevice\firmware   # 이 저장소; README 참고
 . .\idf-env.ps1                       # IDF_TOOLS_PATH, py3.12 venv, WS_AMOLED_REPO 고정
-idf.py set-target esp32s3             # 최초 1회만
 idf.py -p COM7 build flash monitor
 ```
 

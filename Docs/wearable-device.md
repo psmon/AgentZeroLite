@@ -9,7 +9,7 @@ device built, flashed and talking, and how to tell which half is at fault when i
 | Half | Repo | Artifact |
 | --- | --- | --- |
 | PC host | this repo — `Project/ZeroWearable` | `AgentZeroWearable.exe` |
-| Device firmware | [**psmon/Arduino**](https://github.com/psmon/Arduino) | a `.bin` flashed to the board |
+| Device firmware | this repo — [`Project/ZeroWearableDevice`](../Project/ZeroWearableDevice/README.md) (imported from [psmon/Arduino](https://github.com/psmon/Arduino), which keeps the other boards) | a `.bin` flashed to the board |
 
 > The firmware repo is mostly Arduino-family boards today, but nothing here assumes that —
 > §5 is the checklist for adding a device on any toolchain.
@@ -19,8 +19,10 @@ device built, flashed and talking, and how to tell which half is at fault when i
 ## 1. Which device are we talking about
 
 The reference device is a **Waveshare ESP32-S3 Touch AMOLED 1.75"** running
-`project/samples/claude_hud_amoled`, a single firmware that serves three apps over one BLE
-link:
+`Project/ZeroWearableDevice/firmware`, a single firmware whose apps share one BLE link. The
+AgentZero build carries **AskBot only** — Chat and the Claude HUD are build options
+(`CONFIG_WATCH_APP_*`), off by default, which gave AskBot back ~65 KB of internal DMA RAM
+(98 KB → 163 KB free at start). The host still serves all three:
 
 | App on the watch | Protocol | Served by |
 | --- | --- | --- |
@@ -62,9 +64,8 @@ means ESP-IDF; a `.ino` means arduino-cli.
 **ESP-IDF** — the HUD/Chat/AskBot firmware:
 
 ```powershell
-cd C:\code\psmon\Arduino\project\samples\claude_hud_amoled
+cd Project\ZeroWearableDevice\firmware   # this repo; see its README
 . .\idf-env.ps1                       # pins IDF_TOOLS_PATH, the py3.12 venv, WS_AMOLED_REPO
-idf.py set-target esp32s3             # first time only
 idf.py -p COM7 build flash monitor
 ```
 

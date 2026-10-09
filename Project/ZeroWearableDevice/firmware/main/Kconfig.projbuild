@@ -1,0 +1,26 @@
+menu "AgentZero watch apps"
+
+    # Which launcher apps this build carries. Off does not delete anything: the code stays
+    # in the tree, the app just is not registered, so it never runs init() - no tasks, no
+    # buffers, no screen. The board is small (ESP32-S3R8) and AskBot gets its memory back.
+    #
+    # Two things stay compiled whatever is chosen, because other apps lean on them:
+    #   - brookesia_app_claude_hud holds the shared BLE transport, the Korean font and the
+    #     mic / voice / power device code AskBot uses;
+    #   - brookesia_app_chat's core backs the Settings volume slider and the BOOT-button beep.
+
+    config WATCH_APP_CLAUDE_HUD
+        bool "Claude HUD app (Claude Code session tiles)"
+        default y
+        help
+            The CREW / SESSIONS / USAGE / INFO tiles fed by the host's HUD endpoint (:8765).
+
+    config WATCH_APP_CHAT
+        bool "Chat app (BLE line-protocol voice chat)"
+        default y
+        help
+            Hold-to-talk chat over the older line protocol. When off, its capture, transmit
+            and playback tasks are never started, and Settings hides the rows that only
+            drive this app (answer mode, test tone).
+
+endmenu

@@ -1,0 +1,8 @@
+version: 0.1.0
+description: AskBot - the same chat flow as the Chat app, but the device joins the PC's Akka.NET ActorSystem as a remoting peer (client actor) over WiFi/TCP
+dependencies:
+  brookesia_core:
+    public: true
+  waveshare/esp32_s3_touch_amoled_1_75c:
+    version: "^3.0.0"
+  espressif/esp_codec_dev: "*"

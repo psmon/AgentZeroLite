@@ -114,8 +114,22 @@ The `web` command group (M0032, `Services/Browser/WebCliCommands.cs`) is the one
 serves its three apps at once: **AskBot** as a real Akka remoting peer (PDUs tunnelled over
 BLE by `BleTunnel`), **Chat** over the older line protocol (`BleChatProxy` turns it into
 messages for the same `ChatActor`), and the **Claude HUD** over `POST /status` · `/event`
-on :8765. Ported from `D:\…\Arduino\project\samples\akka\host\AkkaHost`; `Docs/` there and
-its `PROTOCOL.md` are the reference for the wire format.
+on :8765. Ported from `D:\…\Arduino\project\samples\akka\host\AkkaHost`.
+
+**The watch firmware lives here too: `Project/ZeroWearableDevice`** (ESP-IDF, not .NET — no
+project references it and `dotnet` never builds it). Imported from psmon/Arduino
+(`claude_hud_amoled` + `akka/cpp` src/include) with only what the AMOLED-1.75C needs; its
+`PROTOCOL.md` is the wire contract and its README describes the board. Three rules:
+- **It reuses the installed toolchain and installs nothing**: `firmware/idf-env.ps1` points at
+  `C:\esp\v5.5.5` (ESP-IDF 5.5.5) and `C:\esp\ws-amoled-175c` (`brookesia_core`), and
+  `managed_components/`, `dependencies.lock`, `sdkconfig` were copied locally and are git-ignored —
+  the first build here fetched nothing.
+- **Chat and the Claude HUD are build options, off in `sdkconfig.defaults`** (`CONFIG_WATCH_APP_CHAT`,
+  `CONFIG_WATCH_APP_CLAUDE_HUD`): off means the app is not registered, so its `init()` never runs.
+  Both components still compile — AskBot needs the HUD component's BLE transport, font and device
+  code; Settings and the BOOT button need the Chat core. Measured: free internal DMA heap at
+  AskBot's start went from 98,223 B to 163,427 B.
+- Stop the PC host before flashing (Wearable page → Stop).
 
 It is a separate exe for exactly one reason: `Windows.Devices.Bluetooth` needs a
 Windows-SDK TFM, and moving `AgentZeroLite.exe` off `net10.0-windows` would move the bin
@@ -136,7 +150,7 @@ sent, so an older host reads PC as text only). `ChatActor.ReadOutput` decides; "
 model's full rate (`WearableVoice.SynthesizeWav`) and plays on this machine through `PcSpeaker` (winmm,
 SND_ASYNC so a newer question or `cancel` stops it). The host advertises `"pcOut":true` in `hostinfo`; the
 watch offers PC only then. `AgentZeroWearable.exe --speak "…" --pc` plays the same path without a watch.
-Wire contract: the firmware repo's `akka/PROTOCOL.md` ("Where the answer is spoken").
+Wire contract: `Project/ZeroWearableDevice/PROTOCOL.md` ("Where the answer is spoken").
 
 **Nothing model-shaped is configured twice.** The host reads AgentZero's own stores and
 loads the bundles the app already installed:
