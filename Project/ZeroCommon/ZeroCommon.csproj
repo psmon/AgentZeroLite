@@ -50,6 +50,13 @@
          ABI are controlled here rather than inherited from NuGet-bundled natives.
          DLLs built from llama.cpp commit 3f7c29d (= LLamaSharp 0.26.0 ABI + Gemma 4). -->
     <PackageReference Include="LLamaSharp" Version="0.26.0" />
+    <!-- Offline STT for the hosts that are not WPF (Voice/WhisperNetStt). Same three
+         packages and version the WPF and wearable hosts already ship, so nothing new
+         lands in their output; the Vulkan runtime carries win/linux natives only and
+         macOS falls back to the CPU runtime. -->
+    <PackageReference Include="Whisper.net" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" />
     <!-- Music classifier (AST AudioSet) inference — CPU-only ONNX Runtime.
          Used by Agent.Common.Music.OnnxAstClassifier + Agent.Common.Vision
          (Florence-2). DirectML/GPU variants are intentionally not added yet to

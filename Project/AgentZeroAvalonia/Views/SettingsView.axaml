@@ -60,6 +60,7 @@
                 <Button Classes="nav" Classes.selected="{Binding IsLlm}" Content="LLM" Command="{Binding ShowLlmCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsCli}" Content="CLI definitions" Command="{Binding ShowCliCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsTerminal}" Content="Terminal" Command="{Binding ShowTerminalCommand}" />
+                <Button Classes="nav" Classes.selected="{Binding IsVoice}" Content="Voice" Command="{Binding ShowVoiceCommand}" />
             </StackPanel>
         </Border>
 
@@ -269,6 +270,85 @@
                     </StackPanel>
                     <TextBlock Classes="status" Text="{Binding TerminalStatus}" />
                 </StackPanel>
+
+                <!-- ═══ VOICE ═══ -->
+                <StackPanel IsVisible="{Binding IsVoice}" MaxWidth="640" HorizontalAlignment="Left">
+                  <StackPanel DataContext="{Binding Voice}" x:DataType="vm:VoiceSettingsViewModel">
+                    <TextBlock Classes="h1" Text="Voice" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}"
+                               Text="Shared with the Windows host and the wearable host (voice-settings.json). The watch speaks with Supertonic and listens with Whisper (local), so those two are what it needs." />
+
+                    <TextBlock Classes="h2" Text="SPEECH TO TEXT (EAR)" />
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Classes="lbl" Grid.Row="0" Text="Provider" />
+                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding SttProviders}" SelectedItem="{Binding SttProvider}" MinWidth="220" HorizontalAlignment="Left" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" IsVisible="{Binding !SttRunsHere}" TextWrapping="Wrap"
+                                   Text="This provider runs in the Windows host only. It stays selected so saving here does not change it." />
+                        <TextBlock Classes="lbl" Grid.Row="2" Text="Whisper model" IsVisible="{Binding ShowWhisper}" />
+                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowWhisper}">
+                            <ComboBox ItemsSource="{Binding WhisperModels}" SelectedItem="{Binding SttWhisperModel}" Width="120" />
+                            <Button Content="Download" Command="{Binding DownloadWhisperCommand}" IsEnabled="{Binding IsIdle}" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="3" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" Text="{Binding WhisperState}" IsVisible="{Binding ShowWhisper}" TextWrapping="Wrap" />
+                        <TextBlock Classes="lbl" Grid.Row="4" Text="GPU (Vulkan)" IsVisible="{Binding GpuSupported}" />
+                        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding GpuSupported}">
+                            <CheckBox Content="Use GPU" IsChecked="{Binding SttUseGpu}" IsEnabled="{Binding ShowWhisper}" />
+                            <ComboBox ItemsSource="{Binding GpuChoices}" SelectedItem="{Binding SttGpu}" MinWidth="240" IsEnabled="{Binding SttUseGpu}" />
+                        </StackPanel>
+                        <TextBlock Classes="lbl" Grid.Row="5" Text="OpenAI API key" IsVisible="{Binding ShowSttKey}" />
+                        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding SttOpenAIApiKey}" PasswordChar="●" Watermark="sk-..." IsVisible="{Binding ShowSttKey}" />
+                        <TextBlock Classes="lbl" Grid.Row="6" Text="Language" />
+                        <ComboBox Grid.Row="6" Grid.Column="1" ItemsSource="{Binding SttLanguages}" SelectedItem="{Binding SttLanguage}" Width="120" HorizontalAlignment="Left" />
+                    </Grid>
+
+                    <TextBlock Classes="h2" Text="TEXT TO SPEECH (VOICE)" />
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Classes="lbl" Grid.Row="0" Text="Provider" />
+                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding TtsProviders}" SelectedItem="{Binding TtsProvider}" MinWidth="220" HorizontalAlignment="Left" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" IsVisible="{Binding !TtsRunsHere}" TextWrapping="Wrap"
+                                   Text="This provider runs in the Windows host only. It stays selected so saving here does not change it." />
+                        <TextBlock Classes="lbl" Grid.Row="2" Text="Supertonic model" IsVisible="{Binding ShowSupertonic}" />
+                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowSupertonic}">
+                            <Button Content="Download model" Command="{Binding DownloadSupertonicCommand}" IsEnabled="{Binding IsIdle}" />
+                            <TextBlock FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource TextDim}" Text="{Binding SupertonicState}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBlock Classes="lbl" Grid.Row="3" Text="Voice / language" IsVisible="{Binding ShowSupertonic}" />
+                        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowSupertonic}">
+                            <ComboBox ItemsSource="{Binding SupertonicVoices}" SelectedItem="{Binding SupertonicVoice}" Width="90" />
+                            <ComboBox ItemsSource="{Binding SupertonicLanguages}" SelectedItem="{Binding SupertonicLanguage}" Width="90" />
+                        </StackPanel>
+                        <TextBlock Classes="lbl" Grid.Row="4" Text="Steps / speed" IsVisible="{Binding ShowSupertonic}" />
+                        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowSupertonic}">
+                            <NumericUpDown Value="{Binding SupertonicSteps}" Minimum="5" Maximum="12" Increment="1" Width="120" />
+                            <NumericUpDown Value="{Binding SupertonicSpeed}" Minimum="0.7" Maximum="2.0" Increment="0.05" FormatString="0.00" Width="120" />
+                        </StackPanel>
+                        <TextBlock Classes="lbl" Grid.Row="5" Text="Voice" IsVisible="{Binding ShowOpenAiTts}" />
+                        <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding OpenAiVoices}" SelectedItem="{Binding OpenAiVoice}" Width="140" HorizontalAlignment="Left" IsVisible="{Binding ShowOpenAiTts}" />
+                        <TextBlock Classes="lbl" Grid.Row="6" Text="OpenAI API key" IsVisible="{Binding ShowOpenAiTts}" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding TtsOpenAIApiKey}" PasswordChar="●" Watermark="sk-..." IsVisible="{Binding ShowOpenAiTts}" />
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                        <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding IsIdle}" />
+                    </StackPanel>
+
+                    <TextBlock Classes="h2" Text="TEST (NO MICROPHONE)" />
+                    <TextBox Text="{Binding TestText}" Watermark="A line to speak" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                        <Button Content="▶ Speak" Command="{Binding SpeakCommand}" IsEnabled="{Binding IsIdle}"
+                                ToolTip.Tip="Synthesise the line with the TTS above and play it" />
+                        <Button Content="⟲ Round trip" Command="{Binding RoundTripCommand}" IsEnabled="{Binding IsIdle}"
+                                ToolTip.Tip="Synthesise, play, and feed the same audio through the STT above" />
+                        <Button Content="■ Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsBusy}" />
+                    </StackPanel>
+                    <ProgressBar Margin="0,8,0,0" Height="4" IsVisible="{Binding IsBusy}"
+                                 IsIndeterminate="{Binding !ProgressKnown}" Value="{Binding Progress}" Maximum="100" />
+                    <TextBlock Classes="status" Text="{Binding Status}" />
+                    <TextBlock Classes="lbl" Margin="0,8,0,2" Text="Heard" />
+                    <TextBox Text="{Binding Heard}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="48" />
+                  </StackPanel>
+                </StackPanel>
+
             </Panel>
         </ScrollViewer>
     </Grid>

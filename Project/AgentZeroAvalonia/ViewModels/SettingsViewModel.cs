@@ -15,7 +15,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AgentZeroAvalonia.ViewModels;
 
-public enum SettingsSection { Llm, Cli, Terminal }
+public enum SettingsSection { Llm, Cli, Terminal, Voice }
 
 /// <summary>A catalog model for the local-LLM combo.</summary>
 public sealed record ModelChoice(LlmModelCatalogEntry Entry)
@@ -106,17 +106,23 @@ public partial class SettingsViewModel : ObservableObject
     public bool IsLlm => Section == SettingsSection.Llm;
     public bool IsCli => Section == SettingsSection.Cli;
     public bool IsTerminal => Section == SettingsSection.Terminal;
+    public bool IsVoice => Section == SettingsSection.Voice;
+
+    /// <summary>Settings → Voice: its own view-model, the same voice-settings.json the WPF host and the wearable host read.</summary>
+    public VoiceSettingsViewModel Voice { get; } = new();
 
     partial void OnSectionChanged(SettingsSection value)
     {
         OnPropertyChanged(nameof(IsLlm));
         OnPropertyChanged(nameof(IsCli));
         OnPropertyChanged(nameof(IsTerminal));
+        OnPropertyChanged(nameof(IsVoice));
     }
 
     [RelayCommand] private void ShowLlm() => Section = SettingsSection.Llm;
     [RelayCommand] private void ShowCli() => Section = SettingsSection.Cli;
     [RelayCommand] private void ShowTerminal() => Section = SettingsSection.Terminal;
+    [RelayCommand] private void ShowVoice() => Section = SettingsSection.Voice;
 
     /// <summary>The definitions changed — the shell reloads its new-tab menu.</summary>
     public event Action? CliDefinitionsChanged;
