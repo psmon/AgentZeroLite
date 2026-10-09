@@ -293,6 +293,19 @@ public sealed class LocalAgentLoop : IAgentLoop
                 return await _host.OsKeyPressAsync(key, ct);
             }
 
+            case "os_type_text":
+            {
+                var text = ReadString(call.Args, "text", "");
+                return await _host.OsTypeTextAsync(text, ct);
+            }
+
+            case "os_launch":
+            {
+                var program = ReadString(call.Args, "program", "");
+                var file = ReadString(call.Args, "file", "");
+                return await _host.OsLaunchAsync(program, string.IsNullOrWhiteSpace(file) ? null : file, ct);
+            }
+
             // ---- Workspace files (mission W8) ---------------------------
             // Toolbelt returns a JSON envelope directly; forward verbatim.
 
@@ -353,6 +366,26 @@ public sealed class LocalAgentLoop : IAgentLoop
 
             case "stop_media":
                 return await _host.StopMediaAsync(ct);
+
+            case "delete_file":
+            {
+                var path = ReadString(call.Args, "path", "");
+                return await _host.DeleteFileAsync(path, ct);
+            }
+
+            case "note_save":
+            {
+                var title = ReadString(call.Args, "title", "");
+                var text = ReadString(call.Args, "text", "");
+                var append = ReadBool(call.Args, "append", false);
+                return await _host.NoteSaveAsync(title, text, append, ct);
+            }
+
+            case "note_read":
+            {
+                var title = ReadString(call.Args, "title", "");
+                return await _host.NoteReadAsync(string.IsNullOrWhiteSpace(title) ? null : title, ct);
+            }
 
             case "web_search":
             {

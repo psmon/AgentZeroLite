@@ -9,10 +9,12 @@ namespace Agent.Common.Wearable;
 ///
 /// <see cref="IAgentToolbelt"/> is AgentZero's side-effect surface. This implementation is a
 /// thin adapter: every file call is an <c>Ask</c> to <see cref="FileToolActor"/>, every web
-/// call an <c>Ask</c> to <see cref="WebToolActor"/>, and the terminal / mouse / keyboard /
-/// screenshot methods are answered "not available" so a device across the room cannot
-/// drive the machine. The tool actors own the policy (allow-listed folders, openable file
-/// types, GUI-or-headless browsing); this class owns nothing but the routing.
+/// call an <c>Ask</c> to <see cref="WebToolActor"/>, every desktop call (windows, screenshot,
+/// mouse, keyboard, launch) an <c>Ask</c> to <see cref="OsToolActor"/> — which answers "turned
+/// off" unless the Wearable page allows it — and the terminal methods are answered "not
+/// available". The tool actors own the policy (allow-listed folders with the built-in
+/// <c>home</c>, openable file types, GUI-or-headless browsing, which programs may start);
+/// this class owns nothing but the routing.
 /// </summary>
 public sealed class WearableToolbelt : IAgentToolbelt
 {
@@ -24,12 +26,16 @@ public sealed class WearableToolbelt : IAgentToolbelt
 
     private readonly IActorRef _files;
     private readonly IActorRef _web;
+    private readonly IActorRef? _os;
 
-    public WearableToolbelt(IActorRef files, IActorRef web)
+    public WearableToolbelt(IActorRef files, IActorRef web, IActorRef? os = null)
     {
         _files = files;
         _web = web;
+        _os = os;
     }
+
+    public WearableToolbelt(WearableToolActors tools) : this(tools.Files, tools.Web, tools.Os) { }
 
     // ── Terminal surface: deliberately absent ────────────────────────────────
     // Returning a truthful envelope (rather than throwing) keeps the model in Mode 1,
@@ -73,6 +79,40 @@ public sealed class WearableToolbelt : IAgentToolbelt
     public Task<string> StopMediaAsync(CancellationToken ct)
         => AskFiles(new FileToolActor.StopMedia(), ct);
 
+    public Task<string> DeleteFileAsync(string path, CancellationToken ct)
+        => AskFiles(new FileToolActor.Delete(path), ct);
+
+    public Task<string> NoteSaveAsync(string title, string text, bool append, CancellationToken ct)
+        => AskFiles(new FileToolActor.NoteSave(title, text, append), ct);
+
+    public Task<string> NoteReadAsync(string? title, CancellationToken ct)
+        => AskFiles(new FileToolActor.NoteRead(title), ct);
+
+    // ── Desktop surface: the OsToolActor decides ─────────────────────────────
+
+    public Task<string> OsListWindowsAsync(string? titleFilter, CancellationToken ct)
+        => AskOs(new OsToolActor.ListWindows(titleFilter), ct);
+
+    public Task<string> OsScreenshotAsync(long hwnd, bool grayscale, CancellationToken ct)
+        => AskOs(new OsToolActor.Screenshot(hwnd, grayscale), ct);
+
+    public Task<string> OsActivateAsync(long hwnd, CancellationToken ct)
+        => AskOs(new OsToolActor.Activate(hwnd), ct);
+
+    public Task<string> OsMouseClickAsync(int x, int y, bool right, bool dbl, CancellationToken ct)
+        => AskOs(new OsToolActor.Click(x, y, right, dbl), ct);
+
+    public Task<string> OsKeyPressAsync(string keySpec, CancellationToken ct)
+        => AskOs(new OsToolActor.Key(keySpec), ct);
+
+    public Task<string> OsTypeTextAsync(string text, CancellationToken ct)
+        => AskOs(new OsToolActor.TypeText(text), ct);
+
+    public Task<string> OsLaunchAsync(string program, string? file, CancellationToken ct)
+        => AskOs(new OsToolActor.Launch(program, file), ct);
+
+    // os_element_tree stays on the interface default: UI Automation is not ported yet.
+
     // ── Web surface: the WebToolActor decides ────────────────────────────────
 
     public Task<string> WebSearchAsync(string query, int maxResults, CancellationToken ct)
@@ -86,6 +126,9 @@ public sealed class WearableToolbelt : IAgentToolbelt
 
     private Task<string> AskFiles(object message, CancellationToken ct) => Ask(_files, message, FileTimeout, ct);
     private Task<string> AskWeb(object message, CancellationToken ct) => Ask(_web, message, WebTimeout, ct);
+    private Task<string> AskOs(object message, CancellationToken ct) => _os is null
+        ? Task.FromResult(ToolJson.Fail("os tools are not wired in this host"))
+        : Ask(_os, message, FileTimeout, ct);
 
     private static async Task<string> Ask(IActorRef target, object message, TimeSpan timeout, CancellationToken ct)
     {

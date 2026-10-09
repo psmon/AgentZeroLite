@@ -69,6 +69,14 @@ public interface IAgentToolbelt
     Task<string> OsKeyPressAsync(string keySpec, CancellationToken ct)
         => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
 
+    /// <summary>Type literal text into the focused window.</summary>
+    Task<string> OsTypeTextAsync(string text, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
+    /// <summary>Start a program by name, optionally with an allowed file. JSON envelope.</summary>
+    Task<string> OsLaunchAsync(string program, string? file, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
     // ====================== File surface (mission W8, orca-adoption) =========
     // Default implementations return a "no workspace" envelope so test doubles
     // and any host without a bound workspace root keep compiling AND stay
@@ -112,6 +120,18 @@ public interface IAgentToolbelt
     /// <summary>Stop the media playback that <see cref="OpenFileAsync"/> started. JSON envelope.</summary>
     Task<string> StopMediaAsync(CancellationToken ct)
         => Task.FromResult("{\"ok\":false,\"error\":\"stop_media not available in this host\"}");
+
+    /// <summary>Delete one file in a writable folder. JSON envelope.</summary>
+    Task<string> DeleteFileAsync(string path, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"delete_file not available in this host\"}");
+
+    /// <summary>Save (or append to) a note under the host's home folder. JSON envelope.</summary>
+    Task<string> NoteSaveAsync(string title, string text, bool append, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"notes not available in this host\"}");
+
+    /// <summary>Read a note by title, or list them when the title is empty. JSON envelope.</summary>
+    Task<string> NoteReadAsync(string? title, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"notes not available in this host\"}");
 
     /// <summary>Web search; returns <c>{ok, results:[{title,url,snippet}]}</c>.</summary>
     Task<string> WebSearchAsync(string query, int maxResults, CancellationToken ct)

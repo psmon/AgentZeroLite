@@ -44,6 +44,13 @@ public partial class WearableViewModel : ObservableObject
     [ObservableProperty] private string _brain = WearableBrainNames.AgentExternal;
     [ObservableProperty] private string _cliProvider = "echo";
     [ObservableProperty] private bool _webToolsEnabled;
+    [ObservableProperty] private bool _osControlEnabled;
+
+    /// <summary>The built-in, always-writable work folder (alias <c>home</c>): notes, screenshots, new files.</summary>
+    public string HomePath => WearableSettings.HomeDirectory;
+
+    /// <summary>Where every desktop action the watch took is written down.</summary>
+    public string OsAuditPath { get; } = new Agent.Common.Os.OsAuditLog("wearable").Directory;
     [ObservableProperty] private string _announceOnConnect = "";
     [ObservableProperty] private decimal _talkOnConnectMs;
 
@@ -101,6 +108,7 @@ public partial class WearableViewModel : ObservableObject
         Brain = Brains.Contains(s.Brain) ? s.Brain : WearableBrainNames.AgentExternal;
         CliProvider = CliProviders.Contains(s.CliProvider) ? s.CliProvider : "echo";
         WebToolsEnabled = s.WebToolsEnabled;
+        OsControlEnabled = s.OsControlEnabled;
         AnnounceOnConnect = s.AnnounceOnConnect;
         TalkOnConnectMs = s.TalkOnConnectMs;
         Roots.Clear();
@@ -120,6 +128,7 @@ public partial class WearableViewModel : ObservableObject
         s.Brain = Brain;
         s.CliProvider = CliProvider;
         s.WebToolsEnabled = WebToolsEnabled;
+        s.OsControlEnabled = OsControlEnabled;
         s.AnnounceOnConnect = AnnounceOnConnect ?? "";
         if (TalkOnConnectMs >= 0) s.TalkOnConnectMs = (int)TalkOnConnectMs;
         s.AllowedRoots = Roots
@@ -167,6 +176,19 @@ public partial class WearableViewModel : ObservableObject
     }
 
     [RelayCommand] private void RemoveFolder(AllowedRootRow row) => Roots.Remove(row);
+
+    [RelayCommand] private void OpenHome() => OpenFolder(HomePath);
+    [RelayCommand] private void OpenAudit() => OpenFolder(OsAuditPath);
+
+    private void OpenFolder(string path)
+    {
+        try
+        {
+            Directory.CreateDirectory(path);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
+        }
+        catch (Exception ex) { Append($"[panel/error] could not open {path}: {ex.Message}"); }
+    }
 
     [RelayCommand] private void Start() => _host.Start();
     [RelayCommand] private void Stop() => _host.Stop();

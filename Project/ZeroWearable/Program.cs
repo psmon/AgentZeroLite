@@ -1,6 +1,7 @@
 using Akka.Actor;
 using Akka.Configuration;
 using Agent.Common.Actors;
+using Agent.Common.Os;
 using Agent.Common.Llm.Tools;
 using Agent.Common.Voice;
 using Agent.Common.Wearable;
@@ -392,7 +393,8 @@ public static class Program
     /// </summary>
     private static IActorRef SpawnAgent(ActorSystem system, WearableAgentPlan plan, WearableSettings settings)
     {
-        var roots = new AllowedRootResolver(settings.AllowedRoots);
+        // home (the built-in, writable work folder) first, then the folders the person chose.
+        var roots = new AllowedRootResolver(settings.RootsWithHome());
         Func<bool> stopKey = MediaKeys.SendStop;   // user32 stays host-side; the actor only knows a delegate
         var filesProps = Props.Create(() => new FileToolActor(roots, null, stopKey, null));
 
@@ -406,9 +408,16 @@ public static class Program
         var webMaxChars = settings.WebMaxChars;
         var webProps = Props.Create(() => new WebToolActor(gui, headless, webEnabled, webMaxChars));
 
+        // The desktop: windows, screenshots, mouse, keyboard, starting programs. The actor
+        // holds the rules (off switch, program names only, files inside the roots, audit);
+        // IOsControl is the platform (Windows today).
+        var os = OsControl.Create();
+        var osEnabled = settings.OsControlEnabled;
+        var osProps = Props.Create(() => new OsToolActor(os, roots, osEnabled, null));
+
         var bindings = plan.Bindings;
         var owned = plan.Owned;
-        return system.ActorOf(Props.Create(() => new WearableAgentActor(bindings, filesProps, webProps, owned)), "agent");
+        return system.ActorOf(Props.Create(() => new WearableAgentActor(bindings, filesProps, webProps, owned, osProps)), "agent");
     }
 
     /// <summary>
@@ -440,10 +449,12 @@ public static class Program
     /// <summary>What the watch's agent may reach on this PC, said once at startup.</summary>
     private static void LogTools(WearableSettings settings)
     {
-        var roots = new AllowedRootResolver(settings.AllowedRoots);
-        Log("tools", "info", roots.IsEmpty
-            ? "files: none — add allowed folders in the Wearable panel"
-            : "files: " + string.Join(", ", roots.Roots.Select(r => r.Alias + (r.Writable ? " (rw)" : " (ro)"))));
+        var roots = new AllowedRootResolver(settings.RootsWithHome());
+        Log("tools", "info", "files: " + string.Join(", ", roots.Roots.Select(r => r.Alias + (r.Writable ? " (rw)" : " (ro)")))
+            + $" — home is {WearableSettings.HomeDirectory}");
+        Log("tools", "info", settings.OsControlEnabled
+            ? $"os: on ({OsControl.Create().Platform}) — windows, screenshot, click, keys, type, launch; audited"
+            : "os: off");
         var gui = GuiCliWebToolSurface.ResolveGuiExe(settings.GuiExePath, AppContext.BaseDirectory);
         Log("tools", "info", !settings.WebToolsEnabled
             ? "web: off"

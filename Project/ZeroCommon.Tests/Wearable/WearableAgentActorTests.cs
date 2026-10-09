@@ -30,8 +30,8 @@ public sealed class WearableAgentActorTests : TestKit
         var roots = new AllowedRootResolver(null);
         var filesProps = FilesProps(roots);
         var webProps = WebProps(null, new FakeSurface("headless"));
-        Func<IActorRef, IActorRef, Agent.Common.Actors.AgentLoopBindings> bindings = (files, web) => new(
-            ToolbeltFactory: () => new WearableToolbelt(files, web),
+        Func<WearableToolActors, Agent.Common.Actors.AgentLoopBindings> bindings = tools => new(
+            ToolbeltFactory: () => new WearableToolbelt(tools),
             OptionsFactory: () => new AgentLoopOptions(),
             AgentLoopFactory: (_, _) => null);
         return Sys.ActorOf(Props.Create(() => new WearableAgentActor(bindings, filesProps, webProps, null)), name);
@@ -94,8 +94,8 @@ public sealed class WearableAgentActorTests : TestKit
         var roots = new AllowedRootResolver(null);
         var filesProps = FilesProps(roots);
         var webProps = WebProps(null, new FakeSurface("headless"));
-        Func<IActorRef, IActorRef, Agent.Common.Actors.AgentLoopBindings> bindings = (files, web) => new(
-            ToolbeltFactory: () => new WearableToolbelt(files, web),
+        Func<WearableToolActors, Agent.Common.Actors.AgentLoopBindings> bindings = tools => new(
+            ToolbeltFactory: () => new WearableToolbelt(tools),
             OptionsFactory: () => new AgentLoopOptions(),
             AgentLoopFactory: (opts, _) => new FakeLoop(opts));
         var agent = Sys.ActorOf(Props.Create(() => new WearableAgentActor(bindings, filesProps, webProps, null)), "agent-progress");

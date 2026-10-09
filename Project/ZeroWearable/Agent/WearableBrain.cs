@@ -3,6 +3,7 @@ using Agent.Common.Actors;
 using Agent.Common.Llm;
 using Agent.Common.Llm.Tools;
 using Agent.Common.Wearable;
+using Agent.Common.Wearable.Actors;
 using ZeroWearable.Chat;
 
 namespace ZeroWearable.Agent;
@@ -80,7 +81,7 @@ public sealed class CliBrain : IWearableBrain
 public sealed record WearableAgentPlan(
     string Name,
     string Status,
-    Func<IActorRef, IActorRef, AgentLoopBindings> Bindings,
+    Func<WearableToolActors, AgentLoopBindings> Bindings,
     IAsyncDisposable? Owned);
 
 /// <summary>
@@ -143,8 +144,8 @@ public static class WearableBrainFactory
             return new WearableAgentPlan(
                 Name: "agent:" + Short(entry.Id),
                 Status: status,
-                Bindings: (files, web) => new AgentLoopBindings(
-                    ToolbeltFactory: () => new WearableToolbelt(files, web),
+                Bindings: tools => new AgentLoopBindings(
+                    ToolbeltFactory: () => new WearableToolbelt(tools),
                     OptionsFactory: () => options,
                     // `opts` (not `options`) carries the actor's progress callbacks.
                     AgentLoopFactory: (opts, host) =>
@@ -176,8 +177,8 @@ public static class WearableBrainFactory
             return new WearableAgentPlan(
                 Name: "agent:" + Short(model),
                 Status: status,
-                Bindings: (files, web) => new AgentLoopBindings(
-                    ToolbeltFactory: () => new WearableToolbelt(files, web),
+                Bindings: tools => new AgentLoopBindings(
+                    ToolbeltFactory: () => new WearableToolbelt(tools),
                     OptionsFactory: () => options,
                     AgentLoopFactory: (opts, host) => new ExternalAgentLoop(provider, model, host, opts)),
                 Owned: null);

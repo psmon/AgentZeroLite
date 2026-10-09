@@ -162,9 +162,19 @@ loads the bundles the app already installed:
 | Brain | Settings → LLM | `IAgentLoop` (`LocalAgentLoop` / `ExternalAgentLoop`) over `WearableToolbelt` |
 
 `WearableToolbelt` (M0032, in `ZeroCommon/Wearable/`) is a thin adapter over two tool
-actors — **files** (`FileToolActor`) and **web** (`WebToolActor`). Terminals, mouse,
-keyboard and screenshots stay unimplemented and answer "not available": a device across
-the room does not drive the machine. The file side is sandboxed to the **allow-listed
+actors — **files** (`FileToolActor`), **web** (`WebToolActor`) and **os** (`OsToolActor`).
+Terminals stay "not available". The **desktop** (os_list_windows / os_screenshot /
+os_activate / os_mouse_click / os_key_press / os_type_text / os_launch) is on only while
+`OsControlEnabled` (Wearable page → OS control): `OsToolActor` holds the rules — program
+NAMES only, never a shell or script host, a file only from the allowed folders, screenshots
+saved to `home/screenshots` and returned as a path, every action in
+`%LOCALAPPDATA%\AgentZeroLite\logs\os-audit\*.jsonl` — and the platform is ZeroCommon's
+`Os/IOsControl` (`WindowsOsControl`: classic DllImport, GDI capture + `PngEncoder`, per-monitor
+DPI aware, cloaked windows filtered; `UnsupportedOsControl` elsewhere until a macOS one is
+written). os_element_tree is not ported (UI Automation is WPF-only). **`home`**
+(`%LOCALAPPDATA%\AgentZeroLite\home`, alias reserved) is always first and writable
+(`WearableSettings.RootsWithHome`, not stored in the settings file); `note_save` / `note_read`
+keep notes in `home/notes`, `delete_file` removes one file in a writable folder. The file side is sandboxed to the **allow-listed
 folders** in `wearable-settings.json` (`AllowedRoots`: alias + path + per-folder
 `Writable`; the model addresses files as `alias/relative/path`, `list_files` with no path
 returns the aliases, an empty list is default-deny; a pre-M0032 `WorkspaceRoot` is

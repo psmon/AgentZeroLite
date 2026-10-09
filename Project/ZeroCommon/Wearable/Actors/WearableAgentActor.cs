@@ -4,6 +4,9 @@ using Agent.Common.Actors;
 
 namespace Agent.Common.Wearable.Actors;
 
+/// <summary>The tool actors under <c>/user/agent</c> the toolbelt routes to. <see cref="Os"/> is null when the desktop tools are not wired.</summary>
+public sealed record WearableToolActors(IActorRef Files, IActorRef Web, IActorRef? Os = null);
+
 /// <summary>
 /// The watch's agent as an actor subtree (M0032). Mirrors the main app's split — there
 /// <c>AgentBotActor</c> is the UI gateway and <see cref="AgentLoopActor"/> is the agent;
@@ -58,9 +61,10 @@ public sealed class WearableAgentActor : ReceiveActor
     }
 
     private readonly ILoggingAdapter _log = Context.GetLogger();
-    private readonly Func<IActorRef, IActorRef, AgentLoopBindings> _bindingsFactory;
+    private readonly Func<WearableToolActors, AgentLoopBindings> _bindingsFactory;
     private readonly Props _filesProps;
     private readonly Props _webProps;
+    private readonly Props? _osProps;
     private readonly IAsyncDisposable? _owned;
 
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.Ordinal);
@@ -70,6 +74,7 @@ public sealed class WearableAgentActor : ReceiveActor
 
     public IActorRef? Files { get; private set; }
     public IActorRef? Web { get; private set; }
+    public IActorRef? Os { get; private set; }
 
     /// <param name="bindingsFactory">
     /// Builds the loop bindings once the tool actors exist — the toolbelt inside them is
@@ -79,12 +84,14 @@ public sealed class WearableAgentActor : ReceiveActor
     /// Something the bindings close over that outlives the loops — the loaded GGUF for
     /// the on-device brain. Disposed when this actor stops.
     /// </param>
-    public WearableAgentActor(Func<IActorRef, IActorRef, AgentLoopBindings> bindingsFactory,
-        Props filesProps, Props webProps, IAsyncDisposable? owned = null)
+    /// <param name="osProps">The desktop tools (<see cref="OsToolActor"/>); null leaves os_* "not available".</param>
+    public WearableAgentActor(Func<WearableToolActors, AgentLoopBindings> bindingsFactory,
+        Props filesProps, Props webProps, IAsyncDisposable? owned = null, Props? osProps = null)
     {
         _bindingsFactory = bindingsFactory;
         _filesProps = filesProps;
         _webProps = webProps;
+        _osProps = osProps;
         _owned = owned;
 
         Receive<Ask>(OnAsk);
@@ -101,7 +108,8 @@ public sealed class WearableAgentActor : ReceiveActor
     {
         Files = Context.ActorOf(_filesProps, "files");
         Web = Context.ActorOf(_webProps, "web");
-        _bindings = _bindingsFactory(Files, Web);
+        if (_osProps is not null) Os = Context.ActorOf(_osProps, "os");
+        _bindings = _bindingsFactory(new WearableToolActors(Files, Web, Os));
         base.PreStart();
     }
 

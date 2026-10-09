@@ -183,6 +183,87 @@ public static class AllowedRootFileTools
         }.ToJsonString(ToolJson.Options);
     }
 
+    /// <summary>
+    /// Delete one file. Same gates as a write — the folder must be writable — and files
+    /// only: removing a folder (and whatever is under it) is not something a sentence from
+    /// across the room should be able to do.
+    /// </summary>
+    public static string DeleteFile(AllowedRootResolver roots, string path)
+    {
+        if (!roots.TryResolve(path, out var root, out var rel, out var error)) return ToolJson.Fail(error);
+        if (!root.Writable) return ToolJson.Fail(ReadOnly(root.Alias));
+        if (!FileToolCore.TryResolveInsideRoot(root.Path, rel, out var full, out error)) return ToolJson.Fail(error);
+        if (Directory.Exists(full)) return ToolJson.Fail("that is a folder; delete_file removes files only");
+        if (!File.Exists(full)) return ToolJson.Fail("file not found");
+        File.Delete(full);
+        return System.Text.Json.JsonSerializer.Serialize(
+            new { ok = true, deleted = true, path = AllowedRootResolver.Prefix(root.Alias, rel) }, ToolJson.Options);
+    }
+
+    /// <summary>Where notes live: <c>home/notes/</c>.</summary>
+    public const string NotesFolder = "notes";
+
+    /// <summary>
+    /// A note is a .txt under <c>home/notes</c>, named after its title — so "save this as
+    /// shopping" and a later "read shopping" meet on the same file, and open_file shows it
+    /// in the PC's text editor. Writing anywhere else is a write_file, with its own gates.
+    /// </summary>
+    public static string NoteSave(AllowedRootResolver roots, string? title, string text, bool append)
+    {
+        var home = roots.Find(Agent.Common.Wearable.WearableSettings.HomeAlias);
+        if (home is null) return ToolJson.Fail("this host has no home folder");
+        var name = NoteFileName(title);
+        var full = Path.Combine(home.Path, NotesFolder, name);
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        var existed = File.Exists(full);
+        if (append && existed)
+        {
+            var sep = new FileInfo(full).Length > 0 ? Environment.NewLine : "";
+            File.AppendAllText(full, sep + text);
+        }
+        else File.WriteAllText(full, text);
+        return System.Text.Json.JsonSerializer.Serialize(new
+        {
+            ok = true,
+            saved = true,
+            appended = append && existed,
+            path = AllowedRootResolver.Prefix(home.Alias, $"{NotesFolder}/{name}"),
+            chars = new FileInfo(full).Length,
+        }, ToolJson.Options);
+    }
+
+    /// <summary>One note's text, or — with no title — the list of notes, newest first.</summary>
+    public static string NoteRead(AllowedRootResolver roots, string? title, int maxBytes)
+    {
+        var home = roots.Find(Agent.Common.Wearable.WearableSettings.HomeAlias);
+        if (home is null) return ToolJson.Fail("this host has no home folder");
+        var dir = Path.Combine(home.Path, NotesFolder);
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            var notes = Directory.Exists(dir)
+                ? new DirectoryInfo(dir).GetFiles("*.txt").OrderByDescending(f => f.LastWriteTimeUtc).Take(50)
+                    .Select(f => new { title = Path.GetFileNameWithoutExtension(f.Name), modified = f.LastWriteTime.ToString("yyyy-MM-dd HH:mm"), bytes = f.Length })
+                    .ToArray()
+                : [];
+            return System.Text.Json.JsonSerializer.Serialize(new { ok = true, count = notes.Length, notes }, ToolJson.Options);
+        }
+        var name = NoteFileName(title);
+        if (!File.Exists(Path.Combine(dir, name))) return ToolJson.Fail($"no note named '{Path.GetFileNameWithoutExtension(name)}' (note_read with no title lists them)");
+        return RewritePath(FileToolCore.ReadFile(home.Path, $"{NotesFolder}/{name}", maxBytes), home.Alias);
+    }
+
+    /// <summary>The title as a safe file name: path characters dropped, length capped, ".txt" added.</summary>
+    public static string NoteFileName(string? title)
+    {
+        var t = (title ?? "").Trim();
+        if (t.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)) t = t[..^4];
+        var bad = Path.GetInvalidFileNameChars().Concat(['/', '\\', ':', '*', '?', '"', '<', '>', '|']).ToHashSet();
+        var clean = new string(t.Select(c => bad.Contains(c) || char.IsControl(c) ? '-' : c).ToArray()).Trim(' ', '.', '-');
+        if (clean.Length > 60) clean = clean[..60].TrimEnd();
+        if (clean.Length == 0) clean = "note-" + DateTime.Now.ToString("yyyyMMdd-HHmm");
+        return clean + ".txt";
+    }
+
     private static string ReadOnly(string alias)
         => $"folder '{alias}' is read-only for this device (write access is granted per folder in the Wearable settings)";
 

@@ -24,6 +24,9 @@ public sealed class FileToolActor : ReceiveActor
     public sealed record Find(string? Query, string? Kind, int MaxResults);
     public sealed record Open(string Path);
     public sealed record StopMedia;
+    public sealed record Delete(string Path);
+    public sealed record NoteSave(string Title, string Text, bool Append);
+    public sealed record NoteRead(string? Title);
 
     private readonly ILoggingAdapter _log = Context.GetLogger();
     private readonly AllowedRootResolver _roots;
@@ -56,6 +59,9 @@ public sealed class FileToolActor : ReceiveActor
         Receive<Find>(m => Reply("find_files", $"{m.Kind}:{m.Query}", () => AllowedRootFileTools.FindFiles(_roots, m.Query, m.Kind, m.MaxResults)));
         Receive<Open>(m => Reply("open_file", m.Path, () => OpenFile(m.Path)));
         Receive<StopMedia>(_ => Reply("stop_media", "", StopPlayback));
+        Receive<Delete>(m => Reply("delete_file", m.Path, () => AllowedRootFileTools.DeleteFile(_roots, m.Path)));
+        Receive<NoteSave>(m => Reply("note_save", m.Title, () => AllowedRootFileTools.NoteSave(_roots, m.Title, m.Text, m.Append)));
+        Receive<NoteRead>(m => Reply("note_read", m.Title ?? "", () => AllowedRootFileTools.NoteRead(_roots, m.Title, 64 * 1024)));
     }
 
     private void Reply(string tool, string subject, Func<string> body)

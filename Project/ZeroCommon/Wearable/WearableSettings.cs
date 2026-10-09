@@ -145,6 +145,33 @@ public sealed class WearableSettings
     /// </summary>
     public List<AllowedRoot> AllowedRoots { get; set; } = new();
 
+    /// <summary>The alias of the built-in work folder; reserved, so no chosen folder can take it.</summary>
+    public const string HomeAlias = "home";
+
+    /// <summary>
+    /// The watch's own work folder: always there, always writable, and the only place notes,
+    /// screenshots and new files go. It is not stored in <see cref="AllowedRoots"/> — it is
+    /// put in front of them when the tools are built (<see cref="RootsWithHome"/>), so the
+    /// settings file and both settings pages keep listing only what the person chose.
+    /// </summary>
+    public static string HomeDirectory => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgentZeroLite", "home");
+
+    /// <summary><c>home</c> (created on demand) followed by the chosen folders — what the file tools see.</summary>
+    public IEnumerable<AllowedRoot> RootsWithHome()
+    {
+        try { System.IO.Directory.CreateDirectory(HomeDirectory); } catch { /* reported by the first tool call */ }
+        yield return new AllowedRoot { Alias = HomeAlias, Path = HomeDirectory, Writable = true };
+        foreach (var root in AllowedRoots) yield return root;
+    }
+
+    /// <summary>
+    /// Whether the watch's agent may look at and drive this PC's desktop: list windows, take
+    /// screenshots, bring a window forward, click, press keys, type, start a program. Every
+    /// action is written to the OS audit log. Off = the os_* tools answer "not enabled".
+    /// </summary>
+    public bool OsControlEnabled { get; set; } = true;
+
     /// <summary>
     /// Whether the watch's agent may search the web and read pages (M0032). When the GUI is
     /// running the pages open in its Browser page; otherwise the host fetches headlessly.
@@ -174,7 +201,8 @@ public sealed class WearableSettings
             AllowedRoots.Add(new AllowedRoot { Alias = "workspace", Path = WorkspaceRoot.Trim(), Writable = true });
         WorkspaceRoot = "";
 
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // "home" is the built-in work folder; a chosen folder that asks for the alias gets home-2.
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { HomeAlias };
         var kept = new List<AllowedRoot>();
         foreach (var root in AllowedRoots)
         {
