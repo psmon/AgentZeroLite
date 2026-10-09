@@ -178,7 +178,15 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider, IDisposable
     {
         if (string.IsNullOrEmpty(model)) return false;
         var m = model.ToLowerInvariant();
-        if (m.StartsWith("gpt-5", StringComparison.Ordinal)) return !m.Contains("-chat");
+        if (m.StartsWith("gpt-", StringComparison.Ordinal))
+        {
+            // gpt-5, gpt-5.6-luna, gpt-6-luna …: every generation from 5 on is a reasoning
+            // model (measured: gpt-6-luna refused max_tokens and temperature 0.2 like gpt-5-mini);
+            // only the "-chat" variants still take a temperature.
+            var end = 4;
+            while (end < m.Length && char.IsDigit(m[end])) end++;
+            return int.TryParse(m.AsSpan(4, end - 4), out var generation) && generation >= 5 && !m.Contains("-chat");
+        }
         return m.Length > 1 && m[0] == 'o' && char.IsDigit(m[1]);
     }
 

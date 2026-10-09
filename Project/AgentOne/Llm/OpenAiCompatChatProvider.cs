@@ -17,7 +17,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
 {
     private readonly HttpClient _http;
     private readonly string _model;
-    private readonly double _temperature;
+    private readonly double? _temperature;
     private readonly string _keySource;
     private readonly string _keyAdvice;
     private readonly bool _hasKey;
@@ -30,7 +30,10 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
     public OpenAiCompatChatProvider(AgentConfig config, HttpMessageHandler? handler = null)
     {
         _model = config.Model;
-        _temperature = config.Temperature;
+        // Measured 2026-10-09 against api.openai.com: gpt-5-mini refused temperature 0.2
+        // ("unsupported_value", only the default 1), gpt-4o-mini took it. The model name
+        // decides, not the base URL, so OpenRouter's "openai/gpt-5" is covered too.
+        _temperature = IsReasoningModel(config.Model) ? null : config.Temperature;
 
         _http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: true);
         _http.BaseAddress = new Uri(config.BaseUrl.TrimEnd('/') + "/");
@@ -46,6 +49,25 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", resolved.Value!);
 
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("agent-one");
+    }
+
+    /// <summary>OpenAI reasoning models — gpt-5 and later (not the -chat variants) and o1/o3/o4* — take only the default temperature.</summary>
+    internal static bool IsReasoningModel(string? model)
+    {
+        if (string.IsNullOrEmpty(model)) return false;
+        var m = model.ToLowerInvariant();
+        var slash = m.LastIndexOf('/');
+        if (slash >= 0) m = m[(slash + 1)..];
+        if (m.StartsWith("gpt-", StringComparison.Ordinal))
+        {
+            // gpt-5, gpt-5.6-luna, gpt-6-luna …: every generation from 5 on is a reasoning
+            // model (measured: gpt-6-luna refused max_tokens and temperature 0.2 like gpt-5-mini);
+            // only the "-chat" variants still take a temperature.
+            var end = 4;
+            while (end < m.Length && char.IsDigit(m[end])) end++;
+            return int.TryParse(m.AsSpan(4, end - 4), out var generation) && generation >= 5 && !m.Contains("-chat");
+        }
+        return m.Length > 1 && m[0] == 'o' && char.IsDigit(m[1]);
     }
 
     public async Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct, Action<string>? onDelta = null)

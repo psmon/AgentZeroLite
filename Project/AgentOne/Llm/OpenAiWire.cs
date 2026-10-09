@@ -15,8 +15,10 @@ public sealed class ChatCompletionRequest
     [JsonPropertyName("messages")]
     public List<ChatMessage> Messages { get; set; } = [];
 
+    // Null leaves the field out: OpenAI's reasoning models (gpt-5*, o1/o3/o4*) answer
+    // 400 "unsupported_value" to any temperature but the default 1.
     [JsonPropertyName("temperature")]
-    public double Temperature { get; set; } = 0.2;
+    public double? Temperature { get; set; } = 0.2;
 
     [JsonPropertyName("stream")]
     public bool Stream { get; set; }

@@ -23,6 +23,11 @@ public class OpenAiRequestBodyTests
     [InlineData("gpt-5")]
     [InlineData("o4-mini")]
     [InlineData("o3")]
+    [InlineData("gpt-5.6-terra")]
+    [InlineData("gpt-5.6-luna")]
+    [InlineData("gpt-5.6-sol")]
+    [InlineData("gpt-6-luna")]
+    [InlineData("gpt-6.1-sol")]
     public void OpenAi_reasoning_model_gets_max_completion_tokens_and_no_temperature(string model)
     {
         var body = OpenAiCompatibleProvider.BuildRequestBody(ExternalProviderNames.OpenAI, Req(model), stream: false);
