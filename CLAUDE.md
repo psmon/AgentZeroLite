@@ -123,6 +123,12 @@ path that CLAUDE.md, the `agentzero-cli` skill, `Docs/scripts/launch-self-smoke.
 installer all quote. The GUI starts/stops it from the **Wearable** activity-bar entry
 (`WearablePagePanel` → `Services/Wearable/WearableHostProcess`) and streams its stdout into
 the panel; `[host/ready]` is the line that means the radio is up.
+The Avalonia host has the same page (⌚, Windows only) over `ZeroCommon/Wearable/WearableHostLauncher` +
+`WearableDiagnostics` — the WPF classes moved down under new names so WPF files importing both
+namespaces stay unambiguous — and its Settings → Voice edits the voice/ear the host reads
+(`Voice/PortableVoiceRuntime`, `WhisperNetStt`, `WavPcm`). Its csproj builds and ships `wearable\` on
+Windows only; the Store MSIX leaves it out (`-p:IncludeWearableHost=false`) until BLE in the package
+has been through certification.
 
 **Nothing model-shaped is configured twice.** The host reads AgentZero's own stores and
 loads the bundles the app already installed:

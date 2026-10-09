@@ -96,9 +96,11 @@ Microsoft Store(Windows): `Project/AgentZeroAvalonia/msix/build-msix.ps1` 가 MS
 | 설정: AI 모드 툴 체인 최대 턴 | ✅ (WPF에도 역이식) | `AgentLoopMaxTurns`(기본 12, 1–200으로 클램프) → `AgentLoopOptions.MaxIterations`. 두 호스트 모두 턴당 토큰 상한과 temperature만 넘기고 있어 턴 예산이 사실상 상수였고, 긴 작업은 "max iterations (12) reached without 'done'"로만 끝날 수 있었다. 여기서 만든 뒤 WPF의 `AgentBotWindow` + LLM 탭의 *AIMODE Turns* 로 적용했으므로, 설정 파일이 공유되는 만큼 두 호스트가 같은 값을 쓴다 |
 | CLI: status, terminal-list/send/key/read/wait/alias(`--alias`), layout, bot-chat, bot-ask, web, selftest | ✅ | 파이프 `AgentZeroLite.cli`; `.ps1` / `.sh` 래퍼 |
 | CI: windows-latest + macos-14, win-x64 zip, `.app` 번들 | ✅ | `.github/workflows/avalonia-build.yml` |
+| 설정: Voice(STT Whisper.net / OpenAI, TTS Supertonic / OpenAI, 모델 다운로드, 마이크 없는 Speak + Round trip 테스트) | ✅ | WPF·웨어러블 호스트와 같은 `voice-settings.json`. 이식 가능한 부분은 ZeroCommon으로 내렸다: `Voice/WhisperNetStt`(WPF `WhisperLocalStt`에서 WMI GPU 선택만 뺀 것), `Voice/WavPcm`(NAudio 없이 WAV → 16 kHz 모노), `Voice/PortableVoiceRuntime`(WPF가 아닌 호스트가 돌릴 수 있는 공급자 생성). 재생은 `Services/WavPlayer`: Windows는 winmm `PlaySound` (비동기라 Stop이 즉시 먹음), macOS는 `afplay`. 저장은 이 화면의 필드만 쓰고, WPF 전용 공급자(SAPI, LocalGemma)는 선택된 채로 둔다. Supertonic이면 목소리를 `TtsVoice`와 `SupertonicVoice` 둘 다에 쓴다 — 실측에서 둘이 어긋나 있었다(데스크톱 M2, 워치 F1). 마이크 캡처는 아래 AgentBot 음성 행에 남아 있다 |
+| Wearable 페이지: 링크 / 브레인 / 허용 폴더 / 연결 시 설정, Start / Stop / Test brain / Test HUD, 호스트 로그 실시간 | ✅ Windows | `ZeroCommon/Wearable/WearableHostLauncher`(WPF `WearableHostProcess`와 종료 시 함께 죽이는 Job Object를 내린 것)와 `WearableDiagnostics`. 액티비티 바 ⌚, 호스트가 WinRT BLE라 Windows가 아니면 숨긴다. csproj는 Windows 빌드에서만 `ZeroWearable`을 빌드하고 `wearable\`로 복사·publish한다. **Store MSIX에는 아직 넣지 않았다** (`build-msix.ps1`가 `-p:IncludeWearableHost=false`를 넘김): 패키지 안의 BLE 자식 프로세스는 별도의 인증 문제다 |
 | AgentBot 스킬: SkillSync, 스타터팩 임포트, `.agent-zero/` 캐시, 슬래시 자동완성 | ⏳ 미착수 | 하나의 의존 사슬 — SkillSync 없이는 슬래시 목록이 항상 비고, SkillSync는 Windows 전용 셸 탐색으로 Claude CLI를 구동한다 |
 | AgentBot 음성(마이크, VAD, STT, TTS, 음소거, 위임) | ⏳ 미착수 | 오디오 캡처 계층을 ZeroCommon으로 먼저 내려야 함; NAudio/WASAPI는 Windows 전용 |
-| Browser 페이지(탭 웹뷰), OS 제어, Voice, Vision, Music, Remote, Wearable BLE, 노트/문서 뷰어, Scrap, WebDev 플러그인 | ⏳ 미착수 | 2차; 그때까지 웹 도구는 headless |
+| Browser 페이지(탭 웹뷰), OS 제어, Vision, Music, Remote, 노트/문서 뷰어, Scrap, WebDev 플러그인 | ⏳ 미착수 | 2차; 그때까지 웹 도구는 headless |
 | macOS 로컬 LLM(Metal) | ⏳ 조사 | 당분간 External 공급자만 |
 | 설치기, Developer ID 서명/공증 | ⏳ | 절차는 `harness/knowledge/_shared/code-signing.md` |
 

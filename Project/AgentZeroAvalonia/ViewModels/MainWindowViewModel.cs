@@ -6,6 +6,7 @@ using Agent.Common.Data;
 using Agent.Common.Data.Entities;
 using Agent.Common.Module;
 using Agent.Common.Services;
+using Agent.Common.Wearable;
 using AgentZeroAvalonia.Layout;
 using AgentZeroAvalonia.Services;
 using AgentZeroAvalonia.Terminal;
@@ -21,6 +22,7 @@ public enum AppPage
 {
     Terminals,
     Settings,
+    Wearable,
 }
 
 /// <summary>
@@ -134,6 +136,15 @@ public partial class MainWindowViewModel : ObservableObject
         try { _botDocked = CliWorkspacePersistence.LoadWindowState()?.IsBotDocked ?? true; }
         catch (Exception ex) { AppLogger.LogError("[Bot] dock state load failed", ex); }
 
+        if (WearableHostLauncher.Supported)
+        {
+#if DEBUG
+            Wearable = new WearableViewModel("Debug");
+#else
+            Wearable = new WearableViewModel("Release");
+#endif
+        }
+
         Settings = new SettingsViewModel();
         Settings.CliDefinitionsChanged += ReloadCliDefinitions;
         Settings.AppearanceChanged += () => TerminalAppearanceChanged?.Invoke();
@@ -159,6 +170,13 @@ public partial class MainWindowViewModel : ObservableObject
 
     public bool IsTerminalsPage => Page == AppPage.Terminals;
     public bool IsSettingsPage => Page == AppPage.Settings;
+    public bool IsWearablePage => Page == AppPage.Wearable;
+
+    /// <summary>The watch's host process exists on Windows only (WinRT BLE), so the page does too.</summary>
+    public bool WearableSupported => WearableHostLauncher.Supported;
+
+    /// <summary>The Wearable page; null where the host cannot run.</summary>
+    public WearableViewModel? Wearable { get; }
     public bool HasWorkspaces => Workspaces.Count > 0;
     public bool HasNoWorkspaces => Workspaces.Count == 0;
     public bool HasActiveWorkspace => ActiveWorkspace is not null;
@@ -175,6 +193,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsTerminalsPage));
         OnPropertyChanged(nameof(IsSettingsPage));
+        OnPropertyChanged(nameof(IsWearablePage));
     }
 
     partial void OnActiveWorkspaceChanged(WorkspaceViewModel? oldValue, WorkspaceViewModel? newValue)
@@ -188,6 +207,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand] private void ShowTerminals() => Page = AppPage.Terminals;
     [RelayCommand] private void ShowSettings() => Page = Page == AppPage.Settings ? AppPage.Terminals : AppPage.Settings;
+    [RelayCommand] private void ShowWearable() => Page = Page == AppPage.Wearable ? AppPage.Terminals : AppPage.Wearable;
     [RelayCommand] private void ToggleSidebar() => SidebarExpanded = !SidebarExpanded;
     [RelayCommand] private void ToggleBot()
     {

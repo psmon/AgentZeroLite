@@ -85,6 +85,9 @@
                                 Content="🤖" ToolTip.Tip="AgentBot" Command="{Binding ToggleBotCommand}" />
                         <Button Classes="activity" Content="▤" ToolTip.Tip="Toggle sidebar"
                                 Command="{Binding ToggleSidebarCommand}" />
+                        <Button Classes="activity" Classes.selected="{Binding IsWearablePage}"
+                                Content="⌚" ToolTip.Tip="Wearable" Command="{Binding ShowWearableCommand}"
+                                IsVisible="{Binding WearableSupported}" />
                     </StackPanel>
                     <Button DockPanel.Dock="Bottom" Classes="activity" Classes.selected="{Binding IsSettingsPage}"
                             Content="⚙" ToolTip.Tip="Settings" VerticalAlignment="Bottom"
@@ -143,6 +146,9 @@
                 <views:TerminalsView IsVisible="{Binding IsTerminalsPage}" />
                 <Panel IsVisible="{Binding IsSettingsPage}">
                     <views:SettingsView DataContext="{Binding Settings}" />
+                </Panel>
+                <Panel IsVisible="{Binding IsWearablePage}">
+                    <views:WearableView DataContext="{Binding Wearable}" />
                 </Panel>
             </Panel>
 

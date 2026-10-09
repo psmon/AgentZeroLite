@@ -104,11 +104,13 @@ public partial class App : Application
             // while the floating bot is still up.
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = new MainWindow { DataContext = vm };
+            vm.Wearable?.AutoStart();
 
             desktop.ShutdownRequested += (_, _) =>
             {
                 try { vm.FlushPersist(); } catch { }
                 try { vm.Bot.Detach(); } catch { }
+                try { vm.Wearable?.Shutdown(); } catch { }
                 try { _cliServer?.Dispose(); } catch { }
                 ActorSystemManager.Shutdown();
             };

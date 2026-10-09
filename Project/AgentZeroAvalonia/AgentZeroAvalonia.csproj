@@ -55,6 +55,51 @@
     <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
   </ItemGroup>
 
+  <!-- The wearable host (Wearable page), the same arrangement as the WPF csproj: a
+       build-order-only reference (it targets net10.0-windows10.0.19041.0 for WinRT BLE,
+       which a plain net10.0 project cannot reference), its output copied into wearable       next to the exe, and a publish of it alongside ours. Windows only — a macOS build
+       must never try to build a WinRT project. IncludeWearableHost=false leaves it out;
+       msix/build-msix.ps1 passes that, because a BLE host in the Store package is its own
+       certification question (capabilities, size) and must not ride along unnoticed. -->
+  <PropertyGroup>
+    <IncludeWearableHost Condition="'$(IncludeWearableHost)' == ''">true</IncludeWearableHost>
+    <_WearableApplies>false</_WearableApplies>
+    <_WearableApplies Condition="'$(IncludeWearableHost)' == 'true' And '$(OS)' == 'Windows_NT' And ('$(RuntimeIdentifier)' == '' Or $(RuntimeIdentifier.StartsWith('win')))">true</_WearableApplies>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(_WearableApplies)' == 'true'">
+    <ProjectReference Include="..\ZeroWearable\ZeroWearable.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      Private="false" />
+  </ItemGroup>
+
+  <Target Name="CopyWearableHost" AfterTargets="Build" Condition="'$(_WearableApplies)' == 'true'">
+    <PropertyGroup>
+      <_WearableOut>$(MSBuildProjectDirectory)\..\ZeroWearable\bin\$(Configuration)\net10.0-windows10.0.19041.0\</_WearableOut>
+    </PropertyGroup>
+    <ItemGroup>
+      <_WearableFiles Include="$(_WearableOut)**\*" Exclude="$(_WearableOut)**\*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WearableFiles)"
+          DestinationFiles="@(_WearableFiles->'$(OutDir)wearable\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(_WearableFiles)' != ''" />
+    <Message Importance="normal" Text="Wearable host copied: @(_WearableFiles->Count()) file(s) -> $(OutDir)wearable\" />
+  </Target>
+
+  <!-- Same RID and self-contained flag as this publish, or a framework-dependent host
+       would not start on a machine without the .NET 10 runtime. -->
+  <Target Name="PublishWearableHost" AfterTargets="Publish" Condition="'$(_WearableApplies)' == 'true'">
+    <PropertyGroup>
+      <_WearableRidArg Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</_WearableRidArg>
+      <_WearableSelfContainedArg Condition="'$(SelfContained)' == 'true'">--self-contained true</_WearableSelfContainedArg>
+      <_WearableSelfContainedArg Condition="'$(SelfContained)' != 'true'">--self-contained false</_WearableSelfContainedArg>
+      <_WearablePublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))wearable\</_WearablePublishDir>
+    </PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\ZeroWearable\ZeroWearable.csproj&quot; -c $(Configuration) $(_WearableRidArg) $(_WearableSelfContainedArg) -p:PublishSingleFile=false -o &quot;$(_WearablePublishDir)&quot;" />
+    <Message Importance="high" Text="Wearable host published -> $(_WearablePublishDir)" />
+  </Target>
+
   <ItemGroup>
     <!-- xterm.js and its fonts are one bundle, kept in the WPF folder and linked here:
          the renderer must stay byte-identical between hosts. index.html / term.js are

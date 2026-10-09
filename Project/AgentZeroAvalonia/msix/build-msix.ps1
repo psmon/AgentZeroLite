@@ -95,7 +95,9 @@ Write-Host "== AgentZero Lite MSIX  $Version  ($IdentityName / $Publisher)"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 
-dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o $stage
+# IncludeWearableHost=false: the BLE host is not part of the Store edition yet (its own
+# certification question - capabilities, size); see the csproj.
+dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:IncludeWearableHost=false -o $stage
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
 Copy-Item (Join-Path $here "Assets") (Join-Path $stage "Assets") -Recurse -Force

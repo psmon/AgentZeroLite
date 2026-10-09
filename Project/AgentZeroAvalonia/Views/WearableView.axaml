@@ -1,0 +1,129 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             x:Class="AgentZeroAvalonia.Views.WearableView"
+             x:DataType="vm:WearableViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.h1">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style Selector="TextBlock.h2">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="Margin" Value="0,14,0,6" />
+        </Style>
+        <Style Selector="TextBlock.lbl">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="Grid.form > TextBox, Grid.form > ComboBox, Grid.form > NumericUpDown, Grid.form > CheckBox, Grid.form > StackPanel">
+            <Setter Property="Margin" Value="0,3" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="3*,2*" Background="{DynamicResource CyberBgDeep}">
+
+        <!-- Settings (wearable-settings.json) -->
+        <ScrollViewer Grid.Column="0" Padding="20,16">
+            <StackPanel>
+                <TextBlock Classes="h1" Text="Wearable" />
+                <TextBlock Classes="note"
+                           Text="AgentZeroWearable.exe owns the watch's BLE link and serves AskBot, Chat and the Claude HUD. Its voice and ear come from Settings → Voice, its brain from Settings → LLM. Saving restarts a running host — it reads this file once, at start." />
+
+                <TextBlock Classes="h2" Text="LINK" />
+                <Grid Classes="form" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                    <TextBlock Classes="lbl" Grid.Row="0" Text="" />
+                    <CheckBox Grid.Row="0" Grid.Column="1" Content="Start the host when AgentZero starts" IsChecked="{Binding Enabled}" />
+                    <TextBlock Classes="lbl" Grid.Row="1" Text="Device name" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DeviceName}" Watermark="claude-hud" Width="220" HorizontalAlignment="Left" />
+                    <TextBlock Classes="lbl" Grid.Row="2" Text="" />
+                    <CheckBox Grid.Row="2" Grid.Column="1" Content="No BLE (network peers only)" IsChecked="{Binding DisableBle}" />
+                    <TextBlock Classes="lbl" Grid.Row="3" Text="Remoting port" />
+                    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding RemotingPort}" Minimum="1" Maximum="65535" Increment="1" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                    <TextBlock Classes="lbl" Grid.Row="4" Text="Claude HUD" />
+                    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <CheckBox Content="HUD endpoint on port" IsChecked="{Binding HudEnabled}" />
+                        <NumericUpDown Value="{Binding HudPort}" Minimum="1" Maximum="65535" Increment="1" FormatString="0" Width="140" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Classes="h2" Text="BRAIN" />
+                <Grid Classes="form" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto">
+                    <TextBlock Classes="lbl" Grid.Row="0" Text="Brain" />
+                    <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Brains}" SelectedItem="{Binding Brain}" MinWidth="200" HorizontalAlignment="Left" />
+                    <TextBlock Classes="lbl" Grid.Row="1" Text="Agent CLI" />
+                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding CliProviders}" SelectedItem="{Binding CliProvider}" MinWidth="200" HorizontalAlignment="Left" IsEnabled="{Binding IsCliBrain}" />
+                </Grid>
+
+                <TextBlock Classes="h2" Text="ALLOWED FOLDERS (FILE TOOLS)" />
+                <TextBlock Classes="note" Text="The watch addresses files as alias/relative/path. No folders means no file access." />
+                <ItemsControl ItemsSource="{Binding Roots}" Margin="0,6,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AllowedRootRow">
+                            <Grid ColumnDefinitions="110,*,Auto,Auto" Margin="0,2">
+                                <TextBox Grid.Column="0" Text="{Binding Alias}" Watermark="alias" />
+                                <TextBox Grid.Column="1" Text="{Binding Path}" Margin="6,0" Watermark="C:\path\to\folder" />
+                                <CheckBox Grid.Column="2" Content="writable" IsChecked="{Binding Writable}" />
+                                <Button Grid.Column="3" Content="✕" Margin="6,0,0,0" ToolTip.Tip="Remove"
+                                        Command="{Binding $parent[ItemsControl].((vm:WearableViewModel)DataContext).RemoveFolderCommand}"
+                                        CommandParameter="{Binding}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="+ Add folder…" Command="{Binding AddFolderCommand}" Margin="0,6,0,0" />
+                <CheckBox Content="Web tools (search, open, read)" IsChecked="{Binding WebToolsEnabled}" Margin="0,10,0,0" />
+
+                <TextBlock Classes="h2" Text="ON CONNECT" />
+                <Grid Classes="form" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto">
+                    <TextBlock Classes="lbl" Grid.Row="0" Text="Announce" />
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding AnnounceOnConnect}" Watermark="(nothing)" />
+                    <TextBlock Classes="lbl" Grid.Row="1" Text="Talk for (ms)" />
+                    <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding TalkOnConnectMs}" Minimum="0" Maximum="600000" Increment="500" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                </Grid>
+
+                <Button Content="Save &amp; apply" Command="{Binding SaveAndApplyCommand}" Margin="0,14,0,0" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Host: status, controls, log -->
+        <Border Grid.Column="1" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1,0,0,0">
+            <DockPanel Margin="16,16,16,12">
+                <StackPanel DockPanel.Dock="Top" Spacing="4">
+                    <TextBlock Classes="h1" Text="Host" />
+                    <TextBlock FontSize="13" Foreground="{DynamicResource CyberCyanBrush}" Text="{Binding Status}" />
+                    <TextBlock Classes="note" Text="{Binding Models}" />
+                    <TextBlock Classes="note" Text="{Binding ExePath}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="#f14c4c" Text="{Binding LastError}" IsVisible="{Binding HasError}" />
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="6" Margin="0,8,0,8">
+                        <Button Content="▶ Start" Command="{Binding StartCommand}" IsEnabled="{Binding IsStopped}" />
+                        <Button Content="■ Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsRunning}" />
+                        <Button Content="🧠 Test brain" Command="{Binding TestBrainCommand}" IsEnabled="{Binding CanTest}"
+                                ToolTip.Tip="Runs the host once with --ask; does not touch the radio" />
+                        <Button Content="📟 Test HUD" Command="{Binding TestHudCommand}" IsEnabled="{Binding CanTest}"
+                                ToolTip.Tip="POSTs one status and one event to the HUD endpoint" />
+                        <Button Content="Clear log" Command="{Binding ClearLogCommand}" />
+                    </WrapPanel>
+                </StackPanel>
+                <TextBox x:Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="11"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>
