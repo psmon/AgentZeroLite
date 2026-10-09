@@ -283,17 +283,16 @@ public sealed class ExternalAgentLoopTests
     }
 
     [Fact]
-    public async Task Loop_fails_fast_when_no_json_repeated_beyond_correction_cap()
+    public async Task Prose_beyond_the_correction_cap_is_taken_as_the_answer()
     {
-        // Every turn is prose. With MaxFormatCorrections=2 and MaxIterations
-        // high enough that the correction cap (not the iteration cap) is what
-        // stops the loop, the loop must fail with a clear "no JSON envelope"
-        // reason and not hang or burn the iteration budget.
+        // Every turn is prose. Two corrections are offered; the third plain reply is the
+        // answer rather than a failure — measured on the watch, where a correct apology
+        // was thrown away three times and the device got nothing.
         var provider = new ScriptedProvider(new[]
         {
             "thinking out loud, no json here",
             "still no json envelope",
-            "definitely not json",
+            "죄송해요. 창이 아직 열려 있어요.",
             "fourth prose turn",
         });
         var host = new MockAgentToolbelt();
@@ -302,10 +301,24 @@ public sealed class ExternalAgentLoopTests
 
         var run = await loop.RunAsync("hi");
 
+        Assert.True(run.TerminatedCleanly, run.FailureReason);
+        Assert.Equal("죄송해요. 창이 아직 열려 있어요.", run.FinalMessage);
+        Assert.True(loop.FormatCorrectionsUsed == 2, "Correction budget must be respected (2 used, then the reply is taken).");
+    }
+
+    [Fact]
+    public async Task A_broken_envelope_beyond_the_cap_still_fails()
+    {
+        // Something that tried to be a tool call is not an answer to show anyone.
+        var provider = new ScriptedProvider(new[] { "tool: list", "tool: list", "{\"tool\": list_files" });
+        var host = new MockAgentToolbelt();
+        var opts = new AgentLoopOptions { MaxIterations = 10, MaxFormatCorrections = 2 };
+        await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
+
+        var run = await loop.RunAsync("hi");
+
         Assert.False(run.TerminatedCleanly);
         Assert.NotNull(run.FailureReason);
-        Assert.Contains("no JSON envelope", run.FailureReason);
-        Assert.True(loop.FormatCorrectionsUsed == 2, "Correction budget must be respected (2 used, then fail).");
     }
 
     [Fact]
@@ -328,15 +341,15 @@ public sealed class ExternalAgentLoopTests
         var opts = new AgentLoopOptions { MaxIterations = 10, MaxFormatCorrections = 2 };
         await using var loop = new ExternalAgentLoop(provider, "test-model", host, opts);
 
-        // First send: exhausts the 2-correction budget on prose, fails.
+        // First send: spends the 2-correction budget, then takes the third reply.
         var first = await loop.RunAsync("hi");
-        Assert.False(first.TerminatedCleanly);
+        Assert.Equal("prose three", first.FinalMessage);
         Assert.Equal(2, loop.FormatCorrectionsUsed);
 
-        // Second send: budget already spent → fails on the very first prose
-        // turn with zero new corrections (cap is per-instance, not per-run).
+        // Second send: budget already spent → the very first plain reply is the
+        // answer, with zero new corrections (cap is per-instance, not per-run).
         var second = await loop.RunAsync("hi again");
-        Assert.False(second.TerminatedCleanly);
+        Assert.Equal("prose four", second.FinalMessage);
         Assert.True(loop.FormatCorrectionsUsed == 2, "Counter must not grow past the per-instance cap.");
     }
 

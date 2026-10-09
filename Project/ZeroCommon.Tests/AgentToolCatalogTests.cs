@@ -10,7 +10,7 @@ namespace ZeroCommon.Tests;
 public sealed class AgentToolCatalogTests
 {
     private static readonly string[] Added = ["find_files", "open_file", "stop_media", "web_search", "web_open", "web_read",
-        "delete_file", "note_save", "note_read", "os_type_text", "os_launch"];
+        "delete_file", "note_save", "note_read", "os_type_text", "os_launch", "os_close_window"];
 
     [Fact]
     public void New_verbs_are_known_grammar_constrained_and_documented()

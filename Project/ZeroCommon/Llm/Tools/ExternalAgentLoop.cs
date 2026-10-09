@@ -134,6 +134,16 @@ public sealed class ExternalAgentLoop : IAgentLoop
                     _messages.Add(LlmMessage.User(noEnvelopeInstruction));
                     continue;
                 }
+                // The corrections are spent and the model still writes a plain reply. When it
+                // is plainly prose — not a broken envelope — it IS the answer; failing the run
+                // threw it away. Measured (2026-10-09, gpt-6-luna on the watch): "why do you
+                // keep lying?" got a correct apology three times and the watch got nothing.
+                if (LooksLikeProseAnswer(assistantText))
+                {
+                    AppLogger.Log($"[ExternalAgentLoop] corrections spent; plain reply taken as the answer at iteration {iter}");
+                    return new AgentLoopRun(turns, assistantText!.Trim(), TerminatedCleanly: true, FailureReason: null)
+                        { GuardStats = guards.Snapshot() };
+                }
                 failure = $"model emitted no JSON envelope at iteration {iter} after {_formatCorrections} correction(s): \"{Truncate(assistantText!, 200)}\"";
                 break;
             }
@@ -418,6 +428,15 @@ public sealed class ExternalAgentLoop : IAgentLoop
                "Call done when the user's request is satisfied." + offending;
     }
 
+    /// <summary>A reply a person can read as it stands: words, no envelope fragments, no code fence.</summary>
+    internal static bool LooksLikeProseAnswer(string? text)
+    {
+        var t = (text ?? "").Trim();
+        if (t.Length < 2) return false;
+        if (t.Contains('{') || t.Contains("\"tool\"", StringComparison.Ordinal) || t.Contains("```", StringComparison.Ordinal)) return false;
+        return t.Any(char.IsLetter);
+    }
+
     internal static string? ExtractFirstJsonObject(string text)
     {
         var start = text.IndexOf('{');
@@ -531,6 +550,12 @@ public sealed class ExternalAgentLoop : IAgentLoop
             {
                 var key = ReadString(call.Args, "key", "");
                 return await _host.OsKeyPressAsync(key, ct);
+            }
+
+            case "os_close_window":
+            {
+                var hwnd = ReadLong(call.Args, "hwnd", 0);
+                return await _host.OsCloseWindowAsync(hwnd, ct);
             }
 
             case "os_type_text":

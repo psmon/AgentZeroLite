@@ -99,6 +99,9 @@ public sealed class WearableToolbelt : IAgentToolbelt
     public Task<string> OsActivateAsync(long hwnd, CancellationToken ct)
         => AskOs(new OsToolActor.Activate(hwnd), ct);
 
+    public Task<string> OsCloseWindowAsync(long hwnd, CancellationToken ct)
+        => AskOs(new OsToolActor.CloseWindow(hwnd), ct);
+
     public Task<string> OsMouseClickAsync(int x, int y, bool right, bool dbl, CancellationToken ct)
         => AskOs(new OsToolActor.Click(x, y, right, dbl), ct);
 

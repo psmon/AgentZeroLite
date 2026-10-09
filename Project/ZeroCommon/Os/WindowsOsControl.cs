@@ -48,20 +48,12 @@ public sealed class WindowsOsControl : IOsControl
             GetWindowText(hwnd, title, title.Capacity);
             var t = title.ToString();
             if (string.IsNullOrWhiteSpace(t)) return true;
-            if (!string.IsNullOrEmpty(titleFilter) && t.IndexOf(titleFilter, StringComparison.OrdinalIgnoreCase) < 0)
+            var window = Describe(hwnd, t, names);
+            if (!string.IsNullOrEmpty(titleFilter)
+                && t.IndexOf(titleFilter, StringComparison.OrdinalIgnoreCase) < 0
+                && window.Process.IndexOf(titleFilter, StringComparison.OrdinalIgnoreCase) < 0)
                 return true;
-            var cls = new StringBuilder(256);
-            GetClassName(hwnd, cls, cls.Capacity);
-            GetWindowRect(hwnd, out var r);
-            GetWindowThreadProcessId(hwnd, out var pid);
-            if (!names.TryGetValue((int)pid, out var proc))
-            {
-                try { using var p = System.Diagnostics.Process.GetProcessById((int)pid); proc = p.ProcessName; }
-                catch { proc = "?"; }
-                names[(int)pid] = proc;
-            }
-            list.Add(new OsWindow(hwnd.ToInt64(), t, cls.ToString(), (int)pid, proc,
-                r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, IsIconic(hwnd)));
+            list.Add(window);
             return true;
         }, IntPtr.Zero);
         return list;
@@ -75,6 +67,23 @@ public sealed class WindowsOsControl : IOsControl
     private static bool IsCloaked(IntPtr hwnd)
         => DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out var cloaked, sizeof(int)) == 0 && cloaked != 0;
 
+    private static OsWindow Describe(IntPtr hwnd, string title, Dictionary<int, string>? names = null)
+    {
+        var cls = new StringBuilder(256);
+        GetClassName(hwnd, cls, cls.Capacity);
+        GetWindowRect(hwnd, out var r);
+        GetWindowThreadProcessId(hwnd, out var pid);
+        string? proc = null;
+        if (names is null || !names.TryGetValue((int)pid, out proc))
+        {
+            try { using var p = System.Diagnostics.Process.GetProcessById((int)pid); proc = p.ProcessName; }
+            catch { proc = "?"; }
+            if (names is not null) names[(int)pid] = proc;
+        }
+        return new OsWindow(hwnd.ToInt64(), title, cls.ToString(), (int)pid, proc!,
+            r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, IsIconic(hwnd));
+    }
+
     public bool Activate(long hwnd)
     {
         var h = new IntPtr(hwnd);
@@ -84,9 +93,41 @@ public sealed class WindowsOsControl : IOsControl
         var fgThread = GetWindowThreadProcessId(fg, out _);
         var me = GetCurrentThreadId();
         var attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
-        var ok = SetForegroundWindow(h);
+        // A tapped ALT counts as user input, which is what unlocks SetForegroundWindow for a
+        // process nobody is using — the documented foreground-lock workaround.
+        keybd_event(0x12, 0, 0, IntPtr.Zero);
+        keybd_event(0x12, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+        SetForegroundWindow(h);
+        BringWindowToTop(h);
         if (attached) AttachThreadInput(me, fgThread, false);
-        return ok;
+        for (var i = 0; i < 10 && GetAncestor(GetForegroundWindow(), GA_ROOT) != h; i++) Thread.Sleep(30);
+        return GetAncestor(GetForegroundWindow(), GA_ROOT) == h;
+    }
+
+    public OsWindow? Foreground()
+    {
+        var h = GetForegroundWindow();
+        if (h == IntPtr.Zero) return null;
+        var root = GetAncestor(h, GA_ROOT);
+        if (root != IntPtr.Zero) h = root;
+        var len = GetWindowTextLength(h);
+        var title = new StringBuilder(len + 1);
+        GetWindowText(h, title, title.Capacity);
+        return Describe(h, title.ToString());
+    }
+
+    public bool Close(long hwnd, TimeSpan wait)
+    {
+        var h = new IntPtr(hwnd);
+        if (h == IntPtr.Zero || !IsWindow(h)) return true;
+        PostMessage(h, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+        var deadline = DateTime.UtcNow + wait;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!IsWindow(h) || !IsWindowVisible(h)) return true;
+            Thread.Sleep(50);
+        }
+        return !IsWindow(h) || !IsWindowVisible(h);
     }
 
     // ------------------------------------------------------------------ capture
@@ -265,6 +306,11 @@ public sealed class WindowsOsControl : IOsControl
     private static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new(-4);
 
     private const int DWMWA_CLOAKED = 14;
+    private const uint WM_CLOSE = 0x0010;
+    private const uint GA_ROOT = 2;
+    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hwnd);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out int value, int size);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc cb, IntPtr lParam);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hwnd);

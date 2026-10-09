@@ -133,9 +133,11 @@
                         <Button Content="Clear log" Command="{Binding ClearLogCommand}" />
                     </WrapPanel>
                 </StackPanel>
-                <TextBox x:Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                <!-- Wrapped, no horizontal scroll: host lines carry a long Akka prefix, and with
+                     NoWrap the start of every line ran off the left edge while scrolled. -->
+                <TextBox x:Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
                          FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="11"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" />
             </DockPanel>
         </Border>
     </Grid>

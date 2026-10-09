@@ -164,14 +164,18 @@ loads the bundles the app already installed:
 `WearableToolbelt` (M0032, in `ZeroCommon/Wearable/`) is a thin adapter over two tool
 actors — **files** (`FileToolActor`), **web** (`WebToolActor`) and **os** (`OsToolActor`).
 Terminals stay "not available". The **desktop** (os_list_windows / os_screenshot /
-os_activate / os_mouse_click / os_key_press / os_type_text / os_launch) is on only while
+os_activate / os_close_window / os_mouse_click / os_key_press / os_type_text / os_launch) is on only while
 `OsControlEnabled` (Wearable page → OS control): `OsToolActor` holds the rules — program
 NAMES only, never a shell or script host, a file only from the allowed folders, screenshots
 saved to `home/screenshots` and returned as a path, every action in
 `%LOCALAPPDATA%\AgentZeroLite\logs\os-audit\*.jsonl` — and the platform is ZeroCommon's
 `Os/IOsControl` (`WindowsOsControl`: classic DllImport, GDI capture + `PngEncoder`, per-monitor
 DPI aware, cloaked windows filtered; `UnsupportedOsControl` elsewhere until a macOS one is
-written). os_element_tree is not ported (UI Automation is WPF-only). **`home`**
+written). os_element_tree is not ported (UI Automation is WPF-only). Two measured traps the
+code now handles: a background host may not take the foreground, so `Activate` checks it got it
+(ALT-tap workaround) and reports `ok:false` otherwise — two `alt+f4` once reported ok while the keys
+went to another window; and Win11 Notepad titles only its active tab, so `ListWindows` filters by
+title OR process. Closing is `os_close_window` (WM_CLOSE, no focus, no keys). **`home`**
 (`%LOCALAPPDATA%\AgentZeroLite\home`, alias reserved) is always first and writable
 (`WearableSettings.RootsWithHome`, not stored in the settings file); `note_save` / `note_read`
 keep notes in `home/notes`, `delete_file` removes one file in a writable folder. The file side is sandboxed to the **allow-listed

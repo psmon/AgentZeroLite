@@ -57,6 +57,10 @@ public interface IAgentToolbelt
     Task<string> OsActivateAsync(long hwnd, CancellationToken ct)
         => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
 
+    /// <summary>Close a window (WM_CLOSE). JSON envelope with <c>closed</c>.</summary>
+    Task<string> OsCloseWindowAsync(long hwnd, CancellationToken ct)
+        => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");
+
     /// <summary>UI Automation tree dump for a window.</summary>
     Task<string> OsElementTreeAsync(long hwnd, int maxDepth, string? search, CancellationToken ct)
         => Task.FromResult("{\"ok\":false,\"error\":\"os tools not available in this host\"}");

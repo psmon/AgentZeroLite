@@ -100,6 +100,8 @@ public sealed class HomeAndOsToolsTests : TestKit, IDisposable
         public IReadOnlyList<OsWindow> ListWindows(string? titleFilter = null)
             => [new OsWindow(42, "제목 없음 - 메모장", "Notepad", 7, "notepad", 10, 20, 800, 600, false)];
         public bool Activate(long hwnd) { Calls.Add($"activate {hwnd}"); return hwnd == 42; }
+        public OsWindow? Foreground() => new(7, "Discord", "Chrome", 1, "discord", 0, 0, 10, 10, false);
+        public bool Close(long hwnd, TimeSpan wait) { Calls.Add($"close {hwnd}"); return hwnd == 42; }
         public OsCapture? Capture(long hwnd, bool grayscale, int maxWidth = 1920, int maxHeight = 1080)
             => new(PngEncoder.Encode(new byte[4 * 2], 4, 2, gray: true), 4, 2, 4, 2);
         public void Click(int x, int y, bool right = false, bool doubleClick = false) => Calls.Add($"click {x},{y}");
@@ -177,6 +179,35 @@ public sealed class HomeAndOsToolsTests : TestKit, IDisposable
         Assert.Equal(2, lines.Length);
         Assert.Contains("\"verb\":\"os_key_press\"", lines[1]);
         Assert.Contains("\"ok\":false", lines[1]);
+    }
+
+    [Fact]
+    public void An_activate_that_did_not_bring_the_window_forward_is_a_failure_that_names_the_focus()
+    {
+        var (actor, _, _) = OsActor();
+        Assert.True(AskOs(actor, new OsToolActor.Activate(42)).GetProperty("ok").GetBoolean());
+        var refused = AskOs(actor, new OsToolActor.Activate(99));
+        Assert.False(refused.GetProperty("ok").GetBoolean());
+        Assert.Contains("Discord", refused.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public void A_key_press_says_which_window_it_landed_in()
+    {
+        var (actor, _, _) = OsActor();
+        var r = AskOs(actor, new OsToolActor.Key("ctrl+s"));
+        Assert.Equal("Discord", r.GetProperty("sent_to").GetString());
+    }
+
+    [Fact]
+    public void Close_reports_a_window_that_stayed_open_as_not_closed()
+    {
+        var (actor, os, _) = OsActor();
+        Assert.True(AskOs(actor, new OsToolActor.CloseWindow(42)).GetProperty("closed").GetBoolean());
+        var stuck = AskOs(actor, new OsToolActor.CloseWindow(43));
+        Assert.False(stuck.GetProperty("ok").GetBoolean());
+        Assert.False(stuck.GetProperty("closed").GetBoolean());
+        Assert.Equal(["close 42", "close 43"], os.Calls);
     }
 
     [Fact]

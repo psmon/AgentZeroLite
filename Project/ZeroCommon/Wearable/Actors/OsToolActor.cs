@@ -30,6 +30,7 @@ public sealed partial class OsToolActor : ReceiveActor
     public sealed record Key(string Spec);
     public sealed record TypeText(string Text);
     public sealed record Launch(string Program, string? File);
+    public sealed record CloseWindow(long Hwnd);
 
     public const string ScreenshotsFolder = "screenshots";
 
@@ -56,21 +57,27 @@ public sealed partial class OsToolActor : ReceiveActor
 
         Receive<ListWindows>(m => Run("os_list_windows", m, () => ListWindowsJson(m.TitleFilter)));
         Receive<Screenshot>(m => Run("os_screenshot", m, () => ScreenshotJson(m.Hwnd, m.Grayscale)));
-        Receive<Activate>(m => Run("os_activate", m, () => _os.Activate(m.Hwnd)
-            ? Ok(new { ok = true, hwnd = m.Hwnd })
-            : ToolJson.Fail("no such window (list it again with os_list_windows)")));
+        Receive<Activate>(m => Run("os_activate", m, () => ActivateJson(m.Hwnd)));
+        Receive<CloseWindow>(m => Run("os_close_window", m, () => CloseJson(m.Hwnd)));
         Receive<Click>(m => Run("os_mouse_click", m, () =>
         {
             _os.Click(m.X, m.Y, m.Right, m.Double);
             return Ok(new { ok = true, x = m.X, y = m.Y, right = m.Right, @double = m.Double });
         }));
-        Receive<Key>(m => Run("os_key_press", m, () => _os.KeyPress(m.Spec)
-            ? Ok(new { ok = true, key = m.Spec })
-            : ToolJson.Fail($"key spec not understood: '{m.Spec}' (modifiers ctrl/alt/shift/win + one key: a-z, 0-9, enter, tab, esc, space, backspace, del, home, end, pgup, pgdn, arrows, f1-f12)")));
+        Receive<Key>(m => Run("os_key_press", m, () =>
+        {
+            // Say where the key went: it lands in whatever has focus, which is not always
+            // the window the model meant (measured: two alt+f4 reported ok, Notepad stayed).
+            var target = _os.Foreground();
+            return _os.KeyPress(m.Spec)
+                ? Ok(new { ok = true, key = m.Spec, sent_to = target?.Title, sent_to_hwnd = target?.Hwnd })
+                : ToolJson.Fail($"key spec not understood: '{m.Spec}' (modifiers ctrl/alt/shift/win + one key: a-z, 0-9, enter, tab, esc, space, backspace, del, home, end, pgup, pgdn, arrows, f1-f12)");
+        }));
         Receive<TypeText>(m => Run("os_type_text", new { chars = m.Text.Length }, () =>
         {
+            var target = _os.Foreground();
             _os.TypeText(m.Text);
-            return Ok(new { ok = true, typed = m.Text.Length });
+            return Ok(new { ok = true, typed = m.Text.Length, sent_to = target?.Title, sent_to_hwnd = target?.Hwnd });
         }));
         Receive<Launch>(m => Run("os_launch", m, () => LaunchJson(m.Program, m.File)));
     }
@@ -109,6 +116,27 @@ public sealed partial class OsToolActor : ReceiveActor
                 hwnd = w.Hwnd, title = w.Title, process = w.Process,
                 x = w.X, y = w.Y, w = w.Width, h = w.Height, minimized = w.Minimized,
             }),
+        });
+    }
+
+    private string ActivateJson(long hwnd)
+    {
+        if (_os.Activate(hwnd)) return Ok(new { ok = true, hwnd, foreground = true });
+        var now = _os.Foreground();
+        return ToolJson.Fail(
+            $"window {hwnd} did not come to the front (Windows refused, or it is gone); the focused window is " +
+            $"'{now?.Title ?? "none"}' — do not send keys now. To close a window use os_close_window.");
+    }
+
+    private string CloseJson(long hwnd)
+    {
+        if (_os.Close(hwnd, TimeSpan.FromSeconds(2))) return Ok(new { ok = true, closed = true, hwnd });
+        return Ok(new
+        {
+            ok = false,
+            closed = false,
+            hwnd,
+            error = "the window is still open — it is probably asking whether to save. Tell the user; do not claim it closed.",
         });
     }
 

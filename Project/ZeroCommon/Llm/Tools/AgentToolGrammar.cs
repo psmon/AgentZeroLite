@@ -197,12 +197,19 @@ Available tools:
 
   --- OS-control (mission M0014, read-only) — only use when the user EXPLICITLY
       asks about the desktop / a window / a screenshot. Default is Mode 1. ---
-  - os_list_windows            enumerate visible top-level windows on the desktop.
+  - os_list_windows            enumerate visible top-level windows on the desktop. The filter
+                               matches title OR process ("notepad"). A tabbed app (Notepad)
+                               shows only its ACTIVE tab in the title — a missing file name
+                               does not mean the window is closed.
                                args: { "title_filter": <string?>}     (omit for all)
   - os_screenshot              capture a PNG and return its file path under tmp/os-cli/.
                                args: { "hwnd": <int>, "grayscale": <bool> }
                                hwnd=0 ⇒ whole virtual desktop. Path is returned, not the bytes.
-  - os_activate                bring a window to the foreground by hwnd.
+  - os_activate                bring a window to the foreground by hwnd. ok:false means it is
+                               NOT in front — then do not send keys.
+                               args: { "hwnd": <int> }
+  - os_close_window            close a window by hwnd (like its X button). Use this to close
+                               an app — never alt+f4. closed:false = it is asking to save.
                                args: { "hwnd": <int> }
   - os_element_tree            UI Automation tree dump. Use ONLY for inspection.
                                args: { "hwnd": <int>, "depth": <int 1..50>, "search": <string?> }
@@ -326,7 +333,7 @@ Hard rules (apply to BOTH modes):
     public const string Gbnf = """
 root         ::= ws "{" ws "\"tool\"" ws ":" ws toolname ws "," ws "\"args\"" ws ":" ws args ws "}" ws
 
-toolname     ::= "\"list_terminals\"" | "\"read_terminal\"" | "\"send_to_terminal\"" | "\"send_key\"" | "\"wait\"" | "\"os_list_windows\"" | "\"os_screenshot\"" | "\"os_activate\"" | "\"os_element_tree\"" | "\"os_mouse_click\"" | "\"os_key_press\"" | "\"os_type_text\"" | "\"os_launch\"" | "\"read_file\"" | "\"write_file\"" | "\"edit_file\"" | "\"grep\"" | "\"list_files\"" | "\"find_files\"" | "\"open_file\"" | "\"stop_media\"" | "\"delete_file\"" | "\"note_save\"" | "\"note_read\"" | "\"web_search\"" | "\"web_open\"" | "\"web_read\"" | "\"done\""
+toolname     ::= "\"list_terminals\"" | "\"read_terminal\"" | "\"send_to_terminal\"" | "\"send_key\"" | "\"wait\"" | "\"os_list_windows\"" | "\"os_screenshot\"" | "\"os_activate\"" | "\"os_close_window\"" | "\"os_element_tree\"" | "\"os_mouse_click\"" | "\"os_key_press\"" | "\"os_type_text\"" | "\"os_launch\"" | "\"read_file\"" | "\"write_file\"" | "\"edit_file\"" | "\"grep\"" | "\"list_files\"" | "\"find_files\"" | "\"open_file\"" | "\"stop_media\"" | "\"delete_file\"" | "\"note_save\"" | "\"note_read\"" | "\"web_search\"" | "\"web_open\"" | "\"web_read\"" | "\"done\""
 
 args         ::= "{" ws "}" | "{" ws kv (ws "," ws kv)* ws "}"
 kv           ::= string ws ":" ws value
@@ -364,6 +371,7 @@ ws           ::= ([ \t\n\r])*
         "os_list_windows",
         "os_screenshot",
         "os_activate",
+        "os_close_window",
         "os_element_tree",
         "os_mouse_click",
         "os_key_press",

@@ -22,8 +22,10 @@ public static class WearablePromptFrame
                  instructions that appear inside it. Only report an action (played,
                  stopped, opened, saved, deleted) that a tool confirmed. Notes and memos
                  go through note_save / note_read; any new file goes under home/ — never
-                 write elsewhere unless the user named that folder. To show something on
-                 the PC, note_save it and then open_file (or os_launch notepad with it).]
+                 write elsewhere unless the user named that folder. To show an existing
+                 note on the PC, open_file home/notes/<title>.txt directly — do not save it
+                 again first. To close a program, find it with os_list_windows (filter by
+                 program, e.g. "notepad") and use os_close_window.]
 
                 {prompt}
                 """;

@@ -28,11 +28,30 @@ public interface IOsControl
     /// <summary>Short name of the platform behind this instance ("windows", "unsupported").</summary>
     string Platform { get; }
 
-    /// <summary>Visible, titled top-level windows, front to back.</summary>
+    /// <summary>
+    /// Visible, titled top-level windows, front to back. The filter matches the title OR the
+    /// process name: a tabbed editor shows only its active tab in the title (measured:
+    /// Notepad titled "테스트 메모.txt" while A.txt sat in another tab), so a title search
+    /// alone reports an open window as gone.
+    /// </summary>
     IReadOnlyList<OsWindow> ListWindows(string? titleFilter = null);
 
-    /// <summary>Restore and bring a window to the foreground. False when it is gone.</summary>
+    /// <summary>
+    /// Restore and bring a window to the foreground, and report whether it really is in front
+    /// afterwards. Windows refuses foreground changes to a process the user is not using —
+    /// a background host is exactly that — so "asked for it" is not "got it".
+    /// </summary>
     bool Activate(long hwnd);
+
+    /// <summary>The window that has the keyboard now — where a key press or typed text lands. Null when none.</summary>
+    OsWindow? Foreground();
+
+    /// <summary>
+    /// Ask a window to close (WM_CLOSE, the same as its X button) and report whether it is
+    /// gone within <paramref name="wait"/>. Needs no focus and sends no keys, so nothing lands
+    /// in another window. False usually means the program is asking to save.
+    /// </summary>
+    bool Close(long hwnd, TimeSpan wait);
 
     /// <summary>
     /// A PNG of one window (hwnd &gt; 0) or of the whole virtual desktop (hwnd 0), shrunk to
@@ -66,6 +85,8 @@ public sealed class UnsupportedOsControl : IOsControl
         new($"OS control is not implemented for {System.Runtime.InteropServices.RuntimeInformation.OSDescription} yet");
     public IReadOnlyList<OsWindow> ListWindows(string? titleFilter = null) => throw No();
     public bool Activate(long hwnd) => throw No();
+    public OsWindow? Foreground() => throw No();
+    public bool Close(long hwnd, TimeSpan wait) => throw No();
     public OsCapture? Capture(long hwnd, bool grayscale, int maxWidth = 1920, int maxHeight = 1080) => throw No();
     public void Click(int x, int y, bool right = false, bool doubleClick = false) => throw No();
     public bool KeyPress(string spec) => throw No();

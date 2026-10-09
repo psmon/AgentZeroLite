@@ -293,6 +293,12 @@ public sealed class LocalAgentLoop : IAgentLoop
                 return await _host.OsKeyPressAsync(key, ct);
             }
 
+            case "os_close_window":
+            {
+                var hwnd = ReadLong(call.Args, "hwnd", 0);
+                return await _host.OsCloseWindowAsync(hwnd, ct);
+            }
+
             case "os_type_text":
             {
                 var text = ReadString(call.Args, "text", "");
