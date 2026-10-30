@@ -144,9 +144,31 @@ public class TerminalEnvironmentTests
     {
         var env = TerminalEnvironment.BuildPosix(Source(
             ("HOME", "/Users/me/Library/Containers/com.psmon.agentzerolite/Data"),
-            ("APP_SANDBOX_CONTAINER_ID", "com.psmon.agentzerolite")));
+            ("APP_SANDBOX_CONTAINER_ID", "com.psmon.agentzerolite"),
+            ("PATH", "/usr/bin:/bin")), canList: _ => true);
 
         Assert.Equal("/Users/me", env["HOME"]);
+        Assert.Equal("/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin", env["PATH"]);
+    }
+
+    /// <summary>Without a home-wide exception the real home is unreadable: the tab keeps the container.</summary>
+    [Fact]
+    public void BuildPosix_KeepsTheContainerHomeWhenTheRealOneIsUnreadable()
+    {
+        const string container = "/Users/me/Library/Containers/com.psmon.agentzerolite/Data";
+        var env = TerminalEnvironment.BuildPosix(Source(("HOME", container), ("PATH", "/usr/bin")), canList: _ => false);
+
+        Assert.Equal(container, env["HOME"]);
+        Assert.StartsWith("/opt/homebrew/bin:", env["PATH"]);
+    }
+
+    [Fact]
+    public void BuildPosix_LeavesAnOrdinaryHomeAndPathAlone()
+    {
+        var env = TerminalEnvironment.BuildPosix(Source(("HOME", "/Users/me"), ("PATH", "/usr/bin")), canList: _ => true);
+
+        Assert.Equal("/Users/me", env["HOME"]);
+        Assert.Equal("/usr/bin", env["PATH"]);
     }
 
     [Theory]

@@ -37,6 +37,10 @@ internal static class Program
             return 1;
         }
 
+        // Mac App Store build: reopen the workspace folders the person picked, before any
+        // terminal starts (a no-op outside the App Sandbox).
+        SandboxFolderAccess.RestoreAll();
+
         try
         {
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

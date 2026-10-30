@@ -100,12 +100,26 @@ public sealed class WearableMcpToolbeltTests
     [InlineData("chrome", true)]
     [InlineData("Chrome.exe", true)]
     [InlineData("Google Chrome", true)]
-    [InlineData(@"C:\Program Files\Microsoft\Edge\msedge.exe", true)]
     [InlineData("whale", true)]
     [InlineData("notepad", false)]
     [InlineData("", false)]
     public void Browser_programs_are_recognised(string program, bool expected)
         => Assert.Equal(expected, McpBrowser.IsBrowserProgram(program));
+
+    // A full Windows path only splits on '\' where it is a separator.
+    [SkippableFact]
+    public void Browser_programs_are_recognised_by_full_windows_path()
+    {
+        Skip.IfNot(OperatingSystem.IsWindows(), "Windows path semantics");
+        Assert.True(McpBrowser.IsBrowserProgram(@"C:\Program Files\Microsoft\Edge\msedge.exe"));
+    }
+
+    [SkippableFact]
+    public void Browser_programs_are_recognised_by_full_posix_path()
+    {
+        Skip.If(OperatingSystem.IsWindows(), "POSIX path semantics");
+        Assert.True(McpBrowser.IsBrowserProgram("/Applications/Microsoft Edge.app/Contents/MacOS/msedge"));
+    }
 
     [Fact]
     public void Cdp_endpoint_is_read_from_either_servers_flag()

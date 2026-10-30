@@ -25,17 +25,17 @@
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
 
-    <!-- A terminal host: the shells and agent CLIs a person runs in a tab inherit this sandbox.
-         Without these, a tab cannot see the person's projects or ~/.claude, cannot run
-         node/claude/codex from Homebrew, and `npm install -g` fails (measured, §4.1). -->
-    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
-    <array>
-        <string>/</string>
-    </array>
+    <!-- Workspace folders stay reachable across launches through security-scoped bookmarks
+         (SandboxFolderAccess). A terminal tab is a child process and inherits the access. -->
+    <key>com.apple.security.files.bookmarks.app-scope</key>
+    <true/>
+
+    <!-- The person's own Homebrew installation, so a tab can start node and the CLIs they
+         installed. App Review refused the home-wide and /usr/local/ exceptions (2.4.5(i),
+         2026-10-28) and did not object to this one. -->
     <key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
     <array>
         <string>/opt/homebrew/</string>
-        <string>/usr/local/</string>
     </array>
 </dict>
 </plist>

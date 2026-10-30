@@ -4,6 +4,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Agent.Common;
+using Agent.Common.Platform;
 using AgentZeroAvalonia.Layout;
 using AgentZeroAvalonia.ViewModels;
 
@@ -245,6 +246,8 @@ public partial class MainWindow : Window
             });
             var path = picked.FirstOrDefault()?.TryGetLocalPath();
             if (string.IsNullOrEmpty(path)) return;
+            // Sandboxed (Mac App Store): keep the dialog's grant past this run.
+            SandboxFolderAccess.Remember(path);
             Vm.AddWorkspace(path);
         }
         catch (Exception ex)

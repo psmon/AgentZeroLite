@@ -104,7 +104,7 @@ public static class TerminalEnvironment
     /// Dock starts with almost nothing, so the terminal identity and a UTF-8 locale are
     /// filled in when absent.
     /// </summary>
-    public static Dictionary<string, string> BuildPosix(IDictionary? source = null)
+    public static Dictionary<string, string> BuildPosix(IDictionary? source = null, Func<string, bool>? canList = null)
     {
         var env = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (DictionaryEntry entry in source ?? Environment.GetEnvironmentVariables())
@@ -119,8 +119,23 @@ public static class TerminalEnvironment
         if (!env.ContainsKey("LANG") && !env.ContainsKey("LC_ALL"))
             env["LANG"] = "en_US.UTF-8";
         if (env.TryGetValue("HOME", out var home) && RealHomeFromSandbox(home) is { } real)
-            env["HOME"] = real;
+        {
+            // Only when the sandbox lets the tab read it. The Mac App Store build no longer holds a
+            // home-wide file exception (App Review refused it, 2.4.5(i)), and a HOME the shell cannot
+            // read is worse than the container: zsh and every CLI would fail on their own dotfiles.
+            if ((canList ?? CanList)(real)) env["HOME"] = real;
+            // The Homebrew prefix keeps its exception; a Dock-launched app has no PATH to it and the
+            // container HOME has no ~/.zprofile to add it.
+            PrependPath(env, "/opt/homebrew/sbin", ':');
+            PrependPath(env, "/opt/homebrew/bin", ':');
+        }
         return env;
+    }
+
+    private static bool CanList(string dir)
+    {
+        try { using var e = Directory.EnumerateFileSystemEntries(dir).GetEnumerator(); e.MoveNext(); return true; }
+        catch { return false; }
     }
 
     /// <summary>

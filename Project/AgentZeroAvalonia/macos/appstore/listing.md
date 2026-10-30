@@ -18,7 +18,7 @@ records what was submitted and what came back.
 | Age rating | Every item None / No (no general-purpose web browser, no user-to-user chat) |
 | Privacy policy URL | https://psmon.github.io/AgentZeroLite/Home/privacy-policy.html |
 | App privacy | Data Not Collected (no account, no telemetry; prompts go only to the LLM endpoint the person configures) |
-| Price | Free, all territories |
+| Price | Free, all territories except China mainland (guideline 5, generative AI) |
 | EU DSA | Not a trader (free, open-source personal project) |
 | Export compliance | `ITSAppUsesNonExemptEncryption = false` in Info.plist (HTTPS only) |
 
@@ -33,7 +33,7 @@ AgentZero Lite is a desktop home for the command-line AI tools you already use.
 
 Open Claude Code, Codex, agent-one or any shell (zsh, bash) side by side in real terminal tabs, arrange them in split panes, and keep each project in its own workspace. The app checks whether each agent CLI is installed and, when you ask, installs it with your own npm (Node.js from Homebrew).
 
-A built-in assistant can read what the terminals show, send them input, and relay work between agents, using any OpenAI-compatible endpoint you configure. Everything is scriptable from a shell with the app's -cli command.
+A built-in assistant can read what the terminals show, send them input, and relay work between agents, using the LLM endpoint you configure. Everything is scriptable from a shell with the app's -cli command.
 
 • Real terminal tabs (xterm.js) for Claude Code, Codex, agent-one and any shell
 • Split panes and per-project workspaces, remembered between sessions
@@ -45,7 +45,7 @@ A built-in assistant can read what the terminals show, send them input, and rela
 • No account, no telemetry: settings and history stay on your Mac
 • Open source
 
-About this Mac App Store edition: the app runs in the macOS App Sandbox. Terminal tabs run the tools you install yourself (for example with Homebrew and npm) and can open your project folders. Install Git with Homebrew (brew install git); the Git that comes with Xcode's command line tools cannot be started from a sandboxed app. Job control (Ctrl+Z) is not available in sandboxed shells.
+About this Mac App Store edition: the app runs in the macOS App Sandbox. Add each project with the folder dialog; the app keeps access to the folders you add, and their terminal tabs can read and write them. Tabs can run the tools you installed with Homebrew. Tools that keep their settings in your home folder cannot read them from this edition. Install Git with Homebrew (brew install git); the Git that comes with Xcode's command line tools cannot be started from a sandboxed app. Job control (Ctrl+Z) is not available in sandboxed shells.
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
@@ -66,12 +66,13 @@ terminal,AI agent,Claude Code,Codex,CLI,LLM,shell,zsh,split panes,developer
 
 **Notes**
 
-No account or sign-in is needed. Click "+" (Add workspace) and choose any folder, then open a terminal tab from the workspace's + menu: choose zsh and type any command (for example ls) to see the terminal working. The built-in assistant (AgentBot) is optional and needs an OpenAI-compatible endpoint entered in Settings → LLM. Agent CLI tabs (Claude Code, Codex) need those tools installed by the user; Settings → CLI Definitions shows their status.
+No account or sign-in is needed. Click "+" (Add workspace) and choose any folder, then open a terminal tab from the workspace's + menu: choose zsh and type any command (for example ls) to see the terminal working. The built-in assistant (AgentBot) is optional and needs an LLM endpoint entered in Settings → LLM. Agent CLI tabs (Claude Code, Codex) need those tools installed by the user; Settings → CLI Definitions shows their status.
 
-Why the app uses temporary exception entitlements: AgentZero Lite is a terminal host. Each terminal tab starts the user's shell (/bin/zsh) as a child process, which inherits the app's sandbox, and the user then runs their own command-line tools there. Without access to the home folder and to the Homebrew prefixes, a tab could not open the user's projects, read the configuration of the tools the user installed (~/.zshrc, ~/.claude), or start the tools the user installed with Homebrew and npm.
+How file access works (changed after the review of 0.25.8, guideline 2.4.5(i)): the home-folder and /usr/local/ temporary exceptions are gone. The app reaches a project only through the folder the user picks in the standard folder dialog (com.apple.security.files.user-selected.read-write) and keeps that access across launches with an app-scoped security-scoped bookmark (com.apple.security.files.bookmarks.app-scope). AgentZero Lite is a terminal host: each terminal tab starts /bin/zsh as a child process, which inherits the app's sandbox and therefore the folders the user picked.
 
-- com.apple.security.temporary-exception.files.home-relative-path.read-write ["/"]: project folders and tool configuration under the user's home, used only by commands the user types in a terminal tab.
-- com.apple.security.temporary-exception.files.absolute-path.read-write ["/opt/homebrew/", "/usr/local/"]: the user's own Homebrew and npm installations, so a tab can start node, git and the agent CLIs the user installed, as in any terminal.
+The one remaining temporary exception is com.apple.security.temporary-exception.files.absolute-path.read-write ["/opt/homebrew/"]: the user's own Homebrew installation, so a tab can start node and the command-line tools the user installed with Homebrew, as in any terminal. It is used only by commands the user types in a terminal tab.
+
+China mainland: the app is no longer offered on the China mainland storefront, and the metadata no longer mentions ChatGPT or OpenAI (guideline 5).
 
 The app itself does not download or run code on its own. Commands run only when the user types them in a terminal tab, or when the user presses Install for an agent CLI in Settings → CLI Definitions, which runs the user's own npm (npm install -g <package>) exactly as typing it in a terminal would. Network: loopback servers render the terminal (xterm.js) and plugin pages inside the app's web view; outbound HTTPS goes only to the LLM endpoint the user configures and to pages the user's commands fetch.
 
