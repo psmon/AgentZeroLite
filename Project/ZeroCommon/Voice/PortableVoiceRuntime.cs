@@ -2,7 +2,7 @@ namespace Agent.Common.Voice;
 
 /// <summary>
 /// Builds the TTS and STT that <see cref="VoiceSettings"/> names, out of the providers that
-/// run on every OS: Supertonic (ONNX), OpenAI TTS, Whisper.net and OpenAI Whisper. The WPF
+/// run on every OS: Supertonic (ONNX), KittenTTS 2 (Windows: llama.cpp + ONNX), OpenAI TTS, Whisper.net and OpenAI Whisper. The WPF
 /// host has its own factory because it also offers Windows SAPI and the LocalGemma stub;
 /// a provider this one cannot build comes back null with the reason, so a screen can say
 /// why instead of failing on first use.
@@ -11,7 +11,7 @@ public static class PortableVoiceRuntime
 {
     /// <summary>The TTS providers this runtime can build, in the order a picker shows them.</summary>
     public static readonly IReadOnlyList<string> TtsProviders =
-        [TtsProviderNames.Off, TtsProviderNames.Supertonic, TtsProviderNames.OpenAITts];
+        [TtsProviderNames.Off, TtsProviderNames.Supertonic, TtsProviderNames.KittenTts2, TtsProviderNames.OpenAITts];
 
     /// <summary>The STT providers this runtime can build.</summary>
     public static readonly IReadOnlyList<string> SttProviders =
@@ -22,20 +22,19 @@ public static class PortableVoiceRuntime
         switch (s.TtsProvider)
         {
             case TtsProviderNames.Supertonic:
-                var dir = SuperTonicModelStore.ResolveModelDir(s);
-                if (!SuperTonicModelStore.IsModelPresent(dir))
+            case TtsProviderNames.KittenTts2:
+                // The same engines the wearable host speaks with (IVoiceEngine), so a voice behaves the same on the
+                // desktop and on the watch - and the model they load stays loaded for the next call (the Voice
+                // tab's test used to reload it on every click).
+                var engine = VoiceEngines.Create(s)!;
+                if (!engine.Available)
                 {
-                    reason = "Supertonic model not downloaded";
+                    reason = engine.Status;
+                    engine.Dispose();
                     return null;
                 }
                 reason = "";
-                return new SuperTonicOnnxTts(dir)
-                {
-                    Voice = string.IsNullOrWhiteSpace(s.SupertonicVoice) ? "F1" : s.SupertonicVoice,
-                    Language = string.IsNullOrWhiteSpace(s.SupertonicLanguage) ? "ko" : s.SupertonicLanguage,
-                    Steps = Math.Clamp(s.SupertonicSteps, 5, 12),
-                    Speed = Math.Clamp(s.SupertonicSpeed, 0.7f, 2.0f),
-                };
+                return new VoiceEngineTts(engine);
             case TtsProviderNames.OpenAITts:
                 if (string.IsNullOrWhiteSpace(s.TtsOpenAIApiKey))
                 {
@@ -58,8 +57,13 @@ public static class PortableVoiceRuntime
     /// own <see cref="VoiceSettings.SupertonicVoice"/> — the generic <see cref="VoiceSettings.TtsVoice"/>
     /// would otherwise override it, and the wearable host reads only the Supertonic field.
     /// </summary>
-    public static string VoiceFor(VoiceSettings s) =>
-        s.TtsProvider == TtsProviderNames.Supertonic ? s.SupertonicVoice : s.TtsVoice;
+    public static string VoiceFor(VoiceSettings s) => s.TtsProvider switch
+    {
+        TtsProviderNames.Supertonic => s.SupertonicVoice,
+        TtsProviderNames.KittenTts2 => s.Kitten2Voice,
+        _ => s.TtsVoice,
+    };
+
 
     public static ISpeechToText? CreateStt(VoiceSettings s, out string reason)
     {

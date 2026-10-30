@@ -44,6 +44,26 @@ public static class TtsProviderNames
     /// Voice tab into <c>%LOCALAPPDATA%\AgentZeroLite\models\supertonic</c>.
     /// </summary>
     public const string Supertonic = "Supertonic";
+
+    /// <summary>
+    /// KittenML's KittenTTS 2 (speech LM + chatterbox-turbo decoder), multilingual incl. Korean, run on the app's own
+    /// runtimes: the LM as a Q8_0 GGUF on llama.cpp (Vulkan), the decoder on CPU ONNX Runtime. Windows only; the
+    /// ~3.3 GB bundle is installed from the Voice tab — see <see cref="KittenTts2.KittenTts2ModelStore"/>.
+    /// </summary>
+    public const string KittenTts2 = "KittenTTS2";
+}
+
+/// <summary>Values of <see cref="VoiceSettings.Kitten2Device"/>.</summary>
+public static class Kitten2Devices
+{
+    public const string Auto = "Auto";
+    public const string Gpu = "GPU";
+    public const string Cpu = "CPU";
+    public static readonly IReadOnlyList<string> All = [Auto, Gpu, Cpu];
+
+    /// <summary>The stored value, or Auto for anything else.</summary>
+    public static string Normalize(string? value) =>
+        All.FirstOrDefault(d => string.Equals(d, value, StringComparison.OrdinalIgnoreCase)) ?? Auto;
 }
 
 /// <summary>
@@ -137,6 +157,27 @@ public sealed class VoiceSettings
 
     /// <summary>Speech speed factor, 0.7..2.0 (default 1.05 per reference).</summary>
     public float SupertonicSpeed { get; set; } = 1.05f;
+
+    // ── KittenTTS 2 (on-device, multilingual; LM on llama.cpp Vulkan, decoder on ONNX) ──
+
+    /// <summary>Voice from the installed bundle's manifest (Bruno, Bella, KoreanNewsAnchor…).</summary>
+    public string Kitten2Voice { get; set; } = KittenTts2.KittenTts2ModelStore.DefaultVoice;
+
+    /// <summary>
+    /// The language answers are written in when KittenTTS 2 speaks them (the wearable brain answers in it). The model
+    /// itself reads any of its languages; this only steers what it is given.
+    /// </summary>
+    public string Kitten2Language { get; set; } = "ko";
+
+    /// <summary>Override for the bundle folder. Empty → <see cref="KittenTts2.KittenTts2ModelStore.DefaultDirectory"/>.</summary>
+    public string Kitten2ModelDir { get; set; } = "";
+
+    /// <summary>
+    /// Where the speech LM runs: <see cref="Kitten2Devices.Auto"/> (the GPU when a Vulkan device exists, else the
+    /// CPU), <see cref="Kitten2Devices.Gpu"/> or <see cref="Kitten2Devices.Cpu"/> — for a machine with no usable GPU,
+    /// or a GPU the local LLM needs. The decoder always runs on the CPU.
+    /// </summary>
+    public string Kitten2Device { get; set; } = Kitten2Devices.Auto;
 
     // ── Capture / VAD ────────────────────────────────────────────────────
 

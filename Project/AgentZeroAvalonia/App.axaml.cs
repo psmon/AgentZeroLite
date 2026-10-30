@@ -121,6 +121,10 @@ public partial class App : Application
             // while the floating bot is still up.
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = new MainWindow { DataContext = vm };
+            // Models switched on in "load at startup" (all off by default) load on the pool after the window is
+            // up — starting the app never waits for one; everything else loads on first use.
+            desktop.MainWindow.Opened += (_, _) =>
+                _ = Agent.Common.Models.ModelResidency.PreloadAtStartupAsync(m => AppLogger.Log(m));
             vm.Wearable?.AutoStart();
             vm.StartAgentStateMonitor();
             vm.StartWorktreeMonitor();

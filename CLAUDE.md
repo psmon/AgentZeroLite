@@ -159,9 +159,63 @@ loads the bundles the app already installed:
 
 | What | Comes from | Reused type |
 |------|-----------|-------------|
-| Voice | Settings → Voice (Supertonic) | `SuperTonicSynthesizer` — the sample's 466-line copy was dropped |
+| Voice | Settings → Voice (Supertonic or KittenTTS 2) | `IVoiceEngine` (`VoiceEngines.Create`) — the sample's 466-line copy and the host's per-engine copies were dropped |
 | Ear | Settings → Voice (WhisperLocal) | `WhisperModelStore` + Whisper.net, incl. the Vulkan→CPU probe |
 | Brain | Settings → LLM | `IAgentLoop` (`LocalAgentLoop` / `ExternalAgentLoop`) over `WearableToolbelt` |
+
+**One voice interface for the desktop and the watch** (`Voice/IVoiceEngine`): `VoiceEngines.Create(settings)` gives
+`SupertonicVoiceEngine` or `KittenTts2VoiceEngine` — raw samples + rate, lazy model load,
+voices, default voice/language. The wearable's `WearableVoice` is now only the 16 kHz ADPCM framing around it, the
+desktop wraps the same engine as an `ITextToSpeech` (`VoiceEngineTts`, used by `PortableVoiceRuntime` for
+KittenTTS 2), and `WearableDiagnostics` asks it too. A new on-device voice is one engine class.
+
+**When models load** (`Models/ModelResidency`, one place for every host): **on use** always — an engine loads on
+its first request and keeps the model; **on Save** (Settings → Voice) the chosen voice and ear load in the background
+and the replaced voice is freed (`VoiceEngines.ReleaseAllExcept`); **at startup** only per kind and only when switched
+on — `ModelPreloadSettings` in `model-preload.json` (`LocalLlm`, `VoiceOut`, `VoiceIn`, all **off by default**: the
+LLM and KittenTTS 2 cost GB each), run on the pool after the main window's `Opened`, never awaited. Voice models are
+held **once per process** (static caches in `SupertonicVoiceEngine` / `KittenTts2VoiceEngine`; the engine object is
+cheap and its Dispose keeps the model): measured, the Voice tab built and disposed an engine per click, so every
+KittenTTS 2 test paid its ~13 s load. AI mode no longer needs Settings → LLM → Load: with the Local backend and no
+model loaded, `AgentLoopWiring` returns a `DeferredAgentLoop` that loads it (`EnsureLocalLlmAsync`, single-flight,
+not cancellable by one caller) inside the first turn on the pool. The wearable host warms its voice on start, like
+its ear (it runs only while the watch is in use). Whisper's factory was already process-wide; the Plugins page's
+models (AST, Florence-2, Sherpa) already load on first use per page.
+
+**KittenTTS 2** (`TtsProviderNames.KittenTts2`, ZeroCommon `Voice/KittenTts2/`; Windows) is KittenML's 1.7 B speech
+LM, multilingual incl. Korean, on the app's **own** runtimes — researched in `E:\lib\kittentts2-onnx` (README there
+has every measurement). The LM is a standard Q8_0 GGUF on the bundled llama.cpp (Vulkan, ~28 audio tok/s on a Radeon
+8060S; real time is ~24.5), fed **embeddings** (`LLamaBatchEmbeddings`) because position 0 is the speaker
+(`spk_proj`), not a token; the decoder is ResembleAI's chatterbox-turbo ONNX on CPU ORT. Things measured the hard way
+and encoded: the residual stream reaches 2.9e6 (fp16 overflows), so the bundle carries it at alpha = 1/256 (inputs,
+v_proj, up_proj ×alpha, eps ×alpha², exact) and every input row is scaled; the repository's own GGUF is a forked quant
+type (43) stock llama.cpp cannot read; llama.cpp can be loaded once per process, so `LlamaSharpLocalLlm.EnsureNative`
+is shared and says whether the LM got Vulkan or the CPU natives the local LLM picked first. Text goes through
+kittenml's normalization — `Voice/KittenTts2/TextNorm` is a C# port of kitten_text_processing's FST runtime
+(identical to Python on 78/78 texts, `KittenTts2Tests` keeps it so with the grammars in `ZeroCommon.Tests/Voice/
+KittenTts2Data`) — and it is the **en** grammar for every language, as served: it drops some Korean spaces on purpose
+and leaves digits in Korean as digits (the model may misread "3시"). The bundle (`KittenTts2ModelStore`,
+`%LOCALAPPDATA%\AgentZeroLite\models\kittentts2\kittentts2-agentzero-v1`, ~3.3 GB, `manifest.json` with sizes and
+SHA-256) is **downloaded from AgentZero's own GitHub Release `model-kittentts2-v1`** (`KittenTts2ModelDownloader`:
+prerelease, not Latest, a tag no workflow matches; assets are the bundle paths with `/` → `.`; resumes a `.part` with a
+Range request, installs a file only when its hash matches, writes the manifest last) — the direct-URL pattern of
+every other model, but the first one AgentZero hosts itself, because the converted bundle exists nowhere upstream. A
+OneDrive share was tried first: its link refuses non-browser clients (401/403). Install from a folder
+(`KittenTts2ModelInstaller`) stays as the offline path. Settings → Voice → KittenTTS 2 → Download / Install, or
+`AgentZeroWearable.exe --download-kitten2` / `--install-kitten2 <folder>`. It is a derivative of Stellon Labs
+materials, publicly released with its NOTICE and licenses. **Device** (`VoiceSettings.Kitten2Device`, Settings → Voice → Device:
+Auto / GPU / CPU; `--kitten2-device`): Auto = GPU when a Vulkan device exists. CPU still loads the **Vulkan** natives
+when a device exists and offloads no layers, because the CPU-only natives would lock the GUI's local LLM off the GPU for
+the rest of the process; the CPU-only natives are for machines without a Vulkan device. A failed GPU load falls back to
+the CPU; `Synthesizer.Device` says where it ran and why. Measured (Radeon 8060S, ~6 s of Korean): GPU ~11 s, CPU ~20 s
+after a ~13 s load. The decoder is CPU either way, and **fp32**: in ORT 1.23.2 the fp16 graph took ~7 s for ~6 s of speech, fp32
+~4 s (bundle v1 swapped it; the downloader fetches only changed files and removes ones the manifest dropped). Publishing it
+failed: single uploads of 100 MB+ were cut mid-stream ("tls: bad record MAC", six tries) while 40 MB went through, so
+the 769 MB decoder data is published as `.001`…`.019` pieces (`parts` / `part_size` in the manifest) that
+`KittenTts2ModelDownloader.Segments` joins — resumable inside a piece, checked as one file.
+Warm synthesis now ~10–11 s for ~6 s of Korean on GPU (LM ~23 tok/s with a 2048 context). KittenTTS 0.8
+(English-only ONNX) was tried and dropped. First load ~16 s.
+
 
 `WearableToolbelt` (M0032, in `ZeroCommon/Wearable/`) is a thin adapter over two tool
 actors — **files** (`FileToolActor`), **web** (`WebToolActor`) and **os** (`OsToolActor`).

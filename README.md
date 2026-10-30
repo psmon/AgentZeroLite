@@ -635,6 +635,17 @@ extends here into tiki-taka between **your own two input modalities**.
     Start fresh, and a Check Install probe with actionable
     error hints (cache lock, HF rate limit, network, disk).
     Model + code license OpenRAIL-M / MIT.
+  - **KittenTTS 2** *(Avalonia host + wearable, Windows)* —
+    KittenML's 1.7 B speech LM, multilingual incl. Korean, on
+    the app's own runtimes: the LM as a Q8_0 GGUF on the bundled
+    llama.cpp (Vulkan, real time on a Radeon 8060S), the
+    chatterbox-turbo decoder on CPU ONNX Runtime, text
+    normalization ported to C#. No Python. The ~3.3 GB bundle
+    downloads from this repository's GitHub Release
+    `model-kittentts2-v1` (resumable, SHA-256 per file); it
+    carries the Stellon Labs Community License and NOTICE.
+    The speech LM runs on the GPU (Vulkan) or the CPU — Settings
+    → Voice → Device (Auto / GPU / CPU).
 
 ---
 
@@ -932,7 +943,7 @@ AMOLED, ESP32-S3R8, speaker + microphone, BLE). Both halves live in this repo:
 
 | Half | Where | What it is |
 | --- | --- | --- |
-| PC host | [`Project/ZeroWearable`](Project/ZeroWearable) | `AgentZeroWearable.exe` — owns the BLE link, runs AgentZero's agent loop for the watch, speaks with Supertonic and listens with Whisper. Started from the **Wearable** page of the WPF or Avalonia host |
+| PC host | [`Project/ZeroWearable`](Project/ZeroWearable) | `AgentZeroWearable.exe` — owns the BLE link, runs AgentZero's agent loop for the watch, speaks with Supertonic or KittenTTS 2 (multilingual) and listens with Whisper. Started from the **Wearable** page of the WPF or Avalonia host |
 | Firmware | [`Project/ZeroWearableDevice`](Project/ZeroWearableDevice/README.md) | ESP-IDF project for the board, with the Akka.NET remoting client AskBot compiles in and the wire contract (`PROTOCOL.md`) |
 
 - **AskBot** is a real Akka remoting peer whose PDUs are tunnelled over BLE. Ask by voice or text;

@@ -30,6 +30,34 @@ public class VoiceSettingsViewModelTests
     }
 
     [Fact]
+    public void KittenTTS2_is_offered_and_its_fields_round_trip()
+    {
+        var stored = new VoiceSettings
+        {
+            TtsProvider = TtsProviderNames.KittenTts2, Kitten2Language = "en", Kitten2Device = "cpu",
+        };
+        var vm = new VoiceSettingsViewModel(stored);
+
+        Assert.Contains(TtsProviderNames.KittenTts2, vm.TtsProviders);
+        Assert.DoesNotContain("KittenTTS", vm.TtsProviders);       // KittenTTS 0.8 is not offered any more
+        Assert.True(vm.ShowKitten2);
+        Assert.True(vm.TtsRunsHere);
+        Assert.Equal(Kitten2Devices.Cpu, vm.Kitten2Device);          // stored lower-case, shown as the picker's value
+        Assert.Equal(Kitten2Devices.All, vm.Kitten2DeviceChoices);
+        vm.Kitten2Device = Kitten2Devices.Gpu;
+        vm.Kitten2Language = "ko";
+
+        var saved = vm.ApplyTo(stored);
+        Assert.Equal(Kitten2Devices.Gpu, saved.Kitten2Device);
+        Assert.Equal("ko", saved.Kitten2Language);
+        Assert.Equal(TtsProviderNames.KittenTts2, saved.TtsProvider);
+    }
+
+    [Fact]
+    public void An_unknown_device_value_reads_as_auto() =>
+        Assert.Equal(Kitten2Devices.Auto, new VoiceSettingsViewModel(new VoiceSettings { Kitten2Device = "npu" }).Kitten2Device);
+
+    [Fact]
     public void A_provider_only_the_windows_host_runs_survives_a_save()
     {
         var stored = new VoiceSettings { TtsProvider = TtsProviderNames.WindowsTts, SttProvider = "LocalGemma" };

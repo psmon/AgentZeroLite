@@ -1,0 +1,314 @@
+[
+ {
+  "input": "Hello, this is Agent Zero. The weather in Seoul is sunny today.",
+  "expected": "Hello, this is Agent Zero. The weather in Seoul is sunny today."
+ },
+ {
+  "input": "안녕하세요, 에이전트 제로입니다. 오늘 서울은 맑습니다.",
+  "expected": "안녕하세요, 에이전트제로입니다. 오늘서울은맑습니다."
+ },
+ {
+  "input": "It costs $12.50 at 3 PM on 2026-10-30.",
+  "expected": "It costs twelve dollars fifty cents at three PM on october thirtieth twenty twenty six."
+ },
+ {
+  "input": "The meeting moved to 3:30 pm, room 204.",
+  "expected": "The meeting moved to three thirty PM, room two hundred and four."
+ },
+ {
+  "input": "Dr. Smith said the temperature is -5°C, about 23°F.",
+  "expected": "Doctor Smith said the temperature is minus five degrees Celsius, about twenty three degrees Fahrenheit."
+ },
+ {
+  "input": "We grew 12.5% in Q3 2025, i.e. 1,234,567 users.",
+  "expected": "We grew twelve point five percent in Q three twenty twenty five, that is one million two hundred thirty four thousand five hundred and sixty seven users."
+ },
+ {
+  "input": "Version V0.8 shipped; v1.2.3 is next.",
+  "expected": "Version V zero point eight shipped; v one point two point three is next."
+ },
+ {
+  "input": "He said \"hello\" and left. The TV is 50\" wide.",
+  "expected": "He said “hello” and left. The TV is fifty inches wide."
+ },
+ {
+  "input": "Results (see section [3]) were good — really good.",
+  "expected": "Results, see section [three], were good, really good."
+ },
+ {
+  "input": "x² + y² = r², and α ≈ 0.05 … roughly.",
+  "expected": "X two plus y two equals r two, and alpha approximately equals zero point zero five, roughly."
+ },
+ {
+  "input": "[joyful] We actually won the grant <laugh> I can (((hardly))) believe it!",
+  "expected": "[joyful] We actually won the grant <laugh> I can (((hardly))) believe it!"
+ },
+ {
+  "input": "Call me at 555-1234 or email agent@example.com.",
+  "expected": "Call me at five hundred and fifty five-twelve thirty four or email agent at example dot com."
+ },
+ {
+  "input": "오늘 기온은 23도이고, 습도는 45%입니다.",
+  "expected": "오늘기온은 23도이고, 습도는 45%입니다."
+ },
+ {
+  "input": "회의는 3시 30분에 시작합니다. 장소는 2층 회의실입니다.",
+  "expected": "회의는 3시 30분에시작합니다. 장소는 2층회의실입니다."
+ },
+ {
+  "input": "Mr. and Mrs. Lee arrived on Jan. 5th, 2024 at 10:15 a.m.",
+  "expected": "Mister and misses Lee arrived on january fifth, twenty twenty four at ten fifteen AM."
+ },
+ {
+  "input": "The answer is 42!",
+  "expected": "The answer is forty two!"
+ },
+ {
+  "input": "Wait... what?",
+  "expected": "Wait, what?"
+ },
+ {
+  "input": "line one\nline two",
+  "expected": "Line one line two."
+ },
+ {
+  "input": "St. Louis is 1,200 km away; that's about 746 mi.",
+  "expected": "Saint Louis is one thousand two hundred kilometers away; that's about seven hundred and forty six miles."
+ },
+ {
+  "input": "I have 3 cats, 2 dogs and 1 fish.",
+  "expected": "I have three cats, two dogs and one fish."
+ },
+ {
+  "input": "Chrome를 두 번째 화면으로 옮겼어요.",
+  "expected": "Chrome를두번째화면으로옮겼어요."
+ },
+ {
+  "input": "",
+  "expected": ""
+ },
+ {
+  "input": "   ",
+  "expected": ""
+ },
+ {
+  "input": "Is it 7?",
+  "expected": "Is it seven?"
+ },
+ {
+  "input": "She finished 1st, he was 22nd and I came 103rd.",
+  "expected": "She finished first, he was twenty second and I came one hundred third."
+ },
+ {
+  "input": "Add 1/2 cup of milk and 3/4 tsp of salt.",
+  "expected": "Add one half cup of milk and three quarters tsp of salt."
+ },
+ {
+  "input": "It costs €15, £7.99 or ₩12,000.",
+  "expected": "It costs fifteen euros, seven pounds ninety nine pence or twelve thousand won."
+ },
+ {
+  "input": "Pay $1.5 million by 10/30/2026.",
+  "expected": "Pay one point five million dollars by october thirtieth twenty twenty six."
+ },
+ {
+  "input": "The flight is at 23:45 on Oct 31.",
+  "expected": "The flight is at twenty three forty five on october thirty first."
+ },
+ {
+  "input": "Speed limit: 65 mph, weight 3.2 kg, 500 ml.",
+  "expected": "Speed limit: sixty five miles per hour, weight three point two kilograms, five hundred milliliters."
+ },
+ {
+  "input": "Visit https://example.com/docs for more.",
+  "expected": "Visit HTTPS colon slash slash example dot com slash DOCS for more."
+ },
+ {
+  "input": "#hashtag and @mention here.",
+  "expected": "Hash hashtag and at mention here."
+ },
+ {
+  "input": "COVID-19 cases rose from 1990-2000.",
+  "expected": "COVID-nineteen cases rose from nineteen ninety to two thousand."
+ },
+ {
+  "input": "Louis XIV ruled France; World War II ended in 1945.",
+  "expected": "Louis XIV ruled France; World War two ended in nineteen forty five."
+ },
+ {
+  "input": "It's 5 o'clock somewhere, isn't it?",
+  "expected": "It's five o'clock somewhere, isn't it?"
+ },
+ {
+  "input": "Great job 👍 see you 🙂 tomorrow.",
+  "expected": "Great job 👍 see you 🙂 tomorrow."
+ },
+ {
+  "input": "café, naïve, résumé, Zürich.",
+  "expected": "Café, naïve, résumé, Zürich."
+ },
+ {
+  "input": "こんにちは、今日は晴れです。",
+  "expected": "こんにちは、今日は晴れです。."
+ },
+ {
+  "input": "你好，今天天气很好。",
+  "expected": "你好，今天天气很好。."
+ },
+ {
+  "input": "Mix of 한국어 and English with 3 numbers 4 5.",
+  "expected": "Mix of 한국어 and English with three numbers four five."
+ },
+ {
+  "input": "((nested (brackets) here)) and [a [b] c].",
+  "expected": "((Nested, brackets, here)) and [a, b, c]."
+ },
+ {
+  "input": "Temperature: −3 °C ± 0.5.",
+  "expected": "Temperature: minus three degrees Celsius plus or minus zero point five."
+ },
+ {
+  "input": "Call +1 (800) 555-0199 now.",
+  "expected": "Call plus one, eight hundred, five hundred and fifty five-zero one nine nine now."
+ },
+ {
+  "input": "Prices: $0.99, $100, $1,000,000.",
+  "expected": "Prices: ninety nine cents, one hundred dollars, one million dollars."
+ },
+ {
+  "input": "Room 101, floor 3, building B-12.",
+  "expected": "Room one hundred and one, floor three, building B-twelve."
+ },
+ {
+  "input": "The ratio is 3:2 and 16:9.",
+  "expected": "The ratio is three:two and sixteen:nine."
+ },
+ {
+  "input": "He scored 99.9% on test #4.",
+  "expected": "He scored ninety nine point nine percent on test hash four."
+ },
+ {
+  "input": "Use git v2.45.1 and Python 3.12.",
+  "expected": "Use git v two point forty five point one and Python three point one two."
+ },
+ {
+  "input": "e.g. apples, oranges, etc.",
+  "expected": "For example apples, oranges, etcetera."
+ },
+ {
+  "input": "U.S.A. and U.K. agreed.",
+  "expected": "USA and UK agreed."
+ },
+ {
+  "input": "50 km/h, 9.81 m/s², 100 W.",
+  "expected": "Fifty kilometers per H, nine point eight one M per S two, one hundred W."
+ },
+ {
+  "input": "The year 2000 bug; year 1999; in 2010s.",
+  "expected": "The year two thousand bug; year nineteen ninety nine; in two thousand and ten S."
+ },
+ {
+  "input": "Chapter 7 — The End – Fin.",
+  "expected": "Chapter seven, The End, Fin."
+ },
+ {
+  "input": "Wow!!! Really??",
+  "expected": "Wow!!! Really??"
+ },
+ {
+  "input": "“Smart quotes” and ‘single quotes’.",
+  "expected": "“Smart quotes” and‘single quotes’."
+ },
+ {
+  "input": "A list: one; two; three.",
+  "expected": "A list: one; two; three."
+ },
+ {
+  "input": "Tabs\tand  double  spaces.",
+  "expected": "Tabs and double spaces."
+ },
+ {
+  "input": "123",
+  "expected": "One hundred and twenty three."
+ },
+ {
+  "input": "3.14159",
+  "expected": "Three point one four one five nine."
+ },
+ {
+  "input": "-42",
+  "expected": "Minus forty two."
+ },
+ {
+  "input": "1e6 and 2.5e-3",
+  "expected": "One e six and two dot five e dash three."
+ },
+ {
+  "input": "It is 7:05 AM and 7:05 a.m.",
+  "expected": "It is seven o five AM and seven o five AM."
+ },
+ {
+  "input": "Jan 1, 2025 vs 1 January 2025.",
+  "expected": "January first, twenty twenty five versus the first of january twenty twenty five."
+ },
+ {
+  "input": "₩5,000원이에요.",
+  "expected": "Five won,000원이에요."
+ },
+ {
+  "input": "오늘은 2026년 10월 30일입니다.",
+  "expected": "오늘은 2026년 10월 30일입니다."
+ },
+ {
+  "input": "배터리 85% 남았어요!",
+  "expected": "배터리 eighty five percent 남았어요!"
+ },
+ {
+  "input": "알람을 7시 30분으로 맞췄어요.",
+  "expected": "알람을 7시 30분으로맞췄어요."
+ },
+ {
+  "input": "서울 기온 -3도, 체감 -8도.",
+  "expected": "서울기온 -3도, 체감 -8도."
+ },
+ {
+  "input": "Hello\n\nWorld\n",
+  "expected": "Hello World."
+ },
+ {
+  "input": "The 3D model is 4K.",
+  "expected": "The three D model is four K."
+ },
+ {
+  "input": "Q&A at 5pm.",
+  "expected": "QANDA at five PM."
+ },
+ {
+  "input": "A+B=C",
+  "expected": "A plus B equals C."
+ },
+ {
+  "input": "x^2 − 4 = 0",
+  "expected": "X to the two minus four equals zero."
+ },
+ {
+  "input": "50\" TV and 6' 2\" tall.",
+  "expected": "Fifty “TV and six' two” tall."
+ },
+ {
+  "input": "<b>bold</b> text",
+  "expected": "B,bold, slash b, text."
+ },
+ {
+  "input": "[sad] I miss you <sigh> so (((much))).",
+  "expected": "[sad] I miss you <sigh> so (((much)))."
+ },
+ {
+  "input": "ALL CAPS SENTENCE HERE.",
+  "expected": "ALL CAPS SENTENCE HERE."
+ },
+ {
+  "input": "lowercase start without period",
+  "expected": "Lowercase start without period."
+ }
+]

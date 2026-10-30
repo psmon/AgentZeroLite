@@ -75,11 +75,17 @@ public static class Program
         if (Arg(args, "--provider") is { } provider) settings.CliProvider = provider;
 
         var voiceSettings = VoiceSettingsStore.Load();
+        // For this run only (never saved): try another engine without touching Settings → Voice.
+        if (Arg(args, "--tts") is { } ttsProvider) voiceSettings.TtsProvider = ttsProvider;
+        if (Arg(args, "--kitten2-dir") is { } kitten2Dir) voiceSettings.Kitten2ModelDir = kitten2Dir;
+        if (Arg(args, "--kitten2-device") is { } kitten2Device) voiceSettings.Kitten2Device = Kitten2Devices.Normalize(kitten2Device);
         using var voice = new WearableVoice(voiceSettings, (level, message) => Log("voice", level, message));
         using var stt = new WearableStt(voiceSettings, settings, (level, message) => Log("stt", level, message));
 
         // ── One-shot diagnostics. Each exits; none of them touch the radio. ──
 
+        if (Arg(args, "--install-kitten2") is { } kitten2Source) return InstallKitten2(kitten2Source);
+        if (HasFlag(args, "--download-kitten2")) return InstallKitten2(null);
         if (Arg(args, "--speak") is { } speakText) return Speak(voice, speakText, args);
         if (Arg(args, "--hear") is { } hearPath) return Hear(stt, hearPath, args);
 
@@ -132,6 +138,14 @@ public static class Program
         var agentName = plan?.Name;
         var chat = system.ActorOf(Props.Create(() => new ChatActor(settings, voice, stt, brain, agent, agentName)), "chat");
         stt.Preload();
+        // The host runs only while the watch is in use, so warm the voice too - on the pool, like the ear: the
+        // radio comes up at once and the first spoken answer does not pay the model load (KittenTTS 2: ~13 s).
+        if (voice.Available)
+            _ = Task.Run(() =>
+            {
+                try { voice.Engine!.Warm(); }
+                catch (Exception ex) { Log("voice", "warn", $"preload failed: {ex.Message}"); }
+            });
 
         Log("host", "info", $"--- run started {DateTime.Now:yyyy-MM-dd HH:mm:ss} ---");
         if (logPath != null) Log("host", "info", $"log: {logPath}");
@@ -298,6 +312,35 @@ public static class Program
     // ── One-shot diagnostics ────────────────────────────────────────────────
 
     /// <summary>
+    /// What Settings → Voice → KittenTTS 2 → Download / Install does, without a GUI. <c>--download-kitten2</c> fetches
+    /// the bundle from AgentZero's GitHub Release (<paramref name="source"/> null); <c>--install-kitten2 &lt;folder&gt;</c>
+    /// copies the bundle a folder holds (a synced cloud folder, a copy). Either way every file's SHA-256 is checked
+    /// against the manifest.
+    /// </summary>
+    private static int InstallKitten2(string? source)
+    {
+        var last = "";
+        var progress = new SyncProgress<ModelDownloadStatus>(p =>
+        {
+            var line = p.IsTerminal ? $"{p.Caption}: {p.Detail}" : $"{p.Caption} {p.PercentComplete}%";
+            if (line == last) return;
+            last = line;
+            Console.WriteLine(line);
+        });
+        var ok = (source is null
+            ? global::Agent.Common.Voice.KittenTts2.KittenTts2ModelDownloader.DownloadAsync(progress, CancellationToken.None)
+            : global::Agent.Common.Voice.KittenTts2.KittenTts2ModelInstaller.InstallFromFolderAsync(source, progress,
+                CancellationToken.None)).GetAwaiter().GetResult();
+        return ok ? 0 : 4;
+    }
+
+    /// <summary>Reports on the caller's thread: a console run has no context to post to.</summary>
+    private sealed class SyncProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
+    }
+
+    /// <summary>
     /// <c>AgentZeroWearable.exe --speak "안녕하세요" --out hello.wav</c> — synthesize with the
     /// app's configured voice and write what the watch would play (16 kHz, post-resample),
     /// so a wrong voice or a silent speaker can be told apart without the device.
@@ -319,7 +362,18 @@ public static class Program
             return 0;
         }
         var outPath = Arg(args, "--out") ?? "speak.wav";
-        var speech = voice.Synthesize(text, 0, Arg(args, "--voice"), Arg(args, "--lang"));
+        // --repeat N: the same text N times in one process, so the first (model load + synthesis) and the
+        // following (synthesis only) can be told apart.
+        var repeat = int.TryParse(Arg(args, "--repeat"), out var r) ? Math.Max(1, r) : 1;
+        Speech speech = null!;
+        for (var i = 1; i <= repeat; i++)
+        {
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            speech = voice.Synthesize(text, 0, Arg(args, "--voice"), Arg(args, "--lang"));
+            if (repeat > 1)
+                Console.WriteLine($"run {i}: {timer.ElapsedMilliseconds} ms for {speech.DurationMs} ms of audio" +
+                                  $" (RTF {timer.ElapsedMilliseconds / (double)speech.DurationMs:0.00})");
+        }
         File.WriteAllBytes(outPath, DeviceAudio.ToWav(speech.Pcm16));
         Console.WriteLine($"wrote {outPath}: {speech.DurationMs} ms, {speech.Frames.Count} ADPCM frames " +
                           $"at {speech.Rate} Hz");

@@ -159,6 +159,8 @@
                             <Button Content="Load" Command="{Binding LoadModelCommand}" />
                             <Button Content="Unload" Command="{Binding UnloadModelCommand}" />
                         </StackPanel>
+                        <CheckBox Margin="0,8,0,0" IsChecked="{Binding PreloadLocalLlm}"
+                                  Content="Load at startup (in the background; otherwise the first AI-mode request loads it)" />
                         <TextBlock Classes="status" Text="{Binding LocalStatus}" />
                     </StackPanel>
                 </StackPanel>
@@ -628,7 +630,7 @@
                   <StackPanel DataContext="{Binding Voice}" x:DataType="vm:VoiceSettingsViewModel">
                     <TextBlock Classes="h1" Text="Voice" />
                     <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}"
-                               Text="Shared with the Windows host and the wearable host (voice-settings.json). The watch speaks with Supertonic and listens with Whisper (local), so those two are what it needs." />
+                               Text="Shared with the Windows host and the wearable host (voice-settings.json). The watch speaks with Supertonic or KittenTTS 2 (multilingual, Windows), and listens with Whisper (local)." />
 
                     <TextBlock Classes="h2" Text="SPEECH TO TEXT (EAR)" />
                     <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
@@ -654,7 +656,7 @@
                     </Grid>
 
                     <TextBlock Classes="h2" Text="TEXT TO SPEECH (VOICE)" />
-                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                         <TextBlock Classes="lbl" Grid.Row="0" Text="Provider" />
                         <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding TtsProviders}" SelectedItem="{Binding TtsProvider}" MinWidth="220" HorizontalAlignment="Left" />
                         <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" IsVisible="{Binding !TtsRunsHere}" TextWrapping="Wrap"
@@ -678,11 +680,41 @@
                         <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding OpenAiVoices}" SelectedItem="{Binding OpenAiVoice}" Width="140" HorizontalAlignment="Left" IsVisible="{Binding ShowOpenAiTts}" />
                         <TextBlock Classes="lbl" Grid.Row="6" Text="OpenAI API key" IsVisible="{Binding ShowOpenAiTts}" />
                         <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding TtsOpenAIApiKey}" PasswordChar="●" Watermark="sk-..." IsVisible="{Binding ShowOpenAiTts}" />
+                        <TextBlock Classes="lbl" Grid.Row="7" Text="KittenTTS 2" IsVisible="{Binding ShowKitten2}" />
+                        <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowKitten2}">
+                            <Button Content="Download (~3.3 GB)" Command="{Binding DownloadKitten2Command}" IsEnabled="{Binding IsIdle}"
+                                    ToolTip.Tip="From AgentZero's GitHub Release; an interrupted download resumes; every file's SHA-256 is checked" />
+                            <TextBox Text="{Binding Kitten2Source}" Watermark="…or a folder holding the bundle" Width="220" />
+                            <Button Content="Install" Command="{Binding InstallKitten2Command}" IsEnabled="{Binding IsIdle}"
+                                    ToolTip.Tip="Copy the bundle into the models folder, checking every file's SHA-256" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="8" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" Text="{Binding Kitten2State}" IsVisible="{Binding ShowKitten2}" TextWrapping="Wrap" />
+                        <TextBlock Classes="lbl" Grid.Row="9" Text="Voice / language" IsVisible="{Binding ShowKitten2}" />
+                        <StackPanel Grid.Row="9" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowKitten2}">
+                            <ComboBox ItemsSource="{Binding Kitten2Voices}" SelectedItem="{Binding Kitten2Voice}" MinWidth="170" />
+                            <ComboBox ItemsSource="{Binding Kitten2Languages}" SelectedItem="{Binding Kitten2Language}" Width="80"
+                                      ToolTip.Tip="The language answers are written in (the watch's brain answers in it)" />
+                        </StackPanel>
+                        <TextBlock Classes="lbl" Grid.Row="10" Text="Device" IsVisible="{Binding ShowKitten2}" />
+                        <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowKitten2}">
+                            <ComboBox ItemsSource="{Binding Kitten2DeviceChoices}" SelectedItem="{Binding Kitten2Device}" Width="100"
+                                      ToolTip.Tip="Where the speech LM runs. Auto = GPU (Vulkan) when there is one, else CPU. The decoder always runs on the CPU." />
+                            <TextBlock FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource TextDim}" TextWrapping="Wrap"
+                                       Text="GPU ≈ real time · CPU is several times slower · applies on the next load (restart the wearable host)" />
+                        </StackPanel>
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-                        <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding IsIdle}" />
+                        <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding IsIdle}"
+                                ToolTip.Tip="Saves, then loads the chosen voice in the background and keeps it in memory" />
+                        <TextBlock FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource TextDim}" Text="{Binding VoiceMemoryState}" TextWrapping="Wrap" />
                     </StackPanel>
+
+                    <TextBlock Classes="h2" Text="LOAD AT STARTUP" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}"
+                               Text="Off: a model loads the first time something uses it (or when you Save here) and then stays loaded. On: it loads in the background right after AgentZero starts — ready for the first request, at the cost of memory from the start." />
+                    <CheckBox IsChecked="{Binding PreloadVoiceOut}" Content="Voice output (the TTS chosen above)" />
+                    <CheckBox IsChecked="{Binding PreloadVoiceIn}" Content="Voice input (local Whisper)" />
 
                     <TextBlock Classes="h2" Text="TEST (NO MICROPHONE)" />
                     <TextBox Text="{Binding TestText}" Watermark="A line to speak" />

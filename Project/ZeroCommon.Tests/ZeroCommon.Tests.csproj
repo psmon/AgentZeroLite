@@ -33,4 +33,10 @@
     <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
   </ItemGroup>
 
+  <!-- KittenTTS 2 text normalization: kitten_text_processing's en grammars (Apache-2.0 AND MIT, licenses beside
+       them) and Python's normalize_text output for 78 texts, which the C# port must reproduce exactly. -->
+  <ItemGroup>
+    <None Include="Voice\KittenTts2Data\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

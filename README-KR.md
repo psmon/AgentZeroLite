@@ -520,6 +520,15 @@ Reactor가 새 continuation cycle로 깨어남. **터미널 화면 폴링(`read_
     실행 가능한 에러 힌트(캐시 잠금 / HF rate limit / 네트워크
     / 디스크)를 가진 Check Install probe 를 제공. 모델/코드
     라이선스는 OpenRAIL-M / MIT.
+  - **KittenTTS 2** *(Avalonia 호스트 + 웨어러블, Windows)* —
+    KittenML 의 1.7B 음성 LM, 한국어 포함 다국어를 앱의 기존
+    런타임으로 실행: LM 은 Q8_0 GGUF 로 내장 llama.cpp(Vulkan,
+    Radeon 8060S 에서 실시간), chatterbox-turbo 디코더는 CPU ONNX
+    Runtime, 텍스트 정규화는 C# 으로 이식. Python 없음. 약 3.3 GB
+    묶음은 이 저장소의 GitHub Release `model-kittentts2-v1` 에서
+    받고(이어받기, 파일별 SHA-256 검증), Stellon Labs Community
+    License 와 NOTICE 를 함께 담는다. 음성 LM 은 GPU(Vulkan)
+    또는 CPU 에서 돈다 — Settings → Voice → Device(Auto / GPU / CPU).
 
 ---
 
@@ -621,7 +630,7 @@ ESP32-S3R8, 스피커 + 마이크, BLE). 양쪽 절반이 모두 이 저장소�
 
 | 절반 | 위치 | 무엇인가 |
 | --- | --- | --- |
-| PC 호스트 | [`Project/ZeroWearable`](Project/ZeroWearable) | `AgentZeroWearable.exe` — BLE 링크를 소유하고, 시계를 위해 AgentZero의 에이전트 루프를 돌리며, Supertonic으로 말하고 Whisper로 듣습니다. WPF 또는 Avalonia 호스트의 **Wearable** 페이지에서 시작 |
+| PC 호스트 | [`Project/ZeroWearable`](Project/ZeroWearable) | `AgentZeroWearable.exe` — BLE 링크를 소유하고, 시계를 위해 AgentZero의 에이전트 루프를 돌리며, Supertonic 또는 KittenTTS 2(다국어)로 말하고 Whisper로 듣습니다. WPF 또는 Avalonia 호스트의 **Wearable** 페이지에서 시작 |
 | 펌웨어 | [`Project/ZeroWearableDevice`](Project/ZeroWearableDevice/README-KR.md) | 보드용 ESP-IDF 프로젝트. AskBot이 함께 컴파일하는 Akka.NET 리모팅 클라이언트와 통신 규약(`PROTOCOL.md`) 포함 |
 
 - **AskBot**은 PDU를 BLE로 터널링하는 진짜 Akka 리모팅 피어입니다. 음성이나 텍스트로 물으면

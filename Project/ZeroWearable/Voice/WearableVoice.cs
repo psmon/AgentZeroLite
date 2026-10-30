@@ -8,106 +8,62 @@ public sealed record Speech(List<byte[]> Frames, int DurationMs, int Rate, byte[
 /// <summary>
 /// The watch's voice — <b>AgentZero's</b> voice.
 ///
-/// The reference host (<c>samples/akka/host/AkkaHost</c>) carried its own 466-line copy of
-/// the SuperTonic-3 pipeline. That copy is gone: this drives
-/// <see cref="SuperTonicSynthesizer"/> out of <c>ZeroCommon</c> — the same four ONNX graphs
-/// the Voice tab loads, from the same
-/// <c>%LOCALAPPDATA%\AgentZeroLite\models\supertonic</c> bundle, with the voice / steps /
-/// speed / language the user already picked in Settings → Voice. Change the voice there and
-/// the watch changes voice.
+/// The reference host (<c>samples/akka/host/AkkaHost</c>) carried its own 466-line copy of the SuperTonic-3
+/// pipeline, and this class later grew a copy of each engine's model handling. Both are gone: the engine is
+/// ZeroCommon's <see cref="IVoiceEngine"/> that Settings → Voice names (<see cref="VoiceEngines.Create"/> —
+/// Supertonic, KittenTTS 0.8 or KittenTTS 2), the same object the desktop's Voice tab speaks with, from the same
+/// <c>%LOCALAPPDATA%\AgentZeroLite\models</c> bundles and the voice / language picked there. Change the voice there
+/// and the watch changes voice.
 ///
-/// What is left here is the part AgentZero has no use for: the watch cannot play 44.1 kHz
-/// float, so the samples are resampled to 16 kHz, IMA-ADPCM encoded and cut into the frames
-/// the firmware's decoder expects (<see cref="DeviceAudio"/>).
+/// What is left here is the part AgentZero has no use for: the watch cannot play 24/44.1 kHz float, so the samples
+/// are resampled to 16 kHz, IMA-ADPCM encoded and cut into the frames the firmware's decoder expects
+/// (<see cref="DeviceAudio"/>).
 ///
-/// It never downloads anything. With the bundle absent <see cref="Available"/> is false, the
-/// device is told <c>tts:false</c> in hostinfo, hides its voice toggle and answers stay text.
+/// It never downloads anything. With the engine's model absent <see cref="Available"/> is false, the device is told
+/// <c>tts:false</c> in hostinfo, hides its voice toggle and answers stay text.
 /// </summary>
 public sealed class WearableVoice : IDisposable
 {
     private readonly VoiceSettings _settings;
-    private readonly string _modelDir;
-    private readonly Action<string, string> _log;
-    private readonly object _lock = new();
-    private readonly Dictionary<string, SuperTonicStyle> _styles = new(StringComparer.OrdinalIgnoreCase);
-    private SuperTonicSynthesizer? _synth;
+    private readonly IVoiceEngine? _engine;
 
     public WearableVoice(VoiceSettings settings, Action<string, string> log)
     {
         _settings = settings;
-        _log = log;
-        _modelDir = SuperTonicModelStore.ResolveModelDir(settings);
+        _engine = VoiceEngines.Create(settings, log);
     }
 
-    public string ModelDirectory => _modelDir;
+    /// <summary>The engine Settings → Voice picked, or null for a provider with no on-device engine.</summary>
+    public IVoiceEngine? Engine => _engine;
 
-    /// <summary>Settings → Voice → Supertonic voice. A request may ask for another.</summary>
-    public string VoiceId => string.IsNullOrWhiteSpace(_settings.SupertonicVoice) ? "F1" : _settings.SupertonicVoice;
+    /// <summary>Settings → Voice voice of the chosen engine. A request may ask for another.</summary>
+    public string VoiceId => _engine?.DefaultVoice ?? "F1";
 
-    /// <summary>Settings → Voice → Supertonic language, the default output language.</summary>
-    public string LanguageId => string.IsNullOrWhiteSpace(_settings.SupertonicLanguage) ? "ko" : _settings.SupertonicLanguage;
+    /// <summary>The default output language — the brain answers in it, so it must be one the engine speaks.</summary>
+    public string LanguageId => _engine?.DefaultLanguage ?? "ko";
+
+    /// <summary>The voices the watch lists in its Settings screen — exactly the engine's, not a hardcoded set.</summary>
+    public IReadOnlyList<string> AvailableVoices => _engine?.Available == true ? _engine.Voices : [];
 
     /// <summary>
-    /// The voices actually on disk, read from <c>voice_styles/</c>. SuperTonic's styles are
-    /// speaker embeddings with no language binding, so every voice can speak every supported
-    /// language; the watch lists exactly these in its Settings screen rather than a hardcoded
-    /// set.
+    /// Voice output is on when Settings → Voice names an on-device engine <i>and</i> its model is installed. Windows
+    /// SAPI and OpenAI are desktop-only paths — neither produces the raw samples this has to resample and frame.
     /// </summary>
-    public IReadOnlyList<string> AvailableVoices
-    {
-        get
-        {
-            var dir = Path.Combine(_modelDir, SuperTonicModelStore.VoiceStylesSubdir);
-            if (!Directory.Exists(dir)) return [];
-            return Directory.EnumerateFiles(dir, "*.json")
-                .Select(Path.GetFileNameWithoutExtension)
-                .Where(name => !string.IsNullOrEmpty(name))
-                .Select(name => name!)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-    }
+    public bool Available => _engine?.Available == true;
+
+    /// <summary>Why voice is off (or what speaks), for the startup line the panel shows.</summary>
+    public string Status => _engine?.Status
+        ?? $"Settings → Voice → TTS is '{_settings.TtsProvider}'; the watch needs " +
+           string.Join(", ", VoiceEngines.OnDevice);
 
     /// <summary>
-    /// Voice output is on when Settings → Voice has Supertonic selected as the TTS provider
-    /// <i>and</i> the bundle is installed. Any other provider (Windows SAPI, OpenAI) is a
-    /// desktop-only path — neither produces the raw samples this has to resample and frame.
-    /// </summary>
-    public bool Available =>
-        string.Equals(_settings.TtsProvider, TtsProviderNames.Supertonic, StringComparison.OrdinalIgnoreCase) &&
-        SuperTonicModelStore.IsModelPresent(_modelDir);
-
-    /// <summary>Why voice is off, for the startup line the panel shows.</summary>
-    public string Status =>
-        !string.Equals(_settings.TtsProvider, TtsProviderNames.Supertonic, StringComparison.OrdinalIgnoreCase)
-            ? $"Settings → Voice → TTS is '{_settings.TtsProvider}'; the watch needs Supertonic"
-            : Available
-                ? $"Supertonic {VoiceId}, {Steps} steps, {LanguageId} ({_modelDir})"
-                : $"model not installed at {_modelDir} — Settings → Voice → Download Model";
-
-    private int Steps => Math.Clamp(_settings.SupertonicSteps, 5, 12);
-    private float Speed => Math.Clamp(_settings.SupertonicSpeed, 0.7f, 2.0f);
-
-    /// <summary>
-    /// Synthesize and frame. Blocking and CPU-heavy (flow matching over N steps), so callers
-    /// run it off the actor thread.
+    /// Synthesize and frame. Blocking and CPU/GPU-heavy, so callers run it off the actor thread.
     /// </summary>
     public Speech Synthesize(string text, int requestId, string? voice = null, string? language = null,
         CancellationToken ct = default)
     {
-        if (!Available) throw new InvalidOperationException($"voice unavailable: {Status}");
-
-        var synth = EnsureLoaded();
-        // Per-request overrides come from the watch's Settings screen; the app's own Voice
-        // settings are the fallback.
-        var voiceId = string.IsNullOrWhiteSpace(voice) ? VoiceId : voice!;
-        var lang = string.IsNullOrWhiteSpace(language) ? LanguageId : language!;
-        var style = Style(voiceId);
-        ct.ThrowIfCancellationRequested();
-
-        var samples = synth.Synthesize(text, lang, style, Steps, Speed);
-
-        var pcm = DeviceAudio.ToPcm16k(samples, synth.SampleRate);
+        var v = Render(text, voice, language, ct);
+        var pcm = DeviceAudio.ToPcm16k(v.Samples, v.SampleRate);
         var blocks = ImaAdpcm.EncodeBlocks(pcm, DeviceAudio.SamplesPerBlock);
 
         var frames = new List<byte[]>(blocks.Count);
@@ -117,61 +73,23 @@ public sealed class WearableVoice : IDisposable
     }
 
     /// <summary>
-    /// The same synthesis at the model's own rate, as a WAV for the PC's speakers — no 16 kHz
-    /// resample and no ADPCM, because nothing has to cross the BLE link.
+    /// The same synthesis at the model's own rate, as a WAV for the PC's speakers — no 16 kHz resample and no
+    /// ADPCM, because nothing has to cross the BLE link.
     /// </summary>
     public (byte[] Wav, TimeSpan Length) SynthesizeWav(string text, string? voice = null, string? language = null,
         CancellationToken ct = default)
     {
-        if (!Available) throw new InvalidOperationException($"voice unavailable: {Status}");
-        var synth = EnsureLoaded();
-        var voiceId = string.IsNullOrWhiteSpace(voice) ? VoiceId : voice!;
-        var lang = string.IsNullOrWhiteSpace(language) ? LanguageId : language!;
-        var style = Style(voiceId);
-        ct.ThrowIfCancellationRequested();
-        var samples = synth.Synthesize(text, lang, style, Steps, Speed);
-        var decoded = new WavPcm.Decoded(samples, synth.SampleRate);
+        var v = Render(text, voice, language, ct);
+        var decoded = new WavPcm.Decoded(v.Samples, v.SampleRate);
         return (WavPcm.ToWav(decoded), TimeSpan.FromSeconds(decoded.DurationSeconds));
     }
 
-    private SuperTonicSynthesizer EnsureLoaded()
+    private VoiceSamples Render(string text, string? voice, string? language, CancellationToken ct)
     {
-        if (_synth is not null) return _synth;
-        lock (_lock)
-        {
-            if (_synth is not null) return _synth;
-            _log("info", $"loading Supertonic from {_modelDir}");
-            var started = DateTime.UtcNow;
-            _synth = SuperTonicSynthesizer.Load(_modelDir);
-            _log("info", $"Supertonic ready in {(DateTime.UtcNow - started).TotalMilliseconds:F0} ms, " +
-                         $"{_synth.SampleRate} Hz");
-            return _synth;
-        }
+        if (_engine is not { Available: true }) throw new InvalidOperationException($"voice unavailable: {Status}");
+        ct.ThrowIfCancellationRequested();
+        return _engine.Synthesize(text, voice, language, ct);
     }
 
-    private SuperTonicStyle Style(string voice)
-    {
-        lock (_lock)
-        {
-            if (_styles.TryGetValue(voice, out var cached)) return cached;
-
-            var path = SuperTonicModelStore.VoiceStylePath(_modelDir, voice);
-            if (!File.Exists(path))
-                throw new InvalidOperationException($"voice style '{voice}' not found at {path}");
-
-            var style = SuperTonicStyle.Load(path);
-            _styles[voice] = style;
-            return style;
-        }
-    }
-
-    public void Dispose()
-    {
-        lock (_lock)
-        {
-            _synth?.Dispose();
-            _synth = null;
-            _styles.Clear();
-        }
-    }
+    public void Dispose() => _engine?.Dispose();
 }

@@ -101,6 +101,19 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm
     private static string WrapGemmaChatTemplate(string userPrompt)
         => $"<start_of_turn>user\n{userPrompt}<end_of_turn>\n<start_of_turn>model\n";
 
+    private static LocalLlmBackend _configuredBackend;
+
+    /// <summary>
+    /// Point LLamaSharp at the self-built natives for <paramref name="preferred"/>, once per process, and say which
+    /// backend is really loaded. llama.cpp can be loaded only once: a second caller (the local LLM, KittenTTS 2's
+    /// speech LM) gets whatever the first one picked.
+    /// </summary>
+    internal static LocalLlmBackend EnsureNative(LocalLlmBackend preferred)
+    {
+        ConfigureNativeOnce(preferred);
+        return _configuredBackend;
+    }
+
     private static void ConfigureNativeOnce(LocalLlmBackend backend)
     {
         lock (NativeInitLock)
@@ -139,6 +152,7 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm
             });
 
             NativeLibraryConfig.All.WithLibrary(llamaPath: llamaDll, mtmdPath: null);
+            _configuredBackend = backend;
             _nativeConfigured = true;
         }
     }

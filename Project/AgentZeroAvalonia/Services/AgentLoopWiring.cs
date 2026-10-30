@@ -3,6 +3,7 @@ using Agent.Common.Actors;
 using Agent.Common.Llm;
 using Agent.Common.Llm.Tools;
 using Agent.Common.Mcp;
+using Agent.Common.Models;
 using Agent.Common.Module;
 using Agent.Common.Platform;
 
@@ -62,12 +63,22 @@ internal static class AgentLoopWiring
                 var settings = LlmSettingsStore.Load();
                 if (settings.ActiveBackend == LlmActiveBackend.Local)
                 {
-                    if (LlmService.Llm is not LlamaSharpLocalLlm llm) return null;
-                    var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
-                    var template = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
-                        ? ChatTemplates.Llama31
-                        : ChatTemplates.Gemma;
-                    return new LocalAgentLoop(llm, host, opts, template);
+                    IAgentLoop Local(LlamaSharpLocalLlm llm)
+                    {
+                        var entry = LlmModelCatalog.FindById(LlmService.CurrentSettings.ModelId);
+                        var template = entry.ChatFamily.Equals("llama31", StringComparison.OrdinalIgnoreCase)
+                            ? ChatTemplates.Llama31
+                            : ChatTemplates.Gemma;
+                        return new LocalAgentLoop(llm, host, opts, template);
+                    }
+                    if (LlmService.Llm is LlamaSharpLocalLlm loaded) return Local(loaded);
+                    // Not loaded yet: load it on this first turn instead of refusing — Settings → LLM → Load is no
+                    // longer a precondition, and nothing is loaded before AI mode is used.
+                    return new DeferredAgentLoop(async ct =>
+                    {
+                        await ModelResidency.EnsureLocalLlmAsync(m => AppLogger.Log(m)).WaitAsync(ct);
+                        return LlmService.Llm is LlamaSharpLocalLlm llm ? Local(llm) : null;
+                    }, "The local model could not be loaded — Settings → LLM: download the model, or check app-log.txt.");
                 }
                 var provider = settings.CreateExternalProvider();
                 var model = settings.ResolveExternalModel();

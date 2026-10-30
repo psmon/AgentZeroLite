@@ -30,11 +30,12 @@ public static class WearableDiagnostics
             var voice = VoiceSettingsStore.Load();
             var llm = LlmSettingsStore.Load();
 
-            var tts = string.Equals(voice.TtsProvider, TtsProviderNames.Supertonic, StringComparison.OrdinalIgnoreCase)
-                ? SuperTonicModelStore.IsModelPresent(SuperTonicModelStore.ResolveModelDir(voice))
-                    ? $"voice Supertonic {voice.SupertonicVoice}/{voice.SupertonicLanguage}"
-                    : "voice Supertonic (model not installed → text only)"
-                : $"voice off (TTS = {voice.TtsProvider})";
+            // The engine the wearable host will speak with; asking it loads no model.
+            string tts;
+            using (var engine = VoiceEngines.Create(voice))
+                tts = engine is null ? $"voice off (TTS = {voice.TtsProvider})"
+                    : engine.Available ? $"voice {engine.Name} {engine.DefaultVoice}/{engine.DefaultLanguage}"
+                    : $"voice {engine.Name} (model not installed → text only)";
 
             var stt = string.Equals(voice.SttProvider, SttProviderNames.WhisperLocal, StringComparison.OrdinalIgnoreCase)
                 ? WhisperModelStore.IsDownloaded(voice.SttWhisperModel)

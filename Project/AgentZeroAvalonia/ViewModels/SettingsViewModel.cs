@@ -224,6 +224,16 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private decimal? _gpuLayerCount = 999;
     [ObservableProperty] private string _localState = LlmService.State.ToString();
     [ObservableProperty] private string _localStatus = "";
+
+    /// <summary>Load the local model when AgentZero starts (off by default — the first AI-mode turn loads it anyway).</summary>
+    [ObservableProperty] private bool _preloadLocalLlm = Agent.Common.Models.ModelPreloadSettingsStore.Load().LocalLlm;
+
+    partial void OnPreloadLocalLlmChanged(bool value)
+    {
+        var p = Agent.Common.Models.ModelPreloadSettingsStore.Load();
+        p.LocalLlm = value;
+        Agent.Common.Models.ModelPreloadSettingsStore.Save(p);
+    }
     [ObservableProperty] private bool _isDownloading;
 
     partial void OnSelectedModelChanged(ModelChoice? value) => RefreshModelStatus();
