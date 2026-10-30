@@ -40,7 +40,8 @@ harness/knowledge/
 └── voice-curator/
     ├── sherpa-onnx-integration.md           # model pair + integration contract
     ├── speaker-diarization-pipeline.md      # capture→STT+diarize→merge→render
-    └── native-inference-lifetime.md         # chunk-scoped lifetime + _noteInferGate
+    ├── native-inference-lifetime.md         # chunk-scoped lifetime + _noteInferGate
+    └── streaming-stt-models.md              # streaming STT: model pick, serving contract, Phase 2
 ```
 
 `build-doctor/` is reserved — currently has no agent-specific knowledge

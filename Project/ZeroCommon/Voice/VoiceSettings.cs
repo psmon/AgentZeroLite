@@ -23,6 +23,13 @@ public static class SttProviderNames
     /// is present in <c>LlmModelCatalog</c>; the local LLM must be loaded.
     /// </summary>
     public const string LocalGemma = "LocalGemma";
+
+    /// <summary>
+    /// On-device streaming recognizer (sherpa-onnx OnlineRecognizer): text appears while the person is still
+    /// speaking and the utterance closes on the model's own endpoint, not on the VAD's silence hangover. The model
+    /// is <see cref="VoiceSettings.StreamingSttModel"/> — see <see cref="Streaming.StreamingSttModelCatalog"/>.
+    /// </summary>
+    public const string SherpaStreaming = "SherpaStreaming";
 }
 
 /// <summary>Stable string identifiers for TTS (text-to-speech) providers.</summary>
@@ -124,6 +131,17 @@ public sealed class VoiceSettings
     /// derived at runtime from <c>LlmModelCatalog</c> entries flagged as audio.
     /// </summary>
     public string SttLocalGemmaModelId { get; set; } = "";
+
+    /// <summary>Catalog id of the streaming model when <see cref="SttProviderNames.SherpaStreaming"/> is active.</summary>
+    public string StreamingSttModel { get; set; } = Streaming.StreamingSttModelCatalog.Default.Id;
+
+    /// <summary>
+    /// Silence (ms) after speech that closes a streaming utterance and sends it on. Lower answers sooner and
+    /// cuts a thinking pause in two; clamped 300–3000 by <see cref="ResolveStreamingEndpointMs"/>.
+    /// </summary>
+    public int StreamingEndpointMs { get; set; } = 800;
+
+    public int ResolveStreamingEndpointMs() => Math.Clamp(StreamingEndpointMs, 300, 3000);
 
     // ── TTS ──────────────────────────────────────────────────────────────
     public string TtsProvider { get; set; } = TtsProviderNames.Off;

@@ -607,6 +607,20 @@ extends here into tiki-taka between **your own two input modalities**.
   (NVIDIA discrete > AMD discrete > Intel Arc > Intel iGPU); on
   laptops with dGPU + iGPU it correctly picks the dGPU. Manual
   override is one click away.
+- **Streaming STT** *(Avalonia host + WPF; Nemotron 3.5 ASR is the official
+  model)* — Settings → Voice → Provider `SherpaStreaming`, then 🎙 in the
+  AgentBot composer: text appears in the input box **while you speak**, and the
+  utterance is sent the moment the recognizer's own endpoint fires (0.8 s
+  of silence by default) instead of after the VAD's 1.2–2 s hangover plus a
+  whole-utterance Whisper pass. sherpa-onnx `OnlineRecognizer` on the CPU,
+  run as an Akka.Streams stage (`StreamingSttFlow`) inside the voice actor.
+  Two models, downloaded from k2-fsa's release: **Nemotron 3.5 ASR
+  streaming 0.6B** (NVIDIA, 40 locales incl. Korean, punctuated, ~455 MB)
+  and the **Korean streaming Zipformer** (Korean only, ~400 MB archive,
+  lighter to run). Measured on a Korean clip paced in real time: the whole
+  sentence is on screen ~0.4 s after the speaker stops, and is sent ~0.9 s
+  after. `AgentZeroWearable.exe --hear-stream clip.wav --realtime` prints
+  the same partials from a shell.
 - **Mic capture** — NAudio with VAD silence-segmentation; sensitivity
   slider; persistent mute + system-volume control on the AskBot
   toolbar.

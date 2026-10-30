@@ -128,7 +128,11 @@ foreach (var s in segments)
 
 - Package: `org.k2fsa.sherpa.onnx` (lowercase, dot-separated — k2-fsa
   convention, not the C#-typical `K2Fsa.Sherpa.Onnx`)
-- Pinned: `1.10.46` (latest stable as of M0024 ship)
+- Pinned: `1.13.8` (2026-10-30, for the streaming recognizer — Nemotron 3.5 needs ≥ 1.13.3;
+  was `1.10.46` at M0024 ship). The minor bump was re-tested as the policy below says:
+  `SherpaDiarizationLiveTests` runs the offline diarizer on 1.13.8. Its `onnxruntime.dll` (1.28.2)
+  now wins the output folder over Microsoft.ML.OnnxRuntime 1.23.2's — see
+  `streaming-stt-models.md` § Serving contract. 2.0.x was out (2026-10-23/26) but under two weeks old.
 - Bump policy:
   - **Patch** (1.10.x → 1.10.y) — safe to take eagerly, k2-fsa maintains
     backward compatibility within a minor

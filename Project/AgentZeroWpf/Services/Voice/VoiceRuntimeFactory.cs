@@ -1,4 +1,5 @@
 using Agent.Common.Voice;
+using Agent.Common.Voice.Streaming;
 using Agent.Common.Voice.Streams;
 
 namespace AgentZeroWpf.Services.Voice;
@@ -24,8 +25,25 @@ internal static class VoiceRuntimeFactory
             },
             SttProviderNames.OpenAIWhisper => new OpenAiWhisperStt(v.SttOpenAIApiKey),
             SttProviderNames.LocalGemma => new LocalGemmaStt(v.SttLocalGemmaModelId),
+            // The streaming model also serves the batch paths (Voice Test, batch mic) — whole buffer, one session.
+            SttProviderNames.SherpaStreaming => BuildStreamingStt(v) is { } streaming
+                ? new StreamingSttBatchAdapter(streaming)
+                : BuildStt(new VoiceSettings { SttProvider = SttProviderNames.WhisperLocal, SttWhisperModel = v.SttWhisperModel,
+                                               SttUseGpu = v.SttUseGpu, SttGpuDeviceIndex = v.SttGpuDeviceIndex }),
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// The streaming recognizer when the streaming provider is chosen and its model is installed; null otherwise,
+    /// which tells the voice actor to run the batch path (an uninstalled model falls back to Whisper Local).
+    /// </summary>
+    public static IStreamingSpeechToText? BuildStreamingStt(VoiceSettings v)
+    {
+        if (v.SttProvider != SttProviderNames.SherpaStreaming) return null;
+        var model = StreamingSttModelCatalog.Resolve(v.StreamingSttModel);
+        if (!StreamingSttModelCatalog.IsInstalled(model)) return null;
+        return new SherpaStreamingStt(model, new StreamingSttOptions(EndpointSilenceSeconds: v.ResolveStreamingEndpointMs() / 1000f));
     }
 
     /// <summary>Build the active <see cref="ITextToSpeech"/> from saved voice settings; null when Off.</summary>

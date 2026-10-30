@@ -494,6 +494,18 @@ Reactor가 새 continuation cycle로 깨어남. **터미널 화면 폴링(`read_
   (NVIDIA 디스크리트 > AMD 디스크리트 > Intel Arc > Intel iGPU).
   dGPU + iGPU 노트북에서도 dGPU 를 정확히 잡고, 잘못 잡혔을 땐
   수동 오버라이드 한 클릭.
+- **스트리밍 STT** *(Avalonia 호스트 + WPF; 공식 모델은 Nemotron 3.5 ASR)* —
+  Settings → Voice → Provider `SherpaStreaming`을 고른 뒤 AgentBot 입력창의 🎙:
+  **말하는 동안** 입력창에 텍스트가 나타나고, VAD의 1.2–2초
+  hangover와 발화 전체 Whisper 처리를 기다리는 대신 인식기 자체의 끝점이
+  감지되는 순간(기본 무음 0.8초) 발화가 전송됩니다. CPU에서 도는 sherpa-onnx
+  `OnlineRecognizer`를 음성 액터 안의 Akka.Streams 스테이지(`StreamingSttFlow`)로
+  실행합니다. k2-fsa 릴리스에서 받는 모델 두 가지: **Nemotron 3.5 ASR
+  streaming 0.6B**(NVIDIA, 한국어 포함 40개 로케일, 문장부호 포함, ~455 MB)와
+  **한국어 스트리밍 Zipformer**(한국어 전용, 아카이브 ~400 MB, 더 가볍게 동작).
+  실시간 속도로 흘린 한국어 클립에서 측정: 말이 끝나고 ~0.4초 뒤 문장 전체가
+  화면에 있고, ~0.9초 뒤 전송됩니다. 셸에서는
+  `AgentZeroWearable.exe --hear-stream clip.wav --realtime`이 같은 부분 결과를 출력합니다.
 - **마이크 캡처** — NAudio + VAD 무음 세그먼테이션, 감도 슬라이더,
   AskBot 툴바의 영구 mute + 시스템 볼륨 슬라이더.
 - **테스트 하네스** — `WhisperCpuVsGpuBenchmarkTests` 가 동일

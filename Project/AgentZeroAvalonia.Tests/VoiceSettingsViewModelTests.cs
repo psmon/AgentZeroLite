@@ -54,6 +54,28 @@ public class VoiceSettingsViewModelTests
     }
 
     [Fact]
+    public void Streaming_STT_is_offered_first_with_nemotron_as_the_official_model()
+    {
+        var stored = new VoiceSettings { SttProvider = SttProviderNames.SherpaStreaming, StreamingSttModel = "", StreamingEndpointMs = 50 };
+        var vm = new VoiceSettingsViewModel(stored);
+
+        Assert.Equal(SttProviderNames.SherpaStreaming, vm.SttProviders[0]);
+        Assert.True(vm.ShowStreaming);
+        Assert.False(vm.ShowWhisper);
+        Assert.True(vm.SttRunsHere);
+        Assert.Equal(Agent.Common.Voice.Streaming.StreamingSttModelCatalog.Default, vm.StreamingModel!.Model);
+        Assert.StartsWith("Nemotron 3.5", vm.StreamingModel.Model.Label);
+        Assert.Contains("official", vm.StreamingModel.ToString());
+        Assert.Equal(300, vm.StreamingEndpointMs);                    // clamped on the way in
+
+        vm.StreamingModel = vm.StreamingModels.Single(c => c.Model.Id == "nemotron-3.5-160ms");
+        vm.StreamingEndpointMs = 600;
+        var saved = vm.ApplyTo(stored);
+        Assert.Equal("nemotron-3.5-160ms", saved.StreamingSttModel);
+        Assert.Equal(600, saved.StreamingEndpointMs);
+    }
+
+    [Fact]
     public void An_unknown_device_value_reads_as_auto() =>
         Assert.Equal(Kitten2Devices.Auto, new VoiceSettingsViewModel(new VoiceSettings { Kitten2Device = "npu" }).Kitten2Device);
 

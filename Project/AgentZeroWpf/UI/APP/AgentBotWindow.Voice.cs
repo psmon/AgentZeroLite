@@ -49,6 +49,10 @@ public partial class AgentBotWindow
     private IActorRef? _voiceStreamRef;
     private Action<MicFrame>? _voiceFrameForwarder;
 
+    // True while the mic runs on the streaming recognizer: partials fill txtInput as the person speaks,
+    // and the Whisper-specific hallucination filter is skipped (a real "감사합니다" is not an outro there).
+    private bool _voiceStreamingStt;
+
     // Test tools popup (Virtual voice today; future virtual keyboard, etc.).
     private TestToolsWindow? _testToolsWindow;
 
@@ -215,7 +219,10 @@ public partial class AgentBotWindow
                 _voiceCapture.FrameAvailable -= _voiceFrameForwarder;
             _voiceFrameForwarder = null;
 
-            if (v.UseStreamPipeline)
+            // The streaming recognizer only exists on the stream path, so choosing it implies that path.
+            var useStream = v.UseStreamPipeline || v.SttProvider == SttProviderNames.SherpaStreaming;
+            _voiceStreamingStt = VoiceRuntimeFactory.BuildStreamingStt(v) is not null;
+            if (useStream)
             {
                 // Stream path: segmenter Flow handles VAD+buffering, so the
                 // legacy PCM buffer + utterance events are unused.
@@ -238,14 +245,14 @@ public partial class AgentBotWindow
 
             _voiceMicOn = true;
             ApplyVoiceMicUi(on: true);
-            var modeTag = v.UseStreamPipeline ? "stream" : "batch";
+            var modeTag = _voiceStreamingStt ? "streaming-stt" : useStream ? "stream" : "batch";
             SetVoiceStatus($"Listening · {ShortProviderLabel(v)}", System.Windows.Media.Brushes.LightGreen);
             AppLogger.Log($"[BOT-Voice] Mic ON | provider={v.SttProvider} sens={v.VadThreshold} device={deviceNumber} mode={modeTag}");
 
             // Warm the STT factory off-thread so the first utterance doesn't
             // pay the cold-start tax (Whisper.net "small" is ~487 MB on CPU).
             // Stream path warms via the SttWorkerActor on first segment instead.
-            if (!v.UseStreamPipeline)
+            if (!useStream)
             {
                 _ = Task.Run(async () =>
                 {
@@ -328,7 +335,10 @@ public partial class AgentBotWindow
                     TtsFactory: () => VoiceRuntimeFactory.BuildTts(VoiceSettingsStore.Load())
                         ?? throw new InvalidOperationException("TTS provider unavailable"),
                     PlaybackFactory: () => new NAudioPlaybackQueue(),
-                    OnTtsPlaybackChanged: OnTtsPlaybackChanged),
+                    OnTtsPlaybackChanged: OnTtsPlaybackChanged,
+                    // Asked on every StartListening, so a provider switch applies at the next mic-on.
+                    StreamingSttFactory: () => VoiceRuntimeFactory.BuildStreamingStt(VoiceSettingsStore.Load()),
+                    OnPartial: OnVoiceStreamPartial),
                 TimeSpan.FromSeconds(5));
             _voiceStreamRef = created.VoiceRef;
         }
@@ -403,7 +413,7 @@ public partial class AgentBotWindow
         // on near-silence input — see WhisperHallucinationFilter. The stream
         // pipeline has no peak/VAR gate yet, so this is the only line of
         // defence against forwarding "thanks for watching" as a user prompt.
-        if (WhisperHallucinationFilter.IsLikelyHallucination(transcript))
+        if (!_voiceStreamingStt && WhisperHallucinationFilter.IsLikelyHallucination(transcript))
         {
             AppLogger.Log($"[BOT-Voice] (stream) dropped — Whisper hallucination pattern: \"{transcript}\" ({durationSeconds:F2}s)");
             return;
@@ -411,6 +421,23 @@ public partial class AgentBotWindow
 
         Dispatcher.BeginInvoke(new Action(() => DispatchVoiceTranscriptOnUi(transcript, "stream")));
         AppLogger.Log($"[BOT-Voice] (stream) Transcript sent ({transcript.Length} chars, {durationSeconds:F2}s utterance)");
+    }
+
+    /// <summary>
+    /// Streaming recognizer, mid-utterance: show what has been heard so far in the input box, so the person
+    /// sees the sentence form while speaking. The final replaces it and is sent (<see cref="OnVoiceStreamTranscript"/>);
+    /// a partial never sends anything — the agent loop has side effects, so it starts on settled words only.
+    /// </summary>
+    private void OnVoiceStreamPartial(Agent.Common.Voice.Streaming.SttUpdate partial)
+    {
+        if (_voicePipelineCts?.IsCancellationRequested == true) return;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_voiceMicOn) return;
+            txtInput.Text = partial.Text;
+            txtInput.CaretIndex = partial.Text.Length;
+            SetVoiceStatus($"🎙 hearing… {partial.AudioSeconds:F1}s", System.Windows.Media.Brushes.SkyBlue);
+        }));
     }
 
     /// <summary>
@@ -622,6 +649,7 @@ public partial class AgentBotWindow
         SttProviderNames.WhisperLocal => $"Whisper {v.SttWhisperModel}",
         SttProviderNames.OpenAIWhisper => "OpenAI Whisper",
         SttProviderNames.LocalGemma => "Local Gemma",
+        SttProviderNames.SherpaStreaming => $"Streaming {Agent.Common.Voice.Streaming.StreamingSttModelCatalog.Resolve(v.StreamingSttModel).Id}",
         _ => v.SttProvider,
     };
 

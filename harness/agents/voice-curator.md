@@ -14,7 +14,16 @@ triggers:
   - "speaker label"
   - "speaker model"
   - "M0024"
-description: On-device speech-side curator — owns the Sherpa-ONNX speaker diarization serving contract, model selection (pyannote-segmentation-3-0 + 3D-Speaker embedding), and the integration seam that lets transcripts grow Speaker A/B/C labels in Voice test + voice-note plugin. Consulted before adding new diarization models (pyannote v3 via subprocess, NeMo Sortformer, WhisperX) or changing how Voice transcripts merge speaker time-spans.
+  - "streaming STT"
+  - "스트리밍 STT"
+  - "실시간 STT"
+  - "리얼타임 음성"
+  - "말하는 중에 반응"
+  - "partial transcript"
+  - "OnlineRecognizer"
+  - "Nemotron ASR"
+  - "Zipformer"
+description: On-device speech-side curator — owns the Sherpa-ONNX serving contracts (offline speaker diarization and, since 2026-10-30, the streaming OnlineRecognizer that shows text while the person speaks — Nemotron 3.5 ASR / Korean Zipformer, StreamingSttFlow in the voice actor), diarization model selection (pyannote-segmentation-3-0 + 3D-Speaker embedding), and the integration seam that lets transcripts grow Speaker A/B/C labels in Voice test + voice-note plugin. Consulted before adding new diarization or streaming STT models (pyannote v3 via subprocess, NeMo Sortformer, WhisperX, another streaming transducer), changing how Voice transcripts merge speaker time-spans, or acting on partial transcripts.
 ---
 
 # Voice Curator
@@ -47,6 +56,14 @@ Three new concerns that didn't exist in the codebase before M0024:
 This agent owns the knowledge to keep all three correct as new models land
 (pyannote v3 subprocess, NeMo Sortformer, WhisperX) and as the voice-note
 web plugin grows speaker visualisation.
+
+4. **Streaming STT (2026-10-30)** — the recognizer that decodes while the
+   person speaks and closes the utterance on its own endpoint instead of the
+   VAD hangover. Model selection (Nemotron 3.5 ASR streaming vs Korean
+   Zipformer vs Gemma 4 audio), the no-VAD-in-front rule, the Hangul spacing
+   repair, the ORT-native ordering rule after the sherpa 1.13.8 bump, and the
+   Phase 2 plan for acting on partials. See
+   `harness/knowledge/voice-curator/streaming-stt-models.md`.
 
 ## Domain expertise
 
@@ -122,6 +139,13 @@ reviews. Treat them as binding for the file types they cover:
   escape hatch) and the `_noteInferGate` single-choke-point serialization
   discipline (blocking wait for finals, try-acquire-skip for partials,
   every new native surface must route through the same gate).
+- **`harness/knowledge/voice-curator/streaming-stt-models.md`** —
+  Streaming STT: candidates evaluated (Gemma 4 audio, Nemotron Omni,
+  Nemotron 3.5 ASR streaming, Korean Zipformer), the serving contract
+  (no VAD in front, 1600-byte frames, endpoint rules, Hangul spacing
+  repair, ORT-native ordering), measured latency, and the Phase 2 plan
+  for reacting on partials (command intents → semantic endpoint → LLM
+  prefill → speculative draft).
 
 ## Evaluation rubric
 

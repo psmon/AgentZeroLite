@@ -313,6 +313,31 @@ ComboBox style is a full re-template (toggle + popup + item). That is Pitfall 6 
 `harness/knowledge/code-coach/wpf-xaml-resource-and-window-pitfalls.md` — `Background` /
 `Foreground` setters alone leave the chrome and the popup drawn from `SystemColors`.
 
+### Streaming STT — text while the person speaks (Nemotron 3.5 ASR, official)
+
+**Nemotron 3.5 ASR streaming 0.6B (560 ms) is the official streaming ear** — `StreamingSttModelCatalog.Default`,
+marked *official* in the pickers; the Korean Zipformer stays as the lighter alternative. **Avalonia (the official
+host)** has it on Settings → Voice (picker, Download, endpoint, 🎙 Listen live) and as 🎙 in the AgentBot composer
+(`AgentBotViewModel.Voice.cs` → ZeroCommon `VoiceMicSession` → the voice actor); WPF has the provider and the
+AgentBot partial preview. `SttProviderNames.SherpaStreaming` (ZeroCommon `Voice/Streaming/`): sherpa-onnx's `OnlineRecognizer` fed every
+50 ms mic frame (1600 bytes of 16 kHz PCM16 — not 3200, which is 100 ms), emitting `SttUpdate` partials and a
+final at the recognizer's own endpoint (`VoiceSettings.StreamingEndpointMs`, 800 by default) instead of the VAD
+hangover (1.2–2 s) + a whole-utterance Whisper pass. In the voice actor it is a second INPUT graph, chosen per
+`StartListening` when `CreateVoiceStream.StreamingSttFactory` returns an engine: `Source.Queue → StreamingSttFlow
+→ Sink.ActorRefWithAck` — **no VAD in front**, because the endpoint rule counts the silence frames. Partials only
+fill the input box; the agent loop starts on a final, since tools have side effects. Models
+(`StreamingSttModelCatalog`, k2-fsa `asr-models` release, `models/streaming-stt/`): Nemotron 3.5 ASR streaming
+0.6B (560 / 160 ms chunk, multilingual, punctuated; language is the stream option `language`) and the Korean
+Zipformer. `StreamingSttBatchAdapter` lets the same model answer every `ISpeechToText` caller. Three measured
+traps: sherpa drops the space between Hangul (Korean is "CJK" to it) while its tokens keep the word marker as a
+leading space, so `SherpaStreamingStt.Render` rebuilds the words from the tokens; moving the freshly unpacked
+627 MB encoder failed with "access denied" (released a few seconds later), so the downloader retries the move;
+and **the bump to sherpa-onnx 1.13.8 (Nemotron needs ≥ 1.13.3) makes its `onnxruntime.dll` 1.28.2 win the output
+folder over Microsoft.ML.OnnxRuntime 1.23.2's** — the managed 1.23.2 API runs on it (Supertonic, KittenTTS 2's
+decoder and the diarizer were re-run on it), but a future ORT pin below sherpa's would break sherpa instead.
+Shell check: `AgentZeroWearable.exe --download-stream-stt --stream-model <id>`, `--hear-stream clip.wav [--realtime]`.
+Design notes and the next step (acting on partials): `harness/knowledge/voice-curator/streaming-stt-models.md`.
+
 ### Persistence
 EF Core + SQLite. DB file: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db`, created/migrated by `AppDbContext.InitializeDatabase()` on first run. **Migrations live in `Project/ZeroCommon/Data/Migrations/`** — the `AgentZeroWpf/Data/Migrations/` folder exists but is empty; don't scaffold into it. Seeded `CliDefinition` rows (CMD, PW5, PW7, Claude, Codex, AgentOne, Netclaw — POSIX hosts get zsh/bash instead of the three Windows shells) are marked `IsBuiltIn = true` and must not be deletable from the UI. The three Windows shells come from the migration's `HasData`; the **agent CLI profiles are seeded at runtime and checked one at a time** (`EnsureDefaultCliDefinitions` + `AgentCliTools.All`), because a single "already seeded?" guard would see the Claude row every existing database has and never add a newly shipped built-in. The agent profiles launch through **PowerShell 5** (`powershell.exe -NoExit -Command <tool>`) on Windows and zsh elsewhere — AgentOne as `agent-one chat` and Netclaw as `netclaw chat` (`AgentCliTool.LaunchArgs`), because their bare commands print help (or manage a daemon) instead of opening the agent — not the tool directly, so the tab survives the agent exiting. Whether the tool is actually installed is `AgentCliTools`' question, not the row's: see the Avalonia settings note below.
 

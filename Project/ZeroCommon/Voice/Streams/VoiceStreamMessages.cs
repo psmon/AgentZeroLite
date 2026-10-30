@@ -94,13 +94,22 @@ public sealed record VoiceStreamFailed(Exception Error);
 /// <para>TtsFactory and PlaybackFactory may be null for INPUT-only sessions
 /// (P1 wiring path). The actor refuses <see cref="SpeakResponse"/> when
 /// either is missing.</para>
+///
+/// <para><b>Streaming STT.</b> When <c>StreamingSttFactory</c> is given and returns an engine at
+/// <see cref="StartListening"/> time, the INPUT graph skips the VAD segmenter and the STT pool: frames go
+/// straight into the engine (<see cref="StreamingSttFlow"/>), <c>OnPartial</c> gets the text while the person
+/// is still speaking, and <c>OnTranscript</c> gets each utterance the moment the engine's endpoint fires.
+/// It is asked on every StartListening (it reads settings at call time), so switching the provider takes
+/// effect at the next mic-on without recreating the actor. Returning null means "use the batch path".</para>
 /// </summary>
 public sealed record CreateVoiceStream(
     Func<ISpeechToText> SttFactory,
     Action<string, double> OnTranscript,
     Func<ITextToSpeech>? TtsFactory = null,
     Func<IAudioPlaybackQueue>? PlaybackFactory = null,
-    Action<bool>? OnTtsPlaybackChanged = null);
+    Action<bool>? OnTtsPlaybackChanged = null,
+    Func<Streaming.IStreamingSpeechToText?>? StreamingSttFactory = null,
+    Action<Streaming.SttUpdate>? OnPartial = null);
 
 /// <summary>Reply for <see cref="CreateVoiceStream"/>.</summary>
 public sealed record VoiceStreamCreated(IActorRef VoiceRef);

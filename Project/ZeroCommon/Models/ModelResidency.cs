@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agent.Common.Llm;
 using Agent.Common.Platform;
 using Agent.Common.Voice;
+using Agent.Common.Voice.Streaming;
 
 namespace Agent.Common.Models;
 
@@ -102,18 +103,27 @@ public static class ModelResidency
         }
     });
 
-    /// <summary>Load the local ear (Whisper) if its model is on disk. Never downloads; a cloud ear needs nothing.</summary>
+    /// <summary>
+    /// Load the local ear (Whisper, or the streaming recognizer) if its model is on disk. Never downloads; a cloud
+    /// ear needs nothing. The streaming recognizer is cached per process, so the mic path finds it loaded.
+    /// </summary>
     public static async Task<bool> WarmVoiceInAsync(VoiceSettings voice, Action<string> log)
     {
         try
         {
-            if (voice.SttProvider != SttProviderNames.WhisperLocal || !WhisperModelStore.IsDownloaded(voice.SttWhisperModel))
+            string name;
+            if (voice.SttProvider == SttProviderNames.WhisperLocal && WhisperModelStore.IsDownloaded(voice.SttWhisperModel))
+                name = $"whisper-{voice.SttWhisperModel}";
+            else if (voice.SttProvider == SttProviderNames.SherpaStreaming
+                     && StreamingSttModelCatalog.IsInstalled(StreamingSttModelCatalog.Resolve(voice.StreamingSttModel)))
+                name = $"streaming {StreamingSttModelCatalog.Resolve(voice.StreamingSttModel).Id}";
+            else
                 return false;
             var stt = PortableVoiceRuntime.CreateStt(voice, out _);
             if (stt is null) return false;
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var ok = await stt.EnsureReadyAsync(null).ConfigureAwait(false);
-            log($"[Models] voice in whisper-{voice.SttWhisperModel} {(ok ? "loaded" : "not loaded")} in {sw.ElapsedMilliseconds} ms");
+            log($"[Models] voice in {name} {(ok ? "loaded" : "not loaded")} in {sw.ElapsedMilliseconds} ms");
             return ok;
         }
         catch (Exception ex)

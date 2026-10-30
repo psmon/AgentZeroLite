@@ -6,6 +6,7 @@ using Agent.Common;
 using Agent.Common.Llm;
 using Agent.Common.Llm.Providers;
 using Agent.Common.Voice;
+using Agent.Common.Voice.Streaming;
 using AgentZeroWpf.Services.Voice;
 
 namespace AgentZeroWpf.UI.Components;
@@ -68,6 +69,8 @@ public partial class SettingsPanel
             ApplySttProviderUi(v.SttProvider);
 
             PopulateLocalGemmaModels(v.SttLocalGemmaModelId);
+            PopulateStreamingSttModels(v.StreamingSttModel);
+            tbSttStreamingEndpoint.Text = v.ResolveStreamingEndpointMs().ToString();
 
             SelectComboTag(cbTtsProvider, v.TtsProvider);
             pbTtsOpenAIKey.Password = v.TtsOpenAIApiKey;
@@ -321,6 +324,56 @@ public partial class SettingsPanel
         spSttWhisperLocal.Visibility = provider == SttProviderNames.WhisperLocal ? Visibility.Visible : Visibility.Collapsed;
         grdSttOpenAIKey.Visibility = provider == SttProviderNames.OpenAIWhisper ? Visibility.Visible : Visibility.Collapsed;
         grdSttLocalGemmaModel.Visibility = provider == SttProviderNames.LocalGemma ? Visibility.Visible : Visibility.Collapsed;
+        spSttStreaming.Visibility = provider == SttProviderNames.SherpaStreaming ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void PopulateStreamingSttModels(string selectedId)
+    {
+        cbSttStreamingModel.Items.Clear();
+        foreach (var m in StreamingSttModelCatalog.All)
+            cbSttStreamingModel.Items.Add(new ComboBoxItem { Content = $"{m.Label}  (~{m.ApproxMegabytes} MB)", Tag = m.Id });
+        SelectComboTag(cbSttStreamingModel, StreamingSttModelCatalog.Resolve(selectedId).Id);
+        RefreshStreamingSttStatus();
+    }
+
+    private StreamingSttModel SelectedStreamingSttModel()
+        => StreamingSttModelCatalog.Resolve(ReadComboTag(cbSttStreamingModel, StreamingSttModelCatalog.Default.Id));
+
+    private void RefreshStreamingSttStatus()
+    {
+        var m = SelectedStreamingSttModel();
+        var installed = StreamingSttModelCatalog.IsInstalled(m);
+        tbSttStreamingStatus.Text = installed
+            ? $"✓ installed · {StreamingSttModelCatalog.ModelDirectory(m)}"
+            : "✗ not installed — press Download (until then the mic falls back to Whisper Local)";
+        tbSttStreamingStatus.Foreground = installed
+            ? System.Windows.Media.Brushes.LightGreen
+            : System.Windows.Media.Brushes.Goldenrod;
+    }
+
+    private void OnSttStreamingModelChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_voiceInitializing) return;
+        RefreshStreamingSttStatus();
+    }
+
+    /// <summary>"Download" — the shared <see cref="ModelDownloadDialog"/> over <see cref="StreamingSttModelDownloader"/>.</summary>
+    private void OnSttStreamingDownload(object sender, RoutedEventArgs e)
+    {
+        var model = SelectedStreamingSttModel();
+        var dlg = new ModelDownloadDialog(
+            title: "Download Streaming STT Model",
+            description: $"{model.Label} — ~{model.ApproxMegabytes} MB .tar.bz2 from k2-fsa's sherpa-onnx asr-models " +
+                         "release, unpacked locally. One-time; shared by every profile.",
+            cachePathHint: StreamingSttModelCatalog.ModelDirectory(model),
+            download: (progress, ct) => StreamingSttModelDownloader.DownloadAsync(model, progress, ct),
+            clearCache: () => StreamingSttModelDownloader.Remove(model))
+        {
+            Owner = Window.GetWindow(this),
+        };
+        dlg.ShowDialog();
+        RefreshStreamingSttStatus();
+        AppLogger.Log($"[Voice-STT] Streaming download dialog closed | model={model.Id} installed={StreamingSttModelCatalog.IsInstalled(model)}");
     }
 
     private void ApplyTtsProviderUi(string provider)
@@ -342,6 +395,8 @@ public partial class SettingsPanel
                               && int.TryParse(idxTag, out var idx) ? idx : -1;
         v.SttOpenAIApiKey = pbSttOpenAIKey.Password ?? "";
         v.SttLocalGemmaModelId = (cbSttLocalGemmaModel.SelectedItem as ComboBoxItem)?.Tag as string ?? v.SttLocalGemmaModelId;
+        v.StreamingSttModel = SelectedStreamingSttModel().Id;
+        if (int.TryParse(tbSttStreamingEndpoint.Text, out var endpointMs)) v.StreamingEndpointMs = Math.Clamp(endpointMs, 300, 3000);
 
         v.TtsProvider = ReadComboTag(cbTtsProvider, TtsProviderNames.Off);
         v.TtsOpenAIApiKey = pbTtsOpenAIKey.Password ?? "";

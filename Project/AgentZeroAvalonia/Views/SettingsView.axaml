@@ -633,7 +633,7 @@
                                Text="Shared with the Windows host and the wearable host (voice-settings.json). The watch speaks with Supertonic or KittenTTS 2 (multilingual, Windows), and listens with Whisper (local)." />
 
                     <TextBlock Classes="h2" Text="SPEECH TO TEXT (EAR)" />
-                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                         <TextBlock Classes="lbl" Grid.Row="0" Text="Provider" />
                         <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding SttProviders}" SelectedItem="{Binding SttProvider}" MinWidth="220" HorizontalAlignment="Left" />
                         <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" IsVisible="{Binding !SttRunsHere}" TextWrapping="Wrap"
@@ -644,6 +644,19 @@
                             <Button Content="Download" Command="{Binding DownloadWhisperCommand}" IsEnabled="{Binding IsIdle}" />
                         </StackPanel>
                         <TextBlock Grid.Row="3" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" Text="{Binding WhisperState}" IsVisible="{Binding ShowWhisper}" TextWrapping="Wrap" />
+                        <!-- SherpaStreaming: text while the person speaks (Nemotron 3.5 ASR is the official model) -->
+                        <TextBlock Classes="lbl" Grid.Row="2" Text="Streaming model" IsVisible="{Binding ShowStreaming}" />
+                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowStreaming}">
+                            <ComboBox ItemsSource="{Binding StreamingModels}" SelectedItem="{Binding StreamingModel}" MinWidth="320" />
+                            <Button Content="Download" Command="{Binding DownloadStreamingCommand}" IsEnabled="{Binding IsIdle}" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="3" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextDim}" Text="{Binding StreamingState}" IsVisible="{Binding ShowStreaming}" TextWrapping="Wrap" />
+                        <TextBlock Classes="lbl" Grid.Row="7" Text="Endpoint (ms)" IsVisible="{Binding ShowStreaming}" />
+                        <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowStreaming}">
+                            <NumericUpDown Value="{Binding StreamingEndpointMs}" Minimum="300" Maximum="3000" Increment="100" FormatString="0" Width="130" />
+                            <TextBlock FontSize="11" Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       Text="silence that ends an utterance and sends it — lower answers sooner" />
+                        </StackPanel>
                         <TextBlock Classes="lbl" Grid.Row="4" Text="GPU (Vulkan)" IsVisible="{Binding GpuSupported}" />
                         <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding GpuSupported}">
                             <CheckBox Content="Use GPU" IsChecked="{Binding SttUseGpu}" IsEnabled="{Binding ShowWhisper}" />
@@ -714,9 +727,9 @@
                     <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}"
                                Text="Off: a model loads the first time something uses it (or when you Save here) and then stays loaded. On: it loads in the background right after AgentZero starts — ready for the first request, at the cost of memory from the start." />
                     <CheckBox IsChecked="{Binding PreloadVoiceOut}" Content="Voice output (the TTS chosen above)" />
-                    <CheckBox IsChecked="{Binding PreloadVoiceIn}" Content="Voice input (local Whisper)" />
+                    <CheckBox IsChecked="{Binding PreloadVoiceIn}" Content="Voice input (local Whisper or the streaming model)" />
 
-                    <TextBlock Classes="h2" Text="TEST (NO MICROPHONE)" />
+                    <TextBlock Classes="h2" Text="TEST" />
                     <TextBox Text="{Binding TestText}" Watermark="A line to speak" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                         <Button Content="▶ Speak" Command="{Binding SpeakCommand}" IsEnabled="{Binding IsIdle}"
@@ -724,6 +737,9 @@
                         <Button Content="⟲ Round trip" Command="{Binding RoundTripCommand}" IsEnabled="{Binding IsIdle}"
                                 ToolTip.Tip="Synthesise, play, and feed the same audio through the STT above" />
                         <Button Content="■ Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsBusy}" />
+                        <ToggleButton Content="🎙 Listen live" IsChecked="{Binding IsListening, Mode=OneWay}"
+                                      Command="{Binding ListenLiveCommand}" IsVisible="{Binding ShowStreaming}" IsEnabled="{Binding MicSupported}"
+                                      ToolTip.Tip="Microphone → the streaming model above; the words appear in Heard while you speak. Press again to stop." />
                     </StackPanel>
                     <ProgressBar Margin="0,8,0,0" Height="4" IsVisible="{Binding IsBusy}"
                                  IsIndeterminate="{Binding !ProgressKnown}" Value="{Binding Progress}" Maximum="100" />

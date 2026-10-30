@@ -5,6 +5,7 @@ using Agent.Common.Llm;
 using Agent.Common.Models;
 using Agent.Common.Voice;
 using Agent.Common.Voice.KittenTts2;
+using Agent.Common.Voice.Streaming;
 using AgentZeroAvalonia.Services;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -18,11 +19,19 @@ public sealed record GpuChoice(int Index, string Label)
     public override string ToString() => Label;
 }
 
+/// <summary>A streaming STT model for the picker (<see cref="StreamingSttModelCatalog"/>).</summary>
+public sealed record StreamingModelChoice(StreamingSttModel Model)
+{
+    public override string ToString() => Model == StreamingSttModelCatalog.Default
+        ? $"{Model.Label} — official (~{Model.ApproxMegabytes} MB)"
+        : $"{Model.Label} (~{Model.ApproxMegabytes} MB)";
+}
+
 /// <summary>
 /// Settings → Voice. Edits the WPF host's <c>voice-settings.json</c> through
 /// <see cref="VoiceSettingsStore"/> — the same file, the same field names — for the
-/// providers that run on every OS (<see cref="PortableVoiceRuntime"/>): Whisper.net and
-/// OpenAI Whisper for the ear, Supertonic, KittenTTS 2 and OpenAI TTS for the voice. These are also
+/// providers that run on every OS (<see cref="PortableVoiceRuntime"/>): the streaming recognizer
+/// (Nemotron 3.5 ASR — the official streaming ear), Whisper.net and OpenAI Whisper for the ear, Supertonic, KittenTTS 2 and OpenAI TTS for the voice. These are also
 /// exactly what the wearable host reads, so this page is where its voice and ear get set.
 ///
 /// <para>Two rules keep the shared file honest. A save starts from the file as it is now
@@ -31,9 +40,9 @@ public sealed record GpuChoice(int Index, string Label)
 /// LocalGemma stub) stays in the picker while it is the stored choice, so opening the
 /// page and pressing Save does not quietly switch the WPF host's provider.</para>
 ///
-/// <para>The test is mic-free on purpose: "Speak" synthesises and plays a line, "Round
-/// trip" also feeds that audio back through STT and shows what it heard. Microphone
-/// capture is the next step (README-Avalonia: AgentBot voice).</para>
+/// <para>"Speak" synthesises and plays a line, "Round trip" also feeds that audio back
+/// through STT and shows what it heard — no microphone. "Listen live" is the one mic test:
+/// with the streaming provider it shows the words while they are spoken.</para>
 /// </summary>
 public partial class VoiceSettingsViewModel : ObservableObject
 {
@@ -51,6 +60,8 @@ public partial class VoiceSettingsViewModel : ObservableObject
     public IReadOnlyList<string> Kitten2Languages { get; } = ["ko", "en", "ja", "zh"];
     public IReadOnlyList<string> Kitten2DeviceChoices { get; } = Kitten2Devices.All;
     public ObservableCollection<GpuChoice> GpuChoices { get; } = [];
+    public IReadOnlyList<StreamingModelChoice> StreamingModels { get; } =
+        [.. StreamingSttModelCatalog.All.Select(m => new StreamingModelChoice(m))];
 
     [ObservableProperty] private string _sttProvider = SttProviderNames.WhisperLocal;
     [ObservableProperty] private string _sttWhisperModel = "small";
@@ -58,6 +69,10 @@ public partial class VoiceSettingsViewModel : ObservableObject
     [ObservableProperty] private bool _sttUseGpu;
     [ObservableProperty] private GpuChoice? _sttGpu;
     [ObservableProperty] private string _sttOpenAIApiKey = "";
+    [ObservableProperty] private StreamingModelChoice? _streamingModel;
+    [ObservableProperty] private decimal _streamingEndpointMs = 800;
+    [ObservableProperty] private string _streamingState = "";
+    [ObservableProperty] private bool _isListening;
 
     [ObservableProperty] private string _ttsProvider = TtsProviderNames.Off;
     [ObservableProperty] private string _openAiVoice = "alloy";
@@ -99,6 +114,8 @@ public partial class VoiceSettingsViewModel : ObservableObject
     public bool GpuSupported { get; } = OperatingSystem.IsWindows();
     public bool ShowWhisper => SttProvider == SttProviderNames.WhisperLocal;
     public bool ShowSttKey => SttProvider == SttProviderNames.OpenAIWhisper;
+    public bool ShowStreaming => SttProvider == SttProviderNames.SherpaStreaming;
+    public bool MicSupported { get; } = Agent.Common.Audio.AudioCapture.Platform.SupportsMicrophone;
     public bool ShowSupertonic => TtsProvider == TtsProviderNames.Supertonic;
     public bool ShowKitten2 => TtsProvider == TtsProviderNames.KittenTts2;
     public bool ShowOpenAiTts => TtsProvider == TtsProviderNames.OpenAITts;
@@ -115,12 +132,14 @@ public partial class VoiceSettingsViewModel : ObservableObject
 
     partial void OnKitten2DeviceChanged(string value) => RefreshModelState();
     partial void OnSttWhisperModelChanged(string value) => RefreshModelState();
+    partial void OnStreamingModelChanged(StreamingModelChoice? value) => RefreshModelState();
     partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(IsIdle));
 
     private void RaiseVisibility()
     {
         OnPropertyChanged(nameof(ShowWhisper));
         OnPropertyChanged(nameof(ShowSttKey));
+        OnPropertyChanged(nameof(ShowStreaming));
         OnPropertyChanged(nameof(ShowSupertonic));
         OnPropertyChanged(nameof(ShowKitten2));
         OnPropertyChanged(nameof(ShowOpenAiTts));
@@ -149,6 +168,9 @@ public partial class VoiceSettingsViewModel : ObservableObject
         SttUseGpu = s.SttUseGpu && GpuSupported;
         SttGpu = GpuChoices.FirstOrDefault(g => g.Index == s.SttGpuDeviceIndex) ?? GpuChoices[0];
         SttOpenAIApiKey = s.SttOpenAIApiKey;
+        var streaming = StreamingSttModelCatalog.Resolve(s.StreamingSttModel);
+        StreamingModel = StreamingModels.First(c => c.Model == streaming);
+        StreamingEndpointMs = s.ResolveStreamingEndpointMs();
         TtsProvider = s.TtsProvider;
         OpenAiVoice = OpenAiVoices.Contains(s.TtsVoice) ? s.TtsVoice : "alloy";
         TtsOpenAIApiKey = s.TtsOpenAIApiKey;
@@ -197,6 +219,10 @@ public partial class VoiceSettingsViewModel : ObservableObject
         WhisperState = WhisperModelStore.IsDownloaded(SttWhisperModel)
             ? $"installed · {WhisperModelStore.ModelPath(SttWhisperModel)}"
             : $"not installed ({WhisperNetStt.SizeLabel(SttWhisperModel)}) — Download or Save downloads it";
+        var model = StreamingModel?.Model ?? StreamingSttModelCatalog.Default;
+        StreamingState = StreamingSttModelCatalog.IsInstalled(model)
+            ? $"installed · {StreamingSttModelCatalog.ModelDirectory(model)}"
+            : $"not installed (~{model.ApproxMegabytes} MB) — Download";
         var dir = SuperTonicModelStore.DefaultModelDirectory;
         SupertonicState = SuperTonicModelStore.IsModelPresent(dir) ? $"installed · {dir}" : "not installed (~398 MB)";
         var k2 = KittenTts2ModelStore.DefaultDirectory;
@@ -217,6 +243,8 @@ public partial class VoiceSettingsViewModel : ObservableObject
         s.SttUseGpu = SttUseGpu;
         s.SttGpuDeviceIndex = SttGpu?.Index ?? -1;
         s.SttOpenAIApiKey = SttOpenAIApiKey.Trim();
+        s.StreamingSttModel = (StreamingModel?.Model ?? StreamingSttModelCatalog.Default).Id;
+        s.StreamingEndpointMs = Math.Clamp((int)StreamingEndpointMs, 300, 3000);
         s.TtsProvider = TtsProvider;
         s.TtsOpenAIApiKey = TtsOpenAIApiKey.Trim();
         s.SupertonicVoice = SupertonicVoice;
@@ -263,6 +291,94 @@ public partial class VoiceSettingsViewModel : ObservableObject
         var stt = new WhisperNetStt(SttWhisperModel) { UseGpu = SttUseGpu, GpuDeviceIndex = SttGpu?.Index ?? -1 };
         await stt.EnsureReadyAsync(new Progress<string>(m => Status = m), ct);
     });
+
+    /// <summary>The streaming model from k2-fsa's sherpa-onnx asr-models release (.tar.bz2, unpacked locally).</summary>
+    [RelayCommand]
+    private Task DownloadStreamingAsync() => RunAsync("Streaming STT", async ct =>
+    {
+        var model = StreamingModel?.Model ?? StreamingSttModelCatalog.Default;
+        var ok = await StreamingSttModelDownloader.DownloadAsync(model, new Progress<ModelDownloadStatus>(p =>
+        {
+            ProgressKnown = p.PercentComplete is not null;
+            Progress = p.PercentComplete ?? 0;
+            Status = $"{p.Caption} — {p.Detail}";
+        }), ct);
+        if (ok) Status = $"{model.Label} installed.";
+    });
+
+    private IStreamingSttSession? _liveSession;
+    private Agent.Common.Audio.IAudioFrameSource? _liveMic;
+
+    /// <summary>
+    /// The microphone through the streaming recognizer chosen above, words shown in "Heard" as they are
+    /// spoken (the settings on this page, saved or not). A second press stops. Decoding runs on the capture
+    /// thread — one 50 ms frame at a time, well inside real time — and the text is posted to the UI.
+    /// </summary>
+    [RelayCommand]
+    private async Task ListenLiveAsync()
+    {
+        if (IsListening) { StopLive(); return; }
+        try
+        {
+            var s = Collect();
+            s.SttProvider = SttProviderNames.SherpaStreaming;
+            var engine = PortableVoiceRuntime.CreateStreamingStt(s, out var why)
+                         ?? throw new InvalidOperationException(why);
+            Status = "Loading the streaming model…";
+            if (!await engine.EnsureReadyAsync(new Progress<string>(m => Status = m)))
+                throw new InvalidOperationException("the streaming model did not load");
+            var session = engine.StartSession(s.SttLanguage);
+            var mic = Agent.Common.Audio.AudioCapture.Platform.OpenMicrophone(
+                string.IsNullOrWhiteSpace(s.InputDeviceId) ? null : s.InputDeviceId);
+            var finals = "";
+            mic.FrameAvailable += pcm =>
+            {
+                IReadOnlyList<SttUpdate> updates;
+                lock (session)
+                {
+                    // A frame already in flight when Stop ran must not reach a finished session.
+                    if (!ReferenceEquals(_liveSession, session)) return;
+                    updates = session.Accept(pcm);
+                }
+                foreach (var u in updates)
+                {
+                    if (u.IsFinal) finals = (finals + " " + u.Text).Trim();
+                    var shown = u.IsFinal ? finals : (finals + " " + u.Text).Trim();
+                    Dispatcher.UIThread.Post(() => Heard = shown);
+                }
+            };
+            _liveSession = session;
+            _liveMic = mic;
+            Heard = "";
+            mic.Start();
+            IsListening = true;
+            Status = $"Listening ({engine.ModelId}) — speak; press again to stop.";
+        }
+        catch (Exception ex)
+        {
+            StopLive();
+            Status = "Listen failed: " + ex.Message;
+        }
+    }
+
+    private void StopLive()
+    {
+        try { _liveMic?.Stop(); } catch { }
+        try { _liveMic?.Dispose(); } catch { }
+        _liveMic = null;
+        if (_liveSession is { } session)
+        {
+            lock (session)
+            {
+                _liveSession = null;
+                if (session.Finish() is { } last && !Heard.EndsWith(last.Text, StringComparison.Ordinal))
+                    Heard = (Heard + " " + last.Text).Trim();
+                session.Dispose();
+            }
+        }
+        if (IsListening) Status = "Stopped listening.";
+        IsListening = false;
+    }
 
     [RelayCommand]
     private Task DownloadSupertonicAsync() => RunAsync("Supertonic", async ct =>
@@ -344,6 +460,7 @@ public partial class VoiceSettingsViewModel : ObservableObject
     [RelayCommand]
     private void Stop()
     {
+        StopLive();
         _cts?.Cancel();
         _player.Stop();
     }

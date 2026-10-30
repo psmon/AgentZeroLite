@@ -127,6 +127,32 @@ public class AgentBotViewModelTests
     }
 
     [Fact]
+    public void Voice_partials_only_fill_the_box_and_the_final_is_sent()
+    {
+        var (vm, session) = Wired();
+        vm.SetMicOnForTest(true);
+
+        vm.OnVoicePartial("오늘");
+        vm.OnVoicePartial("오늘 날씨");
+        Assert.Equal("오늘 날씨", vm.Input);
+        Assert.Empty(session.Writes);                       // a partial never reaches the terminal
+
+        vm.OnVoiceFinal("오늘 날씨 어때?");
+        Assert.Equal("오늘 날씨 어때?", Assert.Single(session.Writes));
+        Assert.Equal("", vm.Input);
+    }
+
+    [Fact]
+    public void Voice_text_after_mic_off_is_dropped()
+    {
+        var (vm, session) = Wired();
+        vm.OnVoicePartial("늦게 온 말");
+        vm.OnVoiceFinal("늦게 온 말");
+        Assert.Equal("", vm.Input);
+        Assert.Empty(session.Writes);
+    }
+
+    [Fact]
     public void Clear_wipes_the_screen_without_echoing_a_bubble()
     {
         var (vm, session) = Wired();

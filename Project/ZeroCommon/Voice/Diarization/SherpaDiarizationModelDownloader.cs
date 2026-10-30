@@ -157,7 +157,12 @@ public static class SherpaDiarizationModelDownloader
         File.Move(found[0], destOnnxPath);
     }
 
-    private static async Task<bool> StreamToFileAsync(
+    /// <summary>
+    /// GET <paramref name="url"/> into <paramref name="destination"/> through a <c>.part</c> file, reporting
+    /// progress every 200 ms. Shared with <see cref="Streaming.StreamingSttModelDownloader"/>, which fetches from
+    /// the same k2-fsa release host.
+    /// </summary>
+    internal static async Task<bool> StreamToFileAsync(
         HttpClient http, string url, string destination, string caption,
         IProgress<ModelDownloadStatus> progress, CancellationToken ct)
     {

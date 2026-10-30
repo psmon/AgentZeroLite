@@ -5,6 +5,10 @@ using Agent.Common.Os;
 using Agent.Common.Llm.Tools;
 using Agent.Common.Mcp;
 using Agent.Common.Voice;
+using Agent.Common.Voice.Streaming;
+using Agent.Common.Voice.Streams;
+using Akka.Streams;
+using Akka.Streams.Dsl;
 using Agent.Common.Wearable;
 using Agent.Common.Wearable.Actors;
 using Agent.Common.Web;
@@ -88,6 +92,8 @@ public static class Program
         if (HasFlag(args, "--download-kitten2")) return InstallKitten2(null);
         if (Arg(args, "--speak") is { } speakText) return Speak(voice, speakText, args);
         if (Arg(args, "--hear") is { } hearPath) return Hear(stt, hearPath, args);
+        if (HasFlag(args, "--download-stream-stt")) return DownloadStreamingStt(args);
+        if (Arg(args, "--hear-stream") is { } streamPath) return HearStream(voiceSettings, streamPath, args);
 
         // Two shapes of brain: AgentZero's own agent is an actor subtree (M0032), an agent
         // CLI is a child process beside the actor system. Only one is ever non-null.
@@ -397,6 +403,80 @@ public static class Program
         var pcm = wav.Length > 44 ? wav[44..] : wav;
         var heard = stt.TranscribeAsync(pcm, Arg(args, "--lang")).GetAwaiter().GetResult();
         Console.WriteLine($"heard: {(heard.Length == 0 ? "(nothing)" : heard)}");
+        return 0;
+    }
+
+    /// <summary>
+    /// <c>AgentZeroWearable.exe --download-stream-stt [--stream-model zipformer-ko]</c> — install a streaming
+    /// model (default: the settings' choice) from k2-fsa's release.
+    /// </summary>
+    private static int DownloadStreamingStt(string[] args)
+    {
+        var model = StreamingSttModelCatalog.Resolve(Arg(args, "--stream-model") ?? VoiceSettingsStore.Load().StreamingSttModel);
+        var last = "";
+        var lastPct = -10;
+        var progress = new SyncProgress<ModelDownloadStatus>(p =>
+        {
+            // A 650 MB download reports every 200 ms; print every 10 %.
+            if (!p.IsTerminal && p.PercentComplete is int pct && pct < lastPct + 10) return;
+            if (p.PercentComplete is int pp) lastPct = pp;
+            var line = p.IsTerminal ? $"{p.Caption}: {p.Detail}" : p.PercentComplete is null ? $"{p.Caption} {p.Detail}" : $"{p.Caption} {p.PercentComplete}% {p.Detail}";
+            if (line == last) return;
+            last = line;
+            Console.WriteLine(line);
+        });
+        return StreamingSttModelDownloader.DownloadAsync(model, progress, CancellationToken.None).GetAwaiter().GetResult() ? 0 : 4;
+    }
+
+    /// <summary>
+    /// <c>AgentZeroWearable.exe --hear-stream hello.wav [--lang ko] [--stream-model id] [--realtime]</c> — run a WAV
+    /// through the same Akka.Streams stage the voice actor uses (<see cref="StreamingSttFlow"/>), in 50 ms frames
+    /// like the microphone's, and print every partial and final with the audio position it came at. 1.5 s of
+    /// silence follows the file so the endpoint can fire as it would after a real sentence. <c>--realtime</c>
+    /// paces the frames at 50 ms, so the wall clock reads as a live mic would.
+    /// </summary>
+    private static int HearStream(VoiceSettings voiceSettings, string path, string[] args)
+    {
+        var model = StreamingSttModelCatalog.Resolve(Arg(args, "--stream-model") ?? voiceSettings.StreamingSttModel);
+        var options = new StreamingSttOptions(EndpointSilenceSeconds: voiceSettings.ResolveStreamingEndpointMs() / 1000f);
+        using var engine = new SherpaStreamingStt(model, options);
+        var load = System.Diagnostics.Stopwatch.StartNew();
+        if (!engine.EnsureReadyAsync(new SyncProgress<string>(m => Console.WriteLine($"[stt] {m}"))).GetAwaiter().GetResult())
+            return 3;
+        Console.WriteLine($"[stt] model={model.Id} load={load.Elapsed.TotalSeconds:F1}s endpoint={options.EndpointSilenceSeconds:F1}s");
+
+        const int frameBytes = 1600; // 50 ms of 16 kHz PCM16, what WindowsAudioCapture delivers
+        var pcm = WavPcm.To16kMono(File.ReadAllBytes(path));
+        var padded = new byte[pcm.Length + 16000 * 2 * 3 / 2];
+        pcm.CopyTo(padded, 0);
+        var frames = Enumerable.Range(0, (padded.Length + frameBytes - 1) / frameBytes)
+            .Select(i => new global::Agent.Common.Voice.Streams.MicFrame(
+                padded.AsSpan(i * frameBytes, Math.Min(frameBytes, padded.Length - i * frameBytes)).ToArray(), 0f))
+            .ToList();
+        Console.WriteLine($"[stt] audio={pcm.Length / 32000.0:F2}s (+1.5s silence) frames={frames.Count}");
+
+        var fed = 0;
+        var wall = System.Diagnostics.Stopwatch.StartNew();
+        var language = Arg(args, "--lang") ?? voiceSettings.SttLanguage;
+        using var system = ActorSystem.Create("HearStream");
+        var source = Akka.Streams.Dsl.Source.From(frames);
+        if (HasFlag(args, "--realtime"))
+            source = source.Throttle(1, TimeSpan.FromMilliseconds(50), 1, Akka.Streams.ThrottleMode.Shaping);
+        var finals = new List<string>();
+        source
+            .Select(f => { Interlocked.Increment(ref fed); return f; })
+            .Via(StreamingSttFlow.Create(() => engine.StartSession(language)))
+            .RunForeach(u =>
+            {
+                var at = $"[audio {Volatile.Read(ref fed) * frameBytes / 32000.0:F2}s | wall {wall.Elapsed.TotalSeconds:F2}s]";
+                Console.WriteLine(u.IsFinal ? $"{at} FINAL #{u.Segment}: {u.Text}" : $"{at} partial: {u.Text}");
+                if (u.IsFinal) finals.Add(u.Text);
+            }, system.Materializer())
+            .GetAwaiter().GetResult();
+        system.Terminate().GetAwaiter().GetResult();
+        var rtf = wall.Elapsed.TotalSeconds / (padded.Length / 32000.0);
+        Console.WriteLine($"heard: {(finals.Count == 0 ? "(nothing)" : string.Join(" ", finals))}");
+        Console.WriteLine($"[stt] wall={wall.Elapsed.TotalSeconds:F2}s rtf={rtf:F2}");
         return 0;
     }
 

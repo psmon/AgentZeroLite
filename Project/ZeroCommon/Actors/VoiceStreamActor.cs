@@ -19,6 +19,17 @@
 //   3. Future P3 control-plane messages (BargeIn, CancelInflight,
 //      EndTurn, DeviceLost) need a single Tell-only inbox per session.
 //
+// Streaming STT variant (chosen per StartListening when the streaming
+// factory returns an engine):
+//
+//   Source.Queue<MicFrame>(N, DropHead)
+//      ▼ ViaMaterialized(KillSwitches.Single, Keep.Both)
+//   StreamingSttFlow (recognizer session; partial + final SttUpdates)
+//   Sink.ActorRefWithAck(Self) → OnPartial / OnTranscript
+//
+// No segmenter and no pool: the recognizer hears every frame, silence
+// included, and its endpoint rule replaces the VAD hangover.
+//
 // Path: /user/stage/voice  (created by StageActor on CreateVoiceStream).
 // ───────────────────────────────────────────────────────────
 
@@ -27,6 +38,7 @@ using Akka.Event;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using Agent.Common.Voice;
+using Agent.Common.Voice.Streaming;
 using Agent.Common.Voice.Streams;
 
 namespace Agent.Common.Actors;
@@ -40,6 +52,13 @@ public sealed class VoiceStreamActor : ReceiveActor
     private readonly Func<IAudioPlaybackQueue>? _playbackFactory;
     private readonly Action<string, double> _onTranscript;
     private readonly Action<bool>? _onTtsPlaybackChanged;
+    private readonly Func<IStreamingSpeechToText?>? _streamingSttFactory;
+    private readonly Action<SttUpdate>? _onPartial;
+
+    // A streaming recognizer must hear every frame (its endpoint counts the silence too), so its
+    // queue holds ~10 s of 50 ms frames instead of the batch path's 64; DropHead only bites if
+    // decoding falls that far behind.
+    private const int StreamingMicBufferFrames = 200;
 
     private ISourceQueueWithComplete<MicFrame>? _frameQueue;
     private UniqueKillSwitch? _inputKillSwitch;
@@ -66,8 +85,12 @@ public sealed class VoiceStreamActor : ReceiveActor
         Action<string, double> onTranscript,
         Func<ITextToSpeech>? ttsFactory = null,
         Func<IAudioPlaybackQueue>? playbackFactory = null,
-        Action<bool>? onTtsPlaybackChanged = null)
+        Action<bool>? onTtsPlaybackChanged = null,
+        Func<IStreamingSpeechToText?>? streamingSttFactory = null,
+        Action<SttUpdate>? onPartial = null)
     {
+        _streamingSttFactory = streamingSttFactory;
+        _onPartial = onPartial;
         _sttFactory = sttFactory;
         _onTranscript = onTranscript;
         _ttsFactory = ttsFactory;
@@ -76,7 +99,7 @@ public sealed class VoiceStreamActor : ReceiveActor
         _materializer = Context.System.Materializer();
 
         // ── INPUT graph ──
-        Receive<StartListening>(OnStart);
+        ReceiveAsync<StartListening>(OnStartAsync);
         Receive<StopListening>(_ => StopInputGraph());
         Receive<MicFrame>(OnMicFrame);
 
@@ -91,6 +114,16 @@ public sealed class VoiceStreamActor : ReceiveActor
         {
             try { _onTranscript(msg.Transcript, msg.UtteranceDurationSeconds); }
             catch (Exception ex) { _log.Error(ex, "[Voice] OnTranscript callback threw"); }
+            Sender.Tell(new VoiceFrameAck());
+        });
+        Receive<SttUpdate>(msg =>
+        {
+            try
+            {
+                if (msg.IsFinal) _onTranscript(msg.Text, msg.AudioSeconds);
+                else _onPartial?.Invoke(msg);
+            }
+            catch (Exception ex) { _log.Error(ex, "[Voice] streaming STT callback threw"); }
             Sender.Tell(new VoiceFrameAck());
         });
         Receive<VoiceStreamEnded>(_ => _log.Info("[Voice] INPUT graph completed"));
@@ -121,7 +154,11 @@ public sealed class VoiceStreamActor : ReceiveActor
         await Task.CompletedTask;
     }
 
-    private void OnStart(StartListening cmd)
+    /// <summary>
+    /// Async so a streaming model can load before the graph exists: the mailbox is suspended meanwhile,
+    /// and the frames that queue up behind it are offered once the graph is running (the oldest dropped).
+    /// </summary>
+    private async Task OnStartAsync(StartListening cmd)
     {
         if (_frameQueue is not null)
         {
@@ -132,6 +169,44 @@ public sealed class VoiceStreamActor : ReceiveActor
         _language = cmd.Language;
         _vadThreshold = cmd.VadThreshold;
 
+        IStreamingSpeechToText? streaming = null;
+        try { streaming = _streamingSttFactory?.Invoke(); }
+        catch (Exception ex) { _log.Error(ex, "[Voice] streaming STT factory threw — using the batch path"); }
+        if (streaming is not null)
+        {
+            if (await streaming.EnsureReadyAsync(new Progress<string>(m => _log.Info("[Voice] {0}", m))))
+            {
+                StartStreamingGraph(cmd, streaming);
+                return;
+            }
+            _log.Warning("[Voice] streaming STT {0} not ready — using the batch path", streaming.ModelId);
+        }
+        StartBatchGraph(cmd);
+    }
+
+    private void StartStreamingGraph(StartListening cmd, IStreamingSpeechToText engine)
+    {
+        var sink = Sink.ActorRefWithAck<SttUpdate>(
+            Self,
+            onInitMessage: new VoiceStreamReady(),
+            ackMessage: new VoiceFrameAck(),
+            onCompleteMessage: new VoiceStreamEnded(),
+            onFailureMessage: ex => new VoiceStreamFailed(ex));
+
+        var language = cmd.Language;
+        var materialized = Source.Queue<MicFrame>(Math.Max(cmd.MicBufferSize, StreamingMicBufferFrames), OverflowStrategy.DropHead)
+            .ViaMaterialized(KillSwitches.Single<MicFrame>(), Keep.Both)
+            .Via(StreamingSttFlow.Create(() => engine.StartSession(language)))
+            .ToMaterialized(sink, Keep.Left)
+            .Run(_materializer);
+
+        _frameQueue = materialized.Item1;
+        _inputKillSwitch = materialized.Item2;
+        _log.Info("[Voice] INPUT graph materialised (streaming) | model={0} language={1}", engine.ModelId, language);
+    }
+
+    private void StartBatchGraph(StartListening cmd)
+    {
         _sttPool = Context.ActorOf(
             SttWorkerActor.PoolProps(_sttFactory, cmd.SttParallelism),
             "stt-pool");
@@ -212,8 +287,10 @@ public sealed class VoiceStreamActor : ReceiveActor
 
     private void StopInputGraph()
     {
-        try { _inputKillSwitch?.Shutdown(); } catch { }
+        // Complete the queue first: a streaming stage flushes its last words on upstream-finish,
+        // which the kill switch's shutdown would cut short.
         try { _frameQueue?.Complete(); } catch { }
+        try { _inputKillSwitch?.Shutdown(); } catch { }
         _frameQueue = null;
         _inputKillSwitch = null;
         if (_sttPool is not null)

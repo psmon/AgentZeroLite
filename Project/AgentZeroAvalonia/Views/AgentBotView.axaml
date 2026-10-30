@@ -64,6 +64,15 @@
             <Setter Property="Padding" Value="8,3" />
             <Setter Property="MinWidth" Value="44" />
         </Style>
+        <Style Selector="Button.mic">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="6,3" />
+        </Style>
+        <Style Selector="Button.mic.live">
+            <Setter Property="Background" Value="#3A1F7A3A" />
+            <Setter Property="BorderBrush" Value="#4CAF50" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
         <Style Selector="Button.small">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Padding" Value="6,2" />
@@ -218,6 +227,9 @@
                         Command="{Binding CycleModeCommand}" Margin="0,0,6,0" />
                 <Button DockPanel.Dock="Right" Content="➤" Padding="8,3"
                         Command="{Binding SendCommand}" Margin="6,0,0,0" />
+                <Button DockPanel.Dock="Right" Classes="mic" Classes.live="{Binding MicOn}" Content="🎙"
+                        Command="{Binding ToggleMicCommand}" IsVisible="{Binding MicSupported}"
+                        ToolTip.Tip="{Binding MicTip}" Margin="6,0,0,0" />
                 <TextBox x:Name="InputBox" Text="{Binding Input}"
                          Watermark="Message… (Enter to send, Shift+Enter for a new line)"
                          AcceptsReturn="True" TextWrapping="Wrap" FontSize="12"

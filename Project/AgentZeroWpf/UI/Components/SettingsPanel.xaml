@@ -1048,6 +1048,7 @@
                                     <ComboBoxItem Content="Whisper Local  (offline, embedded)" Tag="WhisperLocal"/>
                                     <ComboBoxItem Content="OpenAI Whisper API" Tag="OpenAIWhisper"/>
                                     <ComboBoxItem Content="Local Gemma  (on-device, audio-capable)" Tag="LocalGemma"/>
+                                    <ComboBoxItem Content="Streaming  (on-device, text while you speak)" Tag="SherpaStreaming"/>
                                 </ComboBox>
                             </Grid>
 
@@ -1116,6 +1117,43 @@
                                 <ComboBox x:Name="cbSttLocalGemmaModel" Grid.Column="1"
                                           Style="{StaticResource DarkComboBox}"/>
                             </Grid>
+
+                            <!-- SherpaStreaming-specific: streaming model + download + endpoint silence -->
+                            <StackPanel x:Name="spSttStreaming" Visibility="Collapsed">
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Stream Model" FontFamily="Consolas" FontSize="10"
+                                               Foreground="#888899" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="cbSttStreamingModel" Grid.Column="1"
+                                              Style="{StaticResource DarkComboBox}"
+                                              SelectionChanged="OnSttStreamingModelChanged"/>
+                                    <Button Grid.Column="2" Margin="6,0,0,0"
+                                            Content="Download" Padding="10,3"
+                                            Style="{StaticResource DarkButton}"
+                                            Click="OnSttStreamingDownload"
+                                            ToolTip="Pull the selected streaming model from k2-fsa's sherpa-onnx asr-models release."/>
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Endpoint (ms)" FontFamily="Consolas" FontSize="10"
+                                               Foreground="#888899" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="tbSttStreamingEndpoint" Grid.Column="1"
+                                             Style="{StaticResource DarkTextBox}"
+                                             ToolTip="Silence after speech that sends the utterance (300–3000). The VAD path waits 1200–2000."/>
+                                    <TextBlock Grid.Column="2" Margin="8,0,0,0" Text="silence that ends an utterance — lower answers sooner"
+                                               FontFamily="Consolas" FontSize="10" Foreground="#666677" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock x:Name="tbSttStreamingStatus" Margin="120,0,0,6" FontFamily="Consolas" FontSize="10"
+                                           Foreground="#888899" TextWrapping="Wrap"/>
+                            </StackPanel>
 
                             <!-- Common: language -->
                             <Grid Margin="0,0,0,6">
