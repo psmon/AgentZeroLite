@@ -1,6 +1,6 @@
 # AgentZero Lite — Privacy Policy
 
-_Last updated: 2026-10-28._
+_Last updated: 2026-10-30._
 
 Published page: <https://psmon.github.io/AgentZeroLite/Home/privacy-policy.html>
 (this Markdown file is its source — keep the two in step).
@@ -59,12 +59,14 @@ does not see or forward their traffic.
 
 ## Microphone and system audio
 
-Only when you start them in a plugin (for example Voice Note or Agent Band): the app
+Only when you start it: in a plugin (for example Voice Note or Agent Band), with the
+microphone button of the assistant, or with "Listen live" in Settings → Voice. The app then
 listens to the microphone or to what your speakers play, turns it into text or labels
-**on your computer** (Whisper, the AudioSet classifier, speaker labels), and shows the
-result in that plugin. No recording is kept. If you chose the OpenAI provider for speech
-recognition, the speech is sent to OpenAI to be transcribed. Stopping the plugin stops
-the capture.
+**on your computer** (streaming speech recognition, Whisper, the AudioSet classifier, speaker
+labels), and shows the result there — the assistant's microphone puts the text in its input
+box and sends it as if you had typed it. No recording is kept. If you chose the OpenAI provider
+for speech recognition, the speech is sent to OpenAI to be transcribed. Stopping the plugin or
+pressing the microphone button again stops the capture.
 
 ## Children
 

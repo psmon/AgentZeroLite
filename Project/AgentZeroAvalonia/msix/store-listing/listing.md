@@ -24,7 +24,15 @@ Your data stays on your PC: no account, no telemetry. The project is open source
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
-## What's new in this version (1.26.5.0 — submission 16)
+## What's new in this version (1.26.7.0 — submission 17)
+Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
+
+- Talk to the assistant: press the microphone button beside its input box and speak — your words appear while you are still talking and are sent the moment you pause. Speech recognition runs on your PC with NVIDIA's Nemotron streaming model (Korean, English and many more languages, punctuation included); download it once in Settings → Voice.
+- Settings → Voice → Listen live shows the recognized words as you speak, to try a model and a microphone before using it.
+- KittenTTS 2: a new on-device voice that speaks many languages, Korean included, on your GPU when it has one. Download it in Settings → Voice.
+- Voice models now load when first used and stay ready, instead of loading again for every test.
+
+## What's new in version 1.26.5.0 (submission 16)
 Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
 
 - Know when an agent needs you: when an agent in any terminal is blocked on a question or finishes its work, a small popup appears in the corner of the screen (click it to go to that terminal) and the taskbar button flashes. Settings → Notifications.
@@ -110,6 +118,7 @@ Paste into Store listings → English → "What's new in this version" (≤ 1500
 - Active-sessions sidebar showing which agent is working, waiting for you or done — from Claude Code's, Codex's and Hermes' own status, and Agent Stage showing their sub-agents as a crew
 - Code view: the workspace's files with VS Code syntax highlighting, Markdown with Mermaid diagrams, its git log, and a diff to review and annotate
 - Notifications when an agent needs you, a monthly cost view by model and project, and a command palette
+- Speak to the assistant with on-device speech recognition that shows your words while you talk, and on-device voices
 - Resume a Claude Code or Codex conversation when its terminal opens
 - Git worktrees listed under their workspace, including those Claude Code and Codex create
 - No account, no telemetry — settings and history stay on your PC

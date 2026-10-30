@@ -30,7 +30,7 @@ footer { color: var(--muted); font-size: 14px; margin-top: 40px; border-top: 1px
 <body>
 <main>
   <h1>AgentZero Lite — Privacy Policy</h1>
-  <p class="updated">Last updated: 2026-10-28</p>
+  <p class="updated">Last updated: 2026-10-30</p>
 
   <p>AgentZero Lite (“the app”) is a desktop shell for command-line AI tools. It is open source:
     <a href="https://github.com/psmon/AgentZeroLite">github.com/psmon/AgentZeroLite</a>.</p>
@@ -92,11 +92,13 @@ footer { color: var(--muted); font-size: 14px; margin-top: 40px; border-top: 1px
     separate software with their own privacy policies; the app does not see or forward their traffic.</p>
 
   <h2>Microphone and system audio</h2>
-  <p>Only when you start them in a plugin (for example Voice Note or Agent Band): the app listens to the microphone or
-    to what your speakers play, turns it into text or labels <strong>on your computer</strong> (Whisper, the AudioSet
-    classifier, speaker labels), and shows the result in that plugin. No recording is kept. If you chose the OpenAI
-    provider for speech recognition, the speech is sent to OpenAI to be transcribed. Stopping the plugin stops the
-    capture.</p>
+  <p>Only when you start it: in a plugin (for example Voice Note or Agent Band), with the microphone button of the
+    assistant, or with "Listen live" in Settings → Voice. The app then listens to the microphone or to what your
+    speakers play, turns it into text or labels <strong>on your computer</strong> (streaming speech recognition,
+    Whisper, the AudioSet classifier, speaker labels), and shows the result there — the assistant's microphone puts
+    the text in its input box and sends it as if you had typed it. No recording is kept. If you chose the OpenAI
+    provider for speech recognition, the speech is sent to OpenAI to be transcribed. Stopping the plugin or pressing
+    the microphone button again stops the capture.</p>
 
   <h2>Children</h2>
   <p>The app is a developer tool and is not directed at children.</p>
