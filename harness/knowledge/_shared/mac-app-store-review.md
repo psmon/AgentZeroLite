@@ -6,15 +6,23 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 
 ---
 
-## 0. 현재 상태 (2026-10-21)
+## 0. 현재 상태 (2026-10-30)
 
 | 항목 | 값 |
 |---|---|
 | 앱 | AgentZero Lite · App Store Connect 앱 ID **6825237056** · 번들 ID `com.psmon.agentzerolite` · 팀 `HA39FQRUZG`(sang man park, 개인) |
-| 제출 | 0.25.8 (빌드 **2**) · submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a` · 2026-10-21 17:46 KST · `WAITING_FOR_REVIEW` |
-| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d` · 빌드 ID `1a842842-2794-4624-a455-69b17b5fa13e` |
+| 제출 | **2차** — 0.26.6 (빌드 **3**) · 같은 submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a` 재제출 · 2026-10-30 16:02 KST · `WAITING_FOR_REVIEW` |
+| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d` · 빌드 ID `3d82af5b-80eb-448d-b06b-c9dc366a271b` |
 | 출시 방식 | **MANUAL** — 승인돼도 운영자가 출시를 눌러야 공개 |
-| 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다 |
+| 판매 지역 | 전 지역 **중국 본토 제외**(가이드라인 5) |
+| 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다. 빈 초안 submission `fe965f27-…`(항목 0, 취소 불가 상태) — 무시 |
+
+### 심사 이력
+
+| 차수 | 버전(빌드) | 결과 | 사유 → 조치 |
+|---|---|---|---|
+| 1 | 0.25.8 (2), 10-21 제출 | **반려** 2026-10-28 (MacBook Pro 14 Nov 2024) | **2.4.5(i)** 임시 예외 `home-relative-path.read-write "/"`·`absolute-path.read-write "/usr/local/"` 거부(`/opt/homebrew/`는 지적 없음) → 두 예외 삭제, 폴더 선택 + security-scoped bookmark(`SandboxFolderAccess`, `files.bookmarks.app-scope`). **5 Legal(중국)** 메타데이터의 "OpenAI" → 단어 삭제 + 중국 본토 판매 제외. Resolution Center에 조치 답변 |
+| 2 | 0.26.6 (3), 10-30 재제출 | 대기 | — |
 
 확인 기록: 2026-10-25 웹(App Store Connect → 앱 심사)으로 확인 — 여전히 `심사 대기 중`, 메시지 없음.
 
@@ -67,10 +75,20 @@ MAS_PROFILE=.secret/certs/AgentZeroLite_MAS.provisionprofile \
 asc builds upload --app 6825237056 --pkg publish-avalonia/appstore/AgentZeroLite-<ver>-<build>-appstore.pkg --version <ver> --build-number <build> --wait
 asc versions attach-build --app 6825237056 --platform MAC_OS --version-id <버전ID> --build-id <새 빌드ID>
 asc review submit --app 6825237056 --version-id <버전ID> --build-id <새 빌드ID> --dry-run   # wouldSubmit:true 확인
-asc review submit --app 6825237056 --version-id <버전ID> --build-id <새 빌드ID> --confirm
+asc review submit --app 6825237056 --version-id <버전ID> --build-id <새 빌드ID> --confirm   # 첫 제출만
 ```
 
-- 빌드 번호는 실패한 업로드까지 포함해 매번 올린다(1: ITMS-90296 실패, 2: 제출본 → 다음은 **3**).
+**반려 뒤 재제출은 위 마지막 줄이 아니다** (2026-10-30 실측): 반려된 submission(`UNRESOLVED_ISSUES`)이 버전을 계속
+잡고 있어 `asc review submit`은 새 초안을 만들고 "could not be safely reused" 충돌로 끝나며, 웹의 "앱 심사에 다시 제출"
+버튼도 비활성이 된다. 기존 submission을 다시 내는 것이 맞다:
+```sh
+asc review items list --submission <반려된 submission ID>                 # 항목 ID, state REJECTED
+asc review items update --id <항목 ID> --resolved true                    # → READY_FOR_REVIEW
+asc review submissions-submit --id <반려된 submission ID> --confirm       # → WAITING_FOR_REVIEW
+```
+버전 문자열을 새 빌드에 맞춘 뒤(`asc versions update --version-id … --version <ver>`) 빌드를 붙이고, 그다음 위 세 줄.
+
+- 빌드 번호는 실패한 업로드까지 포함해 매번 올린다(1: ITMS-90296, 2: 1차 반려, 3: 2차 제출 → 다음은 **4**).
 - `dotnet publish`가 `Project/version.txt`나 `Project/AgentOne/version.txt`를 올리면 커밋 전에 되돌린다.
 - 반려 대응으로 엔타이틀먼트를 바꾸면 `MAS_SANDBOX_TEST=1` 번들로 GUI 기동·`-cli status`·zsh 탭을 먼저 확인한다
   (워크스페이스는 컨테이너 DB `CliGroups`에 한 줄 넣으면 된다). 확인 뒤 테스트 데이터는 지운다.

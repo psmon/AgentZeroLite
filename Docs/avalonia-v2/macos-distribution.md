@@ -10,7 +10,7 @@ Windows 쪽 짝은 `microsoft-store.md`. 서명 일반 지식은 `harness/knowle
 | 경로 | 무엇 | 기능 | 상태 |
 |---|---|---|---|
 | **Developer ID 서명 + 공증** | 지금의 `.pkg`를 Apple 인증서로 서명하고 Apple 공증 티켓을 붙인다. 홈페이지·GitHub Releases 배포 | 제한 없음 | **1단계 — 진행 중** |
-| **Mac App Store** | App Sandbox 안에서 도는 빌드를 App Store Connect에 제출 | 예외 엔타이틀먼트로 대부분 동작(§4.3) | 2단계 — **0.25.8 심사 제출(2026-10-21)** |
+| **Mac App Store** | App Sandbox 안에서 도는 빌드를 App Store Connect에 제출 | 고른 폴더 + Homebrew(§4.5) | 2단계 — 1차 반려(10-28) → **0.26.6 재제출(2026-10-30)** |
 
 Mac App Store는 **App Sandbox가 필수**이고, 앱이 띄운 **자식 프로세스는 부모의 샌드박스를 그대로 물려받는다.**
 Windows MSIX의 desktop app breakaway(`DesktopAppBreakaway.cs`) 같은 탈출구가 macOS에는 없다. Apple DTS 답변(포럼
@@ -180,6 +180,24 @@ GitHub Secrets: `MACOS_DEVID_APP_P12`·`MACOS_DEVID_INSTALLER_P12`(base64), `MAC
 - 스크린샷 3장(`macos/appstore/screenshots/`, 1440×900): 샌드박스 테스트 빌드 창(1180×788)을 캡처해 1440×900 캔버스에 배치,
   알파 채널 제거(업로드가 알파 PNG를 거부). 이 앱은 창 크기를 저장하지 않는다.
 - **2026-10-21 17:46 KST 심사 제출** — submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a`, 상태 `WAITING_FOR_REVIEW`.
+
+### 4.5 1차 반려와 대응 (2026-10-28 반려 → 2026-10-30 재제출)
+
+반려 원문 요지(심사 기기 MacBook Pro 14-inch Nov 2024, 0.25.8 (2)):
+- **2.4.5(i)**: `temporary-exception.files.absolute-path.read-write` 값 `/usr/local/`, `temporary-exception.files.home-relative-path.read-write`
+  값 `/`는 부여하지 않음. `/opt/homebrew/`는 지적되지 않았다.
+- **5 Legal**: 메타데이터의 "OpenAI" — 중국 생성형 AI 규제. 중국 판매를 빼거나 언급·기능을 없애라.
+
+대응(0.26.6, 빌드 3, 커밋 `9a60255`):
+- 두 예외 삭제. 워크스페이스는 폴더 선택 창으로만 추가하고 **app-scoped security-scoped bookmark**로 유지
+  (`ZeroCommon/Platform/SandboxFolderAccess.cs`: 선택 시 `Remember`, 시작 시 `RestoreAll` →
+  `startAccessingSecurityScopedResource`를 프로세스 수명 동안 유지. Avalonia의 북마크 API는 자기 호출 동안만 범위를 연다).
+  실측: 샌드박스 프로브(Swift, NSOpenPanel) → 선택한 폴더와 재시작 후 북마크로 연 폴더 모두 자식 zsh가 읽기·쓰기 ✅,
+  이어 샌드박스 테스트 빌드에서 같은 결과(`reopened 1/1`, 재시작 후 탭에서 쓰기 ✅).
+- 탭의 HOME은 실제 홈을 읽을 수 있을 때만 실제 홈, 아니면 컨테이너. 컨테이너일 때 `/opt/homebrew/bin`·`sbin`을 PATH 앞에.
+  결과: 탭에서 `node`·`claude`를 찾는다. 홈 폴더에 설정을 두는 도구(예: `~/.claude`)는 이 판에서 그 설정을 못 읽는다(설명문에 명시).
+- 설명문에서 "OpenAI" 삭제, App Store Connect 판매 지역에서 **중국 본토 제외**.
+- Resolution Center 답변 + 심사 메모 갱신 후 재제출. 재제출 절차의 함정은 런북(`harness/knowledge/_shared/mac-app-store-review.md` §4).
 
 ---
 
