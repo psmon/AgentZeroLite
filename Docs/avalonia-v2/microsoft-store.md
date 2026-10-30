@@ -410,6 +410,18 @@ Partner Center에는 10/26에 초안만 열린 채 패키지·목록이 비어 �
 - "게시본"은 개요의 Store presence 줄(Submission 번호)로, 진행 중인 것은 Product update 줄로 본다 — 초안만 열려
   있고 패키지가 Unchanged면 아직 아무것도 제출되지 않은 것이다.
 
+### 17차 제출 (1.26.7.0, 2026-10-30)
+
+내용: 스트리밍 음성 인식 — AgentBot 입력창의 🎙(말하는 동안 글자가 나타나고 멈추면 전송), Settings → Voice의 스트리밍
+공급자(NVIDIA Nemotron 3.5 ASR이 공식 모델, 한국어 Zipformer는 대안)·Download·Listen live, KittenTTS 2(다국어 온디바이스
+음성), 음성 모델은 처음 쓸 때 올라가 계속 유지. sherpa-onnx 1.13.8로 올라 패키지의 `onnxruntime.dll`이 1.28.2다(로컬에서
+Supertonic·KittenTTS 2·화자 분리 재확인). Partner Center는 Submission 14. 개인정보 처리방침을 먼저 고쳤다 — 마이크가
+"플러그인에서만"이 아니게 됐다(`doc-v1.54.0`, Pages 배포 확인). GitHub 릴리스 `v0.26.7` 선행(`ci-0.26.7`이 macOS·Linux에서
+KittenTTS 2 테스트 하나로 실패 → 테스트가 Windows 문구만 기대하던 것을 고쳐 `ci-0.26.7-2` 통과 후 태그). 패키지 152 MB,
+업로드+분석 약 45초, Save에 1.26.7.0만 Validated, 목록 What's new·기능 14줄을 `listing.md`에서 채우고 다시 읽어 일치 확인,
+첫 Submit 클릭에 In certification. 로그인은 이번에도 풀려 있어 운영자가 다시 로그인했다(Edge `pw-edge-partner`, 9333 —
+`msedge --remote-debugging-port=9333 --user-data-dir=%LOCALAPPDATA%\pw-edge-partner`로 띄운다).
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>
