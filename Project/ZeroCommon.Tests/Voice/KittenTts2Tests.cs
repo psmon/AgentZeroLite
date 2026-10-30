@@ -139,9 +139,11 @@ public sealed class KittenTts2Tests(ITestOutputHelper output)
             {
                 TtsProvider = TtsProviderNames.KittenTts2, Kitten2Voice = "bruno", Kitten2Language = "en",
             })!;
+            // Off Windows the engine says so before it looks for a bundle (CI's macOS and Linux jobs run this too).
+            var unavailable = OperatingSystem.IsWindows() ? "not installed" : "Windows only";
             Assert.IsType<KittenTts2VoiceEngine>(engine);
             Assert.False(engine.Available);
-            Assert.Contains("not installed", engine.Status);
+            Assert.Contains(unavailable, engine.Status);
             Assert.Equal("Bruno", engine.DefaultVoice);
             Assert.Equal("en", engine.DefaultLanguage);
             Assert.Throws<InvalidOperationException>(() => engine.Synthesize("hi"));
@@ -152,7 +154,7 @@ public sealed class KittenTts2Tests(ITestOutputHelper output)
             Assert.Null(VoiceEngines.Create(new VoiceSettings { TtsProvider = TtsProviderNames.OpenAITts }));
             Assert.Contains(TtsProviderNames.KittenTts2, PortableVoiceRuntime.TtsProviders);
             Assert.Null(PortableVoiceRuntime.CreateTts(new VoiceSettings { TtsProvider = TtsProviderNames.KittenTts2 }, out var why));
-            Assert.Contains("not installed", why);
+            Assert.Contains(unavailable, why);
         }
         finally { Directory.Delete(root, true); }
     }
