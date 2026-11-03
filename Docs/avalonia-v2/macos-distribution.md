@@ -10,7 +10,7 @@ Windows 쪽 짝은 `microsoft-store.md`. 서명 일반 지식은 `harness/knowle
 | 경로 | 무엇 | 기능 | 상태 |
 |---|---|---|---|
 | **Developer ID 서명 + 공증** | 지금의 `.pkg`를 Apple 인증서로 서명하고 Apple 공증 티켓을 붙인다. 홈페이지·GitHub Releases 배포 | 제한 없음 | **1단계 — 진행 중** |
-| **Mac App Store** | App Sandbox 안에서 도는 빌드를 App Store Connect에 제출 | 고른 폴더 + Homebrew(§4.5) | 2단계 — 1차 반려(10-28) → **0.26.6 재제출(2026-10-30)** |
+| **Mac App Store** | App Sandbox 안에서 도는 빌드를 App Store Connect에 제출 | 고른 폴더 + Homebrew(§4.5) | 3단계 — 1차 반려(10-28) → 2차 반려(10-31, 자동 분석) → **0.26.7 재제출(2026-11-03)** |
 
 Mac App Store는 **App Sandbox가 필수**이고, 앱이 띄운 **자식 프로세스는 부모의 샌드박스를 그대로 물려받는다.**
 Windows MSIX의 desktop app breakaway(`DesktopAppBreakaway.cs`) 같은 탈출구가 macOS에는 없다. Apple DTS 답변(포럼
@@ -198,6 +198,24 @@ GitHub Secrets: `MACOS_DEVID_APP_P12`·`MACOS_DEVID_INSTALLER_P12`(base64), `MAC
   결과: 탭에서 `node`·`claude`를 찾는다. 홈 폴더에 설정을 두는 도구(예: `~/.claude`)는 이 판에서 그 설정을 못 읽는다(설명문에 명시).
 - 설명문에서 "OpenAI" 삭제, App Store Connect 판매 지역에서 **중국 본토 제외**.
 - Resolution Center 답변 + 심사 메모 갱신 후 재제출. 재제출 절차의 함정은 런북(`harness/knowledge/_shared/mac-app-store-review.md` §4).
+
+### 4.6 2차 반려와 대응 (2026-10-31 반려 → 2026-11-03 재제출)
+
+반려 원문 요지(자동 메시지 — 사람 심사 전에 멈춤, 0.26.6 (3)): **2.4.5 Hardware Compatibility** — 자동 분석상
+`com.apple.security.network.server`가 있는데 맞는 기능이 보이지 않는다. 필요 없으면 지우고, 필요하면 Resolution Center에
+용도를 답하고 **App Review Information**에도 적으라.
+
+판단: 필요하다. 웹 뷰가 받는 페이지(`LocalAssetServer`: 모든 터미널 탭의 xterm.js와 Markdown 미리보기, `PluginAssetServer`:
+플러그인 페이지)를 127.0.0.1의 임시 포트에서 토큰 붙은 URL로 서빙한다. `NativeWebView`는 커스텀 스킴에 응답할 수 없다
+(`LocalAssetServer` 주석). 실측(2026-11-03, 샌드박스 `.app` 프로브): 이 엔타이틀먼트가 있으면 `127.0.0.1` bind/listen OK,
+없으면 `Operation not permitted`. 이 엔타이틀먼트 없이는 터미널이 뜨지 않는다.
+
+대응(0.26.7, 빌드 4 — 이 사이의 최신 소스, 엔타이틀먼트는 0.26.6과 같다):
+- `listing.md` 심사 메모에 용도·근거·확인 방법(탭에서 `lsof -nP -iTCP -sTCP:LISTEN | grep AgentZero` → 127.0.0.1만) 추가 → asc로 반영.
+  `entitlements.plist` 주석에 같은 근거.
+- 샌드박스 테스트 번들: GUI 기동, `-cli status`(v0.26.7), 127.0.0.1 리스너 확인. 0.26.7의 음성 기능은 macOS에서 마이크를
+  쓰지 않으므로(`UnsupportedAudioCapture`) 엔타이틀먼트 추가 없음.
+- Resolution Center 답변 → 항목 resolved → 같은 submission 재제출(`WAITING_FOR_REVIEW`, 2026-11-03 10:40 KST).
 
 ---
 

@@ -15,7 +15,12 @@
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
 
-    <!-- Loopback servers (xterm renderer, plugins), External LLM providers, web tools. -->
+    <!-- server: the loopback servers that hand the web view its pages (LocalAssetServer: every
+         terminal tab's xterm.js and the Markdown preview; PluginAssetServer: the Plugins page),
+         127.0.0.1 only. NativeWebView cannot answer a custom scheme, so there is no other way.
+         Without it the sandbox refuses bind() on 127.0.0.1 with EPERM (measured 2026-11-03).
+         App Review's automated check questioned it on 0.26.6; it is explained in the review
+         notes (listing.md), not removed. client: External LLM providers, model downloads. -->
     <key>com.apple.security.network.server</key>
     <true/>
     <key>com.apple.security.network.client</key>

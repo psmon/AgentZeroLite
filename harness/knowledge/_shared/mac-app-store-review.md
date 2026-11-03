@@ -6,13 +6,13 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 
 ---
 
-## 0. 현재 상태 (2026-10-30)
+## 0. 현재 상태 (2026-11-03)
 
 | 항목 | 값 |
 |---|---|
 | 앱 | AgentZero Lite · App Store Connect 앱 ID **6825237056** · 번들 ID `com.psmon.agentzerolite` · 팀 `HA39FQRUZG`(sang man park, 개인) |
-| 제출 | **2차** — 0.26.6 (빌드 **3**) · 같은 submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a` 재제출 · 2026-10-30 16:02 KST · `WAITING_FOR_REVIEW` |
-| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d` · 빌드 ID `3d82af5b-80eb-448d-b06b-c9dc366a271b` |
+| 제출 | **3차** — 0.26.7 (빌드 **4**) · 같은 submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a` 재제출 · 2026-11-03 10:40 KST · `WAITING_FOR_REVIEW` |
+| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d` · 빌드 ID `9abe9264-9355-423a-b6e3-266040464e0a`(빌드 4) |
 | 출시 방식 | **MANUAL** — 승인돼도 운영자가 출시를 눌러야 공개 |
 | 판매 지역 | 전 지역 **중국 본토 제외**(가이드라인 5) |
 | 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다. 빈 초안 submission `fe965f27-…`(항목 0, 취소 불가 상태) — 무시 |
@@ -22,9 +22,10 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 | 차수 | 버전(빌드) | 결과 | 사유 → 조치 |
 |---|---|---|---|
 | 1 | 0.25.8 (2), 10-21 제출 | **반려** 2026-10-28 (MacBook Pro 14 Nov 2024) | **2.4.5(i)** 임시 예외 `home-relative-path.read-write "/"`·`absolute-path.read-write "/usr/local/"` 거부(`/opt/homebrew/`는 지적 없음) → 두 예외 삭제, 폴더 선택 + security-scoped bookmark(`SandboxFolderAccess`, `files.bookmarks.app-scope`). **5 Legal(중국)** 메타데이터의 "OpenAI" → 단어 삭제 + 중국 본토 판매 제외. Resolution Center에 조치 답변 |
-| 2 | 0.26.6 (3), 10-30 재제출 | 대기 | — |
+| 2 | 0.26.6 (3), 10-30 재제출 | **반려** 2026-10-31 (자동 분석, 사람 심사 전) | **2.4.5** `com.apple.security.network.server`에 맞는 기능이 안 보인다 → 실측(샌드박스 + 이 엔타이틀먼트 없음: `127.0.0.1` bind가 `EPERM`) 결과 터미널 렌더러(`LocalAssetServer`)·Markdown 미리보기·플러그인(`PluginAssetServer`)의 loopback 서버에 필수라 **삭제하지 않고 설명**: 심사 메모(`listing.md`)에 용도·검증법(`lsof`) 추가, Resolution Center 답변. 최신 소스 0.26.7 빌드 4로 재제출 |
+| 3 | 0.26.7 (4), 11-03 재제출 | 대기 | — |
 
-확인 기록: 2026-10-25 웹(App Store Connect → 앱 심사)으로 확인 — 여전히 `심사 대기 중`, 메시지 없음.
+확인 기록: 2026-11-03 2차 반려 확인(웹 세션 만료 → 운영자 재로그인 후 읽음). 2026-10-25 웹(App Store Connect → 앱 심사)으로 확인 — 여전히 `심사 대기 중`, 메시지 없음.
 
 `.secret/apple-asc.json`에 모든 ID가 있다. `asc`는 `agentzero` 프로필로 로그인돼 있다(시스템 키체인).
 
@@ -56,6 +57,7 @@ Playwright로 연다: 스크래치패드의 `apple-pw/browser.mjs`(정식 Chrome
 | **2.1 / 4.2 (기능)** | 심사자가 claude/codex가 안 돈다고 지적 | 해당 도구는 사용자가 설치·인증하는 외부 CLI이며 앱의 핵심은 터미널(zsh) 호스트임을 설명(운영자 결정 2026-10-21: AgentZero는 동작하는 터미널을 띄우는 역할) | 설명문·심사 메모에 제약을 더 명확히 |
 | **2.3 (메타데이터)** | 스크린샷·설명 불일치(예: 플러그인·봇이 설정 없이 비어 보임) | 해당 문구 수정 후 재제출(빌드 불필요) | 스크린샷 교체(`macos/appstore/screenshots/`, 1440×900, 알파 없음) |
 | **5.1.1 (개인정보)** | "데이터 수집 안 함"과 외부 LLM 전송 | 프롬프트는 사용자가 설정한 엔드포인트로만 가고 개발자는 받지 않음을 설명 | — |
+| **2.4.5 엔타이틀먼트 자동 분석** | `network.server` 등 "맞는 기능이 없다"(자동 메시지) | 쓰는 엔타이틀먼트면 Resolution Center 답변 + 심사 메모(App Review Information)에 용도 기재 — 메시지가 두 곳 모두 요구한다. `network.server`의 근거: loopback 서버(2차 반려 참고) | 정말 안 쓰면 삭제 |
 | 2.4.5(viii) 등 기타 | — | 사유 원문을 `macos-distribution.md` §4.4에 그대로 기록 후 판단 | — |
 
 원칙: **반려 원문 → 기록 → 답변으로 풀리는지 먼저 → 안 되면 최소 변경**. 메타데이터만 바꾸면 빌드 재업로드 없이
@@ -88,7 +90,7 @@ asc review submissions-submit --id <반려된 submission ID> --confirm       # �
 ```
 버전 문자열을 새 빌드에 맞춘 뒤(`asc versions update --version-id … --version <ver>`) 빌드를 붙이고, 그다음 위 세 줄.
 
-- 빌드 번호는 실패한 업로드까지 포함해 매번 올린다(1: ITMS-90296, 2: 1차 반려, 3: 2차 제출 → 다음은 **4**).
+- 빌드 번호는 실패한 업로드까지 포함해 매번 올린다(1: ITMS-90296, 2: 1차 반려, 3: 2차 제출, 4: 3차 제출 → 다음은 **5**).
 - `dotnet publish`가 `Project/version.txt`나 `Project/AgentOne/version.txt`를 올리면 커밋 전에 되돌린다.
 - 반려 대응으로 엔타이틀먼트를 바꾸면 `MAS_SANDBOX_TEST=1` 번들로 GUI 기동·`-cli status`·zsh 탭을 먼저 확인한다
   (워크스페이스는 컨테이너 DB `CliGroups`에 한 줄 넣으면 된다). 확인 뒤 테스트 데이터는 지운다.
