@@ -1,6 +1,6 @@
 # AgentZero Lite — Privacy Policy
 
-_Last updated: 2026-10-30._
+_Last updated: 2026-11-03._
 
 Published page: <https://psmon.github.io/AgentZeroLite/Home/privacy-policy.html>
 (this Markdown file is its source — keep the two in step).
@@ -47,6 +47,7 @@ Only for features you use, and only to the service involved:
 | Model downloads (local LLM, voice, music) | huggingface.co, github.com | A standard download request |
 | Web tools of the assistant | html.duckduckgo.com, the pages it opens, wttr.in (weather) | The search query or page address |
 | Agent CLI install (Settings → CLI Definitions) | The npm registry (`npm install -g`), or releases.netclaw.dev / hermes-agent.nousresearch.com for the netclaw / Hermes installers | A standard package or download request |
+| Install WebView2 runtime (Windows, shown only when the runtime is missing) | go.microsoft.com and Microsoft's download servers | A standard download request for Microsoft's installer, which then runs as Microsoft's own setup |
 | Voice with the OpenAI provider (Settings → Voice) | api.openai.com, with **your** API key | The text to speak, or the recorded speech to transcribe |
 | MCP servers (Settings → MCP) | The servers **you** add | The tool calls the assistant makes and their arguments |
 | Plugins page — official list and install | api.github.com, raw.githubusercontent.com, github.com (or the address you paste) | A standard download request |

@@ -24,7 +24,14 @@ Your data stays on your PC: no account, no telemetry. The project is open source
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
-## What's new in this version (1.26.7.0 — submission 17)
+## What's new in this version (1.26.8.0 — submission 18)
+Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
+
+- Terminals now work on PCs without the Microsoft Edge WebView2 runtime (older Windows 10, LTSC/Server or managed installs): instead of a blank tab you see why, and one click installs Microsoft's runtime.
+- Find in a terminal: press Ctrl+Shift+F to search the whole scrollback, with a match count, previous/next, match case and regular expressions.
+- Any program in a terminal can now notify you — Gemini CLI, OpenCode, build scripts and others that send standard terminal notifications appear in the same corner popup, with their own message. Settings → Notifications.
+
+## What's new in version 1.26.7.0 (submission 17)
 Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
 
 - Talk to the assistant: press the microphone button beside its input box and speak — your words appear while you are still talking and are sent the moment you pause. Speech recognition runs on your PC with NVIDIA's Nemotron streaming model (Korean, English and many more languages, punctuation included); download it once in Settings → Voice.
@@ -117,7 +124,8 @@ Paste into Store listings → English → "What's new in this version" (≤ 1500
 - Web plugins: Agent Stage, Voice Note, live music recognition and token dashboards, installed from the official list
 - Active-sessions sidebar showing which agent is working, waiting for you or done — from Claude Code's, Codex's and Hermes' own status, and Agent Stage showing their sub-agents as a crew
 - Code view: the workspace's files with VS Code syntax highlighting, Markdown with Mermaid diagrams, its git log, and a diff to review and annotate
-- Notifications when an agent needs you, a monthly cost view by model and project, and a command palette
+- Notifications when an agent needs you or a terminal program sends one, a monthly cost view by model and project, and a command palette
+- Find in terminal (Ctrl+Shift+F) across the whole scrollback
 - Speak to the assistant with on-device speech recognition that shows your words while you talk, and on-device voices
 - Resume a Claude Code or Codex conversation when its terminal opens
 - Git worktrees listed under their workspace, including those Claude Code and Codex create
