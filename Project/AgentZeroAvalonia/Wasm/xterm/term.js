@@ -9,6 +9,7 @@
 //               { type: 'clear' }         clear the viewport
 //               { type: 'focus' }         focus the terminal
 //               { type: 'config', fontFamily, fontSize, lineHeight, cursorBlink, theme, hotkeys }
+//               { type: 'find', query? }   open the find bar (seeded from the selection, or query)
 //                                         appearance, owned by TerminalSettings in C#
 //   JS → host : { type: 'ready',  cols, rows }  renderer initialised
 //               { type: 'in',     data }        user keystrokes / paste
@@ -20,6 +21,7 @@
 //               { type: 'activate' }            the user clicked in here
 //               { type: 'link', url }           Ctrl/Cmd+click on a URL
 //               { type: 'hotkey', name }        a configured chord was pressed
+//               { type: 'notify', osc, data }   OSC 9 / 777 / 99 notification request (raw)
 (function () {
   // Appearance is the host's to decide (TerminalSettings), but it arrives as a
   // message and the renderer must be usable before it does. These are the same
@@ -190,6 +192,113 @@
   try { fit.fit(); } catch (e) {}
   afterFonts(function () { doFit(); });
 
+  // ── find (Ctrl+Shift+F → host → { type: 'find' }) ──────────────────────────
+  // The chord travels through the host's hotkey table like every other one, so it can be
+  // rebound in Settings → Shortcuts and the palette can open the bar too. Search runs over
+  // the whole buffer (scrollback included); matches are decorations, so allowProposedApi
+  // above is what makes the highlights and the overview-ruler marks appear.
+  var search = null;
+  try {
+    if (window.SearchAddon) {
+      search = new window.SearchAddon.SearchAddon({ highlightLimit: 2000 });
+      term.loadAddon(search);
+    }
+  } catch (e) { search = null; }
+
+  var findBar = document.getElementById('find');
+  var findInput = document.getElementById('find-q');
+  var findCount = document.getElementById('find-count');
+  var findCase = document.getElementById('find-case');
+  var findRegex = document.getElementById('find-regex');
+  var findState = { caseSensitive: false, regex: false };
+
+  function findOptions(incremental) {
+    return {
+      caseSensitive: findState.caseSensitive,
+      regex: findState.regex,
+      incremental: !!incremental,
+      decorations: {
+        matchBackground: '#623315',
+        matchBorder: '#623315',
+        matchOverviewRuler: '#d18616',
+        activeMatchBackground: '#a8ac94',
+        activeMatchBorder: '#e0e0e0',
+        activeMatchColorOverviewRuler: '#ffffff'
+      }
+    };
+  }
+
+  function setCount(text, none) {
+    findCount.textContent = text;
+    findInput.classList.toggle('none', !!none);
+  }
+
+  function runFind(direction, incremental) {
+    if (!search) { setCount('unavailable', true); return; }
+    var q = findInput.value;
+    if (!q) { try { search.clearDecorations(); } catch (e) {} setCount('', false); return; }
+    var found = false;
+    try {
+      found = direction < 0 ? search.findPrevious(q, findOptions(false)) : search.findNext(q, findOptions(incremental));
+    } catch (e) {
+      // An unfinished regular expression while typing — not an error worth more than a hint.
+      setCount('bad regex', true);
+      return;
+    }
+    if (!found) setCount('No results', true);
+  }
+
+  if (search && search.onDidChangeResults) {
+    search.onDidChangeResults(function (r) {
+      if (!r || !findInput.value) return;
+      if (r.resultCount === 0) { setCount('No results', true); return; }
+      // resultIndex is -1 past the highlight limit: the count is still right, the position is not known.
+      var pos = r.resultIndex >= 0 ? (r.resultIndex + 1) : '?';
+      setCount(pos + ' of ' + r.resultCount + (r.resultCount >= 2000 ? '+' : ''), false);
+    });
+  }
+
+  function openFind(query) {
+    findBar.hidden = false;
+    if (typeof query === 'string') findInput.value = query;
+    else {
+      // Seed from the selection, as editors do; a multi-line selection is not a query.
+      var sel = term.getSelection();
+      if (sel && sel.indexOf(NL_FIND) < 0 && sel.length <= 200) findInput.value = sel;
+    }
+    findInput.focus();
+    findInput.select();
+    if (findInput.value) runFind(1, true);
+  }
+
+  function closeFind() {
+    findBar.hidden = true;
+    try { search && search.clearDecorations(); } catch (e) {}
+    term.focus();
+  }
+
+  var NL_FIND = String.fromCharCode(10);
+  findInput.addEventListener('input', function () { runFind(1, true); });
+  findInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { runFind(e.shiftKey ? -1 : 1, false); e.preventDefault(); }
+    else if (e.key === 'Escape') { closeFind(); e.preventDefault(); }
+    else if ((e.key === 'f' || e.key === 'F') && (e.ctrlKey || e.metaKey)) { findInput.select(); e.preventDefault(); }
+    else if (e.key === 'F3') { runFind(e.shiftKey ? -1 : 1, false); e.preventDefault(); }
+  });
+  function toggle(btn, key) {
+    btn.addEventListener('click', function () {
+      findState[key] = !findState[key];
+      btn.classList.toggle('on', findState[key]);
+      findInput.focus();
+      runFind(1, true);
+    });
+  }
+  toggle(findCase, 'caseSensitive');
+  toggle(findRegex, 'regex');
+  document.getElementById('find-next').addEventListener('click', function () { runFind(1, false); findInput.focus(); });
+  document.getElementById('find-prev').addEventListener('click', function () { runFind(-1, false); findInput.focus(); });
+  document.getElementById('find-close').addEventListener('click', closeFind);
+
   // User input → host stdin. xterm.js handles IME composition natively, so
   // Korean / CJK input arrives here as committed strings.
   term.onData(function (d) { post({ type: 'in', data: d }); });
@@ -250,6 +359,7 @@
     else if (m.type === 'clear') { term.clear(); scheduleScreen(); }
     else if (m.type === 'focus') { term.focus(); }
     else if (m.type === 'config') { applyConfig(m); }
+    else if (m.type === 'find') { openFind(m.query); }
   }
   window.zeroHost = { recv: recv };
   // The WPF-style channel, should an engine deliver messages that way.
@@ -268,6 +378,19 @@
   // The title the program sets (OSC 0/2). Agent CLIs animate it while busy (Claude Code
   // puts a braille spinner there), the strongest "working" signal agent-state detection has.
   try { term.onTitleChange(function (t) { post({ type: 'title', data: t || '' }); }); } catch (e) {}
+
+  // Desktop notifications a program asks for: OSC 9 (iTerm2), OSC 777 (notify;title;body),
+  // OSC 99 (kitty). Passed raw — the host parses (ZeroCommon TerminalNotificationParser), so
+  // ConEmu's numbered OSC 9 commands such as the 9;4 progress bar are told apart in one
+  // tested place. Returning true marks the sequence handled; nothing is drawn either way.
+  try {
+    [9, 777, 99].forEach(function (code) {
+      term.parser.registerOscHandler(code, function (data) {
+        post({ type: 'notify', osc: code, data: String(data || '') });
+        return true;
+      });
+    });
+  } catch (e) {}
 
   post({ type: 'renderer', name: renderer });
   post({ type: 'ready', cols: term.cols, rows: term.rows });

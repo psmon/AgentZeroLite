@@ -24,6 +24,7 @@ public partial class NotificationSettingsViewModel : ObservableObject
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private bool _onBlocked;
     [ObservableProperty] private bool _onDone;
+    [ObservableProperty] private bool _onNotify;
     [ObservableProperty] private bool _onlyWhenInactive;
     [ObservableProperty] private bool _flashWindow;
     [ObservableProperty] private bool _popup;
@@ -46,6 +47,7 @@ public partial class NotificationSettingsViewModel : ObservableObject
         Enabled = s.Enabled;
         OnBlocked = s.OnBlocked;
         OnDone = s.OnDone;
+        OnNotify = s.OnNotify;
         OnlyWhenInactive = s.OnlyWhenInactive;
         FlashWindow = s.FlashWindow;
         Popup = s.Popup;
@@ -57,6 +59,7 @@ public partial class NotificationSettingsViewModel : ObservableObject
         Enabled = Enabled,
         OnBlocked = OnBlocked,
         OnDone = OnDone,
+        OnNotify = OnNotify,
         OnlyWhenInactive = OnlyWhenInactive,
         FlashWindow = FlashWindow,
         Popup = Popup,
@@ -72,7 +75,7 @@ public partial class NotificationSettingsViewModel : ObservableObject
             AttentionSettingsStore.Save(s, _path);
             PopupSeconds = s.PopupSeconds;
             Status = s.Enabled ? "Saved." : "Saved — notifications are off.";
-            AppLogger.Log($"[Settings] attention saved | enabled={s.Enabled} blocked={s.OnBlocked} done={s.OnDone} inactiveOnly={s.OnlyWhenInactive} flash={s.FlashWindow} popup={s.Popup}/{s.PopupSeconds}s");
+            AppLogger.Log($"[Settings] attention saved | enabled={s.Enabled} blocked={s.OnBlocked} done={s.OnDone} notify={s.OnNotify} inactiveOnly={s.OnlyWhenInactive} flash={s.FlashWindow} popup={s.Popup}/{s.PopupSeconds}s");
             Changed?.Invoke();
         }
         catch (Exception ex)

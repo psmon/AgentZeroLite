@@ -28,7 +28,8 @@ harness/knowledge/
 │   └── crash-dump-forensics.md              # *.stackdump / *.dmp playbook
 ├── test-runner/
 │   ├── unit-test-policy.md                  # explicit-trigger-only rule
-│   └── dotnet-test-execution.md             # serialization, host-cleanup
+│   ├── dotnet-test-execution.md             # serialization, host-cleanup
+│   └── gui-e2e-display.md                   # Debug GUI e2e → secondary monitor, maximized
 ├── test-sentinel/
 │   └── voice-roundtrip-testing.md           # TTS↔STT methodology
 ├── music-curator/

@@ -140,10 +140,15 @@ cd Project\AgentZeroAvalonia\msix
 
 ## 5. 알려진 이슈와 후속 과제
 
-- **WebView2 런타임**: Windows 11과 대부분의 Windows 10에는 이미 있지만 보장되지 않는다.
-  없으면 터미널 탭이 뜨지 않는다. 후속: 시작 시 런타임을 확인하고 설치 링크를 안내.
-- **읽기 전용 설치 폴더**: Store 판은 `C:\Program Files\WindowsApps\…` 에 설치된다. 코드는 설치 폴더를 읽기만 한다.
-  단, 워크스페이스 없이 연 터미널 탭의 시작 폴더가 exe 폴더라 그 탭에서는 파일을 못 쓴다. 후속: 기본 작업 폴더를 홈으로.
+- **WebView2 런타임** (2026-11-03 처리): Windows 11과 대부분의 Windows 10에는 이미 있지만 보장되지 않는다
+  (오래된 Windows 10, LTSC/Server, WSUS·오프라인 이미지). MSIX는 WebView2를 의존성으로 걸 수 없다.
+  이제 런타임이 없으면 모든 터미널 탭이 이유를 보여 주고 **Install WebView2 runtime** 버튼을 제공한다
+  (ZeroCommon `Platform/WebView2Runtime`). 버튼은 Microsoft 부트스트래퍼를 받아 Microsoft 서명을 확인하고,
+  패키지 안에서는 breakaway 정책으로 `/silent /install` 을 실행한다. 다운로드 페이지 링크와
+  `-cli webview2 status|install` 도 있다. 남은 확인: 개발자 모드로 등록한 패키지에서 런타임이 없는 PC를 대상으로
+  breakaway 설치를 실측해야 한다(런타임이 있는 PC에서는 `AGENTZERO_FAKE_NO_WEBVIEW2=1` 로 배너와 흐름만 확인).
+- **읽기 전용 설치 폴더** (9차 제출에서 처리): Store 판은 `C:\Program Files\WindowsApps\…` 에 설치되고, 코드는 설치 폴더를 읽기만 한다.
+  워크스페이스 없이 연 터미널 탭은 이제 홈 폴더에서 시작한다(`PtyHostFactory` 의 `UsableCwd(spec.Cwd) ?? HomeFolder()`).
 - **일반판과 동시 실행 불가**: 같은 단일 인스턴스 뮤텍스를 쓰므로 Store 판과 일반 설치판(WPF·Avalonia)을 동시에
   띄울 수 없다. 데이터 공유가 목적은 아니다(§0) — 한 PC에서 두 판을 같이 쓰는 경우는 고려하지 않는다.
 - **자동 업데이트**: Store 판은 Store가 업데이트한다. GitHub 릴리스 판과 버전 번호 체계(§2)가 다르다는 점만 기억.

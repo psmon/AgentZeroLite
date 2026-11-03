@@ -38,6 +38,12 @@ public static class HotkeyTable
     /// </summary>
     public const string PaletteOpen = "palette.open";
 
+    /// <summary>
+    /// Find in the active terminal's scrollback (xterm search addon). Ctrl+Shift+F, not Ctrl+F:
+    /// inside a shell Ctrl+F is readline's forward-char, and a TUI may bind it too.
+    /// </summary>
+    public const string TerminalFind = "terminal.find";
+
     /// <summary>A binding value that removes a default rather than leaving it in place.</summary>
     public const string Unbound = "none";
 
@@ -47,6 +53,7 @@ public static class HotkeyTable
         (PaletteOpen, "Open the command palette"),
         (WindowCommandIds.TerminalAdd, "Add a terminal to the active workspace"),
         (WindowCommandIds.CloseTab, "Close the active terminal tab"),
+        (TerminalFind, "Find in the active terminal"),
         (NextTab, "Next terminal tab"),
         (PrevTab, "Previous terminal tab"),
         (WindowCommandIds.SplitRight, "Split the active terminal to the right"),
@@ -81,6 +88,7 @@ public static class HotkeyTable
         [BotEmbedToggle] = "Ctrl+Shift+Backquote",
         [CodeToggle] = "Ctrl+Alt+E",
         [PaletteOpen] = "Ctrl+Shift+P",
+        [TerminalFind] = "Ctrl+Shift+F",
     };
 
     /// <summary>Ids this host implements; anything else in the settings is ignored here.</summary>
@@ -90,7 +98,7 @@ public static class HotkeyTable
         WindowCommandIds.TerminalAdd, WindowCommandIds.PanelToggle,
         WindowCommandIds.Float, WindowCommandIds.Dock,
         NextTab, PrevTab, MoveTabNextPane, ClosePane, FocusLeft, FocusRight, FocusUp, FocusDown, BotToggle,
-        BotEmbedToggle, CodeToggle, PaletteOpen,
+        BotEmbedToggle, CodeToggle, PaletteOpen, TerminalFind,
     };
 
     /// <summary>The binding an id has with no user setting: the WPF suggested table, else this host's default.</summary>

@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Agent.Common;
+using Agent.Common.Platform;
 using Agent.Common.Services;
 using AgentZeroAvalonia.Services;
 
@@ -78,6 +79,9 @@ public partial class XtermWebViewTerminalControl : UserControl
     /// <summary>A configured chord was pressed while the renderer had focus.</summary>
     public event EventHandler<string>? HotkeyRequested;
 
+    /// <summary>The program in this tab asked for a desktop notification (OSC 9 / 777 / 99).</summary>
+    public event EventHandler<Agent.Common.Agents.TerminalNotification>? NotificationReceived;
+
     /// <summary>"Restart terminal" on the banner.</summary>
     public event EventHandler? RestartRequested;
 
@@ -90,6 +94,8 @@ public partial class XtermWebViewTerminalControl : UserControl
             AppLogger.Log($"[Xterm] navigation {(e.IsSuccess ? "ok" : "FAILED")} | {e.Request}");
         Web.AdapterCreated += (_, _) => AppLogger.Log($"[Xterm] webview adapter | {Web.AdapterInfo}");
         RestartButton.Click += (_, _) => RestartRequested?.Invoke(this, EventArgs.Empty);
+        InstallRuntimeButton.Click += (_, _) => _ = InstallRuntimeAsync();
+        DownloadPageButton.Click += (_, _) => OpenLink(WebView2Runtime.DownloadPageUrl);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -97,6 +103,13 @@ public partial class XtermWebViewTerminalControl : UserControl
         base.OnAttachedToVisualTree(e);
         if (_sourceSet) return;
         _sourceSet = true;
+        if (!RuntimeStatus.Installed)
+        {
+            // Without the runtime the renderer can only stay blank; say why and offer it.
+            Web.IsVisible = false;
+            ShowRuntimeMissing();
+            return;
+        }
         try
         {
             var webgl = TerminalSettingsStore.Load().UseWebGlRenderer ? "webgl=1" : null;
@@ -330,9 +343,18 @@ public partial class XtermWebViewTerminalControl : UserControl
                 case "link":
                     OpenLink(XtermMessages.Str(root, "url"));
                     break;
+                case "notify":
+                    var note = Agent.Common.Agents.TerminalNotificationParser.Parse(
+                        XtermMessages.Int(root, "osc", 0), XtermMessages.Str(root, "data"));
+                    if (note is null) break;   // e.g. OSC 9;4 progress — a command, not a message
+                    AppLogger.Log($"[Xterm] notification ({note.Source}) | {_spec?.DisplayName ?? "?"} | {note.Text}");
+                    NotificationReceived?.Invoke(this, note);
+                    break;
                 case "hotkey":
                     var name = XtermMessages.Str(root, "name");
-                    if (!string.IsNullOrEmpty(name)) HotkeyRequested?.Invoke(this, name);
+                    // Find belongs to THIS renderer (a floating window's too), not the active tab.
+                    if (name == AgentZeroAvalonia.Layout.HotkeyTable.TerminalFind) OpenFind();
+                    else if (!string.IsNullOrEmpty(name)) HotkeyRequested?.Invoke(this, name);
                     break;
             }
         }
@@ -436,7 +458,72 @@ public partial class XtermWebViewTerminalControl : UserControl
     {
         HealthText.Text = text;
         RestartButton.IsVisible = restart;
+        InstallRuntimeButton.IsVisible = false;
+        DownloadPageButton.IsVisible = false;
         HealthBanner.IsVisible = true;
+    }
+
+    // ── WebView2 runtime (Windows) ────────────────────────────────────────────
+
+    private static WebView2RuntimeStatus? _runtimeStatus;
+    private static Task<WebView2RuntimeStatus>? _install;
+
+    /// <summary>
+    /// Probed once per process (and logged): every tab asks, and the answer cannot change
+    /// under a running WebView anyway — a runtime installed now is used after a restart.
+    /// </summary>
+    private static WebView2RuntimeStatus RuntimeStatus
+    {
+        get
+        {
+            if (_runtimeStatus is null)
+            {
+                _runtimeStatus = WebView2Runtime.Probe();
+                AppLogger.Log($"[Xterm] renderer runtime | {_runtimeStatus}");
+            }
+            return _runtimeStatus;
+        }
+    }
+
+    private void ShowRuntimeMissing(string? detail = null)
+    {
+        HealthText.Text = detail ??
+            "Terminals need the Microsoft Edge WebView2 runtime, which is not installed on this PC " +
+            "(older Windows 10, LTSC/Server or managed images). Install it, then restart AgentZero.";
+        RestartButton.IsVisible = false;
+        InstallRuntimeButton.IsVisible = _install is null;
+        DownloadPageButton.IsVisible = true;
+        HealthBanner.IsVisible = true;
+    }
+
+    /// <summary>
+    /// One install per process however many tabs show the button; each tab follows the same
+    /// task and its own banner.
+    /// </summary>
+    private async Task InstallRuntimeAsync()
+    {
+        InstallRuntimeButton.IsVisible = false;
+        _install ??= WebView2Runtime.InstallAsync(line =>
+        {
+            AppLogger.Log($"[Xterm] webview2 install | {line}");
+            Dispatcher.UIThread.Post(() => HealthText.Text = line);
+        });
+        HealthText.Text = "Installing the WebView2 runtime…";
+        try
+        {
+            var after = await _install;
+            ShowRuntimeMissing(after.Installed
+                ? $"WebView2 runtime {after.Version} is installed. Restart AgentZero to open terminals."
+                : "The installer finished but no runtime is registered. Use the download page, then restart AgentZero.");
+            InstallRuntimeButton.IsVisible = false;
+            DownloadPageButton.IsVisible = !after.Installed;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Log($"[Xterm] webview2 install failed: {ex.GetType().Name}: {ex.Message}");
+            _install = null;   // let the next click try again
+            ShowRuntimeMissing($"Install failed: {ex.Message} — try again or use the download page.");
+        }
     }
 
     private void HideBanner() => HealthBanner.IsVisible = false;
@@ -466,6 +553,14 @@ public partial class XtermWebViewTerminalControl : UserControl
             if (_webReady) Post(new { type = "focus" });
         }
         catch { }
+    }
+
+    /// <summary>Open the find bar over the scrollback (it lives in the page, above the terminal).</summary>
+    public void OpenFind()
+    {
+        if (!_webReady) return;
+        WebViewKeyboardFocus.Focus(Web);   // Web.Focus() alone leaves WebView2's window without the keyboard
+        Post(new { type = "find" });
     }
 
     /// <summary>Clear the renderer's viewport.</summary>

@@ -100,6 +100,9 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>Move focus to the pane in a direction — needs the view's rectangles.</summary>
     public event Action<FocusDirection>? FocusPaneRequested;
 
+    /// <summary>Open the find bar in the active terminal (Ctrl+Shift+F from outside it, or the palette).</summary>
+    public event Action<TerminalTabViewModel>? FindRequested;
+
     /// <summary>Relaunch one tab's process (context menu / CLI).</summary>
     public event Action<WorkspaceViewModel, TerminalTabViewModel>? RestartRequested;
 
@@ -706,6 +709,9 @@ public partial class MainWindowViewModel : ObservableObject
             case HotkeyTable.BotEmbedToggle: ToggleBotEmbedded(); break;
             case HotkeyTable.CodeToggle: ToggleCode(); break;
             case HotkeyTable.PaletteOpen: OpenPalette(); break;
+            case HotkeyTable.TerminalFind:
+                if (ActiveWorkspace?.ActiveTab is { } findIn) FindRequested?.Invoke(findIn);
+                break;
             case HotkeyTable.NextTab: CycleTab(+1); break;
             case HotkeyTable.PrevTab: CycleTab(-1); break;
             case HotkeyTable.MoveTabNextPane: MoveActiveTabToNextPane(); break;

@@ -50,9 +50,73 @@ Name: "{autodesktop}\AgentZero Lite"; Filename: "{app}\AgentZeroLite.exe"; Tasks
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
 
 [Run]
+; Terminals render in WebView2. Older Windows 10, LTSC/Server and managed images may lack the
+; runtime; when it is missing, the wizard downloads Microsoft's Evergreen bootstrapper (see
+; NextButtonClick) and it runs here, before the app can be launched. Without elevation it
+; installs per-user. A silent install skips the wizard pages, so the app's own banner
+; (Install WebView2 runtime) remains the fallback.
+Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing the Microsoft Edge WebView2 runtime..."; Check: NeedWebView2Install; Flags: waituntilterminated
 Filename: "{app}\AgentZeroLite.exe"; Description: "Launch AgentZero Lite"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// ── WebView2 runtime ─────────────────────────────────────────────────────────
+// Same rule as ZeroCommon's WebView2Runtime.Probe: the Evergreen client's "pv" in HKLM
+// (WOW6432Node on 64-bit) or HKCU; missing, empty or 0.0.0.0 means not installed.
+const
+  WebView2Client = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  WebView2Bootstrapper = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
+
+var
+  DownloadPage: TDownloadWizardPage;
+
+function WebView2VersionUsable(Root: Integer; Key: String): Boolean;
+var
+  Pv: String;
+begin
+  Result := RegQueryStringValue(Root, Key, 'pv', Pv) and (Pv <> '') and (Pv <> '0.0.0.0');
+end;
+
+function WebView2Installed(): Boolean;
+begin
+  Result :=
+    WebView2VersionUsable(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\' + WebView2Client) or
+    WebView2VersionUsable(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\' + WebView2Client) or
+    WebView2VersionUsable(HKCU, 'Software\Microsoft\EdgeUpdate\Clients\' + WebView2Client);
+end;
+
+function NeedWebView2Install(): Boolean;
+begin
+  Result := FileExists(ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe')) and not WebView2Installed();
+end;
+
+procedure InitializeWizard();
+begin
+  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpReady) and not WebView2Installed() then
+  begin
+    DownloadPage.Clear;
+    DownloadPage.Add(WebView2Bootstrapper, 'MicrosoftEdgeWebview2Setup.exe', '');
+    DownloadPage.Show;
+    try
+      try
+        DownloadPage.Download;
+      except
+        // Not fatal: the app shows "Install WebView2 runtime" on its terminal tabs.
+        SuppressibleMsgBox('The Microsoft Edge WebView2 runtime could not be downloaded (' + GetExceptionMessage + ').' + #13#10 +
+          'AgentZero Lite will offer to install it when it starts.', mbInformation, MB_OK, IDOK);
+      end;
+    finally
+      DownloadPage.Hide;
+    end;
+  end;
+end;
+
+// ── previous install ─────────────────────────────────────────────────────────
 // Remove the previous install's files before copying the new ones. An upgrade from the
 // WPF build would otherwise leave the WPF host's assemblies beside the Avalonia ones
 // (harmless to .NET, which loads what deps.json names, but hundreds of MB of dead files).

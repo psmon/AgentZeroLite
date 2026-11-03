@@ -297,6 +297,8 @@
                         <StackPanel Spacing="4" Margin="22,0,0,0" IsEnabled="{Binding Enabled}">
                             <CheckBox Content="when an agent is blocked (input or approval)" IsChecked="{Binding OnBlocked}" />
                             <CheckBox Content="when an agent finished and I have not looked" IsChecked="{Binding OnDone}" />
+                            <CheckBox Content="when a program in a terminal sends a notification (OSC 9 / 777 / 99 — Gemini CLI, OpenCode, scripts)"
+                                      IsChecked="{Binding OnNotify}" />
                             <CheckBox Content="only while AgentZero is not the active window" IsChecked="{Binding OnlyWhenInactive}" />
                             <TextBlock Classes="h2" Text="HOW" />
                             <CheckBox Content="{Binding FlashLabel}" IsChecked="{Binding FlashWindow}" />

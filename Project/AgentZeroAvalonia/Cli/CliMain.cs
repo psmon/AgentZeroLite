@@ -80,11 +80,39 @@ internal static class CliMain
             "agent-state" => AgentState(client),
             "attention" => Attention(client, rest),
             "cost" => Cost(rest),
+            "webview2" => WebView2(rest),
             _ => Unknown(command),
         };
     }
 
     // ── verbs ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>webview2 status|install</c> — runs here, not in the GUI: the case it exists for is a
+    /// machine where the GUI's terminals cannot render. JSON on stdout, exit 0 when installed.
+    /// </summary>
+    private static int WebView2(string[] args)
+    {
+        var verb = args.Length > 0 ? args[0].ToLowerInvariant() : "status";
+        if (verb is not ("status" or "install"))
+        {
+            Console.Error.WriteLine("Usage: webview2 status | install");
+            return 2;
+        }
+        var status = Agent.Common.Platform.WebView2Runtime.Probe();
+        if (verb == "install" && !status.Installed && OperatingSystem.IsWindows())
+            status = Agent.Common.Platform.WebView2Runtime.InstallAsync(line => Console.Error.WriteLine(line))
+                .GetAwaiter().GetResult();
+        Console.WriteLine(new System.Text.Json.Nodes.JsonObject
+        {
+            ["ok"] = true,
+            ["installed"] = status.Installed,
+            ["version"] = status.Version,
+            ["scope"] = status.Scope,
+            ["packaged"] = OperatingSystem.IsWindows() && Agent.Common.Services.DesktopAppBreakaway.IsPackagedProcess(),
+        }.ToJsonString());
+        return status.Installed ? 0 : 1;
+    }
 
     private static int Status(CliClient client)
     {
@@ -342,6 +370,7 @@ internal static class CliMain
         Console.WriteLine("  agent-state                          Detected agent state per terminal + attention rollup");
         Console.WriteLine("  attention status | test              \"An agent needs you\" notifications (popup + taskbar / Dock)");
         Console.WriteLine("  cost [--all] [--json]                Agent spend this month by model / project vs the cap (no GUI needed)");
+        Console.WriteLine("  webview2 status | install            The WebView2 runtime terminals need on Windows (no GUI needed)");
         Console.WriteLine("  code open [path] | close | status    The code view (bottom panel): the active workspace's files");
         Console.WriteLine("  worktree list | open | close <path|branch>   Git worktrees detected under each workspace (sidebar nesting)");
         Console.WriteLine("  layout [status|split-right|split-down|close-tab|close-pane|add|next-tab|prev-tab|move-tab|focus-<dir>]");

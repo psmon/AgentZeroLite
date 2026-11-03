@@ -394,6 +394,14 @@ Project/AgentZeroAvalonia/bin/Debug/net10.0/AgentZeroLite.exe -cli selftest all 
 What differs from the WPF host, and why:
 
 - **Terminal**: xterm.js inside `NativeWebView`, served by `LocalAssetServer` (loopback, token path) because the Avalonia WebView cannot map a folder; the PTY is `ConPtyHost` (a copy of `ManagedConPtyHost`) on Windows and `PortaPtyHost` (Porta.Pty) on macOS behind ZeroCommon's `IPtyHost`/`XtermTerminalSession`. Two ConPTY facts the WPF copy never hit: a parent whose stdio is a pipe hands its std handles to the child (blanked around `CreateProcess`), and pipe EOF is not the exit signal (a process-handle watcher is).
+- **WebView2 is not guaranteed on Windows** (older Windows 10, LTSC/Server, managed images) and an MSIX cannot
+  depend on it: `ZeroCommon/Platform/WebView2Runtime` probes `pv` and installs Microsoft's signature-checked
+  bootstrapper (breakaway inside a package); the terminal banner and `-cli webview2 status|install` use it,
+  `AGENTZERO_FAKE_NO_WEBVIEW2=1` fakes a missing runtime. Two renderer facts from the same wave: **`Control.Focus()`
+  on a `NativeWebView` does not give WebView2's window the keyboard** — `Terminal/WebViewKeyboardFocus` calls
+  `ICoreWebView2Controller::MoveFocus` (vtable slot 12); and the inbox ConPTY **passes OSC 9 / 777 through**, so
+  `term.js` hands them to `TerminalNotificationParser` → `AttentionNotifier.ObserveNotification` (find bar:
+  `terminal.find`, Ctrl+Shift+F, `@xterm/addon-search` 0.15.0 in `Wasm/xterm/addons/`).
 - **Split panes**: `WorkspaceLayout<T>` + one Canvas that positions every renderer over its pane slot — no native re-parenting. The stored `CliGroup.LayoutJson` is byte-identical to what WPF writes.
 - **CLI**: same request/response JSON as WPF over the pipe `AgentZeroLite.cli` (not WM_COPYDATA), so `-cli help agentzero` applies; extra verbs `bot-ask`, `layout`, `mcp`, `plugin`, `worktree` (the sidebar's git worktrees: `list|open|close`) and `code` (the code view — the bottom panel is tabbed,
   🤖 BOT | 📄 CODE, sharing one dock; file rules in ZeroCommon `Workspace/WorkspaceFiles`).

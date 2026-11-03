@@ -15,11 +15,19 @@ public sealed class AttentionPopupItem
     {
         Alert = alert;
         Headline = string.IsNullOrEmpty(workspace) ? alert.Title : $"{workspace} / {alert.Title}";
-        Detail = alert.Kind == AttentionKind.Blocked
-            ? "blocked — waiting for input or approval"
-            : "done — finished, not looked at yet";
-        // The sidebar's dot colours (ActiveSessionItem.Visual).
-        Brush = new SolidColorBrush(Color.FromUInt32(alert.Kind == AttentionKind.Blocked ? 0xFFE06C75 : 0xFF61AFEF));
+        Detail = alert.Kind switch
+        {
+            AttentionKind.Blocked => "blocked — waiting for input or approval",
+            AttentionKind.Notify => alert.Message ?? "sent a notification",
+            _ => "done — finished, not looked at yet",
+        };
+        // The sidebar's dot colours (ActiveSessionItem.Visual); a program's own notification is yellow.
+        Brush = new SolidColorBrush(Color.FromUInt32(alert.Kind switch
+        {
+            AttentionKind.Blocked => 0xFFE06C75,
+            AttentionKind.Notify => 0xFFE5C07B,
+            _ => 0xFF61AFEF,
+        }));
     }
 
     public AttentionAlert Alert { get; }

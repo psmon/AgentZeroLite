@@ -189,6 +189,14 @@ the assertion message snippet.}
 expected slowdown for LLM smoke, missing testhost cleanup, etc.}
 ```
 
+## GUI e2e placement
+
+When a check needs the Debug GUI on screen, launch it with `-PassThru` and run
+`Docs/scripts/place-on-secondary-monitor.ps1 -ProcessId <pid>` right away: it is
+maximized on the secondary monitor, away from the operator's working screen
+(single monitor → left in place). Rules and the measured DPI pitfalls:
+`harness/knowledge/test-runner/gui-e2e-display.md`.
+
 ## What the Runner does NOT do
 
 - Does **not** run after `git commit`, `git push`, code refactors of

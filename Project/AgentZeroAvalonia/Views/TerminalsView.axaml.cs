@@ -60,6 +60,7 @@ public partial class TerminalsView : UserControl
             _vm.TabClosed -= OnTabClosed;
             _vm.WorkspaceRemoved -= OnWorkspaceRemoved;
             _vm.FocusPaneRequested -= OnFocusPane;
+            _vm.FindRequested -= OnFindRequested;
             _vm.RestartRequested -= Restart;
             _vm.TerminalAppearanceChanged -= OnAppearanceChanged;
             _vm.HotkeysChanged -= OnHotkeysChanged;
@@ -72,12 +73,19 @@ public partial class TerminalsView : UserControl
         _vm.TabClosed += OnTabClosed;
         _vm.WorkspaceRemoved += OnWorkspaceRemoved;
         _vm.FocusPaneRequested += OnFocusPane;
+        _vm.FindRequested += OnFindRequested;
         _vm.RestartRequested += Restart;
         _vm.TerminalAppearanceChanged += OnAppearanceChanged;
         _vm.HotkeysChanged += OnHotkeysChanged;
         _vm.CliDefinitions.CollectionChanged += (_, _) => NewTerminalMenuButton.Flyout = BuildDefinitionsFlyout(null);
         NewTerminalMenuButton.Flyout = BuildDefinitionsFlyout(null);
         OnActiveTerminalChanged();
+    }
+
+    /// <summary>The find chord or the palette: open the find bar in that tab's renderer.</summary>
+    private void OnFindRequested(TerminalTabViewModel tab)
+    {
+        if (_controls.TryGetValue(tab, out var control)) control.OpenFind();
     }
 
     /// <summary>Settings saved a new appearance: every open renderer gets the config message (live, no restart).</summary>
@@ -489,6 +497,7 @@ public partial class TerminalsView : UserControl
         control.TerminalClicked += (_, _) => _vm?.SelectTab(tab);
         control.HotkeyRequested += (_, name) => _vm?.HandleHotkey(name);
         control.RestartRequested += (_, _) => Restart(ws, tab);
+        control.NotificationReceived += (_, note) => _vm?.OnTerminalNotification(tab, note);
         control.IsVisible = false;
         _controls[tab] = control;
         SurfaceHost.Children.Add(control);

@@ -185,6 +185,25 @@ public partial class MainWindowViewModel
 
     public void ReloadAttentionSettings() => AttentionSettings = AttentionSettingsStore.Load();
 
+    /// <summary>
+    /// A program in <paramref name="tab"/> sent a notification (OSC 9 / 777 / 99). Unlike the
+    /// detected states it is an event, so it is announced now, through the same popup and flash
+    /// and under the same settings; <see cref="AttentionNotifier.ObserveNotification"/> holds the rules.
+    /// </summary>
+    public void OnTerminalNotification(TerminalTabViewModel tab, TerminalNotification note)
+    {
+        for (int g = 0; g < Workspaces.Count; g++)
+        {
+            var t = Workspaces[g].Tabs.IndexOf(tab);
+            if (t < 0) continue;
+            var alert = _attention.ObserveNotification(g, t, tab.Title, note, AttentionSettings, IsAppActive(), DateTime.UtcNow);
+            if (alert is null) return;
+            AppLogger.Log($"[Attention] {Workspaces[g].DisplayName}/{tab.Title}=Notify | {note.Text}");
+            AttentionRaised?.Invoke([(alert, Workspaces[g].DisplayName)]);
+            return;
+        }
+    }
+
     private void RaiseAttention()
     {
         var alerts = _attention.Observe(_agentTracker.Snapshot(), AttentionSettings, IsAppActive(), DateTime.UtcNow);
@@ -212,7 +231,7 @@ public partial class MainWindowViewModel
         var s = AttentionSettings;
         var settings = new System.Text.Json.Nodes.JsonObject
         {
-            ["enabled"] = s.Enabled, ["onBlocked"] = s.OnBlocked, ["onDone"] = s.OnDone,
+            ["enabled"] = s.Enabled, ["onBlocked"] = s.OnBlocked, ["onDone"] = s.OnDone, ["onNotify"] = s.OnNotify,
             ["onlyWhenInactive"] = s.OnlyWhenInactive, ["flashWindow"] = s.FlashWindow,
             ["popup"] = s.Popup, ["popupSeconds"] = s.ResolvePopupSeconds(),
         };
