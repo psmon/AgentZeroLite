@@ -154,7 +154,7 @@ Microsoft Store(Windows): `Project/AgentZeroAvalonia/msix/build-msix.ps1` 가 MS
 | 사이드바: 활성 워크스페이스 행(그리고 활성 워크트리의 하위 행)을 **틸**로 표시 — 강조선·옅은 배경·이름 — 포커스된 터미널의 파랑과 구분; 중첩 워크트리가 활성인 상위 행은 옅은 틸 강조선; `SESSIONS · <워크스페이스>` 헤더 | ✅ Avalonia 전용 | `WorkspaceViewModel.HoldsActiveWorktree`, 전환 시와 워크트리 재검색 후 갱신 |
 | 플러그인 브리지 **`sessions.list` / `sessions.focus`** + 공식 플러그인 **Agent Stage**(`Project/Plugins/agent-stage`): 워크스페이스는 존, 터미널은 움직이는 에이전트 아바타(일하는 중 / 확인 필요 / 완료), Claude 탭의 서브에이전트는 아바타를 둘러싼 크루로 표시, 클릭하면 그 터미널로 이동 | ✅ Avalonia 먼저 · ⏳ WPF | `ZeroCommon/Agents/WorkspaceSessionsFeed`: 호스트가 ACTIVE SESSIONS 갱신마다 그 상태를 게시하고 "터미널로 이동"을 등록; 연산은 하나뿐인 디스패처에 있으므로 WPF는 SESSIONS 모니터가 게시하기 전까지 `supported: false`로 답한다(`AgentStateMonitor` → `WorkspaceSessionsFeed.Publish`). 서브에이전트: `ClaudeSubagentReader`가 Claude 세션의 `subagents/agent-*.jsonl`을 이어 읽기로 접어 읽고, 세션은 상태 파일(`AgentLiveStatus.Session`)에서 온다 |
 | CLI: `plugin list` / `open` / `call` / `capture` | ✅ Avalonia 전용 | `call`은 `window.zero.invoke`를 페이지 **안에서** 실행하므로, 응답이 페이지 → shim → 브리지 → 디스패처를 거쳐 돌아온다 — 셸에서 하는 플러그인 종단 테스트 |
-| Browser 페이지(탭 웹뷰), OS 제어, Vision, Music, Remote, 노트/문서 뷰어, Scrap | ⏳ 미착수 | 2차; 그때까지 웹 도구는 headless |
+| Browser 페이지(탭 웹뷰), OS 제어, Vision, Music, Remote, 노트/문서 뷰어, Scrap | ⏳ 미착수 | 2차; 그때까지 웹 도구는 headless. Remote는 macOS 번들에 아예 빌드하지 않는다(`osx-*` RID면 ZeroCommon `IncludeRemote=false`). Windows 다운로드판은 출시 때 포함 |
 | macOS 로컬 LLM(Metal) | ⏳ 조사 | 당분간 External 공급자만 |
 | 설치기, Developer ID 서명/공증 | ⏳ | 절차는 `harness/knowledge/_shared/code-signing.md` |
 

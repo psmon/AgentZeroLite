@@ -14,7 +14,9 @@
 using Akka.Actor;
 using Akka.Event;
 using Agent.Common;
+#if !NO_REMOTE
 using Agent.Common.Remote;
+#endif
 using Agent.Common.Voice.Streams;
 
 namespace Agent.Common.Actors;
@@ -26,7 +28,9 @@ public sealed class StageActor : ReceiveActor
     private readonly Dictionary<string, IActorRef> _workspaces = new();
     private IActorRef? _botActor;
     private IActorRef? _voiceActor;
+#if !NO_REMOTE
     private IActorRef? _remoteActor;
+#endif
 
     private string? _activeWorkspace;
     private string? _activeTerminalId;
@@ -126,6 +130,8 @@ public sealed class StageActor : ReceiveActor
             _log.Info("Voice stream actor created: {0}", _voiceActor.Path);
         });
 
+#if !NO_REMOTE
+        // Remote access is not built into the macOS bundles (ZeroCommon.csproj, NO_REMOTE).
         Receive<CreateRemoteHub>(msg =>
         {
             if (_remoteActor is not null)
@@ -139,6 +145,7 @@ public sealed class StageActor : ReceiveActor
             Sender.Tell(new RemoteHubCreated(_remoteActor));
             _log.Info("Remote hub actor created: {0}", _remoteActor.Path);
         });
+#endif
 
         Receive<TerminalRegistered>(msg =>
             _log.Info("Terminal registered: {0}/{1}", msg.WorkspaceName, msg.TerminalId));

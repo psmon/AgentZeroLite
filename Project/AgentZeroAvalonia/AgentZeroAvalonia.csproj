@@ -54,8 +54,11 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
 
+  <!-- A macOS build leaves ZeroCommon's Remote access out (IncludeRemote, see ZeroCommon.csproj).
+       Passed down explicitly: a library reference is built without the app's RuntimeIdentifier. -->
   <ItemGroup>
-    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
+    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" Condition="!$(RuntimeIdentifier.StartsWith('osx'))" />
+    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" Condition="$(RuntimeIdentifier.StartsWith('osx'))" AdditionalProperties="IncludeRemote=false" />
   </ItemGroup>
 
   <!-- The wearable host (Wearable page), the same arrangement as the WPF csproj: a
