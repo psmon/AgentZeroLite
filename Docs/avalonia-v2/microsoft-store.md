@@ -427,6 +427,19 @@ KittenTTS 2 테스트 하나로 실패 → 테스트가 Windows 문구만 기대
 첫 Submit 클릭에 In certification. 로그인은 이번에도 풀려 있어 운영자가 다시 로그인했다(Edge `pw-edge-partner`, 9333 —
 `msedge --remote-debugging-port=9333 --user-data-dir=%LOCALAPPDATA%\pw-edge-partner`로 띄운다).
 
+### 18차 제출 (1.26.8.0, 2026-11-03)
+
+내용: WebView2 런타임이 없는 PC에서 터미널이 빈 화면 대신 이유와 **Install WebView2 runtime** 버튼을 보여 준다(§5),
+터미널 내 검색(Ctrl+Shift+F), 터미널 프로그램의 알림(OSC 9 / 777 / 99)을 같은 팝업으로. Partner Center는 Submission 15.
+개인정보 처리방침에 WebView2 설치(go.microsoft.com) 행을 먼저 추가했다(`doc-v1.55.0`, Pages 게시 확인). GitHub 릴리스
+`v0.26.8`이 선행됐다(5개 job 모두 성공, Setup.exe의 WebView2 설치 단계가 CI에서 처음 컴파일됨). 패키지 151.6 MB를
+CDP `DOM.setFileInputFiles`로 넣었고 업로드+분석에 약 45초가 걸렸다. Save 뒤에는 1.26.8.0만 Validated(1.26.7.0은 "higher-versioned
+package" 안내와 함께 자동 제거)였다. What's new와 기능 15줄은 `listing.md`에서 채웠는데, 칸이 14개라 "Add more"로 하나를 늘렸다.
+다시 열어 읽어 보니 둘 다 일치했고, 첫 Submit 클릭에 In certification이 됐다. 로그인은 이번에도 풀려 있어서 운영자가 다시
+로그인했다. 이번 제출의 자동화는 같은 9333 세션 위의 작은 스크립트 네 개로 했다: 개요/링크 읽기, 버튼 클릭, CDP 업로드,
+`listing.md` → 목록 채우기와 대조. 목록 페이지의 입력칸은 `#releaseNotes`와 `#feature-N`이고, 페이지가 열린 뒤
+몇 초가 지나야 나타난다.
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>
