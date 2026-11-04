@@ -304,6 +304,47 @@ public class FileDeliverableTests : IDisposable
     }
 
     [Fact]
+    public async Task AFileWrittenInASubfolderIsNotMissingWhenNamedByItsBasename()
+    {
+        // Measured (2026-11-04, zero-test): the turn wrote the report to
+        // security-assessment/report/endpoint_enumeration_report.html and the
+        // final answer referred to it by basename. An exact-string check had
+        // wrote = {the subpath} and the answer naming {the basename}, so the
+        // real, finished file was declared "not on disk" — which triggered an
+        // apology, a wasted escalation, and a discarded result. A file written
+        // this turn is forgiven however the answer qualifies its path.
+        var provider = new ScriptedChatProvider(
+            Write("security-assessment/report/endpoint_enumeration_report.html", "<h1>report</h1>"),
+            Answer("endpoint_enumeration_report.html 파일에 보고서를 작성 완료했습니다."));
+
+        var run = await Loop(provider).RunAsync("리포트 작성해줘", CancellationToken.None);
+
+        Assert.True(run.Succeeded);
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "unwritten");
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "missing");
+        Assert.DoesNotContain("⚠", run.Text);
+        Assert.True(File.Exists(Path.Combine(_root, "security-assessment", "report", "endpoint_enumeration_report.html")));
+    }
+
+    [Fact]
+    public async Task ANamedFileThatWasNeverWrittenIsStillCaughtAcrossSubfolders()
+    {
+        // The suffix tolerance must not forgive a genuinely absent file: writing
+        // one basename does not excuse a different file the answer also claims.
+        var provider = new ScriptedChatProvider(
+            Write("out/done.html", "<h1>ok</h1>"),
+            Answer("done.html 과 missing.html 을 모두 작성했습니다."),
+            Answer("done.html 만 작성했고 missing.html 은 쓰지 않았습니다."));
+
+        var run = await Loop(provider).RunAsync("두 파일 만들어줘", CancellationToken.None);
+
+        Assert.True(run.Succeeded);
+        var caught = run.Steps.Single(s => s.Tool == "unwritten");
+        Assert.Contains("missing.html", caught.Detail);
+        Assert.DoesNotContain("done.html", caught.Detail);     // that basename really was written
+    }
+
+    [Fact]
     public async Task AFinalFamilySetIsARuleTheModelCannotTalkItsWayOutOf()
     {
         // The wrap-up and the post-escalation pass are deliberate no-tool

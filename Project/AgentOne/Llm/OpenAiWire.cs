@@ -20,6 +20,14 @@ public sealed class ChatCompletionRequest
     [JsonPropertyName("temperature")]
     public double? Temperature { get; set; } = 0.2;
 
+    // Max output tokens for this call. Null leaves the field out, letting the server decide —
+    // which on a local server (LM Studio, llama.cpp) is often a small default that truncates a
+    // long answer or cuts a tool-call JSON mid-string (a multibyte byte at the cut then reads as
+    // malformed JSON). OpenAI reasoning models reject max_tokens (they use max_completion_tokens),
+    // so the provider leaves it null for them, like temperature.
+    [JsonPropertyName("max_tokens")]
+    public int? MaxTokens { get; set; }
+
     [JsonPropertyName("stream")]
     public bool Stream { get; set; }
 }

@@ -189,8 +189,11 @@ public sealed partial class ChatSession : IAgentSession
     {
         _config = config;
         _root = Path.GetFullPath(root);
-        _provider = provider;
-        _reasoning = reasoning;
+        // A hard per-call ceiling (config.maxCallSeconds > 0) so no single model
+        // call can hang the loop: past it the call ends as a stall the loop below
+        // already recovers from. 0 leaves the provider untouched.
+        _provider = WatchdogChatProvider.Wrap(provider, config.MaxCallSeconds)!;
+        _reasoning = WatchdogChatProvider.Wrap(reasoning, config.MaxCallSeconds);
         _smartAvailable = smartAvailable;
         _logKind = logKind;
 
@@ -1183,8 +1186,24 @@ public sealed partial class ChatSession : IAgentSession
         LogText(ReasoningSubtask.Tag, reasoning);
 
         // Back to the everyday model, with no tools: it has everything it needs.
-        return await _loop.RunAsync(ReasoningSubtask.FeedBack(strong, reasoning), ct,
+        var finalRun = await _loop.RunAsync(ReasoningSubtask.FeedBack(strong, reasoning), ct,
             SmartRouter.FamiliesFor(Route.Answer), familiesAreFinal: true);
+
+        // The final write-up is the last upgrade step, not a dependency either.
+        // If it could not complete — a stall the loop's recovery retried past and
+        // then gave up on, or a provider error — the draft still stands, now
+        // informed by the reasoning that was logged above. The turn ends with an
+        // answer instead of an error, and never hangs on this last call.
+        if (!finalRun.Succeeded && draft.Succeeded)
+        {
+            var kept = new AgentStep(0, ReasoningSubtask.Tag,
+                $"final write-up did not complete ({finalRun.Reason}) — keeping the reasoned draft", false, clock.ElapsedMilliseconds);
+            _log?.Step(kept);
+            StepCompleted?.Invoke(kept);
+            return draft;
+        }
+
+        return finalRun;
     }
 
     /// <summary>

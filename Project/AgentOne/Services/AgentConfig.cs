@@ -38,9 +38,41 @@ public sealed class AgentConfig
     [JsonPropertyName("temperature")]
     public double Temperature { get; set; } = 0.2;
 
+    /// <summary>
+    /// Max output tokens the everyday model may generate per call. 0 leaves it to the server
+    /// default — on a local server often small enough to truncate a long answer or cut a tool-call
+    /// JSON mid-string (a multibyte byte at the cut then reads as malformed JSON). Set it generously
+    /// for a local model with headroom; it is clamped to the model's context window anyway. Left out
+    /// of the request for OpenAI reasoning models, which reject max_tokens.
+    /// </summary>
+    [JsonPropertyName("maxTokens")]
+    public int MaxTokens { get; set; }
+
+    /// <summary>
+    /// Max output tokens for the reasoning model. <see cref="ForReasoning"/> moves it into
+    /// <see cref="MaxTokens"/> so the same provider code applies it. 0 = server default.
+    /// </summary>
+    [JsonPropertyName("reasoningMaxTokens")]
+    public int ReasoningMaxTokens { get; set; }
+
     /// <summary>Seconds to wait on one provider request.</summary>
     [JsonPropertyName("timeoutSeconds")]
     public int TimeoutSeconds { get; set; } = 120;
+
+    /// <summary>
+    /// Hard wall-clock ceiling on a single model call, across both the everyday and
+    /// reasoning models. 0 disables it (the default, so nothing changes for anyone who
+    /// does not set it). The stream's idle clock (<see cref="TimeoutSeconds"/>) only
+    /// fires on silence, and a server that keeps the socket warm with keep-alive frames
+    /// while the model produces nothing — or a call that streams one token under the
+    /// idle limit forever — can still outlast any patience. Past this ceiling the call
+    /// is cancelled and reported as a stall, which the loop's stall recovery retries or
+    /// ends: so no one call can hang the loop forever. Set it above the longest answer
+    /// the slowest model is expected to finish (a large <see cref="MaxTokens"/> on slow
+    /// on-device hardware is minutes, not seconds).
+    /// </summary>
+    [JsonPropertyName("maxCallSeconds")]
+    public int MaxCallSeconds { get; set; }
 
     /// <summary>
     /// Seconds to wait on one web page. Its own number because a page is not a
@@ -116,6 +148,7 @@ public sealed class AgentConfig
         var derived = (AgentConfig)MemberwiseClone();
         derived.KeySlot = CredentialStore.Slot.Reasoning;
         derived.Model = ReasoningModel;
+        derived.MaxTokens = ReasoningMaxTokens;
         if (ReasoningBaseUrl.Length > 0) derived.BaseUrl = ReasoningBaseUrl;
         return derived;
     }

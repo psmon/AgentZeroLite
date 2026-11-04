@@ -18,6 +18,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
     private readonly HttpClient _http;
     private readonly string _model;
     private readonly double? _temperature;
+    private readonly int? _maxTokens;
     private readonly string _keySource;
     private readonly string _keyAdvice;
     private readonly bool _hasKey;
@@ -34,6 +35,9 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         // ("unsupported_value", only the default 1), gpt-4o-mini took it. The model name
         // decides, not the base URL, so OpenRouter's "openai/gpt-5" is covered too.
         _temperature = IsReasoningModel(config.Model) ? null : config.Temperature;
+        // Same rule as temperature: OpenAI reasoning models reject max_tokens (they use
+        // max_completion_tokens), so leave it out for them. 0 means "server default".
+        _maxTokens = IsReasoningModel(config.Model) || config.MaxTokens <= 0 ? null : config.MaxTokens;
 
         _http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: true);
         _http.BaseAddress = new Uri(config.BaseUrl.TrimEnd('/') + "/");
@@ -82,6 +86,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             Model = _model,
             Messages = [.. messages],
             Temperature = _temperature,
+            MaxTokens = _maxTokens,
             Stream = false
         };
 
@@ -138,6 +143,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             Model = _model,
             Messages = [.. messages],
             Temperature = _temperature,
+            MaxTokens = _maxTokens,
             Stream = true
         };
 
@@ -187,9 +193,15 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
 
                 while (await reader.ReadLineAsync(idle.Token) is { } line)
                 {
-                    idle.CancelAfter(idleLimit);
-
+                    // Reset the idle clock only on a real SSE data frame. A server that
+                    // keeps the socket warm with comment lines (": ping") or blank
+                    // separators while the model produces no token would otherwise reset
+                    // the clock on every keep-alive and never time out — the call then
+                    // hangs forever on a stream that is technically "not silent" but is
+                    // sending nothing. Only forward progress (a data frame) earns more time.
                     if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+
+                    idle.CancelAfter(idleLimit);
 
                     var payload = line[5..].Trim();
                     if (payload.Length == 0 || payload == "[DONE]") continue;

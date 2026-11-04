@@ -478,12 +478,33 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
         var missing = new List<string>();
         foreach (var path in FilePathsIn(answer))
         {
-            if (wrote.Contains(path)) continue;
+            if (WasWrittenThisTurn(path, wrote)) continue;
             if (Root is { Length: > 0 } root && File.Exists(Path.Combine(root, path))) continue;
             if (Root is null) continue;   // no root, no way to tell an old file from a fictional one
             if (!missing.Contains(path)) missing.Add(path);
         }
         return missing;
+    }
+
+    /// <summary>
+    /// Whether a path the answer names was written this turn. Matched by
+    /// path-suffix, not exact string: the model routinely reports a file it
+    /// wrote at <c>a/b/report.html</c> by its basename <c>report.html</c> (or a
+    /// shorter trailing segment), and an exact compare called that real, on-disk
+    /// file "missing". Measured (2026-11-04, zero-test): a finished HTML report
+    /// written to <c>security-assessment/report/endpoint_enumeration_report.html</c>
+    /// was named by its basename in the answer and flagged as not on disk —
+    /// which drove an apology, a wasted escalation to the strong model whose own
+    /// result was then discarded, and a final answer that denied its own work.
+    /// A written path forgives any trailing path segment of it (basename or more).
+    /// </summary>
+    private static bool WasWrittenThisTurn(string named, IReadOnlyCollection<string> wrote)
+    {
+        foreach (var w in wrote)
+            if (string.Equals(w, named, StringComparison.OrdinalIgnoreCase)
+                || w.EndsWith("/" + named, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
     }
 
     /// <summary>Workspace-relative file paths mentioned in text: a name with a known source or asset extension.</summary>
