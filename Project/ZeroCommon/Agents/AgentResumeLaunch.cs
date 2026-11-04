@@ -22,9 +22,12 @@ public static class AgentResumeLaunch
     /// null when the id is unsafe, the tool has no resume form, or the definition does not
     /// name the tool where a resume could be put.
     /// </summary>
-    public static CliDefinition? WithResume(CliDefinition definition, AgentCliTool tool, string sessionId)
+    /// <param name="command">The word the resume words follow, when the definition runs the tool
+    /// through a wrapper (<c>claude-sam</c>); the tool's own command otherwise. The wrapper must
+    /// pass its arguments on (<c>&amp; claude @args</c>).</param>
+    public static CliDefinition? WithResume(CliDefinition definition, AgentCliTool tool, string sessionId, string? command = null)
     {
-        var arguments = InsertResume(definition.ExePath, definition.Arguments, tool, sessionId);
+        var arguments = InsertResume(definition.ExePath, definition.Arguments, tool, sessionId, command);
         if (arguments is null) return null;
         return new CliDefinition
         {
@@ -45,18 +48,20 @@ public static class AgentResumeLaunch
     }
 
     /// <summary>The definition's argument string with the resume words added, or null (see <see cref="WithResume"/>).</summary>
-    public static string? InsertResume(string? exePath, string? arguments, AgentCliTool tool, string sessionId)
+    public static string? InsertResume(string? exePath, string? arguments, AgentCliTool tool, string sessionId,
+        string? command = null)
     {
         if (!AgentResumeCatalog.IsSafeId(sessionId)) return null;
         var spec = AgentResumeCatalog.Lookup(tool.Command);
         if (spec is null) return null;
         var words = spec.ArgTemplate.Replace("{id}", sessionId);
+        var word = string.IsNullOrWhiteSpace(command) ? tool.Command : command;
 
         // The definition launches the agent directly: the resume words lead its arguments.
-        if (CliToolMention.Mentions(exePath, tool.Command))
+        if (CliToolMention.Mentions(exePath, word))
             return string.IsNullOrWhiteSpace(arguments) ? words : words + " " + arguments.TrimStart();
 
-        var end = CliToolMention.FindCommandEnd(arguments, tool.Command);
+        var end = CliToolMention.FindCommandEnd(arguments, word);
         if (end < 0) return null;
         return arguments![..end] + " " + words + arguments[end..];
     }

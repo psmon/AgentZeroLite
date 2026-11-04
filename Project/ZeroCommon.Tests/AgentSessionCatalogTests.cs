@@ -108,6 +108,97 @@ public sealed class AgentSessionCatalogTests : IDisposable
         Assert.Equal("dddddddd-0000-0000-0000-000000000004", Assert.Single(list).Id);
     }
 
+    // ── profile wrappers (claude-sam) ────────────────────────────────────────
+    // Measured: a "Claude-Sam" row (powershell -NoExit -Command claude-sam, a function that sets
+    // CLAUDE_CONFIG_DIR=~/.claude-sam and runs `claude @args`) never got the resume question.
+
+    private static CliDefinition Row(string arguments) =>
+        new() { Name = "Claude-Sam", ExePath = "powershell.exe", Arguments = arguments };
+
+    private string SamSession(string cwd, string id, string prompt)
+    {
+        var dir = Path.Combine(_home, ".claude-sam", "projects", ClaudeSessionLocator.Slug(cwd));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, id + ".jsonl"), ClaudeUser(prompt) + "\n");
+        return dir;
+    }
+
+    [Fact]
+    public void ProfileWrapper_IsOfferedAndListsItsOwnProfileOnly()
+    {
+        var cwd = @"C:\code\psmon\AgentZeroLite";
+        SamSession(cwd, "aaaaaaaa-0000-0000-0000-00000000000a", "sam's work");
+        File.WriteAllText(Path.Combine(ClaudeDir(cwd), "bbbbbbbb-0000-0000-0000-00000000000b.jsonl"), ClaudeUser("default account") + "\n");
+
+        var target = AgentResumeTarget.Of(Row("-NoExit -Command claude-sam"), _home);
+
+        Assert.NotNull(target);
+        Assert.Same(AgentCliTools.Claude, target!.Tool);
+        Assert.Equal("claude-sam", target.Command);
+        Assert.Equal(Path.Combine(_home, ".claude-sam"), target.ConfigDir);
+        Assert.Equal("Claude (claude-sam)", target.DisplayName);
+        // The tab's environment has no CLAUDE_CONFIG_DIR (the function sets it), and must not decide.
+        var list = target.ListSessions(cwd, env: new Dictionary<string, string>(), homeDir: _home);
+        Assert.Equal("aaaaaaaa-0000-0000-0000-00000000000a", Assert.Single(list).Id);
+    }
+
+    [Fact]
+    public void ProfileWrapper_ResumeWordsFollowTheWrapper()
+    {
+        Directory.CreateDirectory(Path.Combine(_home, ".claude-sam"));
+        var row = Row("-NoExit -Command claude-sam");
+        var target = AgentResumeTarget.Of(row, _home)!;
+
+        var resumed = target.WithResume(row, "aaaaaaaa-0000-0000-0000-00000000000a");
+
+        Assert.Equal("-NoExit -Command claude-sam --resume aaaaaaaa-0000-0000-0000-00000000000a", resumed!.Arguments);
+        Assert.Equal("powershell.exe", resumed.ExePath);
+    }
+
+    [Fact]
+    public void ProfileWrapper_FromTheProfilesFolder()
+    {
+        Directory.CreateDirectory(Path.Combine(_home, ".claude-profiles", "work"));
+        var target = AgentResumeTarget.Of(Row("-NoExit -Command claude-work"), _home);
+        Assert.Equal(Path.Combine(_home, ".claude-profiles", "work"), target!.ConfigDir);
+    }
+
+    [Fact]
+    public void ProfileWrapper_WithoutItsFolder_IsNotOfferedTheDefaultProfile()
+    {
+        // ~/.claude has sessions, ~/.claude-sam does not exist: those ids would not resume under sam.
+        File.WriteAllText(Path.Combine(ClaudeDir(@"C:\x"), "cccccccc-0000-0000-0000-00000000000c.jsonl"), ClaudeUser("default") + "\n");
+        Assert.Null(AgentResumeTarget.Of(Row("-NoExit -Command claude-sam"), _home));
+    }
+
+    [Fact]
+    public void BuiltInRow_KeepsTheTabEnvironmentRule()
+    {
+        var target = AgentResumeTarget.Of(Row("-NoExit -Command claude"), _home);
+        Assert.Equal("claude", target!.Command);
+        Assert.Null(target.ConfigDir);
+        Assert.Equal("Claude", target.DisplayName);
+    }
+
+    [Theory]
+    [InlineData("powershell.exe", "-NoExit -Command claude-sam", "claude-sam", "sam")]
+    [InlineData(@"C:\bin\codex_work.cmd", null, "codex_work", "work")]
+    [InlineData("powershell.exe", "-NoExit -Command \"claude-sam --model opus\"", "claude-sam", "sam")]
+    public void ProfileCommand_IsACommandWordShapedToolDashName(string exe, string? args, string command, string profile)
+    {
+        var found = AgentProfileCommand.Find(exe, args);
+        Assert.Equal(command, found!.Command);
+        Assert.Equal(profile, found.Profile);
+    }
+
+    [Theory]
+    [InlineData("powershell.exe", "-NoExit -Command claude")]               // the tool itself
+    [InlineData("powershell.exe", "-NoExit -Command claudette")]            // not tool-dash-name
+    [InlineData("powershell.exe", "-NoExit -Command claude-")]              // no name
+    [InlineData(@"C:\claude-notes\run.cmd", null)]                          // a folder, not a command
+    public void ProfileCommand_IgnoresWhatIsNotAWrapper(string exe, string? args) =>
+        Assert.Null(AgentProfileCommand.Find(exe, args));
+
     [Fact]
     public void Claude_HugeFirstLineIsSkippedNotMisread()
     {

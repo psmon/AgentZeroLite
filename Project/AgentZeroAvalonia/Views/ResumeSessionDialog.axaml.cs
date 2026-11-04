@@ -56,12 +56,16 @@ public partial class ResumeSessionDialog : Window
 
     public ResumeSessionDialog() => InitializeComponent();
 
-    public ResumeSessionDialog(string toolName, string where, IReadOnlyList<AgentSessionInfo> sessions) : this()
+    /// <param name="toolName">Which agent (and account) the sessions belong to — "Claude (claude-sam)".</param>
+    /// <param name="askScope">What "don't ask again" turns off; the setting is per tool, not per account,
+    /// so a wrapper's dialog names the tool. Defaults to <paramref name="toolName"/>.</param>
+    public ResumeSessionDialog(string toolName, string where, IReadOnlyList<AgentSessionInfo> sessions,
+        string? askScope = null) : this()
     {
         Title = $"Resume {toolName} session";
         HeadingText.Text = $"Resume a previous {toolName} session?";
         WhereText.Text = $"{where} · {sessions.Count} session(s) recorded for this folder, newest first";
-        DontAskBox.Content = $"Don't ask again for {toolName} — always start a new session";
+        DontAskBox.Content = $"Don't ask again for {askScope ?? toolName} — always start a new session";
 
         var now = DateTime.UtcNow;
         SessionList.ItemsSource = sessions.Select(s => new ResumeSessionItem(s, now)).ToList();

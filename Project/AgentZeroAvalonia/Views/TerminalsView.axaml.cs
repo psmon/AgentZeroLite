@@ -518,12 +518,13 @@ public partial class TerminalsView : UserControl
         }
 
         // Claude / Codex: offer the sessions the agent recorded for this folder before its
-        // process starts. The control is already registered, so a second EnsureStarted
+        // process starts — also behind a profile wrapper such as claude-sam, whose sessions
+        // live in its own folder. The control is already registered, so a second EnsureStarted
         // for this tab while the question is open is a no-op.
-        if (!def.IsRemote && AgentCliTools.Match(def) is { } tool && AgentSessionCatalog.Supports(tool)
-            && AgentResumeSettingsStore.Load().Asks(tool))
+        if (!def.IsRemote && AgentResumeTarget.Of(def) is { } target
+            && AgentResumeSettingsStore.Load().Asks(target.Tool))
         {
-            _ = LaunchAfterResumeChoiceAsync(ws, tab, control, def, spec, tool);
+            _ = LaunchAfterResumeChoiceAsync(ws, tab, control, def, spec, target);
             return;
         }
         Launch(ws, tab, control, def, spec);
@@ -533,14 +534,15 @@ public partial class TerminalsView : UserControl
     private static readonly SemaphoreSlim ResumeQuestion = new(1, 1);
 
     private async Task LaunchAfterResumeChoiceAsync(WorkspaceViewModel ws, TerminalTabViewModel tab,
-        XtermWebViewTerminalControl control, CliDefinition def, TerminalLaunchSpec spec, AgentCliTool tool)
+        XtermWebViewTerminalControl control, CliDefinition def, TerminalLaunchSpec spec, AgentResumeTarget target)
     {
         bool StillOurs() => _controls.TryGetValue(tab, out var c) && ReferenceEquals(c, control);
 
+        var tool = target.Tool;
         var launch = spec;
         try
         {
-            var sessions = await Task.Run(() => AgentSessionCatalog.List(tool, ws.DirectoryPath, spec.Env));
+            var sessions = await Task.Run(() => target.ListSessions(ws.DirectoryPath, spec.Env));
             if (sessions.Count > 0 && StillOurs())
             {
                 ResumeChoice? choice = null;
@@ -550,7 +552,7 @@ public partial class TerminalsView : UserControl
                 {
                     if (StillOurs() && await DialogOwnerAsync() is { } owner)
                     {
-                        var dialog = new ResumeSessionDialog(tool.Name, $"{ws.DisplayName}/{tab.Title} · {ws.DirectoryPath}", sessions);
+                        var dialog = new ResumeSessionDialog(target.DisplayName, $"{ws.DisplayName}/{tab.Title} · {ws.DirectoryPath}", sessions, tool.Name);
                         choice = await dialog.ShowDialog<ResumeChoice?>(owner) ?? dialog.Result;
                     }
                 }
@@ -570,13 +572,13 @@ public partial class TerminalsView : UserControl
                 }
                 if (choice?.SessionId is { } id)
                 {
-                    var resumed = AgentResumeLaunch.WithResume(def, tool, id) is { } d
+                    var resumed = target.WithResume(def, id) is { } d
                         ? TerminalLaunchPlanner.Plan(d, ws.DirectoryPath, AppContext.BaseDirectory, out _)
                         : null;
                     if (resumed is not null)
                     {
                         launch = resumed;
-                        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} resumes {tool.Name} session {id}");
+                        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} resumes {target.DisplayName} session {id}");
                     }
                     else AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title}: could not put a resume of {id} into '{def.Arguments}' — starting new");
                 }
