@@ -1061,7 +1061,13 @@ public sealed partial class ChatSession : IAgentSession
             .Select(s => $"- {s.Tool} ({(s.Ok ? "ok" : "failed")}): {WorkspaceStore.FirstLine(s.Detail, 120)}"));
 
         var judged = await _router.ClaimAsync(request, did, run.Text, ct);
-        (string, string)? contradiction = judged is { Ok: true, Choice: SmartRouter.UnbackedChange } && !wrote ? ("files created or changed", "write_file")
+        // A command makes files too — a download, a build, a generator script.
+        // Measured (2026-11-05, music-harness): dv-fetch.cjs saved four takes,
+        // the answer said so, and "files created with no write_file" sent a
+        // finished turn back. A change is unbacked only when nothing that could
+        // have made it succeeded; the loop's own check still holds every file
+        // the answer names against the disk.
+        (string, string)? contradiction = judged is { Ok: true, Choice: SmartRouter.UnbackedChange } && !wrote && !ran ? ("files created or changed", "write_file or run_command")
             : judged is { Ok: true, Choice: SmartRouter.UnbackedRun } && !ran ? ("commands, builds or tests run", "run_command")
             : null;
 

@@ -1033,7 +1033,7 @@ inside those two families.
 
 | Verb | Does |
 |---|---|
-| `list_files(path)` | List a directory. Skips `.git`, `bin`, `obj`, `node_modules` and friends. |
+| `list_files(path)` | List a directory. Skips `.git`, `bin`, `obj`, `node_modules` and friends (not `.claude`). At the root it also names the Claude skills found for the workspace — see below. |
 | `read_file(path)` | Read a UTF-8 file, truncated at 64 KB. |
 | `find_files(pattern, path)` | Find by name pattern (`*.cs`) anywhere below a path. |
 | `grep(text, path, glob)` | Which files contain a piece of text, with line numbers. Case-insensitive **plain text, not a regex** — the pattern comes from a model, and a regex from an untrusted source is a way to hang the process, not a feature. |
@@ -1048,6 +1048,29 @@ inside those two families.
 The file verbs all resolve paths against `--root` and refuse anything that lands
 outside it. `grep` skips files over 2 MB and anything containing a NUL byte, and
 stops at 100 matches.
+
+**Claude skills are part of the search** (`Tools/ClaudeSkillScope`). In a
+workspace set up for Claude Code the method usually lives in a skill, and the
+walk used to skip every dot-folder — `.claude/skills` was invisible and plugin
+skills sit outside the root, so a request like "find it in the Claude skills"
+had nothing to find. Now, detected on first use:
+
+- the project's `.claude/skills/*/SKILL.md`, `.claude/commands`, `.claude/agents`
+  (`.claude/worktrees`, `projects` and other non-definitions stay skipped);
+- the user's `~/.claude/skills` and every plugin **enabled** for the workspace —
+  `enabledPlugins` in the user's `settings.json` (project `settings.json` /
+  `settings.local.json` win), resolved through `plugins/installed_plugins.json`
+  (an install for this project beats the user-wide one; an install for another
+  project is not this one's). Config folders: `$CLAUDE_CONFIG_DIR`, `~/.claude`
+  and every `~/.claude-*` profile with a `settings.json`; one copy per plugin.
+  `AGENT_ONE_CLAUDE_HOMES` replaces the list;
+- the workspace paths those skills name (`harness/knowledge/tools/x.md`,
+  `tools/gen.js`) — project files first, record folders such as `logs/` left out.
+
+`list_files .` names them under the listing; `find_files` / `grep` from the root
+walk skills, then those linked paths, then everything else, so a hit cap is not
+filled with logs before the guidance. A plugin's folder is readable (its
+`references/` sit beside the skill) and never writable.
 
 `web_search` uses DuckDuckGo's HTML endpoint: no API key, no account, works the
 moment agent-one is installed. The cost is that it parses someone else's markup,

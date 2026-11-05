@@ -56,7 +56,7 @@ public static class ToolCatalog
     public static readonly ToolSpec[] All =
     [
         new("list_files", FilesFamily,
-            "List files and folders under a path inside the workspace root.",
+            "List files and folders under a path inside the workspace root. At the root it also names the Claude skills (project .claude, enabled plugins) found for the workspace.",
             ["path"],
             """{"tool":"list_files","args":{"path":"src"}}"""),
 
@@ -66,12 +66,12 @@ public static class ToolCatalog
             """{"tool":"read_file","args":{"path":"README.md"}}"""),
 
         new("find_files", FilesFamily,
-            "Find files by name pattern (e.g. *.cs) anywhere under a path.",
+            "Find files by name pattern (e.g. *.cs) anywhere under a path. From the root, Claude skills and the files they point to are searched first.",
             ["pattern", "path"],
             """{"tool":"find_files","args":{"pattern":"*.csproj","path":"."}}"""),
 
         new("grep", FilesFamily,
-            "Find which files contain a piece of text. Case-insensitive, plain text, not a regex.",
+            "Find which files contain a piece of text. Case-insensitive, plain text, not a regex. From the root, Claude skills and the files they point to are searched first.",
             ["text", "path", "glob"],
             """{"tool":"grep","args":{"text":"ConfigureServices","glob":"*.cs"}}"""),
 

@@ -115,6 +115,8 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
 
         // Paths this turn actually put on disk, to check the answer against.
         var wrote = new List<string>();
+        // Paths it read, listed or ran without writing — named back by basename just as often.
+        var touched = new List<string>();
         var languageNudged = false;
 
         for (int step = 1; step <= maxSteps; step++)
@@ -257,7 +259,7 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                 // called — so smart mode asks the decision engine, which reads
                 // the claim itself (ChatSession.CheckClaimsAsync).
                 var worked = DidAnyWork(steps);
-                var missing = worked ? MissingFilesNamed(answer, wrote) : [];
+                var missing = worked ? MissingFilesNamed(answer, wrote, touched) : [];
                 if ((missing.Count > 0 || ShowsUnwrittenCode(answer, steps)) && guards.TryConsumeUnwrittenNudge(wrote.Count))
                 {
                     var why = missing.Count > 0
@@ -305,7 +307,7 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                 // path matcher cannot tell "created hello.py" from "runs
                 // hello.py", so whether the report is false is left to the
                 // claim check, which reads the words (ChatSession.CheckClaimsAsync).
-                var stillMissing = worked ? MissingFilesNamed(answer, wrote) : [];
+                var stillMissing = worked ? MissingFilesNamed(answer, wrote, touched) : [];
                 if (stillMissing.Count > 0)
                 {
                     var note = "not on disk: " + string.Join(", ", stillMissing);
@@ -399,6 +401,8 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
 
             if (result.Ok && call.Tool == "write_file" && call.Arg("path") is { Length: > 0 } written)
                 wrote.Add(Normalize(written));
+            else if (result.Ok)
+                NoteTouched(call, touched);
 
             Emit(steps, step, call.Tool, Summarize(call, result), result.Ok, stepClock.ElapsedMilliseconds);
 
@@ -473,17 +477,83 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     /// left is a file named in a finished report that nobody ever created.
     /// </summary>
     /// <param name="wrote">Paths written in this turn, workspace-relative.</param>
-    internal IReadOnlyList<string> MissingFilesNamed(string answer, IReadOnlyCollection<string> wrote)
+    /// <param name="touched">Paths this turn read, listed or ran (workspace-relative); forgiven when they exist.</param>
+    internal IReadOnlyList<string> MissingFilesNamed(string answer, IReadOnlyCollection<string> wrote,
+        IReadOnlyCollection<string>? touched = null)
     {
         var missing = new List<string>();
         foreach (var path in FilePathsIn(answer))
         {
             if (WasWrittenThisTurn(path, wrote)) continue;
-            if (Root is { Length: > 0 } root && File.Exists(Path.Combine(root, path))) continue;
             if (Root is null) continue;   // no root, no way to tell an old file from a fictional one
+            if (File.Exists(Path.Combine(Root, path))) continue;
+            if (ExistsBesideAWrite(Root, path, wrote)) continue;
+            if (touched is not null && WasTouchedAndExists(Root, path, touched)) continue;
             if (!missing.Contains(path)) missing.Add(path);
         }
         return missing;
+    }
+
+    /// <summary>
+    /// Whether the named path is the tail of a path this turn read, listed or
+    /// ran, and that path is on disk. Measured (2026-11-05, music-harness): the
+    /// turn read <c>stage-unity/Tools/deevid/dv-gen.cjs</c>, ran it twice
+    /// successfully, and reported "dv-gen.cjs 로 생성" — flagged "not on disk",
+    /// which bought an apology answer, a ⚠ on a turn that had worked, and an
+    /// escalation to the strong model.
+    /// </summary>
+    private static bool WasTouchedAndExists(string root, string named, IReadOnlyCollection<string> touched)
+    {
+        foreach (var t in touched)
+        {
+            // A folder the turn listed or handed to a command: a file named
+            // inside it (a command's output, a sibling it saw) counts.
+            if (Directory.Exists(Path.Combine(root, t)) && File.Exists(Path.Combine(root, t, named))) return true;
+
+            if (!string.Equals(t, named, StringComparison.OrdinalIgnoreCase)
+                && !t.EndsWith("/" + named, StringComparison.OrdinalIgnoreCase)) continue;
+            if (File.Exists(Path.Combine(root, t))) return true;
+        }
+        return false;
+    }
+
+    /// <summary>The paths a successful read/list/find/grep/run call names, for <see cref="WasTouchedAndExists"/>.</summary>
+    private static void NoteTouched(ToolCall call, List<string> touched)
+    {
+        if (call.Tool is "read_file" or "list_files" or "find_files" or "grep"
+            && call.Arg("path") is { Length: > 0 } path)
+            touched.Add(Normalize(path));
+        else if (call.Tool == "run_command" && call.Arg("command") is { Length: > 0 } command)
+        {
+            touched.AddRange(FilePathsIn(command));
+            // Folder arguments too (an output directory) — any relative token with a slash.
+            touched.AddRange(command.Split((char[])[' ', '\t', '"', '\''], StringSplitOptions.RemoveEmptyEntries)
+                .Where(t => (t.Contains('/') || t.Contains('\\')) && !t.Contains("://") && !Path.IsPathRooted(t))
+                .Select(Normalize)
+                .Where(t => t.Length > 0));
+        }
+    }
+
+    /// <summary>
+    /// Whether a named path exists next to something this turn wrote — in the
+    /// written file's folder or one above it. Measured (2026-11-05,
+    /// music-harness): a turn rewrote <c>songs/x/guide.md</c> and reported its
+    /// untouched siblings <c>lyrics.md</c> and <c>notes.md</c> by name; both
+    /// were on disk, but only <c>root/lyrics.md</c> was checked, so each was
+    /// "not on disk" and the model rewrote two good files to satisfy the guard.
+    /// </summary>
+    private static bool ExistsBesideAWrite(string root, string named, IReadOnlyCollection<string> wrote)
+    {
+        foreach (var w in wrote)
+        {
+            var dir = Path.GetDirectoryName(w.Replace('/', Path.DirectorySeparatorChar));
+            while (!string.IsNullOrEmpty(dir))
+            {
+                if (File.Exists(Path.Combine(root, dir, named))) return true;
+                dir = Path.GetDirectoryName(dir);
+            }
+        }
+        return false;
     }
 
     /// <summary>

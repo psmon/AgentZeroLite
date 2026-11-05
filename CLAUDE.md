@@ -742,7 +742,15 @@ call as a command for scripts and other agents — one JSON object out, exit 0/1
 — and shares the option reader and result shape (`Llm/Decision/DecisionInput`)
 with the tool, so the two cannot disagree. The two families
 that change something are `ToolCatalog.GuardedFamilies`, and a test keeps every
-writing/running verb inside them. **Writes never leave the root**; a folder the
+writing/running verb inside them. **Claude skills are searched, not skipped**
+(`Tools/ClaudeSkillScope`): the walk used to drop every dot-folder, so in a
+Claude-skill-based workspace `.claude/skills` was invisible and plugin skills
+(outside the root) unreachable — five turns rebuilt a method from one script found
+by luck. Project `.claude/{skills,commands,agents}`, user skills and **enabled**
+plugins (`enabledPlugins` → `installed_plugins.json`) are detected, plus the
+workspace paths those skills name; `list_files .` names them and a root
+`find_files`/`grep` walks them first. Details: `Project/AgentOne/README.md` §Tools.
+**Writes never leave the root**; a folder the
 user names by absolute path (`Tools/PathGrants`) is granted for *reading* only,
 for the session. **Commands go through a gate** (`ChatSession.GateAsync`):
 `Agent/CommandRisk` patterns (rm -rf /, sudo, format, piped installers,

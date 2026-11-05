@@ -179,6 +179,27 @@ public class ClaimCheckSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task FilesACommandMadeAreNotAnUnbackedChange()
+    {
+        // Measured (2026-11-05): a download script saved the takes, the answer
+        // said "다운로드했습니다", and the claim check sent it back because no
+        // write_file had run. A successful command can make files.
+        var basic = new ScriptedChatProvider(
+            """{"tool":"run_command","args":{"command":"echo hi"}}""",
+            """{"tool":"final","args":{"text":"테이크 4개를 다운로드했습니다."}}""");
+        var engine = new ScriptedDecisionEngine(
+            Choose(SmartRouter.WorkInWorkspace),
+            Choose(SmartRouter.SafeOption),
+            Choose(SmartRouter.UnbackedChange));
+        using var session = Session(basic, engine);
+
+        var run = await session.SubmitAsync("테이크 받아와", CancellationToken.None);
+
+        Assert.DoesNotContain(run!.Steps, s => s.Tool == "unbacked");
+        Assert.Equal(2, basic.CallCount);
+    }
+
+    [Fact]
     public async Task ATurnThatWroteAndRanIsNotAsked()
     {
         var basic = new ScriptedChatProvider(
