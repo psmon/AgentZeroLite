@@ -57,7 +57,8 @@ public class ToolCatalogTests
         foreach (var spec in ToolCatalog.All)
             Assert.False(string.IsNullOrWhiteSpace(spec.Family), spec.Name);
 
-        Assert.Equal([ToolCatalog.FilesFamily, ToolCatalog.WebFamily, ToolCatalog.EditFamily, ToolCatalog.ExecFamily, ToolCatalog.DecideFamily],
+        Assert.Equal([ToolCatalog.FilesFamily, ToolCatalog.WebFamily, ToolCatalog.EditFamily, ToolCatalog.ExecFamily,
+                      ToolCatalog.GuideFamily, ToolCatalog.BrowserFamily, ToolCatalog.DecideFamily],
                      ToolCatalog.Families.ToArray());
     }
 

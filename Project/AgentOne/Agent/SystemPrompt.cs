@@ -1,5 +1,6 @@
 using System.Text;
 using AgentOne.Tools;
+using AgentOne.Tools.Cli;
 
 namespace AgentOne.Agent;
 
@@ -65,6 +66,21 @@ public static class SystemPrompt
         sb.AppendLine("  not ../, not an absolute path, not another worktree or clone: those writes are refused.");
         var shell = ShellInfo.Current;
         sb.AppendLine($"- run_command runs in {shell.Describe}. {shell.Hints}");
+        sb.AppendLine("- You CAN use a real web browser. browser_open opens a page (a new tab in the user's own Chrome when it");
+        sb.AppendLine("  runs with remote debugging, otherwise a browser of your own); browser_snapshot / browser_read /");
+        sb.AppendLine("  browser_find show it; browser_click / browser_fill / browser_press act on it by the [ref=eN] refs of the");
+        sb.AppendLine("  latest snapshot. Use them whenever a page needs a browser — YouTube, a logged-in site, a page built by");
+        sb.AppendLine("  JavaScript — or the user asks for Playwright. Never say you cannot see or use a browser, never ask the");
+        sb.AppendLine("  user to start Chrome or run a script for you, and never write a Playwright script the browser_* tools");
+        sb.AppendLine("  can replace. When the user says they opened a page, browser_tabs finds it.");
+
+        var known = KnownCli.PromptLines(KnownCli.Status);
+        if (known.Length > 0)
+        {
+            sb.AppendLine("- Command-line tools installed on this machine — you already know them; use them with run_command");
+            sb.AppendLine("  instead of searching the web for how. cli_guide {\"name\":\"…\"} gives the exact commands:");
+            sb.AppendLine(known);
+        }
         sb.AppendLine();
         sb.AppendLine("Tools:");
 

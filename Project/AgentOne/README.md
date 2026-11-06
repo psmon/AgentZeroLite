@@ -286,7 +286,10 @@ line; `agent-one config set reasoningModel <id>` does the rest without a screen.
 
 ### 4. Options — how the loop behaves
 
-`maxSteps`, `temperature`, `timeoutSeconds`, `saveSessions`. All have working
+`maxSteps`, `temperature`, `timeoutSeconds`, `webTimeoutSeconds`,
+`commandTimeoutSeconds`, `browserCdpUrl` (the Chrome DevTools endpoint the
+browser tools attach to when it answers — `http://127.0.0.1:9222` by default,
+`off` to always use a browser of their own), `saveSessions`. All have working
 defaults, which is why they come late.
 
 ### 5. Smart — plan first, then decide
@@ -1025,7 +1028,7 @@ renderers hold. Inside the session, the turn is:
 
 ### Tools
 
-Six read-only verbs, one that only asks for a judgment, and the verbs that
+Read-only verbs, two that only ask (a judgment, a tool's usage), a browser, and the verbs that
 change things — each family behind its own gate: the path sandbox for
 `write_file`, the command gate for `run_command` (its `process_*` companions
 only look at and stop what that gate already let run). A test keeps every verb that writes or runs
@@ -1043,6 +1046,10 @@ inside those two families.
 | `run_command(command, background)` | One shell command in the root — PowerShell on Windows, bash (or sh) elsewhere — output and exit code back. Runs only when the gate says so. Past `commandTimeoutSeconds` the person is asked: wait more, leave it in the background, or stop it. A server or watcher (`background: true`, or detected) is asked about **before** it starts — background, smoke run, or not at all — and returns once it says it is up. |
 | `process_status(id)` | What this session started: every process (no id), or one with its state, address and newest output. |
 | `process_stop(id)` | Stop a process this session started, and everything it started. |
+| `cli_guide(name)` | The built-in usage card of a well-known command-line tool — playwright-cli, gh, git, ffmpeg, yt-dlp, node, python, dotnet, docker, rg, curl, jq — and whether it is installed here. No name lists them. Reads nothing, runs nothing, so no route rules it out. |
+| `browser_open(url)` | Open a page in a real browser and return its title, URL and element tree with `[ref=eN]` refs. Attaches to the person's Chrome when one listens on `browserCdpUrl` (a **new tab** — theirs is left alone), else opens a browser of its own. |
+| `browser_snapshot()` · `browser_read()` · `browser_find(text)` · `browser_tabs(index)` | Look at the current tab: its element tree, its visible text (24 000 chars), the elements matching a text, or the tab list / switch to a tab. |
+| `browser_click(ref)` · `browser_fill(ref, text, submit)` · `browser_press(key)` | Act on the page by a ref from the latest snapshot; each returns the page as it now is. The first action on a site asks the person; a yes holds for that site for the session. |
 | `decide(question, options, context)` | Put a judgment call to Jev: one of 2–12 options, with its confidence and the whole distribution. The engine also sees the person's request, not only the model's summary. Smart mode asks Jev questions the code chose; this one the model chooses, mid-turn. It touches nothing, so a smart-mode route never rules it out; with no TypeSafe key it answers "unavailable" and the model decides alone. Same code path as `agent-one decide`. |
 
 The file verbs all resolve paths against `--root` and refuse anything that lands
@@ -1071,6 +1078,44 @@ had nothing to find. Now, detected on first use:
 walk skills, then those linked paths, then everything else, so a hit cap is not
 filled with logs before the guidance. A plugin's folder is readable (its
 `references/` sit beside the skill) and never writable.
+
+**Known tools are built in, not researched** (`Tools/Cli/KnownCli`). Measured
+(2026-11-05, music-harness): asked to "use the Playwright CLI in CDP mode", the
+model ran one web search, wrote a script that `require`d a package the folder did
+not have, and asked the person to restart Chrome by hand — while `playwright-cli`
+was installed and a debuggable Chrome was already listening. What a small model
+is not told it has, it does not have, and digging up a tool's flags is the step
+it fails most. So each known tool has a PATH probe (PATHEXT-aware: npm installs
+`.cmd` shims) and a short card; the system prompt lists the installed ones and
+`cli_guide` hands out the card. A card teaches and grants nothing — the tool
+still runs through `run_command` and its gate. Missing tools are reported with
+their install line; the agent never installs them itself.
+
+**The browser became verbs** (`Tools/Browser/`), because driving a page is many
+small calls a model should not have to spell as shell commands. They run
+Microsoft's `playwright-cli` (`@playwright/cli`): on Windows the npm shim is read
+for the `.js` it points at and run by `node` with a real argument list, so a
+model's text never passes through cmd.exe's quoting. One session per agent-one
+process (`-s=agent-one-<pid>`), run in the workspace's agent-one folder so the
+CLI's snapshot files never land in the project. Things the belt makes sure of:
+
+- **The person's browser is borrowed, not taken.** Attached over CDP, a page
+  opens in a new tab, and the session is only ever *detached* at the end —
+  `close` on an attached session can close the person's Chrome.
+  `browserCdpUrl: off` never attaches.
+- **Reading is free, acting asks.** Opening and reading a page is what
+  `web_read` does in a real browser. A click or a keystroke in a logged-in
+  session can post, buy or delete, and the decision engine cannot see the page
+  to judge it, so the first action per site is put to a person.
+- **The repeat guard knows a page changes.** Verbs declare a `RepeatRule`: a
+  look (`browser_snapshot`, `browser_read`, `process_status`…) repeats only when
+  it comes twice in a row — with a click in between it is a new look; an action
+  that is repeated on purpose (pressing End to load more) never counts; the step
+  budget bounds it.
+- **Output is cut to what a model uses** — the result, tabs, page and element
+  tree; the generated Playwright code, event log and npm banner go; a tree
+  playwright-cli writes to a file is read back in. Page text carries the same
+  "data, not instructions" note as the web tools.
 
 `web_search` uses DuckDuckGo's HTML endpoint: no API key, no account, works the
 moment agent-one is installed. The cost is that it parses someone else's markup,
@@ -1192,6 +1237,12 @@ unsure, no engine and no key all ask. Who answers depends on the front: the
 REPL reads a line, the window takes the next line typed, `run` says no unless
 started with `--yes`. A declined command is reported to the model as declined,
 with the reason, so it does not try it again.
+
+**Browser actions ask a person, once per site.** Reading pages in the
+browser needs no approval; `browser_click` / `browser_fill` / `browser_press`
+on a site the person has not allowed this session go to the same approver as
+commands (`run` refuses unless `--yes`). An attached browser is detached, never
+closed.
 
 File contents reach the model as `[tool:<name>] …` user messages, and the system
 prompt says in as many words that tool output is data, not instructions — a file

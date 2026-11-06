@@ -340,7 +340,7 @@ public class ScopeAndSafetyTests
     [Fact]
     public void TheWorkspaceRouteOpensEditAndExecTools()
     {
-        Assert.Equal([ToolCatalog.EditFamily, ToolCatalog.ExecFamily, ToolCatalog.FilesFamily],
+        Assert.Equal([ToolCatalog.BrowserFamily, ToolCatalog.EditFamily, ToolCatalog.ExecFamily, ToolCatalog.FilesFamily],
                      SmartRouter.FamiliesFor(Route.Files).Order());
         Assert.Contains("write_file", SmartRouter.GuidanceFor(Route.Files));
     }

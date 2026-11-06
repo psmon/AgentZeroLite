@@ -7,6 +7,8 @@ using AgentOne.Llm.Decision;
 using AgentOne.Services;
 using AgentOne.Processes;
 using AgentOne.Tools;
+using AgentOne.Tools.Browser;
+using AgentOne.Tools.Cli;
 
 namespace AgentOne.Agent;
 
@@ -101,6 +103,7 @@ public sealed partial class ChatSession : IAgentSession
     private readonly IChatProvider? _reasoning;
     private readonly LocalFileToolbelt _files;
     private readonly ShellToolbelt _shell;
+    private readonly BrowserToolbelt _browser;
     private readonly CompositeToolbelt _toolbelt;
     private readonly AgentLoop _loop;
     private readonly CountingEngine _engine;
@@ -218,11 +221,22 @@ public sealed partial class ChatSession : IAgentSession
         _shell.Activity += what => ActivityStarted?.Invoke(what);
         _shell.ProcessChanged += OnProcessChanged;
 
+        // The browser runs playwright-cli in the workspace's own agent-one
+        // folder, so its snapshot files never land in the person's project.
+        _browser = new BrowserToolbelt(
+            new PlaywrightCliDriver(Path.Combine(Workspace.Dir, "browser"), TimeSpan.FromSeconds(Math.Max(config.WebTimeoutSeconds, 30))),
+            config.BrowserCdpUrl)
+        {
+            Gate = BrowserGateAsync
+        };
+
         _toolbelt = new CompositeToolbelt(
             (ToolCatalog.FilesFamily, _files),
             (ToolCatalog.EditFamily, _files),
             (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(config.WebTimeoutSeconds))),
             (ToolCatalog.ExecFamily, _shell),
+            (ToolCatalog.BrowserFamily, _browser),
+            (ToolCatalog.GuideFamily, new KnownCliToolbelt()),
             // Counted like smart mode's own questions, and judged against the person's words.
             (ToolCatalog.DecideFamily, new DecisionToolbelt(_smartAvailable ? _engine : null, config.JevConfidenceFloor)
             {
@@ -288,6 +302,7 @@ public sealed partial class ChatSession : IAgentSession
         _loop.Reset(Workspace.MemoryForPrompt());
         _state.Reset();
         _files.ClearGrants();
+        _browser.ClearGrants();
         Title = null;
     }
 
@@ -1053,7 +1068,11 @@ public sealed partial class ChatSession : IAgentSession
     private async Task<(string Claim, string Tool)?> UnbackedClaimAsync(string request, AgentRun run, CancellationToken ct)
     {
         var wrote = run.Steps.Any(s => s.Ok && s.Tool == "write_file");
-        var ran = run.Steps.Any(s => s.Ok && s.Tool == "run_command");
+        // An action in the browser backs a report of one, and of what it made
+        // (a download, a generated track) — like a command does.
+        var ran = run.Steps.Any(s => s.Ok && (s.Tool == "run_command"
+                                              || (ToolCatalog.FamilyOf(s.Tool) == ToolCatalog.BrowserFamily
+                                                  && ToolCatalog.RepeatOf(s.Tool) == RepeatRule.Free)));
         if (wrote && ran) return null;
 
         var did = string.Join("\n", run.Steps
@@ -1266,6 +1285,16 @@ public sealed partial class ChatSession : IAgentSession
 
         return await AskAsync(command, reason, ct);
     }
+
+    /// <summary>
+    /// Whether the agent may act (click, type, press) on a site in the browser.
+    /// Always a person, once per site per session: the browser may be their own,
+    /// logged in, where a click can post, buy or delete — the decision engine
+    /// cannot see the page to judge that. Reading pages needs no approval.
+    /// </summary>
+    private Task<GateVerdict> BrowserGateAsync(string what, string site, CancellationToken ct) =>
+        AskAsync($"browser: {what} on {site} (and further actions on {site} this session)",
+                 "acting in a browser can change things on the site", ct);
 
     private async Task<GateVerdict> AskAsync(string command, string reason, CancellationToken ct)
     {

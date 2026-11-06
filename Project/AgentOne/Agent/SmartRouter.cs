@@ -106,7 +106,8 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     [
         new(SearchWeb,
             "The answer depends on current or external information — news, documentation on the web, " +
-            "prices, weather, anything not in the user's own files. The agent should search the web and read pages before answering."),
+            "prices, weather, anything not in the user's own files — including a page that has to be opened in a real " +
+            "browser (YouTube, a logged-in site). The agent should search the web, read pages or drive the browser before answering."),
         new(WorkInWorkspace,
             "Something has to be MADE OR CHANGED ON DISK, or read from disk. Building anything the user will run or " +
             "keep counts — a program, a game, a web page, a script, a config, a document — and it counts even when the " +
@@ -530,8 +531,10 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
 
     public static IReadOnlySet<string> FamiliesFor(Route route) => route switch
     {
-        Route.Web => new HashSet<string> { ToolCatalog.WebFamily },
-        Route.Files => new HashSet<string> { ToolCatalog.FilesFamily, ToolCatalog.EditFamily, ToolCatalog.ExecFamily },
+        // The browser is the web's tool when a page needs one, and the workspace's
+        // when the work is done on a site (generate a track, upload a video).
+        Route.Web => new HashSet<string> { ToolCatalog.WebFamily, ToolCatalog.BrowserFamily },
+        Route.Files => new HashSet<string> { ToolCatalog.FilesFamily, ToolCatalog.EditFamily, ToolCatalog.ExecFamily, ToolCatalog.BrowserFamily },
         _ => new HashSet<string>()
     };
 
@@ -539,10 +542,12 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     {
         Route.Web =>
             "[route: web] This needs current information from the web. Use web_search, then web_read the most relevant result, " +
-            "before answering. Workspace tools are not available on this turn.",
+            "before answering; a page that needs a real browser (YouTube, a logged-in site) is browser_open + browser_read. " +
+            "Workspace tools are not available on this turn.",
         Route.Files =>
             "[route: workspace] This is about the project in the workspace. Look with list_files, find_files, grep and read_file; " +
-            "create or change files with write_file; run builds, tests and commands with run_command. " +
+            "create or change files with write_file; run builds, tests and commands with run_command; " +
+            "work on a web site in the browser with browser_*. " +
             "Web tools are not available on this turn.",
         _ =>
             "[route: answer] No lookup is needed. Answer directly from what you know and what is already in this conversation; " +

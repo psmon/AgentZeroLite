@@ -1071,6 +1071,25 @@ non-Latin script (Korean, Japanese, Chinese, Russian, Arabic, Thai) the answer
 does not contain at all — `AgentLoop.Request` carries the person's words, because
 the prompt a run gets is often English guidance or a `[check]`.
 
+**Known tools are built in, and the browser is verbs** (`Tools/Cli/`, `Tools/Browser/`,
+`BrowserToolTests`). Measured (2026-11-05, music-harness): told "use the Playwright CLI in CDP mode", the
+model web-searched once, wrote a script `require`-ing a package the folder lacked and asked the person to
+restart Chrome — with `playwright-cli` installed and a debuggable Chrome already on 9222. Now `KnownCli` probes
+PATH (PATHEXT, npm `.cmd` shims) for a curated list (playwright-cli, gh, git, ffmpeg, yt-dlp, node, python,
+dotnet, docker, rg, curl, jq), the system prompt names the installed ones and `cli_guide` (family `guide`,
+route-exempt) returns a usage card; a card grants nothing — tools still run through `run_command`'s gate, and
+a missing one is reported with its install line, never installed. The browser family (`browser_open /
+snapshot / read / find / tabs / click / fill / press`) drives `@playwright/cli` (Windows: the shim's `.js` run
+by `node` with an argument list, so model text never meets cmd.exe quoting), session `agent-one-<pid>`, cwd
+`<workspace store>/browser` so its snapshot files stay out of the project. When `browserCdpUrl` (default
+`http://127.0.0.1:9222`, `off`) answers, it **attaches** to the person's Chrome and opens a **new tab**; the
+session is only ever **detached**, never closed (`close` on an attached session can close their browser).
+Reading is ungated; the first click/fill/press per site goes to the approver (`BrowserGateAsync`), a yes holds
+for that site for the session. Both working routes (web, workspace) admit the family, and a successful browser
+action backs an "I did it" claim like a command. `ToolSpec.Repeat` (`RepeatRule`): looks (`browser_snapshot`,
+`browser_read`, `process_status`…) are a repeat only twice in a row, actions repeated on purpose (End to load
+more) never — the old rule ended a browsing turn on the second snapshot after a click.
+
 ## Documentation pairs — update both languages together
 
 Three READMEs exist in two languages, and a change to one is not done until

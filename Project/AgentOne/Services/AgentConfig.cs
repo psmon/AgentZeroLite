@@ -87,6 +87,17 @@ public sealed class AgentConfig
     public int CommandTimeoutSeconds { get; set; } = 120;
 
     /// <summary>
+    /// The Chrome DevTools endpoint the browser tools attach to when it answers
+    /// — a Chrome started with <c>--remote-debugging-port=9222</c>, the person's
+    /// own browser, logged in. "off" never attaches: the tools always open a
+    /// browser of their own.
+    /// </summary>
+    [JsonPropertyName("browserCdpUrl")]
+    public string BrowserCdpUrl { get; set; } = DefaultBrowserCdpUrl;
+
+    public const string DefaultBrowserCdpUrl = "http://127.0.0.1:9222";
+
+    /// <summary>
     /// Plan first and let the decision engine choose the approach. Off by
     /// default: it costs an extra LLM turn and an extra service.
     /// </summary>
@@ -157,7 +168,7 @@ public sealed class AgentConfig
     [
         "provider", "baseUrl", "model", "apiKeyEnv",
         "reasoningBaseUrl", "reasoningModel",
-        "maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "commandTimeoutSeconds", "saveSessions",
+        "maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "commandTimeoutSeconds", "browserCdpUrl", "saveSessions",
         "jevBaseUrl", "jevModel", "smartMode", "jevConfidenceFloor"
     ];
 
@@ -174,6 +185,7 @@ public sealed class AgentConfig
         "timeoutSeconds" => TimeoutSeconds.ToString(),
         "webTimeoutSeconds" => WebTimeoutSeconds.ToString(),
         "commandTimeoutSeconds" => CommandTimeoutSeconds.ToString(),
+        "browserCdpUrl"  => BrowserCdpUrl,
         "saveSessions"   => SaveSessions ? "true" : "false",
         "jevBaseUrl"     => JevBaseUrl,
         "jevModel"       => JevModel,
@@ -243,6 +255,14 @@ public sealed class AgentConfig
             case "commandTimeoutSeconds":
                 if (!int.TryParse(value, out var cmdSecs) || cmdSecs is < 1 or > 3600) { error = "commandTimeoutSeconds must be 1..3600"; return false; }
                 CommandTimeoutSeconds = cmdSecs;
+                return true;
+            case "browserCdpUrl":
+                var cdp = value.Trim();
+                if (cdp.Length == 0) cdp = DefaultBrowserCdpUrl;
+                if (!cdp.Equals("off", StringComparison.OrdinalIgnoreCase)
+                    && (!Uri.TryCreate(cdp, UriKind.Absolute, out var cdpUri) || cdpUri.Scheme is not ("http" or "https")))
+                { error = "browserCdpUrl must be an http URL like http://127.0.0.1:9222, or off"; return false; }
+                BrowserCdpUrl = cdp.TrimEnd('/');
                 return true;
             case "saveSessions":
                 if (!bool.TryParse(value, out var save)) { error = "saveSessions must be true or false"; return false; }
