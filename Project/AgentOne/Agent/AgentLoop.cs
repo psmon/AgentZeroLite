@@ -63,11 +63,28 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     /// </summary>
     public Func<ChatProviderStalledException, int, CancellationToken, Task<bool>>? OnStall { get; set; }
 
+    /// <summary>
+    /// True while the run carries out a design: a long job whose plan is in the
+    /// conversation. Measured (2026-11-06, music-harness): a grounded design for
+    /// "종말의 그날 1·2 뮤비" — read the rules, take stock, then write lore, lyrics,
+    /// the MV guide and a log — got through nine good steps, then the model asked
+    /// for the todo it had just read, twice. One repeat nudge per run, worded
+    /// "use it, or answer with final": the turn ended on Repeat at step 12 of 50
+    /// with nothing written. A build gets more nudges, and they name the next step.
+    /// </summary>
+    public bool Building { get; set; }
+
+    /// <summary>Repeat nudges a design-carrying run gets before a repeat ends it.</summary>
+    public const int BuildingRepeatNudges = 3;
+
+    /// <summary>The workspace's own instructions for agents, put in every system prompt from the next Reset on.</summary>
+    public WorkspaceGuideText? Guide { get; set; }
+
     public void Reset(string? memory = null)
     {
         if (memory is not null) _memory = memory;
         _messages.Clear();
-        _messages.Add(ChatMessage.System(SystemPrompt.Build(toolbelt.Scope, _memory)));
+        _messages.Add(ChatMessage.System(SystemPrompt.Build(toolbelt.Scope, _memory, Guide)));
     }
 
     /// <summary>
@@ -104,7 +121,7 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
         if (_messages.Count == 0) Reset();
         _messages.Add(ChatMessage.User(userPrompt));
 
-        var guards = new AgentLoopGuards();
+        var guards = new AgentLoopGuards(repeatNudgeBudget: Building ? BuildingRepeatNudges : 1);
         var steps = new List<AgentStep>();
         var sw = Stopwatch.StartNew();
 
@@ -117,6 +134,8 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
         var wrote = new List<string>();
         // Paths it read, listed or ran without writing — named back by basename just as often.
         var touched = new List<string>();
+        // Commands by shape (quoted values blanked), to see values being guessed.
+        var tried = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var languageNudged = false;
 
         for (int step = 1; step <= maxSteps; step++)
@@ -182,6 +201,16 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                 catch (ChatProviderException ex)
                 {
                     return Finish(StopReason.ProviderError, ex.Message, steps, sw);
+                }
+                catch (Exception ex)
+                {
+                    // Whatever a provider lets through, the turn still ends as a
+                    // turn: with its steps, so the result is logged, memory says
+                    // what was done, and a resume knows where it stopped.
+                    // Measured (2026-11-06): an IOException from a dropped stream
+                    // escaped here and the turn vanished after writing a file.
+                    Emit(steps, step, "provider-error", $"{ex.GetType().Name}: {ex.Message}", ok: false, stepClock.ElapsedMilliseconds);
+                    return Finish(StopReason.ProviderError, $"the model call failed: {ex.Message}", steps, sw);
                 }
             }
 
@@ -340,7 +369,12 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                     ? "[error] You already made that exact call and it FAILED: " + Services.WorkspaceStore.FirstLine(earlier.Detail, 300)
                       + "\nIt did not work and repeating it will not change that. Do something different, or tell the user"
                       + " plainly in \"final\" that it failed and why. Never report it as done."
-                    : "[error] You already made that exact call and have its result. Use it, or answer with \"final\"."));
+                    : Building
+                        ? "[error] You already made that exact call — its result is above in this conversation, and asking " +
+                          "again returns nothing new. Do not read it again. Carry on with the design: take its next step that " +
+                          "is not done yet — write that step's file with write_file, or run its command — and answer with " +
+                          "\"final\" only when the design's files exist."
+                        : "[error] You already made that exact call and have its result. Use it, or answer with \"final\"."));
                 continue;
             }
 
@@ -406,12 +440,57 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
 
             Emit(steps, step, call.Tool, Summarize(call, result), result.Ok, stepClock.ElapsedMilliseconds);
 
+            var guessNote = call.Tool == "run_command" && call.Arg("command") is { Length: > 0 } ran
+                ? GuessNote(ran, CameBackEmpty(result), tried) : null;
+
             _messages.Add(ChatMessage.Assistant(raw));
-            _messages.Add(ChatMessage.User($"[tool:{call.Tool}] {result.Text}"));
+            _messages.Add(ChatMessage.User($"[tool:{call.Tool}] {result.Text}" + (guessNote is null ? "" : "\n\n" + guessNote)));
         }
 
         return Finish(StopReason.MaxSteps, $"step budget ({maxSteps}) exhausted before the model answered", steps, sw);
     }
+
+    /// <summary>
+    /// A note when a command has now been run with two or more different quoted
+    /// values in the same place — values being tried, not looked up. Measured
+    /// (2026-11-07): dv-fetch.cjs --match "Apocalypse Day", then "Apocalypse",
+    /// "apocalypse-day", "C2" — one approval each, every one matching nothing —
+    /// while the song's own lyrics.md carried the title the site had used.
+    /// </summary>
+    internal static string? GuessNote(string command, bool empty, Dictionary<string, List<string>> tried)
+    {
+        // Only tries that found nothing count: the same script run over take 1,
+        // take 2, take 3 is work, not guessing.
+        if (!empty) return null;
+        var quoted = QuotedValue().Replace(command, "\"…\"");
+        if (quoted == command) return null;
+        // The same script reached by another path is the same command:
+        // "node dv-fetch.cjs …" failed, then "node stage-unity/…/dv-fetch.cjs …".
+        var shape = ScriptPath().Replace(quoted, m => Path.GetFileName(m.Value));
+        // Distinct values, not distinct commands: the same value at a corrected
+        // path is a retry of the path, not a new guess.
+        var value = string.Join(" ", QuotedValue().Matches(command).Select(m => m.Value));
+        if (!tried.TryGetValue(shape, out var values)) tried[shape] = values = [];
+        if (!values.Contains(value, StringComparer.Ordinal)) values.Add(value);
+        if (values.Count < 2) return null;
+
+        return $"[note] This is try {values.Count} of the same command with different quoted values ({string.Join(" · ", values)}). " +
+               "Trying values is guessing. Before running it again, look the value up: read the script's header to see " +
+               "what the option matches, then grep this work's own files (its folder, its lyrics, guide, notes and logs) " +
+               "for the name, title or id that was actually used, and run it once with that.";
+    }
+
+    /// <summary>A result that failed, was declined, or reports an error or an empty find.</summary>
+    internal static bool CameBackEmpty(ToolResult result) => !result.Ok || EmptyFind().IsMatch(result.Text);
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(?:ERR|error|no match\w*|not found|nothing|no such|no results?|0 results)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex EmptyFind();
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"[\w.\-/\\]+\.(?:cjs|mjs|js|py|sh|ps1)\b")]
+    private static partial System.Text.RegularExpressions.Regex ScriptPath();
+
+    [System.Text.RegularExpressions.GeneratedRegex("\"[^\"]*\"|'[^']*'")]
+    private static partial System.Text.RegularExpressions.Regex QuotedValue();
 
     private AgentStep Emit(List<AgentStep> steps, int index, string tool, string detail, bool ok, long elapsedMs = 0)
     {
@@ -489,6 +568,12 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
             if (File.Exists(Path.Combine(Root, path))) continue;
             if (ExistsBesideAWrite(Root, path, wrote)) continue;
             if (touched is not null && WasTouchedAndExists(Root, path, touched)) continue;
+            // A bare name ("plan.md") that is a file somewhere in the workspace.
+            // Measured (2026-11-07): an answer mentioned plan.md and
+            // asset_prompts.md (both under songs/x/mv/), was told they were not on
+            // disk, and the model rewrote one of them. A bare name cannot say which
+            // file it means; it is not evidence of a file that was never made.
+            if (!path.Contains('/') && ExistsAnywhere(Root, path)) continue;
             if (!missing.Contains(path)) missing.Add(path);
         }
         return missing;
@@ -510,11 +595,54 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
             // inside it (a command's output, a sibling it saw) counts.
             if (Directory.Exists(Path.Combine(root, t)) && File.Exists(Path.Combine(root, t, named))) return true;
 
+            // A bare name ("plan.md") anywhere a few levels under that folder.
+            // Measured (2026-11-07): after `ls -R songs/x`, the answer named
+            // plan.md (it is songs/x/mv/plan.md); flagged "not on disk", the model
+            // was told to write it and replaced a good plan with a new one.
+            if (!named.Contains('/') && Directory.Exists(Path.Combine(root, t)) && ExistsUnder(Path.Combine(root, t), named)) return true;
+
             if (!string.Equals(t, named, StringComparison.OrdinalIgnoreCase)
                 && !t.EndsWith("/" + named, StringComparison.OrdinalIgnoreCase)) continue;
             if (File.Exists(Path.Combine(root, t))) return true;
         }
         return false;
+    }
+
+    /// <summary>A file of that name anywhere in the workspace (generated and engine-cache folders skipped, bounded).</summary>
+    private static bool ExistsAnywhere(string root, string name)
+    {
+        var pending = new Stack<(string Dir, int Depth)>();
+        pending.Push((root, 0));
+        var seen = 0;
+        while (pending.Count > 0 && seen < 30_000)
+        {
+            var (dir, depth) = pending.Pop();
+            try
+            {
+                if (File.Exists(Path.Combine(dir, name))) return true;
+                if (depth >= 6) continue;
+                foreach (var sub in Directory.EnumerateDirectories(dir))
+                {
+                    seen++;
+                    if (!WorkspaceProbe.IsExcluded(Path.GetFileName(sub)) && !LocalFileToolbelt.IsEngineCache(dir, sub))
+                        pending.Push((sub, depth + 1));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* skip */ }
+        }
+        return false;
+    }
+
+    private static bool ExistsUnder(string dir, string name)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(dir, name, new EnumerationOptions
+            {
+                RecurseSubdirectories = true, MaxRecursionDepth = 3, IgnoreInaccessible = true, MatchCasing = MatchCasing.CaseInsensitive
+            }).Any();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return false; }
     }
 
     /// <summary>The paths a successful read/list/find/grep/run call names, for <see cref="WasTouchedAndExists"/>.</summary>
@@ -620,9 +748,25 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     {
         var (script, share) = DominantScript(request);
         if (script is null || share < 0.3) return null;
-        if (answer.Count(char.IsLetter) < 40) return null;
-        return answer.Any(c => ScriptOf(c) == script) ? null : script;
+        // Code and paths are Latin in every language: count prose only.
+        var prose = InlineCode().Replace(FencedBlock().Replace(answer, " "), " ");
+        var letters = prose.Count(char.IsLetter);
+        if (letters < 40) return null;
+        // Not "any letter of the script": measured (2026-11-06), a "재개" turn
+        // answered in English prose whose only Hangul was the title 「종말의 그날」,
+        // and the check passed it. A Korean answer that quotes English file names
+        // stays far above this share.
+        return (double)prose.Count(c => ScriptOf(c) == script) / letters >= AnswerScriptShare ? null : script;
     }
+
+    /// <summary>The share of an answer's prose letters that must be in the request's script.</summary>
+    internal const double AnswerScriptShare = 0.1;
+
+    [GeneratedRegex(@"```.*?```", RegexOptions.Singleline)]
+    private static partial Regex FencedBlock();
+
+    [GeneratedRegex(@"`[^`\n]*`")]
+    private static partial Regex InlineCode();
 
     private static (string? Script, double Share) DominantScript(string text)
     {

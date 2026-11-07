@@ -5,12 +5,22 @@ namespace AgentOne.Tools.Cli;
 /// <param name="Summary">One line for the system prompt.</param>
 /// <param name="Card">The usage the model would otherwise go and search the web for.</param>
 /// <param name="InstallHint">What to tell the user when it is missing. The agent never installs it itself.</param>
-public sealed record KnownCliTool(string Name, string[] Commands, string Summary, string Card, string InstallHint);
+/// <param name="PythonModule">
+/// The module it also runs as (`python -m yt_dlp`) when only pip installed it and no
+/// executable is on PATH. Measured (2026-11-06): yt-dlp 2026.06.09 was installed that
+/// way, the probe looked for an executable, and the prompt said it was missing.
+/// </param>
+public sealed record KnownCliTool(string Name, string[] Commands, string Summary, string Card, string InstallHint,
+    string? PythonModule = null);
 
 /// <param name="Path">Where it was found, or null when it is not installed.</param>
-public sealed record KnownCliStatus(KnownCliTool Tool, string? Path)
+/// <param name="Run">How to start it when that is not its name — "python -m yt_dlp" — or null.</param>
+public sealed record KnownCliStatus(KnownCliTool Tool, string? Path, string? Run = null)
 {
     public bool Installed => Path is not null;
+
+    /// <summary>What to type to run it.</summary>
+    public string Command => Run ?? Tool.Name;
 }
 
 /// <summary>
@@ -97,14 +107,18 @@ public static class KnownCli
         new("yt-dlp", ["yt-dlp"],
             "YouTube and video-site metadata and downloads",
             """
-            yt-dlp — facts about a video or channel without a browser.
+            yt-dlp — facts about a video or channel without a browser. A channel's WHOLE list comes back in one
+            call, where a browser page shows only the first screenful.
+              yt-dlp --flat-playlist --print "%(id)s %(title)s" "<channel-url>/videos"     every video of a channel
               yt-dlp --skip-download --print "%(upload_date)s %(title)s" <video-url>        when it was uploaded
-              yt-dlp --flat-playlist --print "%(id)s %(title)s" "<channel-url>/videos"     a channel's videos
               yt-dlp -j --skip-download <url>                                               everything, as JSON
               yt-dlp -x --audio-format mp3 -o "%(title)s.%(ext)s" <url>                    audio only
+            Titles come back machine-translated into English unless you ask for the channel's language:
+              add --add-header "Accept-Language:ko-KR" (or the language the user writes in).
+            --flat-playlist is fast but leaves upload_date empty; ask per video for dates.
             Respect the site's terms; download only what the user asked for.
             """,
-            "winget install yt-dlp.yt-dlp  (or pip install yt-dlp)"),
+            "winget install yt-dlp.yt-dlp  (or pip install yt-dlp)", PythonModule: "yt_dlp"),
 
         new("node", ["node"],
             "runs JavaScript (.js/.cjs/.mjs) and the workspace's npm scripts (npm, npx)",
@@ -179,14 +193,66 @@ public static class KnownCli
             "winget install jqlang.jq")
     ];
 
-    private static readonly Lazy<IReadOnlyList<KnownCliStatus>> Detected = new(() => Detect(ExecutableLocator.Find));
+    private static readonly Lazy<IReadOnlyList<KnownCliStatus>> Detected = new(() => Detect(ExecutableLocator.Find, PythonHasModule));
 
     /// <summary>Every known tool and where it is, probed once per process.</summary>
     public static IReadOnlyList<KnownCliStatus> Status => Detected.Value;
 
     /// <summary>Test seam: the same probe over any lookup.</summary>
-    internal static IReadOnlyList<KnownCliStatus> Detect(Func<string, string?> find) =>
-        All.Select(tool => new KnownCliStatus(tool, tool.Commands.Select(find).FirstOrDefault(p => p is not null))).ToList();
+    /// <param name="hasModule">Whether that python (full path) can run that module; null skips module probes.</param>
+    internal static IReadOnlyList<KnownCliStatus> Detect(Func<string, string?> find, Func<string, string, bool>? hasModule = null)
+    {
+        string? python = null;
+        var pythonLooked = false;
+        var list = new List<KnownCliStatus>();
+        foreach (var tool in All)
+        {
+            var path = tool.Commands.Select(find).FirstOrDefault(p => p is not null);
+            if (path is null && tool.PythonModule is { } module && hasModule is not null)
+            {
+                if (!pythonLooked) { python = find("python") ?? find("python3") ?? find("py"); pythonLooked = true; }
+                if (python is not null && hasModule(python, module))
+                {
+                    list.Add(new KnownCliStatus(tool, python, $"python -m {module}"));
+                    continue;
+                }
+            }
+            list.Add(new KnownCliStatus(tool, path));
+        }
+        return list;
+    }
+
+    /// <summary>`python -m &lt;module&gt; --version` exits 0 within a few seconds. Never fatal.</summary>
+    private static bool PythonHasModule(string python, string module)
+    {
+        try
+        {
+            var info = new System.Diagnostics.ProcessStartInfo(python)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            foreach (var arg in new[] { "-m", module, "--version" }) info.ArgumentList.Add(arg);
+            using var process = System.Diagnostics.Process.Start(info);
+            if (process is null) return false;
+            process.StandardInput.Close();
+            _ = process.StandardOutput.ReadToEndAsync();
+            _ = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(8000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+                return false;
+            }
+            return process.ExitCode == 0;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            return false;
+        }
+    }
 
     public static KnownCliTool? Find(string name)
     {
@@ -198,10 +264,11 @@ public static class KnownCli
                                        || (key is "npm" or "npx" && t.Name == "node")
                                        || (key is "uv" or "pip" && t.Name == "python")
                                        || (key is "ripgrep" && t.Name == "rg")
-                                       || (key is "youtube-dl" && t.Name == "yt-dlp"));
+                                       || (key is "youtube-dl" or "yt_dlp" && t.Name == "yt-dlp"));
     }
 
     /// <summary>The system prompt's line per installed tool, or empty when none is.</summary>
     public static string PromptLines(IReadOnlyList<KnownCliStatus> status) =>
-        string.Join("\n", status.Where(s => s.Installed).Select(s => $"  {s.Tool.Name} — {s.Tool.Summary}"));
+        string.Join("\n", status.Where(s => s.Installed).Select(s =>
+            $"  {s.Tool.Name} — {s.Tool.Summary}" + (s.Run is { } run ? $" (installed as a module: run it as `{run}`)" : "")));
 }

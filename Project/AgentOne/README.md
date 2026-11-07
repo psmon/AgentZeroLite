@@ -646,7 +646,14 @@ and the workspace keeps two things under `~/.agent-one/workspaces/<name>-<hash>/
 - **`sessions/`** — this workspace's transcripts. `/resume` lists them, newest
   first, each with its task name and turn count; `/resume 2` picks one up: the
   screen replays it as it was, the model gets its questions and answers back
-  as context, and the same file keeps being appended to.
+  as context, and the same file keeps being appended to. A turn that never
+  finished — stopped, failed, or cut off with no result — comes back too: its
+  request, why it ended, the tool steps it took and the head of its design, so
+  "재개" / "continue" carries on from the first step not done instead of
+  starting over. (A dropped connection is retried on its own twice before
+  anyone is asked, and whatever a provider throws ends the turn *with* its
+  steps — measured, a mid-stream drop once made a turn that had already
+  written a file vanish without a trace.)
 
 ```
 › /resume
@@ -670,6 +677,47 @@ and names nothing. With a TypeSafe key, each new request is first put to the
 decision engine as "same task or a new one?" (0.3 s), and the model is only
 asked for a new name when the task changed; without one, the task is named
 once per session. `run` and the echo provider never name anything.
+
+**The workspace's own instructions are read, and its files looked at, before
+anything is planned.** Measured (2026-11-06, music-harness): asked "종말의 그날
+1,2 를 통합해 뮤비작성을 진행해보자", agent-one never opened `AGENTS.md`, whose
+dispatch table sends "뮤비 만들어" to `harness/engine/mv-forge.md`, nor the todo
+that held both episodes' video ids, genre and art style. The strong model
+designed "join two local videos with ffmpeg" for 493 s, the build looked for
+the files that design invented, and the turn asked the person to put them in a
+folder it had just created. Three things now stand in the way:
+
+- **`AGENTS.md` / `CLAUDE.md`** (`Agent/WorkspaceGuide`) at the root go into
+  every system prompt as the owner's rules, and into the design request. Cut to
+  6 000 characters (4 000 for a design) at a heading, with the headings of the
+  rest listed so the model knows what to `read_file`; a `CLAUDE.md` that only
+  imports `@AGENTS.md` is skipped. Re-read on `/new` and `/resume`.
+- **The request's own words are searched for** (`Agent/WorkspaceProbe`, smart
+  mode, a workspace or unsure route): text files only, the file tools' skip
+  rules plus build caches, ≤ 6 000 files and 3 s (music-harness: 1 097 files,
+  0.3 s). A Korean word loses its particle (종말의 → 종말), and a word's weight
+  is how few files hold it, so "진행" or "make" scores nothing without a stop
+  list. The best files go to the model as `[workspace]` material and to the
+  design, whose prompt now says never to assume an input exists that the
+  context does not show, and never to offer a choice the context answers.
+- **An answer that hands the work back is checked** when the probe found files
+  and the turn read none of them: `SmartRouter.HandBackAsync` (proceeds /
+  hands_back — the claim check cannot see it: "put the videos in assets/in"
+  claims nothing false). A hand-back goes back once, with the files listed.
+  Every turn that used tools is asked now, not only one that changed nothing.
+- **A review must examine what it judges.** "Review the six takes" was once
+  answered by ranking them from their lengths and the plan. Such an answer
+  (`unbacked_review`) goes back once with a plan from the strong model, and a
+  command that only lists files (`Get-ChildItem`, `ls`) does not count as
+  examining them.
+- **Earlier work like this one is shown** (`Agent/WorkspacePrecedent`): when
+  the work lives in one folder of a collection (`songs/2026-11-07-x` among
+  other dated song folders), the newest siblings that got further are listed —
+  their scripts, media, logs, and the lines of their notes that say how a step
+  was run ("받기: `dv-fetch.cjs out 4 --match …`").
+- **Guessing is caught.** A command that reads a media file not on disk is
+  refused before anyone is asked; a second empty try of the same command with
+  a different quoted value gets a note to look the value up instead.
 
 When input or output is a pipe — or with `--plain` — the same conversation runs
 as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin
@@ -856,7 +904,20 @@ from a 27B one. If it says the request needs more, the strong model (step 3 of
 the TUI) gets the same material and thinks it through; its answer goes back into
 the everyday model's conversation as `[reasoning:<model>] …`, and *that* model
 writes the final answer — same voice, same language, borrowed thinking. A
-strong model that cannot be reached leaves the draft standing and says so.
+strong model that cannot be reached leaves the draft standing and says so. A
+**web turn** (a confident web route with page material) has a higher bar: it
+escalates only at ≥ 0.95, and never when the draft is mostly the pages' own
+words (≥ 60 % of its distinct words, `ShareFromMaterial`). A lookup is right or
+wrong by what was read, and the strong model reads the same pages — measured
+twice: eleven video titles sorted by topic, escalated at 0.94 and at 0.86, the
+same table back 169 s and 206 s later. What a lookup lacks is more reading.
+
+The strong model also gets the conversation's **earlier answers** (the last
+two, 2 500 characters each) — in the escalation and in the design pass alike.
+Measured: one turn sorted a channel's videos into a table, the next asked for a
+music video "from 종말의 그날 1 and 2"; the design pass got only the analysis's
+first line (the digest keeps numbered items, and a table has none) and designed
+"join two local video files (recommended)" out of nothing.
 
 ```console
 [smart] > How do I keep data consistent when moving to microservices?
@@ -1089,7 +1150,11 @@ it fails most. So each known tool has a PATH probe (PATHEXT-aware: npm installs
 `.cmd` shims) and a short card; the system prompt lists the installed ones and
 `cli_guide` hands out the card. A card teaches and grants nothing — the tool
 still runs through `run_command` and its gate. Missing tools are reported with
-their install line; the agent never installs them itself.
+their install line; the agent never installs them itself. A tool pip installed
+without an executable on PATH is found as its module (`python -m yt_dlp`, probed
+with `--version`), and the prompt and card say to run it that way — measured, a
+module-only yt-dlp was reported missing, and a channel analysis stopped at the
+eleven videos a browser page showed instead of the channel's 457.
 
 **The browser became verbs** (`Tools/Browser/`), because driving a page is many
 small calls a model should not have to spell as shell commands. They run

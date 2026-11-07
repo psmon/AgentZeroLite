@@ -82,4 +82,12 @@ public sealed class ChunkDelta
 {
     [JsonPropertyName("content")]
     public string? Content { get; set; }
+
+    /// <summary>A thinking model's reasoning, streamed before its answer (LM Studio, vLLM, DeepSeek).</summary>
+    [JsonPropertyName("reasoning_content")]
+    public string? ReasoningContent { get; set; }
+
+    /// <summary>The same, as some servers name it.</summary>
+    [JsonPropertyName("reasoning")]
+    public string? Reasoning { get; set; }
 }

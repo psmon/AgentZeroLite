@@ -992,6 +992,16 @@ never quietly builds without its plan on a stall. Unattended (`run`, a
 background session nobody is attached to) the recommendation is retry twice
 (`UnattendedStallRetries`), then the last option, so a dead endpoint cannot
 retry forever. Tests: `StallRetryTests`.
+**A dropped connection is a stall too, and a turn never vanishes** (`ResumeAfterDropTests`). Measured (2026-11-06):
+mid-stream, a long MV build's connection dropped after it had written the lore file; the `IOException` escaped
+(`StreamAsync` caught only the idle cancel), and the turn ended with no result, no memory, no steps. Now an
+`IOException`/`HttpRequestException` while sending or reading is `ChatProviderStalledException { Dropped = true }`,
+retried on its own twice (5 s, 20 s; `DroppedRetryDelay`) before `Chooser` is asked; `AgentLoop` turns anything else a
+provider throws into `ProviderError` **with the steps so far**; and `ChatSession.Resume` restores a turn with no
+successful result as its request + `UnfinishedNote` (why, the tool steps it took, the design's head), so "재개" after a
+restart carries on from the first step not done — a short request right after an unfinished turn also gets the build's
+repeat allowance. `WrongScript` now counts the request's script as a share of the answer's prose (code and inline
+code removed, ≥ 10 %): an English answer whose only Hangul was a title used to pass.
 
 **A report is held against the tool record before anything builds on it.**
 Measured (2026-09-29): asked to write and run unit tests, the model called no
@@ -1089,6 +1099,63 @@ for that site for the session. Both working routes (web, workspace) admit the fa
 action backs an "I did it" claim like a command. `ToolSpec.Repeat` (`RepeatRule`): looks (`browser_snapshot`,
 `browser_read`, `process_status`…) are a repeat only twice in a row, actions repeated on purpose (End to load
 more) never — the old rule ended a browsing turn on the second snapshot after a click.
+
+**The workspace is read before anything is planned** (`Agent/WorkspaceGuide`, `Agent/WorkspaceProbe`,
+`WorkspaceGroundingTests`). Measured (2026-11-06, music-harness): "종말의 그날 1,2 를 통합해 뮤비작성" — agent-one
+never opened AGENTS.md (its dispatch table sends "뮤비 만들어" to `harness/engine/mv-forge.md`) nor the todo holding
+both episodes' ids, genre and art style; the strong model designed "join two local videos with ffmpeg" for 493 s,
+and the turn asked the person to supply the files it had invented. Now: root `AGENTS.md` / `CLAUDE.md` go into every
+system prompt (6 000 chars, cut at a heading with the rest's headings listed; an `@AGENTS.md`-only CLAUDE.md is
+skipped; re-read on reset) and into the design request (4 000); in smart mode a workspace/unsure route first searches
+the request's own words in text files (particle-stripped Korean, IDF-weighted so generic words score nothing, ≤ 6 000
+files / 3 s) and hands the best files to the model as `[workspace]` material and to the design, whose prompt forbids
+assuming inputs the context does not show; and when the probe found files the turn never read, `HandBackAsync`
+(proceeds / hands_back) sends a hand-back answer back once with those files (`ChecksClaims` is its test switch,
+`ProbesWorkspace` the probe's). **Analysis → work in one session** is the case this serves: the design pass and the
+escalation now get the conversation's last two answers (`EarlierAnswers`, 2 500 chars each) — the design used to get
+only `Digest()` (an answer's first line + numbered items; a table has none), so "make the MV from those two episodes"
+was designed blind. memory.md keeps an answer as de-marked-up text (`MemoryText`: no `**`/`###`/table rules, cells
+joined with " · ", 600 chars) instead of 300 raw characters; the worth-saving option names looked-up facts (titles,
+dates, ids, links) as knowledge; an escalated turn keeps the draft's steps (memory said "did: (no tools)" after a
+`browser_open`). Session logs are NOT searched automatically — an earlier session is reached by `/resume`. A web turn
+(steered web route with page material) escalates only at ≥ 0.95 and never when the draft is ≥ 60 % the pages' own
+words (`ShareFromMaterial`) — measured 0.94 / 0.86, the same table back after 169 s / 206 s. Also
+`KnownCliTool.PythonModule` finds a pip-only tool (`python -m yt_dlp`); PowerShell hints say a command inside `-and`
+needs its own parentheses. Measured on the e2e runs of the same chain: a design-carrying run (`AgentLoop.Building`)
+gets 3 repeat nudges that name the next step instead of "use it, or answer with final" (one re-read of a todo ended a
+50-step build at step 12 with nothing written); gemma's `key:="…"` / `key="…"` is a string (`GemmaNativeCall` —
+PowerShell was handed `="Get-Content AGENTS.md"` three times); the design and system prompts say files are read with
+read_file, never Get-Content/cat, and the design stays under ~3 000 characters (a 7 351-char one took 1 002 s).
+
+**A report is held to what the tools examined, and the next step comes from earlier work like it**
+(2026-11-07 e2e, music-harness: generate on deevid → review the takes; `ResumeAfterDropTests.cs`). The review step
+failed for a day in ways each fix below names: the everyday model ranked six takes from their lengths and the plan,
+read its own earlier unmeasured report back as evidence, guessed `--match` values, and handed "upload the mp3s" back.
+- **Review claims** — `SmartRouter.UnbackedReview` (judging files/media no tool examined); a listing command
+  (`ChatSession.ListsOnly`: Get-ChildItem, ls, Select-Object…) examines nothing, so it no longer backs a review — the
+  engine's 0.97 was ignored once because `Get-ChildItem` had succeeded; an unsure `backed` (< floor) yields to an
+  unbacked runner-up with ≥ 25 % (`UnsureBackedYields`, measured "backed" at 0.31). The redo is planned by the strong
+  model (`PlanRedoAsync`) over `DesignContext`.
+- **Precedent** (`Agent/WorkspacePrecedent`) — the work folder's newest siblings that got further (songs/2026-11-05-x
+  beside songs/2026-11-07-y): their files, script folders, media, the logs named after them, and **`how:` lines** — the
+  lines of their notes/logs that name a script ("받기: `dv-fetch.cjs out 4 --match …`", "측정: `mv/judge-takes.py`").
+  Names alone were not enough: the model never opened notes.md. A fresh session takes the work folder from what the
+  turn looked at most (`WorkFolderLookedAt`), not only from writes.
+- **Hand-back** is asked of every tool-using smart turn (writing + running no longer exempts it: a turn wrote two
+  reports, ran ffprobe over nothing and asked for an upload).
+- **Commands** — reading a media file that is not on disk is refused before anyone is asked
+  (`MissingMediaInputs`; output flags and the last of several media paths are writes); trying a second different
+  quoted value of the same command after an empty result gets a note to look the value up instead
+  (`AgentLoop.GuessNote`, script path normalised to its name; `CameBackEmpty` counts `ERR`/`no match` text because
+  `…; Pop-Location` exits 0).
+- **Model limits** — the everyday model's reasoning is also bounded by time (`ThinkingLimitTime` 12 min, strong model
+  40 min; gemma at ~15 tok/s sat 34 min under the 60 000-char cap) and the strong model's char cap is 240 000; a bare
+  file name found anywhere in the workspace is not "missing" (`ExistsAnywhere` — the false verdict overwrote a Korean
+  lyrics.md in English); a broken call in a ```json fence is an envelope, not an answer.
+Outcome: agent-one found the download script, fixed its path and reached deevid's history, but never fetched the
+takes — the match text it needed (the prompt's first words, recorded in `harness/knowledge/tools/input-types.md`) was
+never looked up. Repeated failed turns also poison what comes next: their reports, memory.md and graph facts are read
+back as evidence.
 
 ## Documentation pairs — update both languages together
 

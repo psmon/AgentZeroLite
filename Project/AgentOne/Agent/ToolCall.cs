@@ -77,6 +77,11 @@ public sealed class ToolCall
     public static bool LooksLikeEnvelope(string raw)
     {
         var text = raw.TrimStart();
+        // A call in a code fence is still a call. Measured (2026-11-07): the
+        // reply "```json\n{"tool":"find_files","args":{"pattern":"*그날*",path":"."}}\n```"
+        // (one quote missing) was accepted as a 69-char answer and escalated.
+        if (text.StartsWith("```", StringComparison.Ordinal) && text.IndexOf('\n') is var nl and > 0)
+            text = text[(nl + 1)..].TrimStart();
         return GemmaNativeCall.Contains(text)
                || text.StartsWith('{') && text.Contains("\"tool\"", StringComparison.Ordinal);
     }

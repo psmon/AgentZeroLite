@@ -69,6 +69,7 @@ public sealed class BrowserToolbelt(IBrowserDriver driver, string cdpUrl) : IToo
     public void ClearGrants()
     {
         lock (_grantedSites) _grantedSites.Clear();
+        lock (_clicked) _clicked.Clear();
     }
 
     public async Task<ToolResult> InvokeAsync(ToolCall call, CancellationToken ct)
@@ -193,10 +194,37 @@ public sealed class BrowserToolbelt(IBrowserDriver driver, string cdpUrl) : IToo
 
         var connect = await EnsureAsync(null, ct);
         if (!connect.Ok) return connect;
-        var allowed = await AllowedAsync($"{verb} {target}", ct);
+
+        // The same button clicked again on the same page is asked about every
+        // time, whatever the site grant. Measured (2026-11-07, deevid): the
+        // generate button showed no change at once, the model clicked it three
+        // times, and three generations spent 12 credits where one was meant.
+        var key = $"{CurrentUrl}|{verb} {target}";
+        bool again;
+        lock (_clicked) again = verb == "click" && !_clicked.Add(key);
+        var allowed = again
+            ? await AgainAsync($"click {target} AGAIN — it was already clicked on this page; if it started something " +
+                               "(a generation, a submission, a purchase) a second click does it twice", ct)
+            : await AllowedAsync($"{verb} {target}", ct);
         if (!allowed.Ok) return allowed;
 
         return await AfterActionAsync(await RunAsync([verb, target, .. rest], ct), $"{verb} {target}", ct);
+    }
+
+    /// <summary>Actions already taken, by page and ref: a repeat is a question, not a reflex.</summary>
+    private readonly HashSet<string> _clicked = new(StringComparer.Ordinal);
+
+    /// <summary>A repeated click: always put to the person, never covered by the site's grant.</summary>
+    private async Task<ToolResult> AgainAsync(string what, CancellationToken ct)
+    {
+        if (Gate is null)
+            return ToolResult.Failure("not done: that was already clicked on this page. Look at the page " +
+                                      "(browser_snapshot) — what the first click started may still be running.");
+        var verdict = await Gate(what, SiteOf(CurrentUrl), ct);
+        return verdict.Allowed
+            ? ToolResult.Success("")
+            : ToolResult.Failure("not done: the user did not want it clicked again. What the first click started may " +
+                                 "still be running — look with browser_snapshot instead.");
     }
 
     /// <summary>An action's result is followed by the page as it now is — the next decision needs it.</summary>

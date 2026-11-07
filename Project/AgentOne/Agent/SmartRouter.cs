@@ -159,7 +159,8 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         new(UnsafeOption,
             "Could damage or expose something beyond the project: deletes or overwrites outside the folder, changes " +
             "system or user settings, needs elevated rights, sends data or secrets somewhere, is irreversible " +
-            "(force-push, history rewrite, wiping data), or is not clearly understood.")
+            "(force-push, history rewrite, wiping data), spends money or credits or publishes, posts, uploads or " +
+            "generates something on an external service account, or is not clearly understood.")
     ];
 
     /// <summary>Raised as each question is asked, for the progress line.</summary>
@@ -229,12 +230,19 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     /// answer: a command runs unasked only when the engine says safe and is
     /// sure of it. Anything else — unsafe, unsure, failed — goes to a person.
     /// </summary>
-    public async Task<SafetyDecision> SafetyAsync(string command, string workspaceRoot, string shell, CancellationToken ct)
+    /// <param name="scriptNotes">
+    /// What a script the command runs says about itself (its header comments), or empty. Measured
+    /// (2026-11-07): `node stage-unity/Tools/deevid/dv-gen.cjs guide.md` reads as "run a project file";
+    /// only the script's own first line says it submits a generation that spends the person's credits.
+    /// </param>
+    public async Task<SafetyDecision> SafetyAsync(string command, string workspaceRoot, string shell, CancellationToken ct,
+        string scriptNotes = "")
     {
         ActivityStarted?.Invoke("judging whether the command is safe");
 
         var state = $"A command-line agent wants to run this {shell} command in the project folder {workspaceRoot}:\n\n"
                     + command
+                    + (scriptNotes.Length > 0 ? "\n\nWhat the script it runs says about itself:\n" + scriptNotes : "")
                     + "\n\nThe agent may only change files inside that folder. Nothing outside it should be modified.";
 
         var decision = await engine.ChooseAsync(state, SafetyQuestion, SafetyOptions, ct);
@@ -302,10 +310,12 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     [
         new(SaveKnowledge,
             "Yes: a fact about how this project is built or laid out, a decision and its reason, an error and its fix, " +
-            "a command that works, a constraint discovered. Worth keeping and finding again."),
+            "a command that works, a constraint discovered — or facts looked up for this project's work: names, " +
+            "titles, dates, ids or links found on a page or in a tool's output that a later request may refer to. " +
+            "Worth keeping and finding again."),
         new(SkipKnowledge,
-            "No: a greeting, a question answered from general knowledge, a routine read with nothing learned, a failed " +
-            "turn that taught nothing, or something the files already say plainly.")
+            "No: a greeting, a question answered from general knowledge (not from a page or tool read this turn), a " +
+            "routine read with nothing learned, a failed turn that taught nothing, or something the files already say plainly.")
     ];
 
     public static readonly DecisionOption[] GraphHelpsOptions =
@@ -461,6 +471,7 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const string ClaimsBacked = "backed";
     public const string UnbackedChange = "unbacked_change";
     public const string UnbackedRun = "unbacked_run";
+    public const string UnbackedReview = "unbacked_review";
 
     public const string ClaimQuestion =
         "Does the answer present work as done that the tool calls listed do not show? Judge by the list alone, " +
@@ -476,7 +487,14 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
             "successful write_file in the list shows it."),
         new(UnbackedRun,
             "The answer reports running a command, a build or tests, or states their results (passed, failed, output, " +
-            "counts), but no successful run_command in the list shows it.")
+            "counts), but no successful run_command in the list shows it."),
+        // Measured (2026-11-07): asked to review six generated takes, the answer
+        // ranked them as an "expert review" from their lengths and the plan — no
+        // take was downloaded, played, measured or transcribed.
+        new(UnbackedReview,
+            "The answer judges, compares, ranks or recommends specific files, recordings, takes, images or pages by " +
+            "qualities (sound, words, look, quality) that no tool call in the list examined — it reasons from their " +
+            "names, lengths or a plan instead.")
     ];
 
     /// <summary>
@@ -494,6 +512,37 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
                     + "\n\nTool calls this turn:\n" + (did.Length == 0 ? "(none — no tool was called)" : did)
                     + "\n\nAnswer:\n" + Clip(answer, DraftChars);
         return await engine.ChooseAsync(state, ClaimQuestion, ClaimOptions, ct);
+    }
+
+    // -------------------------------------------------------- hand-back
+
+    public const string Proceeds = "proceeds";
+    public const string HandsBack = "hands_back";
+
+    public const string HandBackQuestion =
+        "Does the answer stop and hand the work back to the user, instead of doing or answering what was asked?";
+
+    public static readonly DecisionOption[] HandBackOptions =
+    [
+        new(Proceeds,
+            "The answer does the work, answers the question or reports what was found. If it asks the user anything, " +
+            "it is a choice only they can make — a preference, a go-ahead — not something for them to supply."),
+        new(HandsBack,
+            "The answer asks the user to provide, find or place files, data, links or details, to do a step " +
+            "themselves, or to pick between versions or options it laid out — instead of going ahead with the " +
+            "default or the one it would recommend — before the work can go on.")
+    ];
+
+    /// <summary>
+    /// Whether the answer hands the work back to the person. Asked only when the
+    /// workspace holds files that mention the request and the turn read none of
+    /// them — the claim check cannot see this: "please put the videos in
+    /// assets/in" claims nothing false (ChatSession.CheckHandBackAsync).
+    /// </summary>
+    public async Task<Decision> HandBackAsync(string request, string answer, CancellationToken ct)
+    {
+        var state = "Request:\n" + request + "\n\nAnswer:\n" + Clip(answer, DraftChars);
+        return await engine.ChooseAsync(state, HandBackQuestion, HandBackOptions, ct);
     }
 
     // -------------------------------------------------------- escalation

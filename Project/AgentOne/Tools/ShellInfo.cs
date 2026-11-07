@@ -38,14 +38,23 @@ public sealed record ShellInfo(string Exe, ShellDialect Dialect, string Version)
         ShellDialect.Pwsh =>
             "It is PowerShell, not bash: chain with && or ;, make folders with " +
             "`New-Item -ItemType Directory -Force a, b` (mkdir takes one path and has no -p), delete with " +
-            "`Remove-Item -Recurse -Force`, read variables as $env:NAME.",
+            "`Remove-Item -Recurse -Force`, read variables as $env:NAME. " + CommandsInExpressions,
         ShellDialect.WindowsPowerShell =>
             "It is Windows PowerShell 5.1, not bash and not PowerShell 7: && and || do NOT exist — chain with ; " +
             "or `if ($?) { … }`; make folders with `New-Item -ItemType Directory -Force a, b` (mkdir takes one path " +
-            "and has no -p), delete with `Remove-Item -Recurse -Force`, read variables as $env:NAME.",
+            "and has no -p), delete with `Remove-Item -Recurse -Force`, read variables as $env:NAME. " + CommandsInExpressions,
         ShellDialect.Bash => "Chain with &&, make folders with `mkdir -p a b`, read variables as $NAME.",
         _ => "It is POSIX sh, not bash: no [[ ]], no arrays; chain with &&, make folders with `mkdir -p a b`."
     };
+
+    /// <summary>
+    /// Measured (2026-11-06): `if (-not (Test-Path "a" -and Test-Path "b"))` — PowerShell
+    /// handed -and to Test-Path as a parameter ("매개 변수 이름 'and'과(와) 일치하는 매개 변수를 찾을
+    /// 수 없습니다"), and the model sent the same line again.
+    /// </summary>
+    internal const string CommandsInExpressions =
+        "A command inside an expression needs its own parentheses: `(Test-Path a) -and (Test-Path b)` — " +
+        "written `Test-Path a -and Test-Path b`, -and is taken as a parameter of Test-Path and the line fails.";
 
     private static string Or(string value, string fallback) => value.Length > 0 ? value : fallback;
 

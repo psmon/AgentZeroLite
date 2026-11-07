@@ -246,6 +246,7 @@ public sealed partial class ChatSession : IAgentSession
         _loop = new AgentLoop(_provider, _toolbelt, config.MaxSteps) { Streaming = streaming, Root = _root };
         _loop.OnStall = async (stall, retries, ct) =>
             await AskAfterStallAsync(_config.Model, stall, retries, [StopTurnOption], ct) == 0;
+        _loop.Guide = WorkspaceGuide.Load(_root);
         _loop.Reset(Workspace.MemoryForPrompt());
         _loop.ActivityStarted += what => ActivityStarted?.Invoke(what);
         _loop.StepCompleted += step =>
@@ -299,7 +300,12 @@ public sealed partial class ChatSession : IAgentSession
     /// <summary>Forgets the conversation, the counters, the grants and the title; keeps the mode, the log and the memory.</summary>
     public void Reset()
     {
+        // Read again: the owner may have edited it since the session started.
+        _loop.Guide = WorkspaceGuide.Load(_root);
         _loop.Reset(Workspace.MemoryForPrompt());
+        _unfinished = false;
+        _lastRequest = null;
+        _workFolder = null;
         _state.Reset();
         _files.ClearGrants();
         _browser.ClearGrants();
@@ -330,16 +336,44 @@ public sealed partial class ChatSession : IAgentSession
         Reset();
 
         string? pending = null;
+        var steps = new List<SessionEntry>();
+        string? design = null;
+
+        // A turn with no successful result — stopped, failed, or cut off with no
+        // result at all — used to be dropped: its request and everything it did
+        // were gone from the resumed context. Measured (2026-11-06): a long MV
+        // build lost its connection after writing the lore file; a resume would
+        // have known neither the request nor the file.
+        void RestoreUnfinished(string why)
+        {
+            if (pending is null) return;
+            _loop.Restore(pending, UnfinishedNote(why, steps, design));
+            _unfinished = true;
+        }
+
         foreach (var entry in entries)
         {
             switch (entry.Kind)
             {
                 case "prompt":
+                    RestoreUnfinished("it was cut off before it ended");
                     pending = entry.Text;
+                    if (SmartRouter.Applies(entry.Text)) _lastRequest = entry.Text;
+                    steps.Clear();
+                    design = null;
+                    _unfinished = false;
                     _state.CountTurn();
                     break;
+                case "step" when entry.Tool == ReasoningSubtask.DesignTag + "-text":
+                    design = entry.Text;
+                    break;
+                case "step":
+                    steps.Add(entry);
+                    if (entry.Tool == "write_file" && entry.Ok == true) NoteWorkFolder(entry.Text);
+                    break;
                 case "result":
-                    if (pending is not null && entry.Ok == true) _loop.Restore(pending, entry.Text);
+                    if (pending is not null && entry.Ok == true) { _loop.Restore(pending, entry.Text); _unfinished = false; }
+                    else RestoreUnfinished($"it stopped ({entry.Tool}): {WorkspaceStore.FirstLine(entry.Text, 160)}");
                     pending = null;
                     break;
                 case "title":
@@ -347,12 +381,106 @@ public sealed partial class ChatSession : IAgentSession
                     break;
             }
         }
+        RestoreUnfinished("it was cut off before it ended");
 
         _log = SessionStore.Open(path);
         _log.Resumed();
         if (Title is { } title) TitleChanged?.Invoke(title);
         return entries;
     }
+
+    /// <summary>Steps of an unfinished turn shown on resume, newest kept.</summary>
+    internal const int UnfinishedSteps = 25;
+
+    /// <summary>
+    /// What a resumed conversation is told about a turn that did not finish:
+    /// why, what its tools did (the files written are the progress), and the
+    /// head of its design — so "재개" / "continue" carries on from there.
+    /// </summary>
+    internal static string UnfinishedNote(string why, IReadOnlyList<SessionEntry> steps, string? design)
+    {
+        var sb = new StringBuilder($"(This turn did not finish — {why}. What it had done before that:");
+        // "learned" is the turn before, distilled after it ended; not this turn's work.
+        var done = steps.Where(s => s.Tool is not (null or "final" or "unwrapped" or "reasoning-text" or "(unparsed)" or "learned")).ToList();
+        if (done.Count == 0) sb.Append("\n- nothing yet");
+        foreach (var s in done.Skip(Math.Max(0, done.Count - UnfinishedSteps)))
+            sb.Append("\n- ").Append(s.Tool).Append(s.Ok == false ? " (failed)" : "").Append(": ").Append(WorkspaceStore.FirstLine(s.Text, 160));
+        if (design is { Length: > 0 })
+            sb.Append("\n\nThe design it was following (head):\n").Append(Clip(design, 2_000));
+        sb.Append("\n\nWhen the user says to resume or continue, check what is already on disk and carry on from the first " +
+                  "step that is not done — do not start over.)");
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// The last turn ended without finishing (stopped, failed, or cut off). A
+    /// short "재개" / "continue" right after one is a build resumed, and gets
+    /// the build's repeat allowance.
+    /// </summary>
+    private bool _unfinished;
+
+    /// <summary>The last request long enough to stand on its own — what "진행해" / "go on" refers to.</summary>
+    private string? _lastRequest;
+
+    /// <summary>The collection folder the session's latest writes went into (songs/2026-11-07-x), or null.</summary>
+    private string? _workFolder;
+
+    /// <summary>Remembers where a written path's work lives; a step detail "path=a/b/c.md content=…" or a bare path.</summary>
+    private void NoteWorkFolder(string detail)
+    {
+        var path = detail.StartsWith("path=", StringComparison.Ordinal) ? detail[5..] : detail;
+        var cut = path.IndexOf(" content=", StringComparison.Ordinal);
+        if (cut >= 0) path = path[..cut];
+        cut = path.IndexOf(" ->", StringComparison.Ordinal);
+        if (cut >= 0) path = path[..cut];
+        if (WorkspacePrecedent.WorkFolderOf(_root, path.Trim()) is { } folder) _workFolder = folder;
+    }
+
+    /// <summary>
+    /// With no write to go by, the work folder the turn looked at most: the
+    /// collection folder of each path a successful file step named (a folder path
+    /// counts as itself), the most named one winning, the earliest on a tie.
+    /// </summary>
+    private void NoteWorkFolderFromLooks(AgentRun run)
+    {
+        if (WorkFolderLookedAt(_root, run.Steps) is { } folder) _workFolder = folder;
+    }
+
+    internal static string? WorkFolderLookedAt(string root, IEnumerable<AgentStep> steps)
+    {
+        var counts = new Dictionary<string, (int Count, int First)>(StringComparer.OrdinalIgnoreCase);
+        var order = 0;
+        foreach (var step in steps)
+        {
+            if (!step.Ok || step.Tool is not ("list_files" or "read_file" or "find_files" or "grep" or "write_file")) continue;
+            var path = PathArgument(step.Detail);
+            if (path is null || path is "." or "") continue;
+            var probe = Directory.Exists(Path.Combine(root, path)) ? path.TrimEnd('/', '\\') + "/_" : path;
+            if (WorkspacePrecedent.WorkFolderOf(root, probe) is not { } folder) continue;
+            counts[folder] = counts.TryGetValue(folder, out var c) ? (c.Count + 1, c.First) : (1, order++);
+        }
+        return counts.Count == 0 ? null
+            : counts.OrderByDescending(kv => kv.Value.Count).ThenBy(kv => kv.Value.First).First().Key;
+    }
+
+    /// <summary>The path= argument of a step detail ("pattern=*.mp3 path=songs/x -> …"), or null.</summary>
+    private static string? PathArgument(string detail)
+    {
+        var at = detail.StartsWith("path=", StringComparison.Ordinal) ? 0 : detail.IndexOf(" path=", StringComparison.Ordinal) + 1;
+        if (at < 0 || (at == 0 && !detail.StartsWith("path=", StringComparison.Ordinal))) return null;
+        var path = detail[(at + 5)..];
+        foreach (var end in new[] { " content=", " ->", " pattern=", " text=" })
+        {
+            var cut = path.IndexOf(end, StringComparison.Ordinal);
+            if (cut >= 0) path = path[..cut];
+        }
+        return path.Trim().Trim('"');
+    }
+
+    /// <summary>The precedent material for the current work folder, or empty.</summary>
+    internal string Precedent() => WorkspacePrecedent.Material(_root, _workFolder);
+
+    private string PrecedentSuffix() => Precedent() is { Length: > 0 } p ? "\n" + p : "";
 
     /// <summary>The status view's numbers, taken now.</summary>
     public SessionStats Stats()
@@ -565,6 +693,20 @@ public sealed partial class ChatSession : IAgentSession
             asked = line + "\n\n" + reference;
             _log?.Step(new AgentStep(0, "reference", reference, true));
         }
+
+        // "생성 진행해", "재개", "go on": too short to route, and it means the
+        // last real request. Measured (2026-11-07): after "종말의 그날 곡 다비드로
+        // 생성 진행해줘", the reply "생성 진행해" was taken as "generate the MV's
+        // image assets" — a prompt document for Midjourney was written and the
+        // music was never generated. The model is told what it continues; the
+        // after-turn checks judge the answer against that request, not two words.
+        var subject = line;
+        if (!SmartRouter.Applies(line) && _lastRequest is { } earlier && ResolveReference(line) is null)
+        {
+            asked += $"\n\n[context] This short reply continues the earlier request: \"{WorkspaceStore.FirstLine(earlier, 300)}\"";
+            subject = earlier + "\n(the user, continuing: " + line + ")";
+        }
+        if (SmartRouter.Applies(line)) _lastRequest = line;
         _loop.Request = line;
 
         var prompt = asked;
@@ -573,6 +715,8 @@ public sealed partial class ChatSession : IAgentSession
         var stopped = false;
         string? designText = null;
         PdsaTurn? pdsa = null;
+        ProbeResult? probe = null;
+        var lookup = false;
 
         // The task is (re)named from the request, in the background, as the turn
         // starts — so the header says "게시판 API 개발" seconds in, not minutes
@@ -594,6 +738,25 @@ public sealed partial class ChatSession : IAgentSession
                 families = route.Families;
             }
 
+            // A web lookup is answered from the pages it reads (see MaybeEscalateAsync).
+            lookup = route.Steers && route.Route == Route.Web;
+
+            // Work in the workspace, or work whose shape is unclear, may be big
+            // enough to design first. A confident web lookup or plain answer
+            // never is — but an unsure route keeps every tool, so it is sized too:
+            // "make a board API" once routed answer_directly at 0.58 and got no
+            // design for exactly the request that needed one.
+            var mayBuild = !route.Steers || route.Route == Route.Files;
+
+            // What the request names may already be in the workspace. Looked for
+            // before anything is designed or built, and handed to both models.
+            if (mayBuild && ProbesWorkspace && SmartRouter.Applies(line))
+            {
+                probe = await ProbeAsync(line, ct);
+                if (probe.Found) prompt = prompt + Environment.NewLine + Environment.NewLine + probe.Material();
+                if (Precedent() is { Length: > 0 } precedent) prompt = prompt + Environment.NewLine + Environment.NewLine + precedent;
+            }
+
             // Before any file is scanned: does the graph already know? The
             // engine says whether to look and which query to run; what comes
             // back is material for the model, and the graph remembers it helped.
@@ -605,15 +768,9 @@ public sealed partial class ChatSession : IAgentSession
                     prompt = prompt + Environment.NewLine + Environment.NewLine + consult.Material();
             }
 
-            // Work in the workspace, or work whose shape is unclear, may be big
-            // enough to design first. A confident web lookup or plain answer
-            // never is — but an unsure route keeps every tool, so it is sized too:
-            // "make a board API" once routed answer_directly at 0.58 and got no
-            // design for exactly the request that needed one.
-            var mayBuild = !route.Steers || route.Route == Route.Files;
             if (_reasoning is not null && mayBuild)
             {
-                var (design, stop) = await MaybeDesignAsync(line, ct);
+                var (design, stop) = await MaybeDesignAsync(line, probe, ct);
                 if (stop)
                 {
                     // The person chose to end the turn at the stalled design.
@@ -638,26 +795,70 @@ public sealed partial class ChatSession : IAgentSession
         }
 
         var before = _loop.Messages.Count;
-        var run = await _loop.RunAsync(prompt, ct, families);
+        AgentRun run;
+        // "재개" after a build that did not finish is that build, resumed.
+        _loop.Building = designed || (_unfinished && !SmartRouter.Applies(line));
+        try { run = await _loop.RunAsync(prompt, ct, families); }
+        finally { _loop.Building = false; }
+        _unfinished = !run.Succeeded;
+        // The checks below hand the precedent to the redo, and a fresh session has
+        // written nothing yet. Measured (2026-11-07, /new then "review the takes"):
+        // the turn listed songs/2026-11-07-x twice, the redo plan came without the
+        // sibling song folders and their download log, and the model never found
+        // where the takes were.
+        if (_workFolder is null) NoteWorkFolderFromLooks(run);
 
         // Before anything builds on the answer, hold its report against what the
         // tools actually did. A turn that had to be sent back is not escalated:
         // measured, the strong model polished an unbacked "tests performed"
         // into a completion report — it sees the draft, not the disk.
+        // The checks judge the answer, not the request: "재개" is too short to
+        // route, but a turn it started that used tools is real work and is held
+        // to its report like any other.
+        var checks = smart || (snapshot.Smart && ToolSteps(run) > 0);
         var checkedClaims = false;
-        if (smart && run.Succeeded && ChecksClaims)
-            (run, checkedClaims) = await CheckClaimsAsync(line, run, ct);
+        if (checks && run.Succeeded && ChecksClaims)
+            (run, checkedClaims) = await CheckClaimsAsync(subject, run, ct, probe);
+
+        // An answer that hands the work back goes back once: with the files that
+        // hold what it asked for, when the workspace has them and the turn did
+        // not look; or, for a turn that worked with tools and changed nothing,
+        // with the order to go ahead. Measured (2026-11-07): "재개" on "generate
+        // it with deevid" read the right guides, then laid out two versions of
+        // the three fields and asked which one — nothing written, nothing run.
+        var handedBack = false;
+        var unread = probe is { Found: true } && !LookedAt(run, probe);
+        // Not only "changed nothing": measured, a turn wrote a prompt document and
+        // then told the user it was their turn to generate. Nor does writing and
+        // running settle it: measured (2026-11-07), a review turn wrote two reports,
+        // ran ffprobe over no files, and ended "please upload the takes to out/" —
+        // the takes were on the generator's site and the workspace had the script
+        // that fetches them. Any turn that worked with tools is asked; the question
+        // is one fixed-option call.
+        var workedButUnfinished = ToolSteps(run) > 0;
+        if (checks && run.Succeeded && ChecksClaims && run.Unverified is null && (unread || workedButUnfinished))
+            (run, handedBack) = await CheckHandBackAsync(subject, run, unread ? probe! : null, ct);
 
         // A designed build already had the strong model's thinking; judging its
         // report against the same model again would be a second slow pass for nothing.
-        if (smart && run.Succeeded && _reasoning is not null && !designed && !checkedClaims && run.Unverified is null)
-            run = await MaybeEscalateAsync(line, before, run, ct);
+        // Nor is a turn that acted — wrote, ran, clicked — escalated: its answer is
+        // a report, right or wrong by the tools' record (which the claim check
+        // holds), and the strong model cannot redo the actions. Measured
+        // (2026-11-07): a deevid generation report went to the strong model at 0.74
+        // and came back 11 minutes later saying the same thing.
+        var acted = run.Steps.Any(s => s.Ok && (s.Tool is "write_file" or "run_command"
+                                                || (ToolCatalog.FamilyOf(s.Tool) == ToolCatalog.BrowserFamily
+                                                    && ToolCatalog.RepeatOf(s.Tool) == RepeatRule.Free)));
+        if (smart && run.Succeeded && _reasoning is not null && !designed && !checkedClaims && !handedBack && !acted && run.Unverified is null)
+            run = await MaybeEscalateAsync(line, before, run, ct, lookup);
 
         // A turn that ran out of budget mid-work must not end on "[stopped: MaxSteps]"
         // and nothing else: the person needs to know what got done and what is next.
         if (!run.Succeeded && run.Reason is StopReason.MaxSteps or StopReason.Repeat && ToolSteps(run) > 0)
             run = await WrapUpAsync(run, ct);
 
+        foreach (var step in run.Steps)
+            if (step.Ok && step.Tool == "write_file") NoteWorkFolder(step.Detail);
         _log?.Result(run);
         Remember(line, run);
 
@@ -870,7 +1071,7 @@ public sealed partial class ChatSession : IAgentSession
             .ToList();
 
         var outcome = run.Succeeded
-            ? Clip(run.Text.Replace("\r", "").Replace('\n', ' '), 300)
+            ? Clip(MemoryText(run.Text), MemoryOutcomeChars)
             : $"stopped ({run.Reason}): {Clip(run.Text.Replace('\n', ' '), 200)}";
 
         // memory.md opens every later session's prompt. A report that did not
@@ -889,6 +1090,35 @@ public sealed partial class ChatSession : IAgentSession
     }
 
     private static string Clip(string text, int max) => text.Length <= max ? text : text[..max] + "…";
+
+    /// <summary>How much of an answer a memory.md entry keeps, after the markup is gone.</summary>
+    internal const int MemoryOutcomeChars = 600;
+
+    /// <summary>
+    /// An answer as one line of substance: markdown bold, headings, table rules
+    /// and cell bars dropped, lines joined with " / ". Measured (2026-11-06): a
+    /// channel's video list was kept as "### 📜 역사/세계사 주제 영상 | 제목 | 표시된
+    /// 등록일 | | :--- | :--- | | 고대 이집트 피라미드…" — 300 characters, one title,
+    /// the next session's memory blind to the other six.
+    /// </summary>
+    internal static string MemoryText(string answer)
+    {
+        var lines = new List<string>();
+        foreach (var raw in answer.Replace("\r", "").Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || TableRule().IsMatch(line) || line is "---" or "***") continue;
+            // A bar escaped inside a cell ("고흐의 편지 \| 영어 회화") is text, not a cell edge.
+            line = line.TrimStart('#', ' ').Replace("**", "").Replace("__", "").Replace("\\|", "\u0001");
+            if (line.StartsWith('|')) line = string.Join(" · ", line.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            line = line.Replace('\u0001', '|');
+            if (line.Length > 0) lines.Add(line);
+        }
+        return string.Join(" / ", lines);
+    }
+
+    [GeneratedRegex(@"^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$")]
+    private static partial Regex TableRule();
 
     // ------------------------------------------------------------- title
 
@@ -912,6 +1142,9 @@ public sealed partial class ChatSession : IAgentSession
 
     /// <summary>Off for tests that script the engine: the claim question after a turn would consume its answers.</summary>
     internal bool ChecksClaims { get; set; } = true;
+
+    /// <summary>Off for a test that wants the turn's prompt exactly as the route made it.</summary>
+    internal bool ProbesWorkspace { get; set; } = true;
 
     private async Task RetitleAsync(string request)
     {
@@ -940,7 +1173,7 @@ public sealed partial class ChatSession : IAgentSession
     }
 
     /// <summary>The scope question, and the design pass when it says so. Null when the everyday model just goes ahead.</summary>
-    private async Task<(string? Design, bool Stop)> MaybeDesignAsync(string request, CancellationToken ct)
+    private async Task<(string? Design, bool Stop)> MaybeDesignAsync(string request, ProbeResult? probe, CancellationToken ct)
     {
         var scope = await _router.ScopeAsync(request, Digest(), ct);
         var strong = _config.ReasoningModel;
@@ -961,7 +1194,7 @@ public sealed partial class ChatSession : IAgentSession
         {
             try
             {
-                design = await ReasoningSubtask.DesignAsync(_reasoning!, _config.Model, Shell, request, Digest(), ct,
+                design = await ReasoningSubtask.DesignAsync(_reasoning!, _config.Model, Shell, request, DesignContext(probe), ct,
                     received => ActivityStarted?.Invoke($"designing with {strong} · {received:N0} chars so far"),
                     Tools.ShellInfo.Current.Hints);
                 break;
@@ -1033,7 +1266,8 @@ public sealed partial class ChatSession : IAgentSession
     /// warning and the run is marked <see cref="AgentRun.Unverified"/>.
     /// </summary>
     /// <returns>The run to use, and whether a correction pass was needed.</returns>
-    private async Task<(AgentRun Run, bool Corrected)> CheckClaimsAsync(string request, AgentRun run, CancellationToken ct)
+    private async Task<(AgentRun Run, bool Corrected)> CheckClaimsAsync(string request, AgentRun run, CancellationToken ct,
+        ProbeResult? probe = null)
     {
         var what = await UnbackedClaimAsync(request, run, ct);
         if (what is null) return (run, false);
@@ -1044,12 +1278,27 @@ public sealed partial class ChatSession : IAgentSession
         StepCompleted?.Invoke(sentBack);
         ActivityStarted?.Invoke("checking the report against what the tools did");
 
-        var fix = await _loop.RunAsync(
-            $"[check] Your answer says {claim}, but no {tool} call succeeded in this turn — so it did not happen. " +
-            "Either do it now with the tools, or answer again and say plainly, in the user's language, what has NOT " +
-            "been done. If it was done in an earlier turn, look with a tool (read_file, list_files) before saying so. " +
-            "Never report a change or a result that a tool did not produce.",
-            ct);
+        // A review the user asked for is work to do, not a confession to make.
+        // Measured (2026-11-07): given "do it now, or say plainly what was not
+        // done", the model chose the confession — "I did not listen to them" —
+        // and the takes stayed unexamined.
+        var review = claim.StartsWith("a judgement", StringComparison.Ordinal);
+        var order = review
+            ? "[check] Your answer judges files or media that no tool examined, so the judgement has no basis. The user " +
+              "asked for the review: do it now. Get the files (download them if they exist only online — the workspace " +
+              "may already have a script for that), then examine them with tools — ffprobe / ffmpeg, a speech recognizer, " +
+              "or the measuring scripts earlier work in this workspace used — and recommend from what you measured. Do " +
+              "not answer by explaining what you could not do." + PrecedentSuffix()
+            : $"[check] Your answer says {claim}, but no {tool} call succeeded in this turn — so it did not happen. " +
+              "Either do it now with the tools, or answer again and say plainly, in the user's language, what has NOT " +
+              "been done. If it was done in an earlier turn, look with a tool (read_file, list_files) before saying so. " +
+              "Never report a change or a result that a tool did not produce.";
+        if (review && await PlanRedoAsync(request, "it judged files or media that no tool examined", probe, ct) is { } plan)
+            order += "\n\n" + plan;
+        AgentRun fix;
+        _loop.Building = review;
+        try { fix = await _loop.RunAsync(order, ct); }
+        finally { _loop.Building = false; }
 
         var merged = fix with { Steps = [.. run.Steps, sentBack, .. fix.Steps], Elapsed = run.Elapsed + fix.Elapsed };
         if (!fix.Succeeded || fix.Unverified is not null) return (merged, true);
@@ -1064,6 +1313,68 @@ public sealed partial class ChatSession : IAgentSession
         return (merged with { Steps = [.. merged.Steps, flagged], Text = merged.Text + "\n\n⚠ " + note, Unverified = $"reports {still.Value.Claim} with no {still.Value.Tool}" }, true);
     }
 
+    /// <summary>The share an unbacked option needs to stand in for an unsure "backed".</summary>
+    internal const double UnbackedRunnerUpShare = 0.25;
+
+    /// <summary>
+    /// "backed" below the floor is not a clearance: when an unbacked option holds a
+    /// real share, it stands. Measured (2026-11-07): a turn read the report an
+    /// earlier unmeasured turn had written and repeated its ranking of six takes;
+    /// the engine said "backed" at 0.31 and the answer went out as a review.
+    /// </summary>
+    internal static Decision UnsureBackedYields(Decision judged, double floor)
+    {
+        if (!judged.Ok || judged.Choice != SmartRouter.ClaimsBacked || judged.Confidence >= floor) return judged;
+        var runnerUp = judged.Ranked.FirstOrDefault(p => p.Key != SmartRouter.ClaimsBacked);
+        return runnerUp.Key is { } key && runnerUp.Value >= UnbackedRunnerUpShare
+            ? judged with { Choice = key, Confidence = runnerUp.Value }
+            : judged;
+    }
+
+    /// <summary>The command of a run_command step detail ("command=… -> 733 chars").</summary>
+    internal static string CommandOf(string detail)
+    {
+        var text = detail.StartsWith("command=", StringComparison.Ordinal) ? detail[8..] : detail;
+        var cut = text.LastIndexOf(" -> ", StringComparison.Ordinal);
+        return cut >= 0 ? text[..cut] : text;
+    }
+
+    private static readonly HashSet<string> ListingVerbs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "get-childitem", "gci", "ls", "dir", "test-path", "get-item", "gi", "resolve-path", "get-location", "pwd",
+        "cd", "set-location", "select-object", "select", "where-object", "where", "?", "format-table", "ft",
+        "format-list", "fl", "sort-object", "sort", "measure-object", "measure", "out-string", "write-output",
+        "echo", "write-host", "find", "tree", "out-host", "group-object", "foreach-object", "%", "stat", "wc", "head", "tail",
+        // control words: the programs inside their blocks are parts of their own
+        "foreach", "for", "if", "else", "elseif", "in",
+    };
+
+    /// <summary>
+    /// True when every part of a command only lists or filters files — nothing
+    /// in it opens, plays, measures or transcribes one. Parts are split at
+    /// pipes, semicolons, &amp;&amp; and newlines; a part's verb is its first word
+    /// after an assignment. ForEach-Object passes only when its block holds no
+    /// other program (the block's words are parts of their own).
+    /// </summary>
+    internal static bool ListsOnly(string command)
+    {
+        var parts = System.Text.RegularExpressions.Regex.Split(command, @"\|\||&&|[|;\n{}()]");
+        var any = false;
+        foreach (var raw in parts)
+        {
+            var part = raw.Trim();
+            var assign = System.Text.RegularExpressions.Regex.Match(part, @"^\$[\w:]+\s*=\s*");
+            if (assign.Success) part = part[assign.Length..].Trim();
+            part = part.TrimStart('&', '.', ' ').Trim();
+            if (part.Length == 0 || part.StartsWith('$') || part.StartsWith('[') || part.StartsWith('-') || part.StartsWith('\'') || part.StartsWith('"')) continue;
+            var verb = part.Split(' ', 2)[0];
+            if (verb.StartsWith('-')) continue;
+            any = true;
+            if (!ListingVerbs.Contains(verb)) return false;
+        }
+        return any;
+    }
+
     /// <summary>What the answer claims that the record does not show, or null when nothing is missing or the engine cannot say.</summary>
     private async Task<(string Claim, string Tool)?> UnbackedClaimAsync(string request, AgentRun run, CancellationToken ct)
     {
@@ -1073,13 +1384,20 @@ public sealed partial class ChatSession : IAgentSession
         var ran = run.Steps.Any(s => s.Ok && (s.Tool == "run_command"
                                               || (ToolCatalog.FamilyOf(s.Tool) == ToolCatalog.BrowserFamily
                                                   && ToolCatalog.RepeatOf(s.Tool) == RepeatRule.Free)));
-        if (wrote && ran) return null;
+        // Listing files examines nothing: measured (2026-11-07), a turn ran
+        // Get-ChildItem for *.mp3, found none, ranked six takes by their lengths —
+        // and the engine's "unbacked_review" (0.97) was ignored because a command
+        // had succeeded.
+        var examined = run.Steps.Any(s => s.Ok && (s.Tool == "run_command" ? !ListsOnly(CommandOf(s.Detail))
+                                                   : ToolCatalog.FamilyOf(s.Tool) == ToolCatalog.BrowserFamily
+                                                     && ToolCatalog.RepeatOf(s.Tool) == RepeatRule.Free));
+        if (wrote && examined) return null;
 
         var did = string.Join("\n", run.Steps
             .Where(s => s.Tool is not ("final" or "unwrapped" or "(unparsed)"))
             .Select(s => $"- {s.Tool} ({(s.Ok ? "ok" : "failed")}): {WorkspaceStore.FirstLine(s.Detail, 120)}"));
 
-        var judged = await _router.ClaimAsync(request, did, run.Text, ct);
+        var judged = UnsureBackedYields(await _router.ClaimAsync(request, did, run.Text, ct), _config.JevConfidenceFloor);
         // A command makes files too — a download, a build, a generator script.
         // Measured (2026-11-05, music-harness): dv-fetch.cjs saved four takes,
         // the answer said so, and "files created with no write_file" sent a
@@ -1088,6 +1406,8 @@ public sealed partial class ChatSession : IAgentSession
         // the answer names against the disk.
         (string, string)? contradiction = judged is { Ok: true, Choice: SmartRouter.UnbackedChange } && !wrote && !ran ? ("files created or changed", "write_file or run_command")
             : judged is { Ok: true, Choice: SmartRouter.UnbackedRun } && !ran ? ("commands, builds or tests run", "run_command")
+            : judged is { Ok: true, Choice: SmartRouter.UnbackedReview } && !examined
+                ? ("a judgement of files or media it never examined", "run_command or browser action that examined them")
             : null;
 
         var verdict = contradiction is { } c ? $"reports {c.Item1} with no {c.Item2}"
@@ -1096,6 +1416,154 @@ public sealed partial class ChatSession : IAgentSession
         _log?.Decision("claims", judged, verdict);
         Decided?.Invoke(new SmartNote("claims", judged, verdict));
         return contradiction;
+    }
+
+    // ---------------------------------------------------- the workspace
+
+    /// <summary>The request's words searched for in the workspace, logged as a step; never fatal.</summary>
+    private async Task<ProbeResult> ProbeAsync(string request, CancellationToken ct)
+    {
+        ActivityStarted?.Invoke("looking for the request's words in the workspace");
+        var clock = Stopwatch.StartNew();
+        ProbeResult probe;
+        try { probe = await WorkspaceProbe.SearchAsync(_root, request, ct); }
+        catch (OperationCanceledException) { return ProbeResult.Empty; }
+
+        if (probe.Terms.Count == 0) return probe;
+        var detail = probe.Found
+            ? $"{probe.Hits.Count} file(s) mention {string.Join(", ", probe.Terms.Take(5))}: {string.Join(", ", probe.Hits.Take(4).Select(h => h.Path))}"
+            : $"no file mentions {string.Join(", ", probe.Terms.Take(5))} ({probe.FilesScanned} scanned)";
+        var step = new AgentStep(0, "workspace", detail, true, clock.ElapsedMilliseconds);
+        _log?.Step(step);
+        StepCompleted?.Invoke(step);
+        return probe;
+    }
+
+    /// <summary>
+    /// What the strong model is told before it designs: the conversation so far,
+    /// the workspace's own instructions, and the files that mention the request.
+    /// It used to get the conversation alone — and designed for a project it had
+    /// never seen.
+    /// </summary>
+    internal string DesignContext(ProbeResult? probe)
+    {
+        var parts = new List<string>();
+        var digest = Digest();
+        if (digest.Length > 0) parts.Add(digest);
+        var earlier = EarlierAnswers(_loop.Messages.Count);
+        if (earlier.Length > 0) parts.Add(earlier);
+        if (WorkspaceGuide.Load(_root, WorkspaceGuide.DesignChars) is { } guide)
+            parts.Add($"The workspace's own instructions for agents ({string.Join(", ", guide.Files)}) — follow them:\n" + guide.Text);
+        if (probe is { Found: true }) parts.Add(probe.Material());
+        if (Precedent() is { Length: > 0 } precedent) parts.Add(precedent);
+        return string.Join("\n\n", parts);
+    }
+
+    /// <summary>Whether the turn already looked: a search of its own, or one of the probe's files read.</summary>
+    internal static bool LookedAt(AgentRun run, ProbeResult probe) =>
+        run.Steps.Any(s => s.Ok && (s.Tool is "grep" or "find_files"
+                                    || (s.Tool == "read_file" && probe.Hits.Any(h => s.Detail.Contains(h.Path, StringComparison.OrdinalIgnoreCase)))));
+
+    /// <summary>
+    /// An answer that hands the work back — "put the files in assets/in and tell
+    /// me" — while the workspace holds what the request names, goes back once
+    /// with those files. Measured (2026-11-06, music-harness): that answer was
+    /// the whole turn, and the claim check passed it at 0.97, rightly — nothing
+    /// in it was false. What was wrong is that nothing had been looked for.
+    /// Asked when the probe found files the turn read none of (<paramref name="unread"/>), or when the
+    /// turn worked with tools and changed nothing (null).
+    /// </summary>
+    private async Task<(AgentRun Run, bool SentBack)> CheckHandBackAsync(string request, AgentRun run, ProbeResult? unread, CancellationToken ct)
+    {
+        var judged = await _router.HandBackAsync(request, run.Text, ct);
+        var handsBack = judged is { Ok: true, Choice: SmartRouter.HandsBack };
+        var verdict = !handsBack ? (judged.Ok ? "the answer carries the work" : $"unavailable ({judged.Message})")
+            : unread is not null ? "hands the work back without looking — sent back with the workspace's files"
+            : "hands the work back — sent back to go ahead";
+        _log?.Decision("hand-back", judged, verdict);
+        Decided?.Invoke(new SmartNote("hand-back", judged, verdict));
+        if (!handsBack) return (run, false);
+
+        var sentBack = new AgentStep(0, "handed-back", unread is not null
+            ? $"the answer asks the user for what {unread.Hits.Count} workspace file(s) may hold — sent back once"
+            : "the answer hands the work or a choice back to the user — sent back once to go ahead", false);
+        _log?.Step(sentBack);
+        StepCompleted?.Invoke(sentBack);
+        ActivityStarted?.Invoke(unread is not null ? "looking in the workspace before asking the user" : "going ahead instead of asking");
+
+        var order = unread is not null
+            ? "[check] Your answer hands the work back to the user, but you have not looked at what this workspace " +
+              "already holds. These files mention the request:\n" +
+              string.Join("\n", unread.Hits.Select(h => $"- {h.Path}:{h.Line}: {h.Text}")) + "\n" +
+              "Read the relevant ones with read_file (and the documents they point to) and carry on with the work from " +
+              "what is there. Ask the user only for what is truly not in the workspace — and then say which files you " +
+              "looked at."
+            : "[check] Your answer stops and hands the work, or a choice between options you laid out, back to the user. " +
+              "They asked you to do it. Go ahead with your tools: where you offered options, take the default or the one " +
+              "you would recommend (the workspace's instructions decide when they say); write the files and run what the " +
+              "work needs. The gate asks the user by itself before anything that needs their approval runs. Ask the user " +
+              "only what truly only they can answer, and say why." + PrecedentSuffix();
+        if (await PlanRedoAsync(request, unread is not null
+                ? "it asked the user for what the workspace already holds"
+                : "it handed the work, or a choice, back to the user instead of doing it", unread, ct) is { } plan)
+            order += "\n\n" + plan;
+
+        // Sent back to do the work, it is a build: the same repeat allowance.
+        AgentRun fix;
+        _loop.Building = true;
+        try { fix = await _loop.RunAsync(order, ct); }
+        finally { _loop.Building = false; }
+
+        var merged = fix with { Steps = [.. run.Steps, sentBack, .. fix.Steps], Elapsed = run.Elapsed + fix.Elapsed };
+        return (merged, true);
+    }
+
+    /// <summary>
+    /// When a check rejects the everyday model's turn, the strong model designs
+    /// the redo: one completion over the workspace's instructions, the files the
+    /// probe found and the conversation's answers — what to read and which of the
+    /// workspace's scripts to run, step by step. Measured (2026-11-07): sent back
+    /// twice with "examine the takes now", the everyday model listed folders and
+    /// rewrote the MV plan; it could not find the procedure on its own, and the
+    /// strong model, given the same material before an earlier build, had. Null
+    /// when there is no strong model or it fails — the redo then goes on without.
+    /// </summary>
+    private async Task<string?> PlanRedoAsync(string request, string why, ProbeResult? probe, CancellationToken ct)
+    {
+        if (_reasoning is null || !_smartAvailable) return null;
+        var strong = _config.ReasoningModel;
+        ActivityStarted?.Invoke($"planning the redo with {strong}");
+        var clock = Stopwatch.StartNew();
+
+        string design;
+        try
+        {
+            design = await ReasoningSubtask.DesignAsync(_reasoning, _config.Model, Shell,
+                request + $"\n\n(The assistant's first attempt at this was rejected: {why}. Design how to actually do it " +
+                "in this workspace: which of its documents to read first and which of its scripts or tools to run, step by step.)",
+                DesignContext(probe), ct,
+                received => ActivityStarted?.Invoke($"planning the redo with {strong} · {received:N0} chars so far"),
+                Tools.ShellInfo.Current.Hints);
+        }
+        catch (ChatProviderException ex)
+        {
+            var failed = new AgentStep(0, ReasoningSubtask.DesignTag, $"{strong} failed to plan the redo: {ex.Message}", false, clock.ElapsedMilliseconds);
+            _log?.Step(failed);
+            StepCompleted?.Invoke(failed);
+            return null;
+        }
+        if (design.Length == 0) return null;
+
+        _state.CountDesign();
+        var step = new AgentStep(0, ReasoningSubtask.DesignTag, $"{strong} · redo plan · {design.Length} chars", true, clock.ElapsedMilliseconds);
+        _log?.Step(step);
+        StepCompleted?.Invoke(step);
+        LogText(ReasoningSubtask.DesignTag, design);
+
+        // A redo does not stop for a choice: the recommendation is taken.
+        var decision = ReasoningSubtask.ExtractDecision(design, out var body);
+        DesignMade?.Invoke(ReasoningSubtask.Summary(body));
+        return ReasoningSubtask.DesignFeedBack(strong, body, decision?.Options[decision.Recommended]);
     }
 
     // ------------------------------------------------------------ stalls
@@ -1113,6 +1581,12 @@ public sealed partial class ChatSession : IAgentSession
     /// </summary>
     internal const int UnattendedStallRetries = 2;
 
+    /// <summary>Dropped connections retried without asking, per step.</summary>
+    internal const int DroppedAutoRetries = 2;
+
+    /// <summary>The pause before each automatic retry of a dropped connection; a test sets it to zero.</summary>
+    internal Func<int, TimeSpan> DroppedRetryDelay { get; set; } = retry => TimeSpan.FromSeconds(retry == 0 ? 5 : 20);
+
     /// <summary>
     /// A model went quiet. Puts retry and the caller's alternatives to the
     /// person through <see cref="Chooser"/> and returns the index picked:
@@ -1122,6 +1596,18 @@ public sealed partial class ChatSession : IAgentSession
     private async Task<int> AskAfterStallAsync(string model, ChatProviderStalledException stall, int retries,
         IReadOnlyList<string> alternatives, CancellationToken ct)
     {
+        // A dropped connection is the network, not the request: retried on its
+        // own, after a pause, before anyone is asked. The person who left a long
+        // build running comes back to a finished turn, not to a question.
+        if ((stall.Dropped || stall.Degenerate) && retries < DroppedAutoRetries)
+        {
+            var wait = stall.Degenerate ? TimeSpan.Zero : DroppedRetryDelay(retries);
+            Noted?.Invoke($"{model}: {(stall.Degenerate ? "cut off a runaway reply" : "connection dropped")} — " +
+                          $"retrying{(wait > TimeSpan.Zero ? $" in {wait.TotalSeconds:0}s" : "")} ({retries + 1}/{DroppedAutoRetries})");
+            await Task.Delay(wait, ct);
+            return 0;
+        }
+
         string[] options = [RetryOption, .. alternatives];
         var recommended = retries < UnattendedStallRetries ? 0 : options.Length - 1;
         var ask = new ChoiceRequest(
@@ -1139,10 +1625,41 @@ public sealed partial class ChatSession : IAgentSession
     /// <summary>Requests and drafts under these lengths, with no tool material, are never escalated.</summary>
     internal const int ShortRequestChars = 60, ShortDraftChars = 200;
 
+    /// <summary>The share of a draft's words found in the material above which a web turn's draft is a report of it.</summary>
+    internal const double LookupShare = 0.6;
+
+    /// <summary>The confidence a web turn's escalation must reach (others follow the engine's choice alone).</summary>
+    internal const double LookupEscalationConfidence = 0.95;
+
+    /// <summary>
+    /// How much of the draft is the material's own words: distinct words (two
+    /// letters for Hangul, three otherwise) found anywhere in it. A table of
+    /// titles copied off a page scores high; an argument built on two search
+    /// snippets does not.
+    /// </summary>
+    internal static double ShareFromMaterial(string draft, string material)
+    {
+        var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var current = new StringBuilder();
+        foreach (var c in draft + " ")
+        {
+            if (char.IsLetterOrDigit(c)) { current.Append(c); continue; }
+            if (current.Length > 0)
+            {
+                var word = current.ToString();
+                var hangul = word.Any(ch => ch is >= '가' and <= '힣');
+                if (word.Length >= (hangul ? 2 : 3) && !word.All(char.IsDigit)) words.Add(word);
+                current.Clear();
+            }
+        }
+        if (words.Count == 0) return 0;
+        return (double)words.Count(w => material.Contains(w, StringComparison.OrdinalIgnoreCase)) / words.Count;
+    }
+
     internal static bool IsShortExchange(string request, string material, string draft) =>
         material.Length == 0 && request.Trim().Length < ShortRequestChars && draft.Trim().Length < ShortDraftChars;
 
-    private async Task<AgentRun> MaybeEscalateAsync(string request, int messagesBefore, AgentRun draft, CancellationToken ct)
+    private async Task<AgentRun> MaybeEscalateAsync(string request, int messagesBefore, AgentRun draft, CancellationToken ct, bool lookup = false)
     {
         var material = ToolResultsSince(messagesBefore);
 
@@ -1159,8 +1676,22 @@ public sealed partial class ChatSession : IAgentSession
         if (judged.Escalate && shortExchange && judged.Decision.Confidence < _config.JevConfidenceFloor)
             judged = judged with { Escalate = false };
 
+        // A web lookup is right or wrong by what was read, and the strong model
+        // reads the same pages. Measured (2026-11-06), twice: eleven video titles
+        // sorted into history/science, escalated at 0.94 and at 0.86, the same
+        // table back 169 s and 206 s later. What a lookup lacks is more reading,
+        // which the everyday model's tools do. So a web turn escalates only when
+        // the engine is all but certain, and never when the draft is mostly the
+        // pages' own words. (A share test alone missed the second run: its table
+        // came with a paragraph of conclusions.)
+        var webLookup = lookup && material.Length > 0
+                        && (ShareFromMaterial(draft.Text, material) >= LookupShare || judged.Decision.Confidence < LookupEscalationConfidence);
+        if (judged.Escalate && webLookup)
+            judged = judged with { Escalate = false };
+
         var strong = _config.ReasoningModel;
         var verdict = judged.Escalate ? $"escalating to {strong}"
+            : judged.Decision is { Ok: true, Choice: SmartRouter.EscalateOption } && webLookup ? "keeping the draft — a web lookup is answered from the pages read"
             : judged.Decision is { Ok: true, Choice: SmartRouter.EscalateOption } ? $"keeping the draft — a short exchange, and the engine was unsure"
             : judged.Decision.Ok ? "keeping the draft"
             : $"unavailable ({judged.Decision.Message}), keeping the draft";
@@ -1179,7 +1710,8 @@ public sealed partial class ChatSession : IAgentSession
             try
             {
                 reasoning = await ReasoningSubtask.RunAsync(_reasoning!, _config.Model, request, material, draft.Text, ct,
-                    received => ActivityStarted?.Invoke($"reasoning with {strong} · {received:N0} chars so far"));
+                    received => ActivityStarted?.Invoke($"reasoning with {strong} · {received:N0} chars so far"),
+                    EarlierAnswers(messagesBefore));
                 break;
             }
             catch (ChatProviderStalledException ex)
@@ -1228,7 +1760,10 @@ public sealed partial class ChatSession : IAgentSession
             return draft;
         }
 
-        return finalRun;
+        // The write-up is the turn's answer, but the turn's work is the draft's:
+        // returned alone, memory.md recorded "did: (no tools)" for a turn that had
+        // opened the page it reported on.
+        return finalRun with { Steps = [.. draft.Steps, step, .. finalRun.Steps], Elapsed = draft.Elapsed + clock.Elapsed + finalRun.Elapsed };
     }
 
     /// <summary>
@@ -1254,8 +1789,103 @@ public sealed partial class ChatSession : IAgentSession
     /// grey area and a confident "safe" runs unasked; everything else — unsafe,
     /// unsure, no engine, no key — is put to a person.
     /// </summary>
+    /// <summary>
+    /// The header comments of every script inside the root that the command
+    /// runs (a token ending in .js/.cjs/.mjs/.ts/.py/.ps1/.sh that is a file
+    /// there), for the safety question: a script's first lines say what it
+    /// does, which its path alone does not.
+    /// </summary>
+    internal static string ScriptNotes(string command, string root)
+    {
+        var notes = new StringBuilder();
+        foreach (var raw in command.Split([' ', '\t', '"', '\''], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var token = raw.Trim(';', '&', '|', '(', ')');
+            if (!ScriptExtension().IsMatch(token)) continue;
+            string full;
+            try { full = Path.GetFullPath(Path.IsPathRooted(token) ? token : Path.Combine(root, token)); }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { continue; }
+            if (!full.StartsWith(Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase) || !File.Exists(full)) continue;
+
+            string[] lines;
+            try { lines = File.ReadLines(full).Take(20).ToArray(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
+            var comments = lines.Select(l => l.Trim())
+                .TakeWhile(l => l.Length == 0 || l.StartsWith("//") || l.StartsWith('#') || l.StartsWith("<#") || l.StartsWith("\"\"\"") || l.StartsWith('*') || l.StartsWith("/*"))
+                .Where(l => l.Length > 0 && !l.StartsWith("#!"))
+                .ToList();
+            if (comments.Count == 0) continue;
+            notes.Append("- ").Append(token).Append(":\n  ").AppendLine(Clip(string.Join("\n  ", comments), 1_200));
+        }
+        return notes.ToString().TrimEnd();
+    }
+
+    [GeneratedRegex(@"\.(c|m)?js$|\.ts$|\.py$|\.ps1$|\.sh$", RegexOptions.IgnoreCase)]
+    private static partial Regex ScriptExtension();
+
+    private static readonly HashSet<string> MediaExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".mp4", ".mov", ".webm", ".mkv", ".png", ".jpg", ".jpeg", ".webp",
+    };
+
+    private static readonly HashSet<string> OutputFlags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "--out", "-o", "--output", "-outfile", "-destination", ">", ">>", "out-file", "set-content", "--save", "--dest",
+    };
+
+    /// <summary>
+    /// Media files a command reads that are not on disk — read relative to the root
+    /// or to a folder the command moves into (Push-Location, cd). A path after an
+    /// output flag is written, not read, and so is the last of several media paths
+    /// (ffmpeg -i in.mp3 out.wav, Copy-Item a b). Measured (2026-11-07): with the
+    /// download still failing, the model asked to transcribe "out/C2_v2.mp3" — a
+    /// name it made up from its own ranking.
+    /// </summary>
+    internal static List<string> MissingMediaInputs(string command, string root)
+    {
+        var tokens = command.Split([' ', '\t', '\n', '"', '\'', ';', '(', ')', ','], StringSplitOptions.RemoveEmptyEntries);
+        var bases = new List<string> { root };
+        for (var i = 0; i + 1 < tokens.Length; i++)
+            if (tokens[i] is "cd" || tokens[i].Equals("Push-Location", StringComparison.OrdinalIgnoreCase)
+                                  || tokens[i].Equals("Set-Location", StringComparison.OrdinalIgnoreCase) || tokens[i] is "pushd")
+                try { bases.Add(Path.GetFullPath(Path.Combine(root, tokens[i + 1]))); }
+                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { }
+
+        var media = new List<(string Token, bool Written)>();
+        for (var i = 0; i < tokens.Length; i++)
+        {
+            var token = tokens[i].Trim('&', '|');
+            if (token.IndexOfAny(['*', '?', '$', '{', '<']) >= 0 || !MediaExtensions.Contains(Path.GetExtension(token))) continue;
+            var written = i > 0 && (OutputFlags.Contains(tokens[i - 1]) || tokens[i - 1].EndsWith('>'));
+            media.Add((token, written));
+        }
+        if (media.Count >= 2) media[^1] = (media[^1].Token, true);
+
+        var missing = new List<string>();
+        foreach (var (token, written) in media)
+        {
+            if (written) continue;
+            var found = false;
+            foreach (var b in bases)
+            {
+                try { found = File.Exists(Path.IsPathRooted(token) ? token : Path.Combine(b, token)); }
+                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { found = true; }
+                if (found) break;
+            }
+            if (!found) missing.Add(token);
+        }
+        return missing;
+    }
+
     private async Task<GateVerdict> GateAsync(string command, CancellationToken ct)
     {
+        // A command over files that do not exist is not put to a person: it can only
+        // fail, and asking spends their attention on a guess.
+        if (MissingMediaInputs(command, _root) is { Count: > 0 } absent)
+            return GateVerdict.Deny(
+                $"it reads {string.Join(", ", absent)}, which is not on disk (nobody was asked). Find the real files " +
+                "first with list_files / find_files, or run the step that produces them, then run it on those.");
+
         var risk = CommandRisk.Inspect(command);
         string reason;
 
@@ -1265,7 +1895,7 @@ public sealed partial class ChatSession : IAgentSession
         }
         else if (_smartAvailable)
         {
-            var safety = await _router.SafetyAsync(command, _root, Shell, ct);
+            var safety = await _router.SafetyAsync(command, _root, Shell, ct, ScriptNotes(command, _root));
             var verdict = safety.Safe ? "safe, running"
                 : safety.Decision.Ok ? $"{safety.Decision.Choice} — asking you"
                 : $"unavailable ({safety.Decision.Message}) — asking you";
@@ -1293,8 +1923,10 @@ public sealed partial class ChatSession : IAgentSession
     /// cannot see the page to judge that. Reading pages needs no approval.
     /// </summary>
     private Task<GateVerdict> BrowserGateAsync(string what, string site, CancellationToken ct) =>
-        AskAsync($"browser: {what} on {site} (and further actions on {site} this session)",
-                 "acting in a browser can change things on the site", ct);
+        what.Contains(" AGAIN ", StringComparison.Ordinal)
+            ? AskAsync($"browser: {what} on {site} (this click only)", "repeating an action can repeat what it started", ct)
+            : AskAsync($"browser: {what} on {site} (and further actions on {site} this session)",
+                       "acting in a browser can change things on the site", ct);
 
     private async Task<GateVerdict> AskAsync(string command, string reason, CancellationToken ct)
     {
@@ -1451,6 +2083,39 @@ public sealed partial class ChatSession : IAgentSession
             if (call.IsFinal) return call.Arg("text");
         }
         return null;
+    }
+
+    /// <summary>How much of each earlier answer the strong model is shown, and how many answers.</summary>
+    internal const int EarlierAnswerChars = 2_500, EarlierAnswerCount = 2;
+
+    /// <summary>
+    /// The conversation's answers before <paramref name="beforeIndex"/>, newest
+    /// first, as material for the strong model: "the analysis this request
+    /// builds on". Measured (2026-11-06, music-harness): one turn listed a
+    /// channel's videos by topic — 「종말의 그날 1」 and 「2」 among them — and
+    /// the next asked to make a music video from those two. The everyday model
+    /// had that answer in its conversation; the design pass got the Digest — the
+    /// answer's first line and its numbered items, and a table has none — and
+    /// designed "join two local video files (recommended)" from nothing.
+    /// </summary>
+    internal string EarlierAnswers(int beforeIndex)
+    {
+        var answers = new List<string>();
+        for (var i = Math.Min(beforeIndex, _loop.Messages.Count) - 1; i >= 0 && answers.Count < EarlierAnswerCount; i--)
+        {
+            var message = _loop.Messages[i];
+            if (message.Role != "assistant") continue;
+            var text = !ToolCall.TryParse(message.Content, out var call, out _) ? message.Content.Trim()
+                : call.IsFinal ? call.Arg("text") : null;
+            if (text is { Length: > 0 }) answers.Add(Clip(text.Trim(), EarlierAnswerChars));
+        }
+        if (answers.Count == 0) return "";
+
+        var sb = new StringBuilder("Earlier answers in this conversation, newest first — the request may build on them " +
+                                   "(\"those two\", \"from that analysis\"); take names, titles and facts from here rather than assuming:");
+        for (var n = 0; n < answers.Count; n++)
+            sb.Append("\n--- answer ").Append(n == 0 ? "just before this request" : $"{n + 1} turns back").Append(" ---\n").Append(answers[n]);
+        return sb.ToString();
     }
 
     /// <summary>The lines of a numbered list ("1. …", "2) …"), in order.</summary>

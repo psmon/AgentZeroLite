@@ -315,7 +315,7 @@ public sealed class LocalFileToolbelt : IToolbelt
             try
             {
                 foreach (var sub in Directory.GetDirectories(dir).OrderBy(d => d, StringComparer.Ordinal))
-                    if (!IsExcluded(Path.GetFileName(sub)) && !IsClaudeNoise(dir, sub))
+                    if (!IsExcluded(Path.GetFileName(sub)) && !IsClaudeNoise(dir, sub) && !IsEngineCache(dir, sub))
                         stack.Push(sub);
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException) { /* skip */ }
@@ -348,6 +348,18 @@ public sealed class LocalFileToolbelt : IToolbelt
     private static bool IsExcluded(string name) =>
         (name.StartsWith('.') && !name.Equals(".claude", StringComparison.OrdinalIgnoreCase)) ||
         name is "bin" or "obj" or "node_modules" or "dist" or "build" or "__pycache__";
+
+    /// <summary>
+    /// A Unity project's generated folders (beside its <c>Assets</c> and
+    /// <c>ProjectSettings</c>): the import cache alone is gigabytes of binary.
+    /// Measured (2026-11-07, music-harness with three Unity projects): one
+    /// whole-workspace grep took 223 s. Named only where a Unity project is, so
+    /// a folder called Library anywhere else is still searched.
+    /// </summary>
+    internal static bool IsEngineCache(string parent, string sub) =>
+        Path.GetFileName(sub) is "Library" or "Temp" or "Logs" or "UserSettings"
+        && Directory.Exists(Path.Combine(parent, "Assets"))
+        && Directory.Exists(Path.Combine(parent, "ProjectSettings"));
 
     /// <summary>What Claude Code keeps under .claude that is not a definition: worktree checkouts, transcripts, history.</summary>
     private static bool IsClaudeNoise(string parent, string sub) =>

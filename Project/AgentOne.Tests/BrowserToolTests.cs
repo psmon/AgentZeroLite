@@ -118,6 +118,37 @@ public class BrowserToolTests
     }
 
     [Fact]
+    public async Task TheSameButtonClickedAgainOnTheSamePageIsAskedAboutEveryTime()
+    {
+        // Measured (2026-11-07, deevid): three clicks on "generate", three generations, 12 credits.
+        var driver = new FakeBrowserDriver { CdpAlive = true };
+        var asked = new List<string>();
+        var allowAgain = false;
+        using var belt = new BrowserToolbelt(driver, Cdp)
+        {
+            Session = "t",
+            Gate = (what, _, _) =>
+            {
+                asked.Add(what);
+                return Task.FromResult(what.Contains("AGAIN") && !allowAgain ? GateVerdict.Deny("no") : GateVerdict.Allow());
+            }
+        };
+
+        await belt.InvokeAsync(Call("browser_open", ("url", "https://www.youtube.com/@sandy/videos")), CancellationToken.None);
+        await belt.InvokeAsync(Call("browser_click", ("ref", "e7")), CancellationToken.None);
+        var refused = await belt.InvokeAsync(Call("browser_click", ("ref", "e7")), CancellationToken.None);
+        allowAgain = true;
+        var allowed = await belt.InvokeAsync(Call("browser_click", ("ref", "e7")), CancellationToken.None);
+
+        Assert.False(refused.Ok);
+        Assert.Contains("still be running", refused.Text);
+        Assert.True(allowed.Ok);
+        Assert.Equal(2, driver.Calls.Count(c => c == "click e7"));
+        Assert.Equal(3, asked.Count);                                 // first (site), then each repeat
+        Assert.Contains("AGAIN", asked[1]);
+    }
+
+    [Fact]
     public async Task ADeclinedOrUngatedActionNeverReachesTheBrowser()
     {
         var driver = new FakeBrowserDriver { CdpAlive = true };

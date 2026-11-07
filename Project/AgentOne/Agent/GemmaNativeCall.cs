@@ -83,8 +83,13 @@ public static class GemmaNativeCall
             var key = ReadKey(s, ref i);
             if (key is null) return null;
             SkipSpace(s, ref i);
-            if (i >= s.Length || s[i] != ':') return null;
+            // `key:value`, and the variants gemma also writes: `key=value`, `key:=value`.
+            // Measured (2026-11-06): `command:="Get-Content AGENTS.md"` was read as a
+            // bare word, quotes and `=` included, and PowerShell was handed
+            // `="Get-Content AGENTS.md"` three times in a row.
+            if (i >= s.Length || s[i] is not (':' or '=')) return null;
             i++;
+            if (i < s.Length && s[i] == '=') i++;
             SkipSpace(s, ref i);
 
             if (!TryReadValue(s, ref i, out var value)) return null;

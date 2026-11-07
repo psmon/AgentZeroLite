@@ -28,11 +28,13 @@ public sealed class KnownCliToolbelt(IReadOnlyList<KnownCliStatus>? status = nul
                 $"no built-in guide for '{name}'. Known: {string.Join(", ", KnownCli.All.Select(t => t.Name))}. " +
                 $"For another tool, run `{name} --help` with run_command before guessing its flags."));
 
-        var where = Status.FirstOrDefault(s => s.Tool == tool)?.Path;
+        var found = Status.FirstOrDefault(s => s.Tool == tool);
         var sb = new StringBuilder();
-        sb.AppendLine(where is null
+        sb.AppendLine(found is not { Installed: true }
             ? $"{tool.Name}: NOT installed on this machine. Do not install it yourself; tell the user it can be installed with: {tool.InstallHint}"
-            : $"{tool.Name}: installed ({where}). Run it with run_command.");
+            : found.Run is { } run
+                ? $"{tool.Name}: installed as a Python module ({found.Path}). Run it with run_command as `{run}` wherever the card says `{tool.Name}`."
+                : $"{tool.Name}: installed ({found.Path}). Run it with run_command.");
         sb.AppendLine();
         sb.Append(tool.Card.Trim());
         return Task.FromResult(ToolResult.Success(sb.ToString()));
@@ -43,7 +45,7 @@ public sealed class KnownCliToolbelt(IReadOnlyList<KnownCliStatus>? status = nul
         var sb = new StringBuilder("Known command-line tools (cli_guide {\"name\":\"…\"} for usage):\n");
         foreach (var s in Status)
             sb.Append(s.Installed ? "  ✓ " : "  ✗ ").Append(s.Tool.Name).Append(" — ").Append(s.Tool.Summary)
-              .AppendLine(s.Installed ? "" : " (not installed)");
+              .AppendLine(!s.Installed ? " (not installed)" : s.Run is { } run ? $" (run as `{run}`)" : "");
         return sb.ToString().TrimEnd();
     }
 }
