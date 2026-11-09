@@ -440,6 +440,24 @@ package" 안내와 함께 자동 제거)였다. What's new와 기능 15줄은 `l
 `listing.md` → 목록 채우기와 대조. 목록 페이지의 입력칸은 `#releaseNotes`와 `#feature-N`이고, 페이지가 열린 뒤
 몇 초가 지나야 나타난다.
 
+### 19차 제출 (1.26.9.0, 2026-11-09)
+
+내용: 코드 뷰를 소유자 없는 독립 창으로 띄우기(📌 항상 위, ↩ Dock back), 폴더를 펼치거나 고를 때 그 폴더만 다시 읽는
+트리 부분 갱신(⟳도 제자리 병합), 이미지 화면 맞춤(1:1 전환), 설정·플러그인 페이지가 사이드바 없이 전체 폭을 씀, 워크스페이스
+저장을 한 트랜잭션으로(저장 도중 실패하면 목록이 비던 버그), 프로필 래퍼 탭의 세션 재개. Partner Center는 Submission 16.
+새 권한·네트워크 흐름이 없어 개인정보 처리방침은 고치지 않았다. GitHub 릴리스 `v0.26.9`를 먼저 냈는데, **macos 잡이 단계
+하나 없이 취소**됐다 — `release.yml`이 은퇴한 `macos-14` 러너를 쓰고 있었다(agent-one 워크플로는 이미 macos-15로 옮긴
+뒤였다). Windows·Linux 파일은 정상 게시, `macos-15`로 고쳤다. 패키지 151.6 MB를 CDP `DOM.setFileInputFiles`로 넣어
+업로드+분석 약 40초, Save 뒤 1.26.9.0만 Validated, What's new를 `listing.md`에서 채우고 다시 열어 일치 확인(기능 15줄은
+그대로), 첫 Submit 클릭에 In certification. 로그인은 이번에도 풀려 있어 운영자가 다시 로그인했다.
+
+이번에 확인한 것:
+
+- 개요의 **Start update**와 **Submit for certification**은 `he-button` 웹 컴포넌트다 — `button`/`a`로 찾으면 없다.
+  Packages 페이지의 Save는 `input.btn-primary[value=Save]`, 목록 페이지의 Save는 `button.btn-primary`로 서로 다르다.
+- 목록 페이지 주소는 `…/submissions/<id>/listings?languageid=4&languagecode=en-us`(Store listings 항목은
+  `managelanguages`로 간다). 목록 편집은 `#releaseNotes`에 값을 넣고 `input`/`change` 이벤트를 보내면 Save에 반영된다.
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>

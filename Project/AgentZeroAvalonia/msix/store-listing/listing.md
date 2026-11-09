@@ -24,7 +24,16 @@ Your data stays on your PC: no account, no telemetry. The project is open source
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
-## What's new in this version (1.26.8.0 — submission 18)
+## What's new in this version (1.26.9.0 — submission 19)
+Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
+
+- Code view in its own window: float it beside your terminals, pin it on top, and bring it back with "Dock back".
+- The code view's file tree now picks up new and deleted files when you open or select a folder, and refresh keeps your place — open folders, selection and scroll position stay where they were.
+- Images in the code view fit the panel; switch to actual size with "1:1" or a double-click.
+- Settings and Plugins use the full width of the window.
+- Fixes: workspaces can no longer be lost when saving them fails partway; resuming a session is offered in terminals started through a profile command (such as a second Claude account).
+
+## What's new in version 1.26.8.0 (submission 18)
 Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
 
 - Terminals now work on PCs without the Microsoft Edge WebView2 runtime (older Windows 10, LTSC/Server or managed installs): instead of a blank tab you see why, and one click installs Microsoft's runtime.
