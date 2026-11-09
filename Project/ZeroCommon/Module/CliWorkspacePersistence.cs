@@ -126,9 +126,20 @@ public static class CliWorkspacePersistence
         db.SaveChanges();
     }
 
+    /// <summary>
+    /// Replaces the stored workspaces and tabs with <paramref name="groups"/> — all of it or none.
+    /// </summary>
+    /// <remarks>
+    /// The delete and the inserts run in one transaction. Measured (2026-11-09): the delete was
+    /// its own committed SaveChanges, a CLI process held the database for a moment, the next
+    /// insert failed with "SQLite Error 5: database is locked", and the profile came back with
+    /// no workspaces at all — ten workspaces and fourteen tabs gone. A failed save now leaves the
+    /// previous rows exactly as they were.
+    /// </remarks>
     public static void SaveCliGroups(IReadOnlyList<ICliGroupInfo> groups)
     {
         using var db = new AppDbContext();
+        using var transaction = db.Database.BeginTransaction();
         db.CliTabs.RemoveRange(db.CliTabs);
         db.CliGroups.RemoveRange(db.CliGroups);
         db.SaveChanges();
@@ -162,6 +173,7 @@ public static class CliWorkspacePersistence
         }
 
         db.SaveChanges();
+        transaction.Commit();
     }
 
     public static IReadOnlyList<CliGroupSnapshot> LoadCliGroups()
