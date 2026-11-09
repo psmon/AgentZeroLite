@@ -52,6 +52,29 @@ public partial class CodeView : UserControl
             _textMate = null;
         };
         AttachedToVisualTree += (_, _) => Show();
+        Picture.DoubleTapped += (_, _) => _vm?.ToggleImageFitCommand.Execute(null);
+    }
+
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CodeViewModel.ImageFit)) ApplyImageFit();
+    }
+
+    /// <summary>
+    /// Fit: no scroll bars, so the image is measured against the pane and shrunk into it
+    /// (DownOnly — a small icon is not blown up), centred. 1:1: its own pixels, scroll bars,
+    /// top-left like any document.
+    /// </summary>
+    private void ApplyImageFit()
+    {
+        var fit = _vm?.ImageFit ?? true;
+        var bars = fit ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+        PictureScroll.HorizontalScrollBarVisibility = bars;
+        PictureScroll.VerticalScrollBarVisibility = bars;
+        Picture.Stretch = fit ? Avalonia.Media.Stretch.Uniform : Avalonia.Media.Stretch.None;
+        Picture.HorizontalAlignment = fit ? Avalonia.Layout.HorizontalAlignment.Center : Avalonia.Layout.HorizontalAlignment.Left;
+        Picture.VerticalAlignment = fit ? Avalonia.Layout.VerticalAlignment.Center : Avalonia.Layout.VerticalAlignment.Top;
+        PictureScroll.Offset = default;
     }
 
     /// <summary>
@@ -83,9 +106,18 @@ public partial class CodeView : UserControl
     private void Bind(CodeViewModel? vm)
     {
         if (ReferenceEquals(_vm, vm)) return;
-        if (_vm is not null) _vm.TextChanged -= Show;
+        if (_vm is not null)
+        {
+            _vm.TextChanged -= Show;
+            _vm.PropertyChanged -= OnVmPropertyChanged;
+        }
         _vm = vm;
-        if (_vm is not null) _vm.TextChanged += Show;
+        if (_vm is not null)
+        {
+            _vm.TextChanged += Show;
+            _vm.PropertyChanged += OnVmPropertyChanged;
+        }
+        ApplyImageFit();
         Show();
     }
 

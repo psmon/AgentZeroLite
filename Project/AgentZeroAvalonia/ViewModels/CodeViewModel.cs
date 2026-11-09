@@ -251,6 +251,18 @@ public sealed partial class CodeViewModel : ObservableObject
     [RelayCommand] private void TogglePreview() => MarkdownPreview = !MarkdownPreview;
 
     /// <summary>
+    /// Images open fitted to the pane (shrunk to fit, never blown up past their own size) and
+    /// can be switched to actual size with scroll bars; the choice holds for the next image.
+    /// </summary>
+    [ObservableProperty] private bool _imageFit = true;
+
+    public string ImageFitLabel => ImageFit ? "1:1" : "⤢ Fit";
+
+    partial void OnImageFitChanged(bool value) => OnPropertyChanged(nameof(ImageFitLabel));
+
+    [RelayCommand] private void ToggleImageFit() => ImageFit = !ImageFit;
+
+    /// <summary>
     /// A link clicked in the preview: a web address goes to the browser (returned for the view
     /// to launch), a workspace file opens here. Anything else is ignored.
     /// </summary>
@@ -492,6 +504,7 @@ public sealed partial class CodeViewModel : ObservableObject
             ["folder"] = IsFolderView && CurrentFolder is not null ? CurrentTitle : null,
             ["view"] = IsFolderView ? "folder" : !HasFile ? null : IsPreview ? "preview" : IsImage ? "image" : IsTextView ? "text" : "note",
             ["preview"] = PreviewInfo.Length == 0 ? null : PreviewInfo,
+            ["imageFit"] = IsImage ? ImageFit : null,
             ["chars"] = Text.Length,
             ["topLevel"] = Nodes.Count,
             ["gitLog"] = new System.Text.Json.Nodes.JsonObject
