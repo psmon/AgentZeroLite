@@ -179,9 +179,12 @@ public partial class CodeView : UserControl
             _bitmap = null;
 
             _textMate ??= Editor.InstallTextMate(Registry);
+            // ⟳ on a file that changed: same place in the new text, not back to line 1.
+            var keep = _vm.IsReload ? (double?)Editor.VerticalOffset : null;
             Editor.Document = new TextDocument(_vm.Text);
             ApplyGrammar(_vm.CurrentPath);
-            Editor.ScrollToHome();
+            if (keep is { } offset) Editor.ScrollToVerticalOffset(offset);
+            else Editor.ScrollToHome();
         }
         catch (Exception ex)
         {

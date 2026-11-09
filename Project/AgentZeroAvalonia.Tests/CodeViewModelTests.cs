@@ -87,6 +87,60 @@ public sealed class CodeViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Expanding_again_picks_up_new_files_and_keeps_the_nodes_below()
+    {
+        var vm = new CodeViewModel();
+        await vm.SetRootAsync(_root, "ws");
+        var src = vm.Nodes.Single(n => n.Name == "src");
+        Directory.CreateDirectory(Path.Combine(_root, "src", "lib"));
+        await src.LoadAsync();
+        var lib = src.Children.Single(n => n.Name == "lib");
+        File.WriteAllText(Path.Combine(_root, "src", "lib", "a.cs"), "");
+        await lib.LoadAsync();
+        lib.IsExpanded = true;
+
+        // Created after the folder was read: no ⟳, just the next expand (or a select) of src.
+        File.WriteAllText(Path.Combine(_root, "src", "new.cs"), "");
+        File.Delete(Path.Combine(_root, "src", "app.cs"));
+        var result = await src.LoadAsync();
+
+        Assert.Equal((1, 1), (result.Added, result.Removed));
+        Assert.Equal(new[] { "lib", "new.cs" }, src.Children.Select(n => n.Name));
+        Assert.Same(lib, src.Children[0]);                       // the same node, not a rebuilt one
+        Assert.True(lib.IsExpanded);
+        Assert.Equal("a.cs", Assert.Single(lib.Children).Name);  // its children are still there
+    }
+
+    [Fact]
+    public async Task Refresh_merges_in_place_and_keeps_expansion_and_the_open_file()
+    {
+        var vm = new CodeViewModel();
+        await vm.SetRootAsync(_root, "ws");
+        var src = vm.Nodes.Single(n => n.Name == "src");
+        await src.LoadAsync();
+        src.IsExpanded = true;
+        await vm.OpenAsync("src/app.cs");
+        var changes = 0;
+        vm.TextChanged += () => changes++;
+
+        File.WriteAllText(Path.Combine(_root, "src", "more.cs"), "");
+        File.WriteAllText(Path.Combine(_root, "NOTES.txt"), "");
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Same(src, vm.Nodes.Single(n => n.Name == "src"));
+        Assert.True(src.IsExpanded);
+        Assert.Equal(new[] { "app.cs", "more.cs" }, src.Children.Select(n => n.Name));   // expanded folder re-read
+        Assert.Contains(vm.Nodes, n => n.Name == "NOTES.txt");
+        Assert.Equal("src/app.cs", vm.CurrentTitle);
+        Assert.Equal(0, changes);                                  // unchanged file: not re-shown
+
+        File.WriteAllText(Path.Combine(_root, "src", "app.cs"), "class App { int x; }");
+        await vm.RefreshCommand.ExecuteAsync(null);
+        Assert.Equal(1, changes);
+        Assert.Equal("class App { int x; }", vm.Text);
+    }
+
+    [Fact]
     public void The_toggle_chord_is_bound()
     {
         var binding = Assert.Single(HotkeyTable.Build(null, isMac: false), b => b.Name == HotkeyTable.CodeToggle);
