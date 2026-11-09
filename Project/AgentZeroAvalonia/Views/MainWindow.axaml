@@ -176,7 +176,7 @@
             <!-- Sidebar collapsed: a slim strip whose only job is to bring it back. -->
             <Border Grid.Column="1" Grid.Row="0" Width="18" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0"
-                    IsVisible="{Binding !SidebarExpanded}">
+                    IsVisible="{Binding WorkspaceSidebarStripVisible}">
                 <Button Classes="fold" Content="›" VerticalAlignment="Top" HorizontalAlignment="Center"
                         Margin="0,6,0,0" ToolTip.Tip="Show workspaces" Command="{Binding ToggleSidebarCommand}" />
             </Border>
@@ -186,7 +186,7 @@
                  dock leaves the sidebar less height than its lists need. -->
             <Border Grid.Column="1" Grid.Row="0" Width="220" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0"
-                    IsVisible="{Binding SidebarExpanded}">
+                    IsVisible="{Binding WorkspaceSidebarVisible}">
                 <DockPanel Margin="0,6,0,0">
                     <DockPanel DockPanel.Dock="Top" Margin="12,2,4,2">
                         <Button DockPanel.Dock="Right" Classes="fold" Content="‹"
@@ -318,7 +318,8 @@
                 </DockPanel>
             </Border>
 
-            <!-- Content: one page at a time -->
+            <!-- Content: one page at a time. Only Terminals shows the workspace sidebar (column 1);
+                 the app-wide pages hide it, so the Auto column collapses and they get its width. -->
             <Panel Grid.Column="2" Grid.Row="0">
                 <views:TerminalsView IsVisible="{Binding IsTerminalsPage}" />
                 <Panel IsVisible="{Binding IsSettingsPage}">

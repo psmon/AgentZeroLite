@@ -248,6 +248,7 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsWearablePage));
         OnPropertyChanged(nameof(IsPluginsPage));
+        RaiseSidebar();
         if (value == AppPage.Plugins) Plugins.NotifyShown();
     }
 
@@ -280,6 +281,25 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand] private void ShowWearable() => Page = Page == AppPage.Wearable ? AppPage.Terminals : AppPage.Wearable;
     [RelayCommand] private void ShowPlugins() => Page = Page == AppPage.Plugins ? AppPage.Terminals : AppPage.Plugins;
     [RelayCommand] private void ToggleSidebar() => SidebarExpanded = !SidebarExpanded;
+
+    /// <summary>
+    /// The workspace sidebar belongs to the Terminals page only. Settings, Wearable and Plugins
+    /// are app-wide — nothing on them depends on which workspace is picked — so they take the
+    /// whole width right of the activity bar instead of sitting beside a workspace list.
+    /// <see cref="SidebarExpanded"/> is the person's choice for the Terminals page and is kept.
+    /// </summary>
+    public bool WorkspaceSidebarVisible => IsTerminalsPage && SidebarExpanded;
+
+    /// <summary>The slim "›" strip that brings the sidebar back — Terminals page only, like the sidebar.</summary>
+    public bool WorkspaceSidebarStripVisible => IsTerminalsPage && !SidebarExpanded;
+
+    partial void OnSidebarExpandedChanged(bool value) => RaiseSidebar();
+
+    private void RaiseSidebar()
+    {
+        OnPropertyChanged(nameof(WorkspaceSidebarVisible));
+        OnPropertyChanged(nameof(WorkspaceSidebarStripVisible));
+    }
     [RelayCommand] private void ToggleBot()
     {
         BotVisible = !BotVisible;
