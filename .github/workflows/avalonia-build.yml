@@ -56,8 +56,8 @@ jobs:
           path: publish-avalonia/*.zip
 
   macos:
-    name: B · macos-14 (build + osx-arm64 .app + self-test)
-    runs-on: macos-14
+    name: B · macos-15 (build + osx-arm64 .app + self-test)
+    runs-on: macos-15   # macos-14 was retired (2026-11)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

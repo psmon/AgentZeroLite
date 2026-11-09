@@ -1,6 +1,6 @@
 # macOS 스모크 체크리스트 — AgentZero Lite (Avalonia host)
 
-CI(macos-14)는 빌드·`.app` 번들·`-cli version/selftest`·헤드리스 테스트까지만 증명한다. 화면과 WKWebView는 사람이
+CI(macos-15)는 빌드·`.app` 번들·`-cli version/selftest`·헤드리스 테스트까지만 증명한다. 화면과 WKWebView는 사람이
 Mac에서 확인해야 한다. 결과는 아래 표에 날짜·기기·OS 버전과 함께 적는다.
 
 ## 준비
