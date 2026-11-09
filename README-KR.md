@@ -1,989 +1,191 @@
 # AgentZero Lite
 
-**AI 시대를 위한 미니멀 IDE — 여러 개의 CLI를 한 화면에서 나란히 다루세요.**
+**이미 쓰고 있는 커맨드라인 AI 에이전트들의 데스크톱 거처 — Claude Code, Codex, 어떤 셸이든 한 창에 나란히.**
 
-> 영문 원본: [README.md](README.md)
->
-> 🧩 **확장 기능 매뉴얼** (파일 도구 · Diff 리뷰 · 커맨드 팔레트 · 멀티 에이전트 CLI ·
-> worktree · 오케스트레이션 · 예약 자동화 · 비용): **[확장 매뉴얼 → README-EX.md](README-EX.md)** · [English](README-EX.en.md)
->
-> 🖥️ **Avalonia 호스트 (Windows + macOS)** — 멀티 OS 판과 WPF 퍼스트 변환 플레이북: **[README-Avalonia-KR.md](README-Avalonia-KR.md)** · [English](README-Avalonia.md)
+> 🇺🇸 English: [README.md](README.md)
 
----
+![AgentZero Lite — Claude Code와 Codex가 나란히 작업하고, 사이드바에 실시간 상태가 표시된 모습](Home/readme/main.png)
 
-![AgentZero Lite — multi-CLI multi-view](Home/main.png)
+Claude Code, Codex, PowerShell 같은 CLI를 진짜 터미널 탭으로 열고, 분할 화면으로 배치하고,
+프로젝트마다 워크스페이스를 따로 둡니다. AgentZero Lite는 어느 에이전트가 일하는 중인지,
+어느 쪽이 내 답을 기다리는지, 어느 쪽이 끝났는지 알려 줍니다. 내장 어시스턴트는 터미널을 읽고
+대신 조작할 수 있고, 모든 기능은 어떤 셸에서든 스크립트로 다룰 수 있습니다.
 
-🎬 **시연 영상** — Claude 와 Codex 동시 제어 데모:
+계정도, 텔레메트리도 없습니다 — 설정과 기록은 내 PC에 남습니다. 오픈 소스입니다.
+
+🎬 시연 영상 — Claude와 Codex 동시 제어:
 
 <a href="https://www.youtube.com/watch?v=kXQjohrpA8o"><img src="https://img.youtube.com/vi/kXQjohrpA8o/mqdefault.jpg" width="240" alt="YouTube에서 보기"></a>
 
-같은 워크스페이스에서든 다른 워크스페이스에서든, CLI로 돌아가는 AI(Claude,
-Codex, 종류 무관)에게 명령 하나를 바로 꽂아 넣을 수 있습니다. 서로 다른 모델의
-AI들을 동시에 띄워두고, 같은 경로로 둘을 대화시킬 수도 있습니다 — 별도 중계
-서버나 커스텀 브로커 없이, 모델 간 크로스 대화.
-
-AgentZero Lite는 단순한 아이디어로 만들어진 Windows 데스크톱 셸입니다. AI 시대에
-하루의 대부분은 *커맨드라인 도구와 대화하는 시간*입니다. `claude`, `codex`, `gh`,
-`docker`, `pwsh`, REPL, 빌드 로그 tail — 각각 자기만의 터미널을 원하고, 사용자는
-이 모두를 창을 옮기지 않고 동시에 보고 싶습니다. AgentZero Lite는 진짜 멀티탭·
-멀티워크스페이스 ConPTY 터미널과, 포커스된 터미널로 텍스트·스킬 매크로를 전달하는
-작은 채팅 창을 제공합니다. 그 이상도 이하도 아닙니다.
-
 ## 설치
-
-공식 배포판은 **크로스 플랫폼(Avalonia) 판**입니다 — Windows 10/11 x64 용으로 배포 중이며(자가 포함
-빌드라 .NET 을 따로 설치할 필요가 없습니다), macOS(Apple Silicon) 판은 개발자 테스트 빌드(`.pkg`)로 받을 수 있습니다. 소개 페이지:
-<https://psmon.github.io/AgentZeroLite/Home/#install>
 
 | 판 | 받는 곳 | 비고 |
 |---|---|---|
-| **Windows 설치판** (추천) | [Releases](https://github.com/psmon/AgentZeroLite/releases/latest) → `AgentZeroLite-v<ver>-Setup.exe` | ⌚ **웨어러블** 호스트가 들어 있는 유일한 판. 이전(WPF) 설치본 위에 설치하면 그 자리에서 업그레이드되고 워크스페이스·설정은 그대로 남습니다. |
-| Windows 포터블 | Releases → `AgentZeroLite-v<ver>-win-x64.zip` | 압축만 풀면 실행. 웨어러블 호스트 포함. |
-| **Microsoft Store** | [apps.microsoft.com/detail/9NRHDFMD38H7](https://apps.microsoft.com/detail/9NRHDFMD38H7) | 자동 업데이트. 데이터는 패키지 안에 따로 보관. 웨어러블 없음. |
-| macOS (Apple Silicon) — 테스트 빌드 | Releases → `AgentZeroLite-v<ver>-osx-arm64.pkg` | `/Applications` 에 설치하는 인스톨러(macOS 12 이상). Apple Developer ID 서명 + 공증을 마쳐 더블클릭으로 바로 설치됩니다. 로컬 LLM·웨어러블 없음. |
+| **Microsoft Store** (추천) | [apps.microsoft.com/detail/9NRHDFMD38H7](https://apps.microsoft.com/detail/9NRHDFMD38H7) | Windows 10/11 x64. 자동 업데이트. |
+| Windows 설치판 | [Releases](https://github.com/psmon/AgentZeroLite/releases/latest) → `AgentZeroLite-v<ver>-Setup.exe` | 자가 포함 빌드라 .NET을 따로 설치할 필요가 없습니다. |
+| Windows 포터블 | Releases → `AgentZeroLite-v<ver>-win-x64.zip` | 압축을 풀고 실행. |
+| macOS (Apple Silicon) — 테스트 빌드 | Releases → `AgentZeroLite-v<ver>-osx-arm64.pkg` | 서명·공증 완료. 로컬 LLM 없음. v0.26.9에는 빠졌으니 다음 릴리스 전까지는 v0.26.8의 것을 쓰세요. |
+| Ubuntu (x64) — 테스트 빌드 | `curl -fsSL https://psmon.github.io/AgentZeroLite/Home/install-linux.sh \| bash` | 최신 릴리스의 `.deb`. |
 
-**WPF 호스트**(`Project/AgentZeroWpf`)는 이제 레퍼런스 빌드입니다. 기능을 Windows 에서 먼저 빠르게
-시험하는 실험실이고, 검증된 것이 공식 판으로 옮겨집니다. 이 README 의 기능 설명 대부분은 그곳에서 만든
-모습 그대로이며, 공식 판에 어떤 기능이 들어왔는지는 [README-Avalonia-KR.md](README-Avalonia-KR.md)가
-추적합니다.
+Store 판은 데이터(데이터베이스, 설정)를 패키지 안에 따로 보관하며, Releases 설치본과 공유하지
+않습니다. 소개 페이지: <https://psmon.github.io/AgentZeroLite/Home/>
 
 ---
 
 ## 주요 기능
 
-- **멀티탭 ConPTY 터미널** — 탭마다 Windows 의 진짜 의사 콘솔이 하나씩(의사 PTY
-  흉내가 아님). `ManagedConPtyHost`(직접 호출하는 `CreatePseudoConsole`)가 몰고
-  WebView2 안의 xterm.js 가 그립니다. 그래서 테마·폰트를 고를 수 있고,
-  **네이티브 터미널 DLL 은 하나도 배포하지 않습니다.**
-- **워크스페이스** — 탭을 폴더 단위로 묶어 프로젝트마다 별도 CLI 세트를 유지합니다.
-  워크스페이스 버튼 한 번으로 `cd` 컨텍스트와 새 Claude가 함께 뜹니다.
-- **AgentChatBot** (v0.9.1 부터 UI 라벨은 **AgentCLI**) — 도킹 가능한 채팅 패널.
-  입력한 텍스트를 **현재 활성 터미널**로 전달합니다. `CHT` 모드는 텍스트를,
-  `KEY` 모드는 순수 키스트로크(Ctrl+C, 화살표, Tab 등)를 보냅니다. AI가 아니라
-  **입력 브로커**입니다. *리브랜드는 UI 표면만 — 내부 액터 경로
-  `/user/stage/bot` 과 `AgentBotActor` 클래스명은 그대로라 외부 스크립트와
-  스킬 매크로는 그대로 동작합니다.*
-- **AI ↔ AI 대화 (핵심 기능)** — `AgentZeroLite.ps1`을 Claude 탭이나 Codex 탭에
-  **딱 한 번 가르치면** 그 뒤로 한쪽 AI가 다른 터미널을 *이름으로 불러* 대화를
-  시작할 수 있습니다. 탭 0의 Claude가 탭 1의 Codex에게 말을 걸고, Codex가
-  답장을 보내고, 각자 `terminal-read`로 상대 출력을 읽습니다. 중간 브로커도, 클라우드
-  중계도 없이, AgentZero의 IPC만 거칩니다. Lite 에디션이 존재하는 이유인, 모델들
-  사이의 티키타카입니다.
-- **AIMODE — 인-셸 코디네이터로서의 온디바이스 LocalLLM** — Shift+Tab으로
-  AgentBot을 AI 모드로 전환하면, 작은 온디바이스 LLM(현재 Gemma 4, Nemotron
-  준비 중)이 *다른* AI CLI들을 사용자 대신 구동하는 비서가 됩니다. 한국어든
-  영어든 모호하게 부탁하면 LocalLLM이 적절한 터미널 AI를 골라 메시지를 보내고,
-  기다리고, 응답을 읽고, 한 줄로 요약해서 가져옵니다. 양방향 채널: peer 터미널은
-  기존 `bot-chat` CLI로 직접 회신할 수 있어 LocalLLM이 폴링만 하지 않아도
-  됩니다. 어떤 것도 기기를 떠나지 않습니다. 자세한 내용은
-  [AIMODE 섹션](#-aimode--인-셸-코디네이터로서의-locallm) 참조.
-- **🎙 음성 — 핸즈프리로 AgentBot 구동, 옆 탭은 키보드 작업** —
-  마이크에 말하면 AgentBot이 오프라인으로 받아쓴 뒤(Whisper.net, GGML
-  small/medium 모델 로컬 캐시) 그 텍스트를 활성 터미널 AI에 그대로 타이핑해
-  보냅니다. 핵심은 **듀얼 멀티태스킹**: 한 탭은 손가락으로(코드 작성, Claude
-  diff 검토), *다른* 탭은 음성으로 동시 진행. 두 개의 AI 대화가 병렬로
-  돌아가고, 사람 한 명이 둘 다 감독합니다 — AIMODE의 모델 간 티키타카가
-  이젠 **사용자 본인의 두 입력 채널 간 티키타카**로 확장됩니다. 백엔드는
-  **CPU + Vulkan** 동시 번들이라 AMD / Intel / NVIDIA 모두 같은 바이너리로
-  가속됩니다. 멀티 GPU 시스템은 자동 베스트 픽 휴리스틱 + 음성 설정탭의
-  수동 오버라이드로 대응. **TTS 출력**은 세 백엔드 — Windows SAPI (즉시,
-  오프라인), OpenAI TTS (클라우드, byok), 그리고 v0.9.2 부터 **Supertonic**
-  (Supertone Inc 의 온디바이스 ONNX, ~99M params, 보이스 10종, 한국어 포함
-  31개 언어) — **pip 설치된 Python 패키지를 서브프로세스 시암으로 구동하는
-  AgentZero 첫 사례**로, 더 넓은 Python 온디바이스 모델 생태계로의 길을
-  엽니다. Settings → Voice → Supertonic 에서 설치된 Python 자동 탐지
-  (`py -0p` + filesystem 폴백), 라이브 진행률 + Cancel + Start fresh 가
-  있는 Download Model 다이얼로그, 멀티-Python 환경 진단 메시지를 가진
-  Check Install probe 를 제공.
-- **🎵 Music — 마이크 *또는* 스피커 출력으로 악기 분류 + 실시간 스펙트럼** —
-  Settings → Music 에서 MIT 의 `ast-finetuned-audioset-10-10-0.4593`
-  (Audio Spectrogram Transformer, 86.6M params, AudioSet 527 클래스)
-  를 ONNX Runtime 로 슬라이딩 10초 윈도우에 대해 구동합니다. 두 가지
-  입력 소스: **마이크** (NAudio WaveIn — 라이브 악기 캡처) 또는
-  **시스템 출력** (WASAPI 루프백 — 가상 케이블 없이 Spotify / YouTube /
-  게임이 스피커로 재생 중인 그 소리를 그대로 분석). 1.5초마다 재추론,
-  Top-K 라벨이 in-place 갱신되고 라벨 위에는 64밴드 로그 주파수 dBFS
-  스펙트럼이 ~30 Hz 로 다시 그려집니다. 모델 + 클래스 CSV 는 Supertonic 이
-  쓰는 동일한 `ModelDownloadDialog` 를 통해 `onnx-community` 허깅페이스
-  미러에서 받아옵니다 (~347 MB, 1회, "Start fresh" 로 클린 재시작 가능).
-  Voice 의 *듣기·말하기* 축에서 *듣고 이해하기* 축으로 한 발 더 — AgentZero
-  최초로 음성 트랜스크립션이 아닌 **구조화된 의미 판단**을 출력하는 기능.
-- **AgentBot `[+]` 메뉴 — 터미널 AI를 무장시키는 세 가지 방법** —
-  - **`AgentZeroCLI Helper`** — 채팅 입력창에 AgentZero Lite CLI 사용법 브리핑을
-    바로 넣어줍니다. 검토 후 Send 를 누르면 현재 활성 터미널의 AI(Claude, Codex, 셸
-    탑재 모델 무관)가 1회 학습 — 스킬 설치 없이 즉석에서 `AgentZeroLite.exe -cli`
-    사용법을 알게 됩니다. CLI가 PATH에 없으면 *Settings → Register PATH* 후 재시작
-    안내 메시지를 띄웁니다.
-  - **`Import Starter Skills`** — 함께 배포되는 `agent-zero-lite` 스킬을 현재
-    워크스페이스의 `.claude/skills/` 로 복사합니다. 다음 Claude Code 세션부터
-    영구적으로 스킬이 인식됩니다.
-  - **`Skill Sync`** — Claude가 이미 탭에서 돌아가는 상태에서 `/skills` 화면을 읽어
-    채팅창의 `/` 슬래시 메뉴로 변환합니다. `/` → 스킬 선택 → Enter 로 매크로 텍스트가
-    터미널로 바로 발사됩니다. LLM 라운드트립 없음.
-- **🔎 Scrap — 윈도우 스파이 + 스크롤 인식 텍스트 캡처 (v0.9.1)** —
-  ActivityBar 의 새 Scrap 아이콘에서 크로스헤어를 드래그해 아무 보이는 창에
-  떨어뜨리면 (또는 HWND 직접 입력) 그 창의 *읽을 수 있는 텍스트* 전체를
-  자동 스크롤하며 잡아옵니다. 캡처 전략 4단계: UIA `TextPattern` → 포커스
-  영역 UIA 스크롤 → **클립보드 스크롤** (Ctrl+Home → Ctrl+A/C + PageDown
-  루프, IntelliJ / Chrome / VSCode 등 Ctrl+A 지원하는 *모든* 앱에서 동작) →
-  `WM_VSCROLL` 폴백. 각 캡처는 `logs/scrap/yyyy-MM-dd-HH-mm-ss-scrap.txt`
-  파일로 저장되며 스크롤 진행 중 프리뷰 패널이 *라이브로* 채워집니다.
-  캡처 종료 시 원본 클립보드 복원.
-- **Note 패널** — 마크다운/Mermaid 다이어그램/Pencil 파일을 렌더링하는 보조
-  패널. 현재 워크스페이스 폴더 범위로 동작합니다.
-- **CLI 원격 제어** — `AgentZeroLite.exe -cli terminal-send 0 0 "npm test"`를
-  스크립트 어디서든 실행해 GUI를 `WM_COPYDATA` + 메모리 맵 파일로 제어합니다.
-- **액터 모델 (Akka.NET)** — 터미널 생명주기, 워크스페이스 라우팅, 채팅 입력을
-  감독받는 액터로 처리합니다. 한 세션이 죽어도 창 전체가 내려가지 않습니다.
-- **🧭 agent-one — 같은 저장소의 독립 CLI 에이전트, 코드 공유 없음** — Native AOT
-  단일 바이너리(Windows / macOS / Linux, npm 설치)로, 워크스페이스를 읽고 파일을
-  쓰고 승인 게이트 뒤에서 명령을 실행해 답합니다. 작고 빠른 온디바이스 모델이
-  일을 하고, 결정 엔진(TypeSafe *Jev*)이 고정 질문 — 라우팅, 규모, 안전, 상위
-  모델로 에스컬레이션 — 에 답합니다. 워크스페이스별로 기억하고(메모리 파일,
-  재개 가능한 세션, 엔진이 채우고 참고하는 **Kùzu 지식 그래프**), GUI Bot 모드와
-  **같은 `AgentBotActor` / `AgentLoopActor` 쌍**을 자체 Akka.NET 위에서 돌리며,
-  백그라운드 세션으로 어느 셸에서든 — 다른 에이전트가 — 구동할 수 있습니다.
-  `agent-one dashboard` 는 그렇게 남긴 흔적 — 메모리, 대화 기록, 그래프, Cypher
-  입력창 — 을 로컬 읽기 전용 웹 페이지로 보여 줍니다.
-  아래 [agent-one 섹션](#-agent-one--독립-cli-에이전트)과
-  [Project/AgentOne/README.md](Project/AgentOne/README.md) 참고.
-- **실행 파일 하나, 프로세스 하나** — 단일 인스턴스 가드, 설정은 SQLite, .NET 10
-  런타임 외 의존성 없음. 빌드 크기 ~60 MB.
-
----
-
-## 메탈 모델
-
-```
-+--------------------------------------------------------------------------+
-| AgentZero                                                    -  □  ×    |
-+---+------------+-----------------------------------------------+--------+
-|   | WORKSPACES | [Claude1] [pwsh1] [build-log] [+]            |        |
-| ⚙ | ▸ monorepo +-----------------------------------------------+        |
-| 🤖 |   ▸ web    |                                              |        |
-|   |   ▸ api    |           ConPTY 터미널 (활성 탭)              |        |
-|   | ▸ blog     |                                              |        |
-|   |            |                                              |        |
-|   | SESSIONS   +-----------------------------------------------+        |
-|   |  · Claude1 | AGENT BOT ▾ | OUTPUT | LOG | NOTE                    |
-|   |  · pwsh1   +-----------------------------------------------+        |
-|   |            |  > /skills                                    |        |
-|   |            |  [스킬 목록]                                    |        |
-|   |            |  > 테스트 돌리고 요약해줘                    [Send]  |
-+---+------------+-----------------------------------------------+--------+
-```
-
-상단: 탭마다 ConPTY 터미널. 좌측: 액티비티 바 + 워크스페이스/세션 사이드바.
-하단: 탭 전환형 패널 — AGENT BOT(활성 터미널로 텍스트/키 전송), OUTPUT, LOG,
-NOTE(워크스페이스별 마크다운 뷰어).
-
----
-
-## 아키텍처
-
-```
-┌─ AgentZeroWpf (WinExe, WPF, net10.0-windows) ───────────────────────────┐
-│                                                                         │
-│  MainWindow  ──── N개 ConPTY 탭 호스팅  ──── AgentBotWindow (dock/float)│
-│      │                                              │                   │
-│      │  WM_COPYDATA + MMF  <─  CliHandler.cs  ──>   │                   │
-│      │  (외부 스크립트가 GUI를 구동)                  │                   │
-│      ▼                                              ▼                   │
-│  ActorSystemManager (Akka.NET)                                          │
-└──────────────────────┬──────────────────────────────────────────────────┘
-                       │  ProjectReference
-┌─ ZeroCommon (ClassLib, net10.0) ────────────────────────────────────────┐
-│  Actors/    Stage → Workspace(N) → Terminal(N)  + AgentBot (1)          │
-│  Services/  ITerminalSession, AgentEventStream, AppLogger               │
-│  Data/      AppDbContext + EF Core (SQLite)                             │
-│             CliDefinition / CliGroup / CliTab / ClipboardEntry          │
-│  Module/    CliTerminalIpcHelper, CliWorkspacePersistence, ...          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-`ZeroCommon`은 UI 의존성이 없는 라이브러리로, 자체 헤드리스 테스트 프로젝트
-(`ZeroCommon.Tests`, xUnit + Akka.TestKit)가 커버합니다. `AgentTest`는 WPF에
-의존하는 영역을 담당합니다.
-
-### 액터 토폴로지
-
-```
-/user/stage                  — 최상위 감독자, 1개 인스턴스
-    /bot                     — AgentBotActor: UI 게이트웨이 (모드 Chat/Key,
-                               UI 콜백, peer 라우팅). 자식 AgentLoop을 lazy로 생성.
-        /loop                — AgentLoopActor: 본 에이전트. IAgentLoop 한 개를
-                               보유, Idle→Thinking→Generating→Acting→Done FSM 구동.
-    /ws-<workspace>          — WorkspaceActor: 해당 폴더의 터미널 소유
-        /term-<id>           — TerminalActor: ITerminalSession 래핑
-```
-
-모든 메시지는 `ZeroCommon/Actors/Messages.cs` 한 곳에 정의돼 있습니다.
-Agent 어휘 표준 표 — `harness/knowledge/_shared/agent-architecture.md`.
-같은 두 액터 구조가 같은 메시지 이름으로 [agent-one](#-agent-one--독립-cli-에이전트)
-안에서도 자체 `ActorSystem`(`/user/bot` → `/user/bot/loop`)으로 돌아가므로, CLI 와
-GUI 의 Bot 모드를 같은 눈으로 읽을 수 있습니다.
-
----
-
-## 프로젝트 구성
-
-| 프로젝트              | 경로                          | 종류                          | 네임스페이스          |
-|----------------------|-------------------------------|-------------------------------|----------------------|
-| **AgentZeroWpf**     | `Project/AgentZeroWpf/`       | WinExe (net10.0-windows, WPF) | `AgentZeroWpf.*`     |
-| **ZeroCommon**       | `Project/ZeroCommon/`         | ClassLib (net10.0, UI 없음)   | `Agent.Common.*`     |
-| **AgentTest**        | `Project/AgentTest/`          | xUnit (net10.0-windows)       | `AgentTest.*`        |
-| **ZeroWearable**     | `Project/ZeroWearable/`       | Exe (net10.0-windows10.0.19041) | `ZeroWearable.*`   |
-| **ZeroCommon.Tests** | `Project/ZeroCommon.Tests/`   | xUnit (net10.0, 헤드리스)     | `ZeroCommon.Tests.*` |
-| **AgentZeroAvalonia** | `Project/AgentZeroAvalonia/` | Exe (net10.0, Avalonia, Win+macOS) | `AgentZeroAvalonia.*` |
-| **AgentOne**         | `Project/AgentOne/`           | Exe (net10.0, Native AOT, `agent-one`) | `AgentOne.*` |
-| **AgentOne.Tests**   | `Project/AgentOne.Tests/`     | xUnit (net10.0, 헤드리스)     | `AgentOne.Tests.*`   |
-| **ZeroWearableDevice** | `Project/ZeroWearableDevice/` | ESP-IDF 펌웨어 (C++, ESP32-S3) | — (.NET 아님)     |
-
-참조 관계: `AgentTest → AgentZeroWpf → ZeroCommon ← ZeroCommon.Tests`, 그리고
-`ZeroWearable → ZeroCommon`. **AgentOne 은 아무것도 참조하지 않고 참조되지도
-않습니다** — 저장소와 액터 어휘를 공유하는 두 번째 제품이지, 코드를 공유하지는
-않습니다. WPF / Win32 의존성이 없는 코드는 전부 ZeroCommon에
-있어야 합니다. **ZeroWearable은 의도적으로 별도 프로세스**입니다 — BLE 센트럴이
-WinRT라 Windows SDK 타겟 프레임워크가 필요하고, GUI를 거기로 옮길 수는 없기 때문입니다.
-시계의 단일 BLE 링크를 이 프로세스가 소유합니다 —
-[웨어러블 기기 문서](Docs/wearable-device.kr.md) 참고. **ZeroWearableDevice**는 시계의
-펌웨어입니다 — ESP-IDF, `idf.py`로 빌드하며 아무도 참조하지 않습니다.
-[⌚ 웨어러블](#-웨어러블--손목-위의-askbot) 참고.
-
----
-
-## 빌드 & 실행
-
-요구사항: Windows 10/11, [.NET 10 SDK](https://dotnet.microsoft.com/), `dotnet`을
-실행할 수 있는 터미널. Rider나 Visual Studio 2022 17.11+에서 작업 가능 —
-아래 IDE 주의사항을 꼭 읽어주세요.
-
-```bash
-# 복원 + WPF 앱 빌드 (ZeroCommon은 프로젝트 참조로 자동 빌드)
-dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Debug
-
-# Release 빌드 (CLI 래퍼 스크립트 쓰기 전에 필요)
-dotnet build Project/AgentZeroWpf/AgentZeroWpf.csproj -c Release
-
-# GUI 실행
-Project/AgentZeroWpf/bin/Debug/net10.0-windows/AgentZeroLite.exe
-
-# 헤드리스 테스트 (공용 로직)
-dotnet test Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj
-
-# agent-one — 독립 CLI 에이전트 (나머지는 자체 README 에)
-dotnet build Project/AgentOne/AgentOne.csproj -c Debug
-dotnet test  Project/AgentOne.Tests/AgentOne.Tests.csproj
-Project/AgentOne/agent-one.ps1 run "hello" --provider echo
-Project/AgentOne/agent-one.ps1 chat
-
-# WPF 의존 테스트 (액터, 터미널 세션, 승인 파서)
-dotnet test Project/AgentTest/AgentTest.csproj
-```
-
-### ⚠️ IDE 주의사항 — 디버깅 시 Terminal Mode OFF
-
-AgentZero는 WPF 내부에 자기만의 ConPTY 터미널을 호스팅합니다. IDE가 프로세스의
-stdin/stdout/stderr에 자기 터미널을 붙이면(Rider 기본값, VS의 "Redirect standard
-output", VS Code 내장 터미널로 직접 실행) **ConPTY가 소유해야 할 콘솔 이벤트를
-IDE가 가로챕니다**. 탭이 시작되지 않거나 깨진 출력이 보입니다.
-
-**Run / Debug 누르기 전에 IDE의 터미널 붙이기를 반드시 끄세요:**
-
-| IDE            | 설정                                                                      |
-|----------------|---------------------------------------------------------------------------|
-| **Rider**      | Run / Debug configuration → **Use external console = ON** (`USE_EXTERNAL_CONSOLE=1` in `.run.xml`) |
-| **Visual Studio** | 프로젝트 속성 → 디버그 → **"Use the standard console" / "Redirect standard output" 체크 해제** |
-| **VS Code**    | `launch.json`에서 `"console": "externalTerminal"` 설정 (`"internalConsole"` 금지) |
-
-요약 — 자식 프로세스에게 진짜 콘솔 창을 주세요. 일반 셸에서 `dotnet run`으로
-실행하는 경우는 문제없습니다(IDE가 stdio를 가로채지 않음).
-
----
-
-## 두 AI CLI가 서로 대화하게 만들기
-
-Lite 에디션의 대표 유스케이스이며 1분이면 세팅됩니다.
-
-1. **CLI 경로 등록 (1회).** Settings → *AgentZero CLI* → `Register PATH`.
-   이제 어느 셸에서든 `AgentZeroLite.ps1`이 잡힙니다.
-2. **같은 워크스페이스에 AI 탭을 2개 띄웁니다.** 예를 들어 그룹 0 탭 0 = `claude`,
-   그룹 0 탭 1 = `codex` (자연어 지시를 받는 AI CLI면 어느 것이든).
-3. **각 AI에게 이 도구를 가르칩니다.** 탭마다 아래 한 줄을 붙여넣으세요:
-   > `AgentZeroLite.ps1 help`를 학습하고, 터미널 간 대화에 이 도구를 사용해.
-   > `terminal-list`로 탭 목록을 보고, `terminal-send <grp> <tab> "텍스트"`로
-   > 다른 AI 탭에 이름으로 말을 걸고, `terminal-read <grp> <tab> --last 2000`으로
-   > 상대 답변을 읽어.
-4. **대화를 시작합니다.** Claude 탭에서 이렇게 말하세요:
-   *"Codex라는 이름의 탭에 인사하고, REST 엔드포인트를 함께 설계하자고 제안해."*
-   Claude는 `AgentZeroLite.ps1 terminal-send 0 1 "안녕 Codex, ..."`를 실행합니다.
-   Codex는 자기 프롬프트에서 그것을 보고 답변을 구성해 `terminal-send 0 0 "..."`로
-   보냅니다. 두 탭에서 대화가 실시간으로 흐릅니다.
-
-이 구조가 작동하는 이유:
-
-- 각 AI는 **자기만의 ConPTY**에서 돌아갑니다 — 공유 메모리 없음, 컨텍스트 유출 없음.
-- 메시지는 **AgentZero의 IPC**(`WM_COPYDATA` + 메모리 맵 파일)로 이동합니다.
-  클라우드 중계 아님 — 어떤 것도 기기를 떠나지 않습니다.
-- 탭 레이아웃 덕분에 언제든 끼어들거나 방향을 틀거나 수동 보조를 넣을 수 있습니다.
-  인간이 계속 감독자입니다.
-- 브로커가 그냥 AI가 이미 이해하는 셸 명령이므로, `claude` 대신 아무 CLI-native
-  에이전트(Aider, Copilot, 로컬 `ollama` 챗 등)를 꽂아도 같은 프로토콜이 유지됩니다.
-
-이것이 Lite 에디션이 만들어진 이유인 "모델 간 티키타카"입니다. 터미널 멀티플렉서는
-여러 프롬프트를 **볼** 수 있게 해주지만, AgentZero Lite는 그들이 **서로 말할** 수
-있게 해줍니다.
-
----
-
-## 🧠 AIMODE — 인-셸 코디네이터로서의 LocalLLM
-
-"두 CLI가 서로 대화하게 만들기"의 다음 단계는 **온디바이스 LLM이 그 대화를 코디네이트하게
-하는 것**입니다. 그게 **AIMODE** — AgentBot 패널을 **Shift+Tab**으로 전환하면,
-GPU/CPU에서 도는 Gemma 4(Nemotron 준비 중)가 진짜 AI CLI들을 대신 구동해 주는
-작은 인-앱 비서가 됩니다.
-
-> **철학.** 여기서의 LocalLLM은 **Claude나 Codex보다 똑똑해지려는 게 아닙니다.**
-> 목표는 *작은 비서* 역할 — 모호한 부탁을 받아 적절한 터미널 AI에게 라우팅하고,
-> 결과를 정리해서 가져오는 것. PM보다는 작고, bash 별칭보다는 큰 정도. 무거운
-> 추론은 그 더 큰 CLI들에 살아있고, LocalLLM은 모든 사람의 내선번호와 전화 돌리는
-> 프로토콜을 아는 안내데스크 직원입니다.
-
-### 동작 그림
-
-```
-                  +----------------------+
-                  |      You (사용자)     |
-                  +----------+-----------+
-                             | 채팅: "claude한테 토론해줘", "안녕", ...
-                             v
-+----------------------------+----------------------------+
-|                AgentBot AIMODE  (채팅 패널)              |
-|                                                         |
-|   +----------------------+      도구 카탈로그            |
-|   | LocalLLM             |      list_terminals          |
-|   | Gemma 4 / Nemotron   | ---  read_terminal           |
-|   | 온디바이스             |      send_to_terminal        |
-|   | GBNF 제약             |     send_key  wait  done    |
-|   | 매 turn 한 JSON 호출  |                              |
-|   +----------+-----------+                              |
-|              | Tell                                     |
-|              v                                          |
-|   +-------------------------------------------------+   |
-|   |  AgentLoopActor   (Akka FSM, /bot/loop)         |   |
-|   |  Idle -> Thinking -> Generating -> Acting -> Done   |
-|   |  KV cache 보유; StartAgentLoop당 한 사이클      |   |
-|   +-------------------------------------------------+   |
-+----------------------------+----------------------------+
-                             | ConPTY (텍스트 + Enter)
-                             v
-            +-----------------+   +-----------------+
-            | Claude (탭)     |<->| Codex  (탭)     |   ...
-            | 똑똑한 쪽       |   | 또 다른 똑똑함   |
-            +--------+--------+   +--------+--------+
-                     | 회신 경로: 기존 CLI 사용
-                     v
-   AgentZeroLite.exe -cli bot-chat "DONE(텍스트)" --from <peerName>
-                     |
-                     | WM_COPYDATA  (기존 CLI/IPC 채널)
-                     v
-   MainWindow.HandleBotChat
-       -> /user/stage/bot.Tell(TerminalSentToBot)
-       -> AgentLoop이 깨어나 continuation cycle
-```
-
-### LLM이 Agent가 되는 법 — 펑션콜 툴 체인
-
-순수 LLM은 텍스트 자동완성 엔진입니다. **Agent가 아닙니다.** 세상에 영향을
-주는 행동을 하게 만들려면 네 가지를 해야 합니다:
-
-1. **출력 제약**: 도구 표면으로만 emit. 여기선 GBNF 문법으로 모든 출력이
-   `{"tool": "<이름>", "args": { ... }}` 외엔 불가능하도록 강제. sampler 단계에서
-   자유 산문은 절대 못 만듦.
-2. **도구 실행** 후 결과 캡처.
-3. **결과를 LLM 컨텍스트로 다시 주입** — 다음 user turn으로.
-4. LLM이 `done`을 emit할 때까지 **반복**.
-
-생성 → 도구 → 결과 → 다시 생성 루프가 텍스트 완성을 행동력(Agency)으로 바꾸는
-핵심입니다. AgentZero의 레시피는 `Project/ZeroCommon/Llm/Tools/` 안에:
-
-| 레이어 | 역할 |
-|-------|------|
-| `AgentToolGrammar.Gbnf` | GBNF 문법 — sampler가 유효한 tool-call JSON만 emit 가능 |
-| 도구 표면 (6개) | `list_terminals`, `read_terminal`, `send_to_terminal`, `send_key`, `wait`, `done` |
-| `IAgentLoop` | 백엔드 무관 계약: `RunAsync(userRequest) → AgentLoopRun`. 두 구현 — `LocalAgentLoop` (LLamaSharp + GBNF) / `ExternalAgentLoop` (OpenAI 호환 REST). |
-| `IAgentToolbelt` | 에이전트가 영향을 끼치는 사이드이펙트 표면 — 위 6개 도구가 여기로 dispatch. 실서비스 = `WorkspaceTerminalToolHost`, 테스트 = `MockAgentToolbelt`. |
-| `AgentLoopActor` | `/user/stage/bot/loop` 의 Akka 래퍼 — 라이브 진행 상황, 취소, KV cache, peer-signal continuation |
-| 시스템 프롬프트 (Mode 1 / Mode 2) | 직답 vs 터미널 릴레이 모드 분기 학습 |
-| 핸드쉐이크 프로토콜 | 본 대화 전에 역방향 채널 동작 검증 |
-
-**한 run = 한 사이클**이 핵심 규칙: 각 `StartAgentLoop`은 peer와 한 번의 짧은
-round-trip만(send → wait → read → react → done) 수행하고 멈춤. 다음 사이클은
-사용자나 도착한 peer signal이 트리거 — LLM이 5턴 토론을 한 거대 tool chain으로
-스크립트하지 *않음*. KV cache가 사이클 간 히스토리를 보존.
-
-### 양방향 채널 — peer 터미널 AI가 CLI로 회신
-
-새로 추가된 부분: 터미널 AI(탭의 Claude, 탭의 Codex)가 기존 `bot-chat` CLI를
-통해 **AgentBot에게 메시지를 push할 수 있음**. AgentBot이 터미널과 첫 접촉할 때
-다음 핸드쉐이크 헤더를 prepend함:
-
-> You are **Claude** and I am AgentBot.
-> Step 1 — 채널 검증: `AgentZeroLite.exe -cli help`
-> Step 2 — 응답: `AgentZeroLite.exe -cli bot-chat "DONE(handshake-ok)" --from Claude`
-
-그 명령이 실행되면 메시지가 `WM_COPYDATA` → `MainWindow.HandleBotChat` →
-`Tell(TerminalSentToBot)`로 봇 액터에 도달. peer가 active conversation 상태면
-Reactor가 새 continuation cycle로 깨어남. **터미널 화면 폴링(`read_terminal`)은
-시그널을 못/안 보내는 peer를 위한 *폴백***.
-
-이 구조 덕분에 터미널 AI가 능동적 참여자가 됨 — 응답을 *지연*시킬 수 있고
-(긴 컴파일, 큰 리팩토링 등) 준비되면 직접 호출. AgentBot이 `Crafting…` 인디케이터를
-계속 폴링할 필요 없음.
-
-### 검증된 시나리오 (라이브, Gemma 4)
-
-- **T5G** — 인사는 직답: `"안녕"` → 봇이 채팅에서 답, 터미널로 라우팅 안 함.
-- **T6G** — 5번 연속 continuation 사이클, 각 ≤ 6 tool iterations
-  (한 run에 한 사이클, 한 run으로 전체 대화 처리 X).
-- **T7G** — 모호한 Mode 2 요청(`"Claude한테 토론 시작해"`)도 사용자에게 다시
-  떠밀지 않고 합리적 opener로 `send_to_terminal` 트리거.
-
-42/42 헤드리스 테스트 + 위 라이브 스위트가 loop / actor / prompt 변경마다 검증.
-
----
-
-## 🎙 음성 — 손과 입을 동시에 쓰는 듀얼 멀티태스킹
-
-음성 입력은 AgentBot 에 직결돼 있습니다. 마이크에 말하면 오디오가 **로컬에서**
-(클라우드 안 거침, Whisper.net 오프라인 GGML 모델) 받아쓰여지고, 그 텍스트는
-사용자가 채팅창에 직접 타이핑한 것과 동일한 경로로 활성 AI CLI 탭에 흘러
-들어갑니다.
-
-**왜 의미 있나 — 듀얼 멀티태스크 플레이:** 한 터미널이 *키보드*로 점령돼
-있을 때(코드 작성, 파일 탐색, Claude diff 코드리뷰), *두 번째* 터미널은
-손을 대지 않고 *음성*으로 구동할 수 있습니다. 두 AI 대화가 동시에 돌고
-사람 한 명이 둘 다 감독하는 구조. AIMODE 의 모델 간 티키타카가 이젠
-**본인의 두 입력 모달리티(손/입) 간 티키타카**로 확장되는 셈입니다.
-
-```
-┌─ 탭 0 ─ Claude (키보드) ─────┐   ┌─ 탭 1 ─ Codex (음성) ────────┐
-│ 사용자가 타이핑:               │   │ 사용자가 마이크에 말함:        │
-│ "이 함수를 리팩터링해줘…"      │   │ "오늘 작업한 PR 요약해줘"      │
-│         │                    │   │         │                    │
-│         ▼                    │   │         ▼ Whisper.net (Vulkan)│
-│   Claude 작업                │   │   AgentBot 받아쓰기           │
-│         │                    │   │         │                    │
-│         ▼                    │   │         ▼                    │
-│   탭 0 에 답신                │   │   탭 1 에 자동 타이핑          │
-└──────────────────────────────┘   └──────────────────────────────┘
-                  감독자 한 명(사용자), 두 스트림이 병렬 진행
-```
-
-### 스택
-
-- **Whisper.net** — 오프라인 STT, GGML `small`(~466 MB) / `medium`
-  (~1.5 GB) 모델이 `%USERPROFILE%\.ollama\models\agentzero\whisper\`
-  에 캐시. 첫 사용 시 자동 다운로드.
-- **CPU + Vulkan 런타임 동시 번들** (Vulkan 쪽 ~63 MB 추가). Vulkan
-  백엔드는 **크로스 벤더** — AMD / Intel / NVIDIA 가 같은 바이너리로
-  가속됩니다. CUDA 는 미포함 (cuBLAS 만 ~750 MB; on-demand 다운로드로
-  추후 검토).
-- **멀티 GPU 지원** — Voice 설정탭에 GPU 디바이스 픽커 노출. *Auto*
-  는 벤더 + VRAM 휴리스틱으로 베스트 어댑터를 자동 선택
-  (NVIDIA 디스크리트 > AMD 디스크리트 > Intel Arc > Intel iGPU).
-  dGPU + iGPU 노트북에서도 dGPU 를 정확히 잡고, 잘못 잡혔을 땐
-  수동 오버라이드 한 클릭.
-- **스트리밍 STT** *(Avalonia 호스트 + WPF; 공식 모델은 Nemotron 3.5 ASR)* —
-  Settings → Voice → Provider `SherpaStreaming`을 고른 뒤 AgentBot 입력창의 🎙:
-  **말하는 동안** 입력창에 텍스트가 나타나고, VAD의 1.2–2초
-  hangover와 발화 전체 Whisper 처리를 기다리는 대신 인식기 자체의 끝점이
-  감지되는 순간(기본 무음 0.8초) 발화가 전송됩니다. CPU에서 도는 sherpa-onnx
-  `OnlineRecognizer`를 음성 액터 안의 Akka.Streams 스테이지(`StreamingSttFlow`)로
-  실행합니다. k2-fsa 릴리스에서 받는 모델 두 가지: **Nemotron 3.5 ASR
-  streaming 0.6B**(NVIDIA, 한국어 포함 40개 로케일, 문장부호 포함, ~455 MB)와
-  **한국어 스트리밍 Zipformer**(한국어 전용, 아카이브 ~400 MB, 더 가볍게 동작).
-  실시간 속도로 흘린 한국어 클립에서 측정: 말이 끝나고 ~0.4초 뒤 문장 전체가
-  화면에 있고, ~0.9초 뒤 전송됩니다. 셸에서는
-  `AgentZeroWearable.exe --hear-stream clip.wav --realtime`이 같은 부분 결과를 출력합니다.
-- **마이크 캡처** — NAudio + VAD 무음 세그먼테이션, 감도 슬라이더,
-  AskBot 툴바의 영구 mute + 시스템 볼륨 슬라이더.
-- **테스트 하네스** — `WhisperCpuVsGpuBenchmarkTests` 가 동일
-  TTS 샘플을 CPU / GPU 양쪽에 돌려 prep / transcribe / RT factor /
-  similarity 를 출력. 본인 머신에서 Vulkan 런타임이 실제 로딩됐는지
-  바로 확인 가능.
-
-### 상태: 입력 ✓ · 출력 ✓ (v0.9.2 부터 3 backends)
-
-- ✅ **STT (사용자 → 터미널 AI)** — 출시. 마이크 → AgentBot →
-  활성 터미널로 흐르는 경로가 라이브.
-- ✅ **TTS (터미널 AI → 음성 응답)** — 출시. Settings → Voice
-  에 세 가지 백엔드:
-  - **Windows SAPI** — 즉시, 오프라인, OS 설치된 보이스 사용.
-  - **OpenAI TTS** — `tts-1`, 보이스 11종, byok.
-  - **Supertonic** *(v0.9.2 신규)* — Supertone Inc 의 온디바이스
-    ONNX TTS, ~99M params, 보이스 10종(M1–M5 / F1–F5), 한국어
-    포함 31개 언어. **AgentZero 첫 'pip 설치된 Python
-    라이브러리 구동' 사례** — `python -c <script>` 서브프로세스
-    시암 — Python 온디바이스 모델 생태계 진입로. Settings →
-    Voice → Supertonic 에서 설치된 Python 자동 탐지
-    (`py -0p` + filesystem 폴백), 라이브 tqdm 진행률 +
-    Cancel + Start fresh 가 있는 Download Model 다이얼로그,
-    실행 가능한 에러 힌트(캐시 잠금 / HF rate limit / 네트워크
-    / 디스크)를 가진 Check Install probe 를 제공. 모델/코드
-    라이선스는 OpenRAIL-M / MIT.
-  - **KittenTTS 2** *(Avalonia 호스트 + 웨어러블, Windows)* —
-    KittenML 의 1.7B 음성 LM, 한국어 포함 다국어를 앱의 기존
-    런타임으로 실행: LM 은 Q8_0 GGUF 로 내장 llama.cpp(Vulkan,
-    Radeon 8060S 에서 실시간), chatterbox-turbo 디코더는 CPU ONNX
-    Runtime, 텍스트 정규화는 C# 으로 이식. Python 없음. 약 3.3 GB
-    묶음은 이 저장소의 GitHub Release `model-kittentts2-v1` 에서
-    받고(이어받기, 파일별 SHA-256 검증), Stellon Labs Community
-    License 와 NOTICE 를 함께 담는다. 음성 LM 은 GPU(Vulkan)
-    또는 CPU 에서 돈다 — Settings → Voice → Device(Auto / GPU / CPU).
-
----
-
-## 🎵 Music — 악기 분류 + 실시간 스펙트럼
-
-Voice가 AgentZero 에게 **듣고 말하기**를 가르쳤다면, Music 은 **듣고
-이해하기**를 더합니다. 이 PC 의 모든 오디오 소스를 가리켜 1.5초마다 무엇이
-재생되는지(악기군, 장르 큐, 환경음)를 식별하고, 라벨 위에는 실시간
-스펙트럼 바를 띄워 모델 출력과 실제 주파수 내용을 시각적으로 대조할 수
+### 에이전트를 위한 터미널 — 탭, 분할 화면, 워크스페이스
+
+- **진짜 터미널.** 탭 하나하나가 Windows 의사 콘솔(ConPTY)이고 xterm.js가 그립니다 — Claude Code,
+  Codex, Hermes Agent, netclaw, PowerShell, CMD, 직접 추가한 어떤 프로그램이든. macOS와 Linux에서는
+  zsh 또는 bash가 도는 진짜 PTY입니다.
+- **분할 화면.** 오른쪽·아래로 나누고, 탭을 다른 칸으로 옮기고, 터미널을 별도 창으로 떼어 냈다가
+  다시 붙일 수 있습니다 — 떼어 내도 계속 실행되고 화면도 그대로입니다.
+- **워크스페이스.** 프로젝트 폴더마다 하나씩, 각자의 탭과 배치를 갖고 다음에 앱을 열 때 그대로
+  복원됩니다. 사이드바에는 폴더의 git 브랜치와 worktree 목록이 보이고 — Claude Code와 Codex가
+  만든 것도 포함 — 클릭 한 번으로 옮겨 갈 수 있습니다.
+- **터미널 내 검색**(Ctrl+Shift+F) — 스크롤백 전체에서, 대소문자 구분과 정규식 지원.
+
+### 나를 기다리는 에이전트를 바로 알기
+
+사이드바의 **ACTIVE SESSIONS** 목록(맨 위 스크린샷)은 모든 워크스페이스에서 돌고 있는 터미널을
+*working*(작업 중), *waiting*(내 답을 기다림), *done*(완료)으로 보여 줍니다. Claude Code, Codex,
+Hermes Agent는 화면만이 아니라 각 에이전트가 스스로 남기는 상태 기록을 읽기 때문에, 아직 진행 중인
+턴은 정말 끝날 때까지 *working*으로 남습니다. 에이전트가 일을 마치거나 질문을 하면 화면 구석에
+작은 팝업이 뜨고 작업 표시줄 버튼이 깜박입니다. 누르면 그 터미널로 바로 갑니다
+(설정 → Notifications). 표준 터미널 알림을 보내는 프로그램이면 무엇이든 같은 방식으로 뜹니다.
+
+### 터미널을 열 때 이전 대화 이어가기
+
+![이전 Codex 세션 이어가기 — 이 폴더에서 그 에이전트가 나눈 대화를 최신순으로](Home/readme/resume.png)
+
+Claude Code나 Codex 탭을 열면, 그 에이전트가 이 폴더에서 이미 나눈 대화를 최신순으로 제목과 첫
+프롬프트와 함께 보여 주고 — 새 세션도 고를 수 있습니다. "Don't ask again"으로 에이전트별로 끌 수
 있습니다.
 
-```
-┌─ Settings → 🎵 Music ───────────────────────────────────────────────┐
-│ Source  [▼ System Output  — WASAPI 루프백, 가상 케이블 불필요   ]   │
-│ Device  [▼ ★ Default — 현재 Windows 재생 장치                    ]  │
-│ Window  10 s    Top-K  5                                            │
-│                                                                     │
-│ ▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  (마이크/루프백 레벨)  [STOP]  │
-│ SPECTRUM  (30 Hz – 8 kHz, 로그 주파수)                              │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │  ▆█▆▃▃ ▆▆ ▃ ▆█▆▃ ▃▃▆ ▆ ▃▃ █▆ ▆▆▆▆▆ ▃▃ ▃                       │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│ TOP LABELS  (라이브 · 슬라이딩 10초 윈도우)                          │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ tick #14 · window 10.0s · mel 1024×128 · pre 12 ms · inf 244 ms │ │
-│ │ ───────────────────────────────────────────────────────────────  │ │
-│ │ 71.2% ██████████████████████  Electric guitar                  │ │
-│ │ 18.4% █████                   Guitar                           │ │
-│ │ 12.1% ████                    Music                            │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-```
+### 에이전트 CLI 설치 확인과 설치
 
-### 스택
+![설정 → CLI definitions — 내장 에이전트와 각각의 설치 여부](Home/readme/agent-cli.png)
 
-- **MIT/ast-finetuned-audioset-10-10-0.4593** — Audio Spectrogram
-  Transformer, 86.6M params, Google AudioSet (악기 / 장르 / 음성 /
-  환경음 등 527 클래스) 로 파인튜닝됨. 입력은 10초 / 16 kHz 모노 /
-  128 bin log-mel 스펙트로그램, 출력은 클래스별 logits → sigmoid 로
-  멀티라벨 점수.
-- **ONNX Runtime 1.20** — CPU 추론 (~200–400 ms/pass on 모던 x64),
-  GPU 의존성 없음. `onnx-community/ast-finetuned-audioset-10-10-0.4593-ONNX`
-  허깅페이스 미러를 통해 배포되어 `optimum-cli` Python 우회 불필요.
-  Supertonic이 쓰는 동일한 `ModelDownloadDialog` 가 347 MB 파일을
-  resume / cancel / "Start fresh" 와 함께 스트리밍.
-- **두 가지 캡처 소스** —
-  - **마이크** — NAudio `WaveInEvent` 16 kHz 모노 (Voice 가 쓰는
-    동일 파이프라인 — Voice 마이크가 동작하면 Music 마이크도 동작).
-  - **시스템 출력 (WASAPI 루프백)** — 활성 렌더 엔드포인트(기본
-    재생 장치, 보조 스피커, 가상 케이블) 대상으로
-    `WasapiLoopbackCapture` → NAudio `BufferedWaveProvider →
-    StereoToMono → WdlResamplingSampleProvider(16 kHz) →
-    SampleToWaveProvider16` 체인을 통과시켜 디바이스 믹서 포맷이
-    무엇이든 AST 입력 포맷에 맞춥니다. *스피커로 나오고 있는 것* —
-    Spotify, YouTube, 게임, Zoom 통화 — 을 헤드폰을 빼거나 가상
-    오디오 케이블을 설치하지 않고 그대로 분석.
-- **실시간 슬라이딩 윈도우 추론** — 캡처 프레임이 롤링 10초 PCM
-  버퍼로 흘러가고, 백그라운드 루프가 1.5초마다 스냅샷을 떠 AST 를
-  ONNX Runtime 으로 돌립니다. interlocked 단일-flight 게이트로
-  느린 CPU 에서도 백로그가 쌓이지 않음.
-- **라이브 로그 주파수 스펙트럼** — AST mel 과 별도로, 저렴한
-  2048-pt Hann FFT 가 ~33 ms (30 Hz repaint) 마다 64 로그 밴드 레벨을
-  계산해 WPF Canvas 의 Rectangle 들에 그립니다. dBFS 정규화로 바가
-  첫 음에 saturate 하지 않고 -60 dBFS ~ -3 dBFS 사이에서 자연스럽게
-  움직임.
+설정 → CLI definitions에는 `+` 메뉴로 열 수 있는 셸과 에이전트가 모여 있습니다. 내장 에이전트
+(Claude Code, Codex, AgentOne, netclaw, Hermes Agent)를 고르면 설치되어 있는지 확인하고, 없으면
+설치해 줍니다 — npm으로, netclaw와 Hermes는 제작사의 설치 스크립트로. 두 번째 Claude 계정처럼
+다른 명령도 직접 항목으로 추가할 수 있습니다.
 
-### 아키텍처 시암
+### AgentBot — 터미널을 읽고 조작하는 어시스턴트
 
-- **백엔드 추상화** — `Project/ZeroCommon/Music/` 의 `IMusicClassifier`
-  는 `ISpeechToText` 와 같은 형태: `EnsureReadyAsync` 로 네이티브
-  리소스 워밍, `ClassifyAsync` 가 1회 추론. MERT (음악 전용 임베딩)
-  나 CLAP (zero-shot text-conditioned) 를 붙이는 것은 같은 모양의
-  새 구현 추가일 뿐 — UI 재설계 아님.
-- **Settings 탭** — Settings → 🎵 Music. Provider 는 첫 이터레이션
-  AST AudioSet 으로 잠금이지만 ComboBox 형태로 유지되어 향후 MERT /
-  CLAP 옵션이 추가될 자리가 마련됨.
-- **지식 전문가** — `harness/knowledge/music-curator/` 가 모델 카드,
-  mel-spectrogram 정규화 컨벤션, WASAPI 루프백 함정을 소유합니다.
-  새 음악 모델 추가, 스펙트럼 시각화 튜닝, 루프백 캡처 포맷 불일치
-  디버그 시 `music-curator` 에이전트를 호출.
+![AI 모드의 AgentBot이 Claude와 Codex 터미널을 읽고 각자 방금 한 일을 요약한 모습](Home/readme/agentbot.png)
 
-### 잘하는 것, 못하는 것
+아래쪽 **BOT** 패널은 입력한 내용을 포커스된 터미널로 보내며, 모드가 셋입니다:
 
-이번 빌드의 AST mel 전처리는 Hann 윈도우 + HTK mel scale 입니다.
-AST 학습 시 사용된 Kaldi `compliance.kaldi.fbank` (Povey 윈도우 +
-pre-emphasis) 와 *가깝지만 정확히 동일하지는 않음*. 발표된 AudioSet
-mAP 가 약간 떨어집니다 — 명확한 악기 (피아노, 드럼, 기타, 바이올린,
-사람 목소리) 에 대한 Top-K 라벨은 정확하게 나오지만, 엣지 케이스
-(미묘한 환경음, 다중 악기 융합) 는 기준 파이프라인 대비 몇 퍼센트
-차이가 보일 수 있습니다. Kaldi 정확 호환으로의 정련은 music-curator
-지식에 follow-up 으로 추적.
-
----
-
-## ⌚ 웨어러블 — 손목 위의 AskBot
-
-AgentZero는 시계에서도 돌아갑니다: **Waveshare ESP32-S3-Touch-AMOLED-1.75C**(466×466 원형 AMOLED,
-ESP32-S3R8, 스피커 + 마이크, BLE). 양쪽 절반이 모두 이 저장소에 있습니다.
-
-| 절반 | 위치 | 무엇인가 |
-| --- | --- | --- |
-| PC 호스트 | [`Project/ZeroWearable`](Project/ZeroWearable) | `AgentZeroWearable.exe` — BLE 링크를 소유하고, 시계를 위해 AgentZero의 에이전트 루프를 돌리며, Supertonic 또는 KittenTTS 2(다국어)로 말하고 Whisper로 듣습니다. WPF 또는 Avalonia 호스트의 **Wearable** 페이지에서 시작 |
-| 펌웨어 | [`Project/ZeroWearableDevice`](Project/ZeroWearableDevice/README-KR.md) | 보드용 ESP-IDF 프로젝트. AskBot이 함께 컴파일하는 Akka.NET 리모팅 클라이언트와 통신 규약(`PROTOCOL.md`) 포함 |
-
-- **AskBot**은 PDU를 BLE로 터널링하는 진짜 Akka 리모팅 피어입니다. 음성이나 텍스트로 물으면
-  Settings → LLM에 설정한 브레인(로컬 또는 OpenAI 호환 모델)이 답하고, 허용 폴더 안의 파일 도구와
-  웹 도구를 씁니다.
-- **답을 어디서 말할지**는 시계에서 고릅니다: 텍스트만 → 시계에서 음성 → **PC 스피커**에서 음성.
-  목소리와 귀는 Settings → Voice — 데스크톱과 같은 설정입니다.
-- **빌드는 AskBot에 집중합니다.** 보드가 작아 Chat과 Claude HUD 앱은 빌드 옵션이며 기본은 꺼짐입니다.
-  그 덕에 AskBot의 내부 DMA RAM이 약 65 KB 늘었습니다(여유 98 KB → 163 KB).
-- 펌웨어는 이미 설치된 ESP-IDF(`C:\esp\v5.5.5`)로 빌드하며 아무것도 내려받지 않습니다:
-
-```powershell
-cd Project\ZeroWearableDevice\firmware
-. .\idf-env.ps1
-idf.py -p COM7 build flash monitor
-```
-
-보드·앱·메모리·빌드 상세: [Project/ZeroWearableDevice](Project/ZeroWearableDevice/README-KR.md) ·
-USB·포트·링크 양쪽 디버깅: [Docs/wearable-device.kr.md](Docs/wearable-device.kr.md).
-
----
-
-## 🧭 agent-one — 독립 CLI 에이전트
-
-```console
-$ agent-one chat
-› 보드 API 만들어줘
-  route: → workspace  (confidence 0.98)
-  scope: small — going ahead  (confidence 0.73)
-  graph: consulted via by_keywords — 2 item(s)  (confidence 0.81)
-  ✓ write_file  (0.0s)
-  ⚠ run this command?  dotnet build src/BoardApi     ← y 를 치면 실행
-  ✓ run_command  (4.1s)
-  escalation: keeping the draft  (confidence 0.98)
-◆ 보드 API를 만들고 빌드했습니다. 다음 단계: 1. … 2. …
-  knowledge: kept 2 item(s)  (confidence 0.84)
-```
-
-AgentZero Lite 는 데스크톱이고, **agent-one** 은 같은 생각을 어느 머신에나
-`npm install` 할 수 있는 단일 바이너리로 옮긴 것입니다: 폴더 안에서 일하는
-에이전트, 작고 빠른 온디바이스 모델, 그 모델을 정직하게 잡아 주는 결정 엔진.
-[`Project/AgentOne`](Project/AgentOne/) 에 살고 이 저장소의 다른 어떤 것도
-참조하지 않습니다 — Native AOT 는 Akka.Remote, EF Core, LLamaSharp, ONNX 를
-실을 수 없습니다 — 다만 구조는 빌려 왔습니다.
-
-| | |
+| 모드 | 하는 일 |
 |---|---|
-| **도구** | 파일(`list_files` `read_file` `find_files` `grep`), 워크스페이스 루트 안에서만 `write_file`, `web_search` / `web_read`(GET 만), `run_command`(루트에서 PowerShell / bash). 쓰기와 실행은 *보호되는* 패밀리: 위험 패턴은 항상 사람에게 묻고, 그 외는 결정 엔진의 `safe` 가 확신할 때만 그냥 실행, 아니면 묻습니다. |
-| **스마트 모드** | 턴 앞에서 엔진이 도구 패밀리를 고르고(제안이 아니라 강제), 워크스페이스 작업의 규모를 재며(크면 상위 모델의 *설계* 부터), 일상 모델의 초안이 나온 뒤에는 느리고 강한 **추론 모델**이 한 번 더 봐야 하는지 결정합니다. 모델 둘, 고정 질문 엔진 하나(TypeSafe *System One*, 질문당 ~0.3 초), 계획용 LLM 호출 없음. 실측 기록은 [`docs/smart-mode-jev.md`](Project/AgentOne/docs/smart-mode-jev.md). |
-| **메모리** | 워크스페이스별 메모리 파일(50 k 자, 세션마다 열림), `/resume` 으로 화면까지 재연되는 저장 세션, 모델이 붙이는 작업 제목. 그리고 **지식 그래프**(임베디드 Kùzu, Cypher): 턴이 끝날 때마다 엔진이 *남길 가치가 있나?* 를 판단하고, 모델이 1~3 줄로 증류해 엔진의 근거를 노드로 붙여 저장하며, 턴 앞에서는 엔진이 그래프를 볼지 — 어떤 쿼리로 볼지 — 를 정해 파일을 뒤지기 전에 참고합니다. `agent-one memory` 로 들여다볼 수 있습니다. |
-| **대시보드** | `agent-one dashboard` 가 `127.0.0.1` 링크를 출력하고, 그 링크의 로컬 웹 페이지가 agent-one 이 작업한 모든 워크스페이스를 — 프로젝트 하나 또는 전체로 — 보여 줍니다: 메모리는 턴마다 카드 한 장, 세션 기록은 타임라인(도구 단계, 엔진의 판정, 결과), Kùzu 그래프는 노드와 엣지로 그리고, Cypher 입력창은 모든 그래프에 걸쳐 `workspace` 열을 붙여 실행합니다. 관찰 전용: 그래프는 Kùzu 의 읽기 전용 플래그로 열고 요청마다 닫아서 실행 중인 세션이 쓰기 핸들을 유지하며, API 는 링크에 담긴 실행별 토큰을 요구하고, 페이지는 바이너리에 내장되어 다른 것을 받아 오지 않습니다. |
-| **백그라운드 세션** | `agent-one session start` 가 세션 하나를 분리 실행하고, 어느 셸에서든 `agent-one ask "…"` 가 턴의 이벤트를 스트리밍하며 승인도 같은 파이프로 답합니다. 한 번에 하나, `session stop` 으로 끝. 릴리스 플랫폼마다 채팅 모드가 스스로를 테스트하는 방법이자, 다른 에이전트(예: AgentZero 의 Claude 탭)가 agent-one 과 협업하는 방법입니다. |
-| **액터** | 대화는 `AgentBotActor`(게이트웨이: 콜백, 한 번에 한 턴) 위의 `AgentLoopActor`(세션 소유, Idle ⇄ Running, 시작당 결과 정확히 하나) — `ZeroCommon/Actors/Messages.cs` 의 어휘 그대로, Akka.NET 1.6 나이틀리로, AOT 바이너리 안에서. 창, REPL, `run`, 파이프 서버는 게이트웨이 하나 위의 렌더러입니다. |
-| **일시중지** | 턴이 도는 중 Esc 를 누르면 다음 스텝 앞에서 멈추고, 다음에 친 한 줄을 *재개* / *중단* / *개선* 으로 읽습니다 — 개선이면 그 줄이 `[the user, mid-turn] …` 으로 모델 앞에 놓입니다. |
-| **배포** | `dotnet publish` → RID 마다(win-x64, linux-x64, osx-arm64, osx-x64) 약 22 MB 바이너리 하나와 옆의 Kùzu 라이브러리. 릴리스 워크플로가 각각을 스모크 테스트(설정 화면, 파이프 위의 채팅 모드)하고 npm 래퍼 `@webnori/agent-one` 이 받아서 검증합니다. |
+| **CHT** | 입력한 글을 활성 터미널에 칩니다. |
+| **KEY** | 키를 그대로 넘깁니다 — Ctrl+C, 방향키, Tab. |
+| **AI** | 터미널을 읽고, 입력을 보내고, 답을 기다리고, 에이전트 사이에 일을 전달하는 에이전트. |
 
-나머지 — 설정 화면, 채팅 창의 키, 안전 경계, JSON 계약, `~/.agent-one/` 의 구성 —
-는 **[Project/AgentOne/README.md](Project/AgentOne/README.md)** 에 있습니다.
+AI 모드는 **내 PC의 로컬 모델**(Windows) 또는 설정 → LLM에 넣은 **OpenAI 호환 엔드포인트**에서
+돌고, 설정 → MCP에서 추가하고 하나씩 허용한 **MCP 서버**의 도구를 부를 수 있습니다. **말로 걸 수도**
+있습니다: 마이크 버튼을 누르고 말하면 내 PC에서 바로 받아 적습니다(NVIDIA Nemotron 스트리밍 음성
+인식 — 한국어, 영어 등 여러 언어). 설정 → Voice에는 기기 내 음성 합성(TTS) 목소리도 있으며,
+모델은 그곳에서 한 번만 내려받으면 됩니다.
 
----
+### 코드 뷰, git 로그, diff 리뷰
 
-## 🧪 하네스 — 펑션콜 체인의 셀프 개선
+![터미널 아래의 코드 뷰: 워크스페이스 파일과 문법 강조](Home/readme/code-view.png)
 
-LLM을 유용한 툴 체인으로 엮는 일은 **어렵고**, 솔직히 (아직) 제가 잘하는
-영역이 아닙니다. [`harness/`](harness/) 아래 하네스가 매번 처음부터 다시
-추론하지 않고 이 저장소가 반복 개선하는 방식입니다:
+**CODE** 탭(왼쪽 바의 📄 또는 Ctrl+Alt+E)은 워크스페이스의 파일을 보여 줍니다: VS Code 문법 강조,
+패널에 맞춰 보이는 이미지, Mermaid 다이어그램까지 렌더링되는 Markdown. 폴더를 펼치거나 선택하면
+새로 생긴 파일과 지워진 파일이 바로 반영됩니다.
 
-```
-harness/
-├── agents/        — 전문가 평가자들 (security-guard, build-doctor,
-│                    test-sentinel, code-coach, tamer)
-├── engine/        — 워크플로우 (release-build-pipeline, pre-commit-review)
-├── knowledge/     — 도메인 노트 (LLM 프롬프트 컨벤션, tool-calling 서베이)
-└── logs/          — 모든 Mode 3 리뷰, RCA, 평가가 여기 고정
-```
+![별도 창으로 띄운 코드 뷰가 Markdown 파일의 Mermaid 다이어그램을 그린 모습](Home/readme/code-window.png)
 
-이번 iteration에서 AIMODE 펑션콜 체인을 개선한 피드백 루프:
+별도 창으로 띄워 터미널 옆에 두고, 맨 위에 고정했다가, **Dock back**으로 되돌릴 수 있습니다.
 
-1. **유닛테스트 피드백** — `T1G..T7G` 라이브 + 헤드리스 TestKit 스위트
-   (현재 42/42)가 회귀 대비 프로토콜 & 상태 머신 검증.
-2. **실 수행 피드백** — 실제 앱 로그
-   (`%LOCALAPPDATA%\AgentZeroWpf\logs\app-log.txt`)가 매 Reactor turn,
-   peer signal, JSON parse failure 캡처.
-3. **Mode 3 RCA 로그** —
-   [`harness/logs/code-coach/`](harness/logs/code-coach/) 아래. 회귀마다
-   날짜별 사후 분석: 증상, 근본 원인, 패치, 평가, deferred 후속 작업.
-4. **사용자(저)는 검토자** — 제가 프롬프트 디자인을 혼자 끌고 가지 않습니다.
-   하네스가 개선 제안을 내면, 검토 후 수용하거나 코스 보정하고, 다음 루프가
-   그 피드백을 반영. "AI가 다 한다"보다는 **반복 개선자와 페어 프로그래밍**에
-   가까움 — 그 페어링의 산출물(로그/평가/최종 프롬프트)이 제가 실제로 학습하는
-   재료입니다.
+![GIT LOG — 워크스페이스의 최근 커밋](Home/readme/git-log.png)
 
-이번 iteration의 구체 사례: AIMODE 프롬프트가 한 자리에서 **6번 개정** —
-one-cycle 규칙, 모호한 릴레이 안티-수동성, 안티-거부, 핸드쉐이크 분리,
-peer-signal 트리거, ID 스킴을 string으로 전환 — 각 시도가 같은 Mode 3 doc에
-무엇이 실패하고 왜 다음 시도가 그걸 해결하는지 기록됨. 하네스가 그 시도들의
-**기억**이라 같은 실수가 반복되지 않음.
+**GIT LOG**는 로컬 git으로 읽은 워크스페이스의 최근 커밋을 보여 줍니다. **DIFF**는 새 파일을 포함한
+작업 트리의 변경을 보여 주고, 줄마다 메모를 달아 그 메모들을 터미널의 에이전트나 AgentBot에 한꺼번에
+보낼 수 있습니다.
 
-> 이런 하네스가 어떻게 구성되는지 공부하고 싶다면, 자매 저장소
-> **[harness-kakashi](https://github.com/psmon/harness-kakashi)**가 같은 패턴으로
-> 만든 독립형 연습 사부입니다.
+### Agent Stage와 플러그인
 
----
+![Agent Stage — 작업 중인 Claude와 Codex, Claude 주위의 Explore 서브에이전트 두 개](Home/readme/agent-stage.png)
 
-## 🔁 루프 엔지니어링 — AI가 *건너뛸 수 없는* 절차
+**Plugins** 페이지(🧩)는 웹 플러그인을 앱 안에서 실행합니다. **Agent Stage**는 워크스페이스를 무대로,
+터미널을 에이전트로 그립니다 — 일하는 동안 움직이고, 내가 필요하면 깜박이고, Claude Code·Codex·Hermes가
+띄운 서브에이전트를 주위에 무리로 보여 줍니다. 에이전트를 누르면 그 터미널로 갑니다. 그 밖의 공식
+플러그인 — Voice Note(화자 구분이 되는 받아쓰기), Agent Band(실시간 음악 인식), 토큰 대시보드 — 는
+같은 페이지의 목록에서 설치하거나, GitHub 폴더나 `.zip`으로 설치합니다. 플러그인은 별도 창으로 떼어
+낼 수 있습니다.
 
-하네스 엔지니어링에는 고유한 실패 모드가 있습니다. 에이전트의 루프를 **지침만으로**
-구동하면("먼저 A, 다음 B, 그다음에야 C") 절차 전체가 작업 컨텍스트에 들어 있는
-동안엔 모델이 잘 따릅니다. 하지만 긴 실행에서 에이전트의 컨텍스트는 **압축**되고,
-압축은 손실적입니다 — 조용히 누락되는 그 단계가 하필 **핵심(load-bearing)** 단계인
-경우가 많습니다. 이는 특히 **절차를 반드시 지켜야 하는 flow**(릴리스 전 게이트,
-커밋 전 검증)를 모델이 기억해 주리라 믿고 **문장으로만** 강제할 때 가장 크게
-드러납니다.
+### 명령 팔레트, 예산, 단축키
 
-해법은 순서를 문장에 맡기지 않는 것입니다. **루프를 그래프로 엔지니어링**하세요.
-순서와 게이트는 그래프의 엣지에 — 프롬프트가 아니라 런타임이 — 소유하고, LLM은
-각 노드 *안에서* 창의적 작업을 합니다. 모델은 Study보다 Act를 먼저 할 수 없습니다,
-그런 엣지가 없으니까요. 그래프가 곧 **잊지 않는 부분**입니다.
+![명령 팔레트 — 터미널, 워크스페이스, 페이지, 명령으로 바로 이동](Home/readme/palette.png)
 
-이 프로젝트가 엔지니어링하는 루프는 **PDSA**(데밍의 *Plan → Do → Study → Act*
-개선 사이클)입니다:
+- **명령 팔레트**(Ctrl+Shift+P) — 어떤 터미널, 워크스페이스, 페이지, 명령으로든 바로 이동.
+- **Budget** — 터미널의 에이전트들이 이번 달 쓴 비용을 모델별·프로젝트별로, 선택한 월 한도와 함께
+  보여 줍니다. 이번 달 지출은 상태 바에 나옵니다. 가격은 직접 고칠 수 있습니다.
+- **Shortcuts** — 설정 → Shortcuts에서 단축키를 바꿉니다.
 
-- **Plan** — LLM이 *검증 가능한 기대 결과*(측정지표)를 약속.
-- **Do** — 작업 수행.
-- **Study** — 그 기대 대비 결과를 LLM이 판정(met / partial / unmet).
-- **Act** — 학습을 기록하고, 필요 시 보강 사이클을 자동 연결.
+### 어떤 셸에서든 스크립트로
 
-각 사이클은 **프로젝트별 그래프 메모리**에 누적됩니다 — 에이전트의 장기 기억이며,
-루프가 작업만이 아니라 *프로세스*를 개선하게 합니다. 루프 자체는 **Akka Streams
-그래프 DSL**(자매 프로젝트 [`akka-graph-loop`](https://github.com/psmon/akka-graph-loop))로
-만들어졌고, 단일 Native-AOT CLI `@webnori/pdsa`로 배포됩니다.
-
-**AgentZero는 이것을 여러분의 에이전트에게 제공합니다.** `npm i -g @webnori/pdsa`를
-설치하면, 호스팅된 에이전트가 자신의 터미널에서 그래프로 강제되는 PDSA 루프를 구동할
-수 있습니다(`pdsa plan …` → `pdsa do …` → `pdsa study …` → `pdsa act`). 하네스가 계약·
-인증·그래프 메모리 모델을 [`harness/knowledge/tamer/pdsa-cli.md`](harness/knowledge/tamer/pdsa-cli.md)
-에 연결해 둡니다.
-
-전부 오픈소스입니다: fork 해서 그래프를 조정하면 **여러분만의** 커스텀 AI 루프를
-엔지니어링할 수 있습니다. 이론, 이것이 다루는 컨텍스트 압축 실패, 그리고 Akka 그래프가
-절차를 어떻게 강제하는지는 **[Docs/loop-engineering.md](Docs/loop-engineering.md)**에
-정리했습니다.
-
----
-
-## CLI — 스크립트에서 GUI 구동
-
-스크립트에서 호출 가능한 모든 동작은 `AgentZeroLite.exe -cli <command>`를 통해
-나갑니다. GUI가 이미 떠 있어야 하며, CLI는 `WM_COPYDATA`(marker `0x414C "AL"`)로
-명령을 보내고 지정된 메모리 맵 파일로 응답을 받습니다. 기본 5초 폴링 타임아웃이
-있고, 응답을 기다리지 않으려면 `--no-wait`를 붙이세요.
-
-| 명령                                | 동작                                                            |
-|-------------------------------------|-----------------------------------------------------------------|
-| `status`                            | GUI 상태 JSON 덤프 (워크스페이스 수, 상태 바)                  |
-| `copy`                              | 최근 클립보드 버퍼를 시스템 클립보드로 복사                    |
-| `open-win` / `close-win`            | 메인 창 표시 / 숨김                                             |
-| `console`                           | 앱 디렉토리에서 PowerShell 새로 열기                            |
-| `log [--last N] [--clear]`          | CLI 액션 히스토리 (파일 기반)                                   |
-| `terminal-list`                     | 워크스페이스/탭 세션 전체 JSON 리스트                           |
-| `terminal-send <g> <t> "text"`      | 탭 `<t>`로 텍스트 전송 (또는 `--alias <name>`)                  |
-| `terminal-key <g> <t> <key>`        | 제어키 전송 (Ctrl+C, Enter, Tab, 화살표, …) (또는 `--alias <name>`) |
-| `terminal-read <g> <t> [-n N]`      | 탭 스크롤백 마지막 N바이트 읽기 (또는 `--alias <name>`)         |
-| `terminal-alias <list\|set\|rm>`    | 터미널에 안정적 이름 부여 → `--alias`로 인덱스 대신 지목        |
-| `agent-resume-launch <g> <t>`       | 탭의 최신 세션을 찾아 `--resume` 명령을 라이브 터미널에 주입    |
-| `bot-chat [--from X] "text"`        | Bot 창에 외부 채팅 버블 표시                                    |
-| `os <verb> [args]`                  | OS 자동화: 윈도우 열거 / 스크린샷 / UIA / 마우스 / 키 입력      |
-| `cost`                              | 기록된 토큰 사용량 기반 USD 추정 비용                           |
-| `help`                              | 명령어 레퍼런스                                                 |
-
-편의용 PowerShell 래퍼가 `Project/AgentZeroWpf/AgentZeroLite.ps1`에 있습니다. 앱
-디렉토리가 `PATH`에 등록된 뒤라면 어느 셸에서든 호출 가능합니다. Settings에서
-**AgentZero CLI → Register PATH** 버튼으로 등록할 수 있습니다.
-
----
-
-## 🖥 OS 자동화 — CLI / LLM 양쪽에서 윈도우 제어
-
-`os` 명령군은 미션 **M0014** 에서 AgentZero Origin 의 데스크톱 자동화 표면을
-가져와 CLI 와 온디바이스 LLM agent loop 양쪽에 노출합니다. 읽기 전용 동사들은
-완전 대칭 — 셸 호출과 LLM 도구 호출이 같은 코드 경로를 타며 같은 audit JSONL,
-같은 스크린샷 파일을 만듭니다.
+위의 기능은 모두 같은 실행 파일로 스크립트에서 — 또는 다른 에이전트가 — 다룰 수 있습니다:
 
 ```powershell
-# 보이는 창 열거
-AgentZeroLite.exe -cli os list-windows --filter "AgentZero"
-
-# 데스크탑 전체 PNG 캡처 (그레이스케일, 1920×1080 다운스케일)
-AgentZeroLite.exe -cli os screenshot
-
-# 한 창의 UI Automation 트리 조회
-AgentZeroLite.exe -cli os element-tree 0x000A0234 --depth 5
-
-# Alt+F4 입력 시뮬레이션 (게이트 필요)
-$env:AGENTZERO_OS_INPUT_ALLOWED = "1"
-AgentZeroLite.exe -cli os keypress alt+f4
+AgentZeroLite.exe -cli terminal-list                          # 워크스페이스와 탭
+AgentZeroLite.exe -cli terminal-send 0 1 "run the tests"      # 워크스페이스 0, 탭 1에 입력
+AgentZeroLite.exe -cli terminal-wait 0 1 --until done         # 에이전트가 끝날 때까지 대기
+AgentZeroLite.exe -cli terminal-read 0 1 --last 2000          # 답한 내용 읽기
+AgentZeroLite.exe -cli bot-ask "what is the Codex tab doing?" # AI 모드의 AgentBot에 질문
 ```
 
-**LLM 도구** (AIMODE 에서 호출 가능): `os_list_windows`, `os_screenshot`,
-`os_activate`, `os_element_tree`, `os_mouse_click`, `os_key_press`.
-`os_mouse_*` / `os_key_*` 두 도구는 CLI 와 동일한 환경변수
-(`AGENTZERO_OS_INPUT_ALLOWED=1`) 로 게이팅됩니다. 게이트가 닫혀 있으면
-`{"ok":false,"error":"…gate denied…"}` 가 반환되며, 시스템 프롬프트가
-재시도를 금지합니다.
+| 명령 | 하는 일 |
+|---|---|
+| `status`, `terminal-list` | 앱 상태, 워크스페이스와 탭 |
+| `terminal-send` / `terminal-key` / `terminal-read` / `terminal-wait` | 입력, 키 누르기, 화면 읽기, 에이전트 상태 대기 |
+| `terminal-alias` | 터미널에 이름을 붙이고 `--alias <name>`으로 지정 |
+| `agent-state`, `attention` | 터미널별 에이전트 상태, "나를 기다림" 알림 |
+| `layout` | 칸 나누기·옮기기·포커스, 워크스페이스 전환 |
+| `bot-chat`, `bot-ask` | AgentBot에 메시지 넣기, AI 모드로 질문 |
+| `code`, `worktree`, `plugin`, `mcp` | 코드 뷰, git worktree, 플러그인, MCP 서버 |
+| `cost` | 이번 달 에이전트 지출(GUI 없이도 동작) |
 
-**산출물** 은 `tmp/os-cli/` 아래에 누적됩니다:
+`AgentZeroLite.exe -cli help`가 전체 목록을 보여 주고, `-cli help agentzero`는 에이전트를 위해 쓴
+안내서입니다 — Claude나 Codex 탭에 한 번 가르쳐 두면 에이전트끼리 서로의 터미널과 대화할 수 있습니다.
 
+---
+
+## 개인정보
+
+AgentZero Lite에는 계정이 없고 텔레메트리를 보내지 않습니다. 터미널, 설정, 기록은 내 PC에 남고,
+입력한 API 키는 암호화해 저장합니다(Windows는 DPAPI). [개인정보 처리방침](https://psmon.github.io/AgentZeroLite/Home/privacy-policy.html)
+
+## 소스에서 빌드
+
+```bash
+dotnet build Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Debug
+Project/AgentZeroAvalonia/bin/Debug/net10.0/AgentZeroLite.exe
+dotnet test  Project/AgentZeroAvalonia.Tests/AgentZeroAvalonia.Tests.csproj
+dotnet test  Project/ZeroCommon.Tests/ZeroCommon.Tests.csproj
 ```
-tmp/os-cli/
-├── audit/<date>.jsonl          모든 CLI/LLM 호출 1줄씩 기록
-├── screenshots/<date>/         PNG 출력
-└── e2e/<date>.log              스모크 결과 요약
-```
 
-**E2E 수락 검증**: `Docs/scripts/launch-self-smoke.ps1` 가 새
-`os` 동사들을 사용해 빌드된 본체가 데스크탑에서 실제로 접근 가능한지
-확인합니다. 읽기 전용 — 기능 수행 없음. CLI / OS 표면 변경 후 매번 한 번
-실행 권장.
+.NET 10 SDK가 필요합니다. Debug 빌드는 설치된 릴리스 옆에서 자기 데이터로 따로 돕니다. macOS·Linux
+빌드, 패키징, 구조는 [README-Avalonia-KR.md](README-Avalonia-KR.md)에 있습니다.
 
-전체 레퍼런스: [`Docs/OsControl.md`](Docs/OsControl.md).
-내부 아키텍처 노트: `harness/knowledge/_shared/os-control.md`.
+## 더 보기
 
----
+| 문서 | 내용 |
+|---|---|
+| [README-Avalonia-KR.md](README-Avalonia-KR.md) | 공식 호스트: 스택, Windows / macOS / Linux 빌드, Store 패키징, 설계 |
+| [README-EX.md](README-EX.md) | 기능을 먼저 시험하는 WPF 참조 빌드의 확장 매뉴얼 |
+| [Project/AgentOne/README.md](Project/AgentOne/README.md) | 이 저장소의 실험적 독립 CLI 에이전트 `agent-one` |
+| [Docs/avalonia-v2/microsoft-store.md](Docs/avalonia-v2/microsoft-store.md) | Microsoft Store 제출 기록 |
 
-## 설정
-
-전체 창 오버레이 방식의 탭 패널입니다(터미널이 아직 WPF가 위에 그릴 수 없는 자식
-창이던 시절에 도입됐습니다. 지금 렌더러에는 airspace 가 없지만, 설정 화면에는 이
-형태가 맞아서 그대로 뒀습니다):
-
-- **CLI Definitions** — AgentZero가 실행할 셸(`cmd`, `pwsh`, `claude …`, 커스텀)을
-  등록합니다. 내장 항목은 삭제 불가. 새로 추가하면 모든 워크스페이스의 `+` 메뉴에
-  나타납니다. 내장 에이전트는 **Claude**, **Codex**, **AgentOne**(`agent-one chat`,
-  이 저장소의 CLI 에이전트), **Netclaw**(`netclaw chat`, netclaw.dev), **Hermes**(`hermes`,
-  Nous Research의 Hermes Agent)이며, 하나를 선택하면 설치 여부를 보여주고 없으면 설치를
-  제안합니다 — 앞의 셋은 `npm install -g`, npm에 없는 Netclaw와 Hermes는 공식 설치 스크립트로.
-- **LLM** — 로컬 모델 선택(Gemma 4 / Nemotron) + 외부 백엔드(OpenAI 호환) 토글.
-- **Voice** — STT 프로바이더(WhisperLocal CPU/Vulkan, OpenAI Whisper 등) + 언어 +
-  GPU 디바이스 + VAD 민감도. voice-note가 그대로 상속받는 값입니다.
-- **🎵 Music** — AST AudioSet ONNX 분류기(마이크 / WASAPI 루프백 두 입력원). 347MB
-  모델 원클릭 [Download], 1.5초 슬라이딩 윈도우 실시간 추론 테스트 패널, ~30Hz로
-  리페인트되는 64-bar 로그주파수 dBFS 스펙트럼 포함. Music 설정을 저장하면 라이브
-  분류기가 자동으로 무효화·재로드되어 재시작 없이 새 모델 경로가 반영됩니다.
-- **WebDev** — 튜토리얼 / 플러그인 작성 가이드. 실제 샌드박스는 상단 지구본 아이콘.
-- **AgentZero CLI** — 원클릭으로 앱 디렉토리를 사용자 `PATH`에 등록합니다. 이후
-  `AgentZeroLite.ps1` 및 `AgentZeroLite.exe -cli …`가 어느 셸에서든 동작합니다.
-  **AI ↔ AI Talk 섹션**에는 Claude/Codex에게 이 CLI를 가르치는 원샷 지시문이
-  복사 가능한 형태로 준비돼 있습니다.
-- **💲 Budget** — 기록된 토큰 텔레메트리 위의 비용/예산 레이어. **월 상한(USD)** 설정,
-  **모델별 가격표**(입력/출력/캐시쓰기/캐시읽기 per 1M tokens, 부분일치 override) 편집,
-  그리고 **이달 누적 지출** 표시(상한 임박 시 주황, 초과 시 빨강). 빈 가격표 = 내장 기본값.
-
-저장 위치: `%LOCALAPPDATA%\AgentZeroLite\agentZeroLite.db` (SQLite, 첫 실행 시
-EF Core가 자동 마이그레이션).
+문의와 이슈: <https://github.com/psmon/AgentZeroLite/issues>
 
 ---
 
-## 상태
+🚧 **In preparation** · <https://blumn.ai/>
 
-**Alpha — 현재 릴리스 v0.20.x.** 헤드리스 스위트 그린(500+ 테스트), agent-one
-자체 스위트도 그린(500+, Akka.TestKit 아래의 액터 쌍 포함). WPF 통합
-테스트는 데스크톱 세션에서만 실행되는 opt-in 항목입니다. `ZeroCommon` 내부 API는
-v1.0까지 불안정한 것으로 간주됩니다.
-
----
-
-## 왜 또 다른 터미널인가?
-
-인간이 아니라 AI 코딩 도구가 터미널을 움직이기 시작했기 때문입니다. 유용한 작업
-단위는 더 이상 "셸 하나"가 아니라 "그 중 하나가 생각하는 동안 내가 탭으로 왔다갔다
-하는 셸 셋"입니다. Windows Terminal, Conemu, Hyper 같은 도구는 **단일 프롬프트**를
-최적화합니다. AgentZero Lite는 그 반대를 최적화합니다 — 프로젝트별로 묶인
-여러 동시 프롬프트, 옆에 붙은 노트패드, 텍스트 브로커 채팅 패널. 제품의 전부는
-그것뿐입니다.
-
-## 로드맵
-
-> **왜 Lite 스탠드얼론 모드부터 Akka.NET인가?**
-> 지금은 단일 장치에서 돌아가는 Lite지만, 같은 액터 모델이 **Remote / Cluster**
-> 로 자연스럽게 확장됩니다 — 원격 비서 추가, 온디바이스 AI 클러스터까지.
-> 장기 로드맵으로 **실험 중**이며, 이 도전이 완성될지는 지켜봐 주세요.
-> `LiteMode`는 오픈소스로 공개되어, Akka.NET의 베이직 액터 모델과 함께 멀티뷰 모드로 CLI 제어할수 있어  
-> 교보재로도 활용할 수 있습니다.
-
-### AgentZero **PRO** 로드맵
-
-#### 🧩 AkkaStacks — 분산 런타임
-
-| 단계 | 이름 | 설명 |
-| --- | --- | --- |
-| 1 | **AgentZeroRemote** | 1대의 AgentZero 장치를 원격에서 조작 |
-| 2 | **AgentZeroCluster** | N대의 AgentZero를 클러스터화해 다중 이용 |
-
-#### 🧠 LLMStacks — 지능·입출력 확장
-
-| 이름 | 설명 |
-| --- | --- |
-| **AgentZeroAIMODE** | 온디바이스 모델 탑재 AI 채팅 모드 — 예: *Gemma 4* ↔ *Claude Code* 간 대화, 온디바이스 LLM 컨트롤러에 TASK 처리 위임 |
-| **AgentZeroVoice** | 음성 입출력 — STT 입력은 **출시됨** (Whisper.net + Vulkan, [음성 섹션](#-음성--손과-입을-동시에-쓰는-듀얼-멀티태스킹) 참조); TTS 출력 (Windows 11 Natural Voices) 은 단계적 진행 중 |
-| **AgentZeroOS** | OS 네이티브 자동화 지원 — 스크린샷 캡처 기반이 아닌 **OS 메타정보(UI Automation) 기반 화면 해석기**로 AI 제어, 매크로급 처리 속도 |
-
----
-
-### ⌚ 형제 저장소 — 기기 쪽 절반
-
-![하나의 호스트가 하나의 BLE 링크로 먹이는 시계의 앱들 — 실제 Akka 리모팅 피어인 AskBot, 음성을 양방향으로 나르는 Chat, 세션 텔레메트리를 보여주는 Claude HUD, 그리고 기기 전역 설정](Home/wearable/watch-apps.png)
-
-<sub>형제 저장소에서 가져왔습니다. 옆에 둔 `watch-apps.svg`는 그쪽에서 실제 LVGL 레이아웃을 읽어
-`tools/gen_hero_svg.py`가 생성한 것이므로, 화면이 바뀌면 여기 사본을 고치지 말고 그쪽에서 다시
-생성해 복사한 뒤 PNG를 다시 뽑으세요. 그림 속 *AkkaHost*는 `ZeroWearable`이 이식되어 나온
-원본이며, 여기서는 `AgentZeroWearable.exe`로 배포됩니다.</sub>
-
-AgentZero Lite는 웨어러블과 대화하며, 이제 **양쪽 절반이 모두 이 저장소에** 있습니다 — PC
-호스트는 `Project/ZeroWearable`, AMOLED-1.75C 펌웨어는 `Project/ZeroWearableDevice`
-([⌚ 웨어러블](#-웨어러블--손목-위의-askbot) 참고). 펌웨어는 형제 저장소에서 이 보드에 필요한 만큼만
-영입했습니다.
-
-| 저장소 | 무엇인가 |
-| --- | --- |
-| [**psmon/Arduino**](https://github.com/psmon/Arduino) | 펌웨어의 출처이자, 다른 보드와 샘플(LCD-1.28, 참조용 .NET 호스트, PC 쪽 HUD 브리지)이 계속 있는 곳. 펌웨어 리뷰용 자체 하네스(`device-resource-warden`, `ble-contract-sentinel`)를 가짐 |
-
-USB로 기기를 빌드·플래시·디버깅하는 방법 — 포트 판별, arduino-cli · ESP-IDF 두 경로,
-호스트와 기기 로그를 나란히 읽는 방법, 그리고 **아두이노 계열이 아닌** 보드를 들일 때의
-체크리스트는 README에서 분리해 별도 페이지로 두었습니다:
-
-➤ **[Docs/wearable-device.kr.md](Docs/wearable-device.kr.md)**
-
----
-
-### 🔬 함께 연구 중인 AI 패밀리 저장소
-
-| 저장소 | 한 줄 소개 |
-| --- | --- |
-| [**harness-kakashi**](https://github.com/psmon/harness-kakashi) | 하네스 입문을 위한 1인용 연습 하네스 — *나루토* 세계관을 통해 하네스의 감을 잡는 샌드박스. 샘플로 [Aaronontheweb/dotnet-skills](https://github.com/Aaronontheweb/dotnet-skills)의 전문가를 하네스 평가자로 영입 |
-| [**pencil-creator**](https://github.com/psmon/pencil-creator) | 하네스를 활용해 디자인 시스템에 새 템플릿을 들이는 실험. **3축 지원**: ① MS Blend XAML 리서칭, ② 일반 웹페이지 디자인 이식, ③ `designmd.ai` MD 검색 기반 템플릿 |
-| [**memorizer-v1**](https://github.com/psmon/memorizer-v1) | [Aaronontheweb/memorizer-v1](https://github.com/Aaronontheweb/memorizer-v1) 포크 — *벡터 검색 기반 에이전트 메모리 MCP 서버*. 향후 **하네스의 문서/메모리 시스템**으로 도약 예정 (하네스 에이전트들이 일회성 컨텍스트 대신 장기·검색 가능한 공용 메모리를 공유하도록) |
-| [**DeskWeb**](https://github.com/psmon/DeskWeb) | qooxdoo 기반 Windows XP 스타일 **WebOS** — **Claude Code Skill 4종**(`deskweb-convention` / `-app` / `-game` / `-llm`)이 내장되어, 포크 후 *바이브 코딩*만으로 자기만의 WebOS 변종을 빠르게 만든다. "메모장 앱 추가", "Three.js 체스 + LLM 대전", "AI 챗봇이 데스크톱을 조작" 같은 짧은 지시만 던지면 스킬이 프로젝트 컨벤션에 맞춰 코드를 생성. 데모: <https://webos.webnori.com/> |
-| [**CodeScan**](https://github.com/psmon/CodeScan) | 빠른 CLI/TUI/GUI **코드 스캐너 + 인덱서** — 10여 개 언어의 클래스/메서드/주석 구조를 추출하고 `git blame` 으로 풍부화한 뒤 로컬 SQLite(FTS5 트라이그램 + Neo4j 스타일 그래프 + Cypher 서브셋 쿼리)에 적재, 2D/3D 웹 그래프 뷰어까지 제공. .NET 10 네이티브 AOT 단일 바이너리, winget / brew / npm 으로 설치. 향후 하네스 연계: AgentZero 의 에이전트들에게 *구조화된 코드 맵*을 제공해 단순 파일 grep 을 대체하는 방향 |
-
----
-
-🚧 **준비 중** · <https://blumn.ai/>
-
-<sub>디자인 코칭: bk-mon · 개발: psmon</sub>
+<sub>design coaching: bk-mon · dev: psmon</sub>
