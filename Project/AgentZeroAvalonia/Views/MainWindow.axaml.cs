@@ -27,6 +27,12 @@ public partial class MainWindow : Window
             AttachAttention(Vm);
             if (Vm is { } vm)
                 vm.ClipboardWriter = text => Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
+#if REMOTE_CONTROL
+            // Download builds only — the Store builds compile the page out, so the window
+            // names it nowhere in markup.
+            RemotePageHost.Children.Clear();
+            if (Vm?.Remote is { } remote) RemotePageHost.Children.Add(new RemoteView { DataContext = remote });
+#endif
         };
         BotSplitter.DragCompleted += (_, _) => RememberBotPaneHeight();
 

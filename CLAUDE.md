@@ -463,6 +463,15 @@ What differs from the WPF host, and why:
   settings installer create their processes with the desktop-app breakaway policy (`ZeroCommon/Services/
   DesktopAppBreakaway.cs`, applied only when `IsPackagedProcess()`), so npm -g / claude / git write the real
   profile. Packaging, verification and submission history: `Docs/avalonia-v2/microsoft-store.md`.
+- **Remote (📡, the terminals from a browser) is in the download builds only.** `IncludeRemote` (csproj, default
+  true) defines `REMOTE_CONTROL`; false compiles out `Services/Remote/`, the page and `Wasm/remote/`. The Store MSIX
+  (`build-msix.ps1`, which also fails if `Wasm\remote` reached the stage) and the Mac App Store build (publish with
+  `-p:IncludeRemote=false`; `build-appstore.sh` refuses a publish that has `Wasm/remote`) leave it out — a LAN
+  listener is a review question (Apple asks why the app listens) those editions do not need. Keep new Remote code
+  inside those files or behind `#if REMOTE_CONTROL`. The server is our own HTTP/WebSocket on a `TcpListener`
+  (`RemoteServer`: no http.sys URL reservation or UAC prompt, same code on macOS/Linux); the actors, the PIN/token
+  auth and the wire protocol are WPF's, in `ZeroCommon/Remote`, plus two frames of ours (`attached`, `size`) so the
+  browser draws at the pseudo-console's size (`Terminal/TerminalGeometry`, recorded when the renderer fits).
 - **macOS ships two ways** (`Docs/avalonia-v2/macos-distribution.md`): a Developer ID signed + notarized `.pkg`
   (`macos/build-app.sh` `SIGN_ID`, `build-pkg.sh`, `notarize.sh`; `release.yml` does it when the `MACOS_DEVID_*` /
   `ASC_*` secrets exist) and the **Mac App Store** build (`macos/appstore/build-appstore.sh`: App Sandbox, the

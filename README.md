@@ -131,6 +131,16 @@ GitHub folder or a `.zip`. A plugin can be detached into its own window.
   against an optional monthly cap; the month's spend is on the status bar. Prices are editable.
 - **Shortcuts** — Settings → Shortcuts changes the keys.
 
+### Use the terminals from your phone — Remote (download edition)
+
+Start the server on the **📡 Remote** page and a phone or another computer on the same network can
+watch and type into this PC's terminals from a browser. A browser pairs once with a one-time code
+issued in the app (8 digits, five minutes) and keeps a key afterwards (the app stores only its hash;
+revoke it from the page at any time). The terminal is drawn at the PC's own columns and rows, with
+buttons for the keys a phone lacks — Esc, Tab, Ctrl+C, arrows — and a field for sending a line.
+Nothing listens until you start it. **Only the Releases builds have it** (installer, portable, macOS,
+Ubuntu); the Microsoft Store and Mac App Store editions leave it out.
+
 ### Scriptable from any shell
 
 Everything above can be driven by a script — or by another agent — through the same executable:
@@ -153,6 +163,7 @@ AgentZeroLite.exe -cli bot-ask "what is the Codex tab doing?" # ask AgentBot in 
 | `bot-chat`, `bot-ask` | Post into AgentBot; ask it a question in AI mode |
 | `code`, `worktree`, `plugin`, `mcp` | Code view, git worktrees, plugins, MCP servers |
 | `cost` | This month's agent spend (no GUI needed) |
+| `remote` | Remote server status, start / stop, issue a pairing code (download edition) |
 
 `AgentZeroLite.exe -cli help` prints the full list, and `-cli help agentzero` is a guide written
 for agents — teach it to a Claude or Codex tab once and the agents can talk to each other's

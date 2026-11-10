@@ -128,6 +128,15 @@ AI 모드는 **내 PC의 로컬 모델**(Windows) 또는 설정 → LLM에 넣�
   보여 줍니다. 이번 달 지출은 상태 바에 나옵니다. 가격은 직접 고칠 수 있습니다.
 - **Shortcuts** — 설정 → Shortcuts에서 단축키를 바꿉니다.
 
+### 휴대폰에서 터미널 쓰기 — Remote (다운로드판)
+
+**📡 Remote** 페이지에서 서버를 켜면, 같은 네트워크의 휴대폰이나 다른 PC 브라우저에서 이 PC의 터미널을
+보고 입력할 수 있습니다. 처음 한 번은 앱에서 발급한 일회용 코드(8자리, 5분)로 브라우저를 페어링하고,
+그 뒤에는 그 브라우저가 키를 간직합니다(앱에는 해시만 저장, 페이지에서 언제든 회수). 터미널은 PC와 같은
+열·행으로 그려지고, 휴대폰에 없는 Esc · Tab · Ctrl+C · 방향키 버튼과 한 줄 보내기 입력칸이 있습니다.
+서버를 켜기 전에는 아무것도 수신 대기하지 않습니다. **Releases의 설치 파일·포터블·macOS·Ubuntu 빌드에만**
+있고, Microsoft Store판과 Mac App Store판에는 빠져 있습니다.
+
 ### 어떤 셸에서든 스크립트로
 
 위의 기능은 모두 같은 실행 파일로 스크립트에서 — 또는 다른 에이전트가 — 다룰 수 있습니다:
@@ -150,6 +159,7 @@ AgentZeroLite.exe -cli bot-ask "what is the Codex tab doing?" # AI 모드의 Age
 | `bot-chat`, `bot-ask` | AgentBot에 메시지 넣기, AI 모드로 질문 |
 | `code`, `worktree`, `plugin`, `mcp` | 코드 뷰, git worktree, 플러그인, MCP 서버 |
 | `cost` | 이번 달 에이전트 지출(GUI 없이도 동작) |
+| `remote` | Remote 서버 상태·시작·중지, 페어링 코드 발급(다운로드판만) |
 
 `AgentZeroLite.exe -cli help`가 전체 목록을 보여 주고, `-cli help agentzero`는 에이전트를 위해 쓴
 안내서입니다 — Claude나 Codex 탭에 한 번 가르쳐 두면 에이전트끼리 서로의 터미널과 대화할 수 있습니다.

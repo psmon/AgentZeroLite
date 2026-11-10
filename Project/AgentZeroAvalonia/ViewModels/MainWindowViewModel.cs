@@ -24,6 +24,7 @@ public enum AppPage
     Settings,
     Wearable,
     Plugins,
+    Remote,
 }
 
 /// <summary>
@@ -169,6 +170,7 @@ public partial class MainWindowViewModel : ObservableObject
             Wearable = new WearableViewModel(configuration);
 
         Plugins = new PluginsViewModel();
+        InitRemote();
 
         Settings = new SettingsViewModel();
         Settings.CliDefinitionsChanged += ReloadCliDefinitions;
@@ -221,6 +223,24 @@ public partial class MainWindowViewModel : ObservableObject
     public bool IsSettingsPage => Page == AppPage.Settings;
     public bool IsWearablePage => Page == AppPage.Wearable;
     public bool IsPluginsPage => Page == AppPage.Plugins;
+    public bool IsRemotePage => Page == AppPage.Remote;
+
+    /// <summary>
+    /// The Remote page (browser control of the terminals) exists only in the download builds:
+    /// the Store MSIX and the Mac App Store build compile it out (<c>-p:IncludeRemote=false</c>),
+    /// so they never open a listening socket. See <c>MainWindowViewModel.Remote.cs</c>.
+    /// </summary>
+#if REMOTE_CONTROL
+    public bool RemoteSupported => true;
+#else
+    public bool RemoteSupported => false;
+#endif
+
+    /// <summary>Builds the Remote page where it is compiled in (<c>MainWindowViewModel.Remote.cs</c>).</summary>
+    partial void InitRemote();
+
+    /// <summary>Tells the Remote page whether it is on screen (it polls only then).</summary>
+    partial void RemotePageShown(bool visible);
 
     /// <summary>The Plugins page (the WPF host's WebDev page) — web plugins over the shared JS bridge.</summary>
     public PluginsViewModel Plugins { get; }
@@ -248,6 +268,8 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsWearablePage));
         OnPropertyChanged(nameof(IsPluginsPage));
+        OnPropertyChanged(nameof(IsRemotePage));
+        RemotePageShown(value == AppPage.Remote);
         RaiseSidebar();
         if (value == AppPage.Plugins) Plugins.NotifyShown();
     }
@@ -280,6 +302,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand] private void ShowSettings() => Page = Page == AppPage.Settings ? AppPage.Terminals : AppPage.Settings;
     [RelayCommand] private void ShowWearable() => Page = Page == AppPage.Wearable ? AppPage.Terminals : AppPage.Wearable;
     [RelayCommand] private void ShowPlugins() => Page = Page == AppPage.Plugins ? AppPage.Terminals : AppPage.Plugins;
+    [RelayCommand] private void ShowRemote() => Page = Page == AppPage.Remote || !RemoteSupported ? AppPage.Terminals : AppPage.Remote;
     [RelayCommand] private void ToggleSidebar() => SidebarExpanded = !SidebarExpanded;
 
     /// <summary>

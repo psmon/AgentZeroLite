@@ -166,6 +166,9 @@
                                 IsVisible="{Binding WearableSupported}" />
                         <Button Classes="activity" Classes.selected="{Binding IsPluginsPage}"
                                 Content="🧩" ToolTip.Tip="Plugins" Command="{Binding ShowPluginsCommand}" />
+                        <Button Classes="activity" Classes.selected="{Binding IsRemotePage}"
+                                Content="📡" ToolTip.Tip="Remote — use the terminals from a browser" Command="{Binding ShowRemoteCommand}"
+                                IsVisible="{Binding RemoteSupported}" />
                     </StackPanel>
                     <Button DockPanel.Dock="Bottom" Classes="activity" Classes.selected="{Binding IsSettingsPage}"
                             Content="⚙" ToolTip.Tip="Settings" VerticalAlignment="Bottom"
@@ -331,6 +334,8 @@
                 <Panel IsVisible="{Binding IsPluginsPage}">
                     <views:PluginsView DataContext="{Binding Plugins}" />
                 </Panel>
+                <!-- The Remote page is added from code-behind where it is compiled in (download builds only). -->
+                <Panel x:Name="RemotePageHost" IsVisible="{Binding IsRemotePage}" />
             </Panel>
 
             <!-- AgentBot: a sibling row spanning everything but the activity bar, as in the

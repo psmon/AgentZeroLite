@@ -66,12 +66,13 @@ Playwright로 연다: 스크래치패드의 `apple-pw/browser.mjs`(정식 Chrome
 ```sh
 export DOTNET_ROOT=$HOME/.dotnet PATH=$HOME/.dotnet:$PATH          # 이 맥: PATH의 dotnet은 9.0뿐
 security unlock-keychain -p "$(cat .secret/certs/signing-keychain-password.txt)" ~/Library/Keychains/agentzero-signing.keychain-db
-dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -o publish-avalonia/osx-arm64
+# 스토어판은 Remote(브라우저 원격 제어, LAN listen)를 빼고 publish한다 — build-appstore.sh가 Wasm/remote가 있으면 거부
+dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -p:IncludeRemote=false -o publish-avalonia/osx-arm64-mas
 # 로컬 샌드박스 확인(선택): MAS_SANDBOX_TEST=1 … build-appstore.sh … → open publish-avalonia/appstore-test/AgentZeroLite.app
 MAS_SIGN_ID="Apple Distribution: sang man park (HA39FQRUZG)" \
 MAS_PKG_ID="3rd Party Mac Developer Installer: sang man park (HA39FQRUZG)" \
 MAS_PROFILE=.secret/certs/AgentZeroLite_MAS.provisionprofile \
-  sh Project/AgentZeroAvalonia/macos/appstore/build-appstore.sh publish-avalonia/osx-arm64 publish-avalonia/appstore <ver> <build+1>
+  sh Project/AgentZeroAvalonia/macos/appstore/build-appstore.sh publish-avalonia/osx-arm64-mas publish-avalonia/appstore <ver> <build+1>
 asc builds upload --app 6825237056 --pkg publish-avalonia/appstore/AgentZeroLite-<ver>-<build>-appstore.pkg --version <ver> --build-number <build> --wait
 asc versions attach-build --app 6825237056 --platform MAC_OS --version-id <버전ID> --build-id <새 빌드ID>
 asc review submit --app 6825237056 --version-id <버전ID> --build-id <새 빌드ID> --dry-run   # wouldSubmit:true 확인

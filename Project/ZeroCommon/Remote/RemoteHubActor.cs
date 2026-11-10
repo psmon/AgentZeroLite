@@ -6,7 +6,7 @@
 //   2. 최대 동시 커넥션 수 강제 (설정값, 기본 3)
 //
 // 경로: /user/stage/remote
-//   자식: /user/stage/remote/session-{key}
+//   자식: /user/stage/remote/session-{key}-{seq}
 //
 // WorkspaceActor 의 per-id child 패턴을 그대로 따른다.
 // ───────────────────────────────────────────────────────────
@@ -24,6 +24,12 @@ public sealed class RemoteHubActor : ReceiveActor
     // Logical session key → child actor. Key stays raw; only the actor-name segment is sanitized.
     private readonly Dictionary<string, IActorRef> _sessions = new();
     private int _maxConnections;
+
+    // Child names carry a sequence number: a reattach stops the old child and spawns its
+    // replacement in the same message, and a stopped child's name stays reserved until it has
+    // terminated — reusing it threw InvalidActorNameException and the browser's terminal switch
+    // timed out.
+    private long _seq;
 
     public RemoteHubActor(int maxConnections)
     {
@@ -71,7 +77,7 @@ public sealed class RemoteHubActor : ReceiveActor
 
         var child = Context.ActorOf(
             Props.Create(() => new RemoteSessionActor(msg.SessionKey, msg.Session, msg.SendToWeb)),
-            $"session-{ActorNameSanitizer.Safe(msg.SessionKey)}");
+            $"session-{ActorNameSanitizer.Safe(msg.SessionKey)}-{++_seq}");
         Context.Watch(child);
         _sessions[msg.SessionKey] = child;
 

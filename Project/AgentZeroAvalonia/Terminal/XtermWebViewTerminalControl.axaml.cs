@@ -314,6 +314,7 @@ public partial class XtermWebViewTerminalControl : UserControl
                 case "resize":
                     ApplyResizeFromMessage(root);
                     _host?.Resize(_cols, _rows);
+                    TerminalGeometry.Set(Session, _cols, _rows);
                     break;
                 case "title":
                     // OSC 0/2 — agent-state detection's strongest "working" signal.
@@ -395,6 +396,7 @@ public partial class XtermWebViewTerminalControl : UserControl
         _ = PumpAsync();
         // Match the pseudo-console to the renderer's fitted size.
         _host?.Resize(_cols, _rows);
+        TerminalGeometry.Set(Session, _cols, _rows);
     }
 
     /// <summary>Hand the renderer the appearance from <see cref="TerminalSettings"/> (+ the hotkey table).</summary>

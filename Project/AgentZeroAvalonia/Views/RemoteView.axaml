@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             x:Class="AgentZeroAvalonia.Views.RemoteView"
+             x:DataType="vm:RemoteViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.h1">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style Selector="TextBlock.h2">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="Margin" Value="0,16,0,6" />
+        </Style>
+        <Style Selector="TextBlock.lbl">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.value">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Grid.form > TextBox, Grid.form > ComboBox, Grid.form > NumericUpDown, Grid.form > CheckBox, Grid.form > StackPanel, Grid.form > TextBlock.value">
+            <Setter Property="Margin" Value="0,3" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer Padding="20,16" Background="{DynamicResource CyberBgDeep}">
+        <StackPanel MaxWidth="760" HorizontalAlignment="Left">
+            <TextBlock Classes="h1" Text="Remote" />
+            <TextBlock Classes="note"
+                       Text="Use this PC's terminals from a browser — a phone on the same Wi-Fi, or another computer. The browser sees the terminal you pick and types into it, alongside you. Nothing listens until you start the server, and a browser has to pair with a one-time code first. Download edition only: the Store builds leave this out." />
+
+            <TextBlock Classes="h2" Text="SERVER" />
+            <Grid Classes="form" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                <TextBlock Classes="lbl" Grid.Row="0" Text="Status" />
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                             Fill="{DynamicResource CyberMintBrush}" IsVisible="{Binding IsRunning}" />
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                             Fill="{DynamicResource TextDim}" IsVisible="{Binding IsStopped}" />
+                    <TextBlock Classes="value" Text="{Binding StatusText}" />
+                </StackPanel>
+                <TextBlock Classes="lbl" Grid.Row="1" Text="" />
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="▶ Start" Command="{Binding StartCommand}" IsEnabled="{Binding IsStopped}" />
+                    <Button Content="■ Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsRunning}" />
+                </StackPanel>
+                <TextBlock Classes="lbl" Grid.Row="2" Text="Connections" />
+                <TextBlock Classes="value" Grid.Row="2" Grid.Column="1" Text="{Binding Connections}" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Error}" IsVisible="{Binding HasError}"
+                           Foreground="#F48771" FontSize="11" TextWrapping="Wrap" Margin="0,3" />
+            </Grid>
+
+            <TextBlock Classes="h2" Text="OPEN IN A BROWSER" />
+            <TextBlock Classes="note" Text="Start the server, then open one of these on the other device. The first address is usually the one a phone on the same network can reach."
+                       IsVisible="{Binding IsRunning}" />
+            <TextBlock Classes="note" Text="The addresses appear here while the server runs." IsVisible="{Binding IsStopped}" />
+            <ItemsControl ItemsSource="{Binding Urls}" Margin="0,6,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2">
+                            <TextBox Grid.Column="0" Text="{Binding}" IsReadOnly="True" FontFamily="Consolas,Menlo,monospace" FontSize="13" VerticalContentAlignment="Center" />
+                            <Button Grid.Column="1" Content="Copy" Margin="6,0,0,0"
+                                    Command="{Binding $parent[ItemsControl].((vm:RemoteViewModel)DataContext).CopyCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="2" Content="Open" Margin="6,0,0,0"
+                                    Command="{Binding $parent[ItemsControl].((vm:RemoteViewModel)DataContext).OpenCommand}"
+                                    CommandParameter="{Binding}" ToolTip.Tip="Open on this PC to try it" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Classes="h2" Text="PAIR A BROWSER" />
+            <TextBlock Classes="note" Text="The browser asks for a code the first time. Issue one here and type it there — it works once and expires in five minutes. Five wrong tries lock pairing for five minutes." />
+            <StackPanel Orientation="Horizontal" Spacing="14" Margin="0,8,0,0">
+                <Button Content="Issue pairing code" Command="{Binding IssuePinCommand}" VerticalAlignment="Center" />
+                <StackPanel IsVisible="{Binding HasPin}" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Pin}" FontFamily="Consolas,Menlo,monospace" FontSize="26" FontWeight="Bold"
+                               LetterSpacing="4" Foreground="{DynamicResource CyberMintBrush}" />
+                    <TextBlock Classes="note" Text="{Binding PinExpiry}" />
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Classes="h2" Text="PAIRED BROWSERS" />
+            <TextBlock Classes="note" Text="Each browser that paired keeps a key until you revoke it. Only a one-way hash of the key is stored." />
+            <TextBlock Classes="note" Text="None yet." Margin="0,6,0,0" IsVisible="{Binding HasNoPaired}" />
+            <ItemsControl ItemsSource="{Binding Paired}" Margin="0,6,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PairedBrowserRow">
+                        <DockPanel Margin="0,2" MaxWidth="420" HorizontalAlignment="Left">
+                            <Button DockPanel.Dock="Right" Content="Revoke" FontSize="11"
+                                    Command="{Binding $parent[ItemsControl].((vm:RemoteViewModel)DataContext).RevokeCommand}"
+                                    CommandParameter="{Binding}" />
+                            <TextBlock Text="{Binding Label}" FontFamily="Consolas,Menlo,monospace" FontSize="12"
+                                       Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Revoke all" Command="{Binding RevokeAllCommand}" Margin="0,6,0,0" />
+
+            <TextBlock Classes="h2" Text="SETTINGS" />
+            <Grid Classes="form" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                <TextBlock Classes="lbl" Grid.Row="0" Text="" />
+                <CheckBox Grid.Row="0" Grid.Column="1" Content="Start the server when AgentZero starts" IsChecked="{Binding StartAtLaunch}" />
+                <TextBlock Classes="lbl" Grid.Row="1" Text="Reachable from" />
+                <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding BindChoices}" SelectedIndex="{Binding BindIndex}" MinWidth="320" HorizontalAlignment="Left" />
+                <TextBlock Classes="lbl" Grid.Row="2" Text="Port" />
+                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                <TextBlock Classes="lbl" Grid.Row="3" Text="Max connections" />
+                <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding MaxConnections}" Minimum="1" Maximum="20" Increment="1" FormatString="0" Width="140" HorizontalAlignment="Left" />
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+                <Button Content="Save" Command="{Binding SaveCommand}" />
+                <TextBlock Classes="note" Text="{Binding SavedNote}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Classes="note" Margin="0,12,0,0"
+                       Text="The connection is plain HTTP inside your network: use it on networks you trust. On Windows the first LAN start may ask the firewall to allow AgentZero on private networks." />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
