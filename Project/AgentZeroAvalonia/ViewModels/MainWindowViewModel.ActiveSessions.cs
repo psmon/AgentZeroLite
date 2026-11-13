@@ -273,6 +273,26 @@ public partial class MainWindowViewModel
     /// <summary>The <c>agent-state</c> CLI reply — the WPF host's contract.</summary>
     public string AgentStateJson() => _agentTracker.ToCliJson();
 
+    /// <summary>
+    /// Store, on each running tab, the agent conversation its live status names (Claude's status
+    /// file, Codex's rollout — matched to the tab through its process tree), so the tab's next
+    /// start can offer that conversation by name rather than only the folder's whole list.
+    /// </summary>
+    private void RememberTabSessions(List<(int G, int T, WorkspaceViewModel W, TerminalTabViewModel Tab)> running)
+    {
+        foreach (var r in running)
+            if (_agentTracker.Lookup(r.G, r.T)?.Session is { } session)
+                RememberTabSession(r.W, r.Tab, session);
+    }
+
+    /// <summary>Record <paramref name="session"/> as the tab's newest conversation and save when that changed anything.</summary>
+    public void RememberTabSession(WorkspaceViewModel ws, TerminalTabViewModel tab, AgentSessionRef session)
+    {
+        if (!tab.RememberSession(session)) return;
+        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} remembers {session.Agent} session {session.SessionId}");
+        Persist();
+    }
+
     /// <summary>One detection pass + list sync. Cheap when nothing changed.</summary>
     public void RefreshActiveSessions()
     {
@@ -292,6 +312,7 @@ public partial class MainWindowViewModel
                         running.Add((g, t, Workspaces[g], Workspaces[g].Tabs[t]));
 
             PublishSessionsFeed(active);
+            RememberTabSessions(running);
 
             var signature = string.Join("|", running.Select(r =>
                 $"{r.W.DisplayName}/{r.Tab.Title}/{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(r.Tab)}"))

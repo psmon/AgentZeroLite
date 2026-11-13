@@ -1,3 +1,4 @@
+using Agent.Common.Agents;
 using Agent.Common.Data.Entities;
 using Agent.Common.Module;
 using Agent.Common.Services;
@@ -11,7 +12,7 @@ namespace AgentZeroAvalonia.ViewModels;
 /// <see cref="IConsoleTabInfo"/> the CLI catalog and the actor binding read, and it
 /// carries no view type — the view keeps the control keyed by this object.
 /// </summary>
-public partial class TerminalTabViewModel : ObservableObject, IConsoleTabInfo
+public partial class TerminalTabViewModel : ObservableObject, IConsoleTabInfo, IAgentSessionMemory
 {
     [ObservableProperty] private string _title;
     [ObservableProperty] private bool _isActive;
@@ -36,6 +37,20 @@ public partial class TerminalTabViewModel : ObservableObject, IConsoleTabInfo
 
     /// <summary>The session id last handed to the actors, so a restart binds a fresh one (WPF <c>LastBoundSessionId</c>).</summary>
     public string? LastBoundSessionId { get; set; }
+
+    /// <summary>
+    /// The agent conversations this tab ran, newest first (<see cref="TabSessionMemory"/>) —
+    /// persisted with the tab so its next start can offer "this tab's last session".
+    /// </summary>
+    public string? AgentSessions { get; set; }
+
+    /// <summary>Record <paramref name="session"/> as this tab's newest; true when that changed what is stored.</summary>
+    public bool RememberSession(AgentSessionRef session)
+    {
+        if (TabSessionMemory.Push(AgentSessions, session) is not { } next) return false;
+        AgentSessions = next;
+        return true;
+    }
 
     /// <summary>Owner callbacks — the tab strip binds to the commands, the owner does the work.</summary>
     public Action<TerminalTabViewModel>? ActivateRequested { get; set; }

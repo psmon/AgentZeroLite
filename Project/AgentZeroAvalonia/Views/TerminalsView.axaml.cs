@@ -542,7 +542,7 @@ public partial class TerminalsView : UserControl
         var launch = spec;
         try
         {
-            var sessions = await Task.Run(() => target.ListSessions(ws.DirectoryPath, spec.Env));
+            var (sessions, tabLast) = await Task.Run(() => ListWithTabLast(target, tab, ws.DirectoryPath, spec.Env));
             if (sessions.Count > 0 && StillOurs())
             {
                 ResumeChoice? choice = null;
@@ -552,7 +552,7 @@ public partial class TerminalsView : UserControl
                 {
                     if (StillOurs() && await DialogOwnerAsync() is { } owner)
                     {
-                        var dialog = new ResumeSessionDialog(target.DisplayName, $"{ws.DisplayName}/{tab.Title} · {ws.DirectoryPath}", sessions, tool.Name);
+                        var dialog = new ResumeSessionDialog(target.DisplayName, $"{ws.DisplayName}/{tab.Title} · {ws.DirectoryPath}", sessions, tool.Name, tabLast);
                         choice = await dialog.ShowDialog<ResumeChoice?>(owner) ?? dialog.Result;
                     }
                 }
@@ -578,7 +578,10 @@ public partial class TerminalsView : UserControl
                     if (resumed is not null)
                     {
                         launch = resumed;
-                        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} resumes {target.DisplayName} session {id}");
+                        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} resumes {target.DisplayName} session {id}"
+                                      + (tabLast?.Id == id ? " (this tab's last)" : ""));
+                        // Known now, before the agent's live status names it: a tab closed right away keeps it.
+                        _vm?.RememberTabSession(ws, tab, new AgentSessionRef(tool.Command, target.ConfigDir ?? "", id, ws.DirectoryPath));
                     }
                     else AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title}: could not put a resume of {id} into '{def.Arguments}' — starting new");
                 }
@@ -590,6 +593,23 @@ public partial class TerminalsView : UserControl
         }
 
         if (StillOurs()) Launch(ws, tab, control, def, launch);
+    }
+
+    /// <summary>
+    /// The folder's sessions and, among them, the one this tab last ran. With several tabs in one
+    /// folder the tab's conversation can be older than the newest 30, so a remembered id missing
+    /// from the first page is looked for in a longer one before it is given up.
+    /// </summary>
+    private static (IReadOnlyList<AgentSessionInfo> Sessions, AgentSessionInfo? TabLast) ListWithTabLast(
+        AgentResumeTarget target, TerminalTabViewModel tab, string cwd, IReadOnlyDictionary<string, string>? env)
+    {
+        const int page = 30;
+        var sessions = target.ListSessions(cwd, env, page);
+        var last = TabSessionMemory.Pick(tab.AgentSessions, target.Tool, sessions);
+        if (last is null && sessions.Count >= page && TabSessionMemory.Has(tab.AgentSessions, target.Tool)
+            && TabSessionMemory.Pick(tab.AgentSessions, target.Tool, target.ListSessions(cwd, env, 300)) is { } older)
+            return (sessions.Append(older).ToList(), older);
+        return (sessions, last);
     }
 
     /// <summary>The window a dialog can be modal to — the main window, once it is on screen.</summary>

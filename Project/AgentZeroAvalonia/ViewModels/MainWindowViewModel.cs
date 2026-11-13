@@ -409,7 +409,11 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 var ws = CreateWorkspace(snap.DirectoryPath, snap.DisplayName);
                 foreach (var t in snap.Tabs)
-                    ws.Tabs.Add(CreateTab(ws, t.Title, t.CliDefinitionId, FindDefinition(t.CliDefinitionId)));
+                {
+                    var tab = CreateTab(ws, t.Title, t.CliDefinitionId, FindDefinition(t.CliDefinitionId));
+                    tab.AgentSessions = t.AgentSessions;
+                    ws.Tabs.Add(tab);
+                }
                 ws.RestoreLayout(snap.DockLayoutJson);
                 Workspaces.Add(ws);
                 TerminalActorBinder.RegisterWorkspace(ws);

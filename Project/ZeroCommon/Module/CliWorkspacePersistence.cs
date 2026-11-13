@@ -1,4 +1,5 @@
-﻿using Agent.Common.Data;
+﻿using Agent.Common.Agents;
+using Agent.Common.Data;
 using Agent.Common.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,7 +40,8 @@ public sealed record CliTabSnapshot(
     string? SshAuthMethod = null,
     string? SshKeyPath = null,
     string? EncryptedPassword = null,
-    bool ReducedMotion = false);
+    bool ReducedMotion = false,
+    string? AgentSessions = null);
 
 public sealed record CliGroupSnapshot(
     string DirectoryPath,
@@ -140,6 +142,15 @@ public static class CliWorkspacePersistence
     {
         using var db = new AppDbContext();
         using var transaction = db.Database.BeginTransaction();
+
+        // A host whose tabs keep no session memory (IAgentSessionMemory) must not erase the one
+        // another host recorded: its tab keeps the stored value while it is still the same tab
+        // (same workspace, position, title and definition).
+        var previous = db.CliTabs
+            .Where(tab => tab.AgentSessions != null)
+            .Select(tab => new { tab.Group.DirectoryPath, tab.SortOrder, tab.Title, tab.CliDefinitionId, tab.AgentSessions })
+            .ToList();
+
         db.CliTabs.RemoveRange(db.CliTabs);
         db.CliGroups.RemoveRange(db.CliGroups);
         db.SaveChanges();
@@ -162,12 +173,19 @@ public static class CliWorkspacePersistence
             for (int tabIndex = 0; tabIndex < group.TabsView.Count; tabIndex++)
             {
                 var tab = group.TabsView[tabIndex];
+                var definitionId = tab.CliDefinitionId > 0 ? tab.CliDefinitionId : 1;
+                var sessions = tab is IAgentSessionMemory memory
+                    ? memory.AgentSessions
+                    : previous.FirstOrDefault(p => p.SortOrder == tabIndex && p.Title == tab.Title
+                        && p.CliDefinitionId == definitionId
+                        && string.Equals(p.DirectoryPath, group.DirectoryPath, StringComparison.OrdinalIgnoreCase))?.AgentSessions;
                 db.CliTabs.Add(new CliTab
                 {
                     GroupId = dbGroup.Id,
                     Title = tab.Title,
-                    CliDefinitionId = tab.CliDefinitionId > 0 ? tab.CliDefinitionId : 1,
+                    CliDefinitionId = definitionId,
                     SortOrder = tabIndex,
+                    AgentSessions = sessions,
                 });
             }
         }
@@ -199,7 +217,8 @@ public static class CliWorkspacePersistence
                         tab.CliDefinition.SshAuthMethod,
                         tab.CliDefinition.SshKeyPath,
                         tab.CliDefinition.EncryptedPassword,
-                        tab.CliDefinition.ReducedMotion))
+                        tab.CliDefinition.ReducedMotion,
+                        tab.AgentSessions))
                     .ToList(),
                 group.ActiveTabIndex,
                 group.LayoutJson))
