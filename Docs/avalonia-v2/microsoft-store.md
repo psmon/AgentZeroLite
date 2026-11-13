@@ -458,6 +458,26 @@ package" 안내와 함께 자동 제거)였다. What's new와 기능 15줄은 `l
 - 목록 페이지 주소는 `…/submissions/<id>/listings?languageid=4&languagecode=en-us`(Store listings 항목은
   `managelanguages`로 간다). 목록 편집은 `#releaseNotes`에 값을 넣고 `input`/`change` 이벤트를 보내면 Save에 반영된다.
 
+### 20차 제출 (1.27.0.0, 2026-11-13)
+
+내용: Claude / Codex 탭마다 마지막으로 진행한 대화를 기억해(에이전트 안의 `/new` 전환 포함) 다시 열 때 *Continue this
+tab's session*으로 먼저 내놓는다 — 한 폴더에 에이전트 탭이 여럿일 때 어느 세션이 어느 탭의 것인지 고르지 않아도 된다.
+같은 릴리스의 Remote(브라우저에서 터미널)는 Store판에서 컴파일되지 않으므로 What's new에 넣지 않았고, 함께 들어간 터미널
+전환 타임아웃 수정도 Remote 액터(`ZeroCommon/Remote/RemoteHubActor`) 쪽이라 빼었다. Partner Center는 Submission 17.
+새 권한·네트워크 흐름이 없어 개인정보 처리방침은 그대로(세션 id는 이미 읽던 Claude/Codex 파일에서 오고 로컬 DB에만 저장).
+선행: GitHub Pages `doc-v1.58.0`, GitHub 릴리스 `v0.27.0`(5개 자산 모두 게시, macOS `.pkg` 포함). 패키지 151.6 MB,
+What's new를 `listing.md`에서 채우고 다시 열어 일치 확인(기능 15줄은 그대로), 첫 Submit 클릭에 In certification.
+이번에는 로그인이 살아 있었다(9333 Edge를 새로 띄웠을 때 이미 로그인 상태).
+
+이번에 확인한 것:
+
+- **업로더는 파일을 받는 즉시 `input[type=file]`을 비운다.** `DOM.setFileInputFiles` 직후 `files.length`가 0이라 실패로
+  보고 다시 넣었더니, 두 번 모두 서버에 올라가 "Multiple uploaded files contain the same package"로 막혔다. 진행 여부는
+  입력칸이 아니라 패키지 목록(파일명 + 진행 막대, 끝나면 `v1.27.0.0, X64`)으로 판단한다. 중복은 두 행 중 하나의
+  **Remove**(새 패키지에 붙은 버튼 — 평소에는 누르지 않는다)로 지우고, 그 행이 "will be removed after you save"로
+  바뀐 것을 본 뒤 Save하면 1.27.0.0 하나만 남는다.
+- 업로드+분석은 이번에 약 8분 걸렸다(두 개가 동시에 올라간 탓일 수 있다).
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>

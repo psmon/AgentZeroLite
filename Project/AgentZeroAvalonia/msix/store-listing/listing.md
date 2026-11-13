@@ -24,7 +24,12 @@ Your data stays on your PC: no account, no telemetry. The project is open source
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
-## What's new in this version (1.26.9.0 — submission 19)
+## What's new in this version (1.27.0.0 — submission 20)
+Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
+
+- Each Claude and Codex terminal now remembers the conversation it last ran — also after you start a new one inside the agent. When the terminal opens again, that conversation is offered first as "Continue this tab's session", so with several agent terminals in one folder you no longer have to guess which session was whose. The full list of the folder's sessions is still there to pick from.
+
+## What's new in version 1.26.9.0 (submission 19)
 Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
 
 - Code view in its own window: float it beside your terminals, pin it on top, and bring it back with "Dock back".
