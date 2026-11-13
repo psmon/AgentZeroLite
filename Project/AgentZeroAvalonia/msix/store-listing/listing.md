@@ -24,7 +24,15 @@ Your data stays on your PC: no account, no telemetry. The project is open source
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
-## What's new in this version (1.27.0.0 — submission 20)
+## What's new in this version (1.27.1.0 — submission 21)
+Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
+
+- Settings now open on Terminal, with CLI definitions and Shortcuts next. The terminal font is picked from the fonts installed on your PC (monospace ones first) with a live preview.
+- New terminal definitions without memorising flags: pick a shell found on your PC (PowerShell 7 and Git Bash appear only when installed) or browse for a program, and type only the command to run, such as claude. The shell options that keep the terminal open are added for you, and the full command line is shown.
+- LLM settings show only what applies to the backend you chose, with one Save and one Test for both — Test on the local backend loads the selected model first. For an external server, pick the model from the list the server reports; only chat models are listed.
+- Sidebar: Active sessions sit right under your workspaces, and the current workspace's terminals are shown three to a row with the selected one highlighted.
+
+## What's new in version 1.27.0.0 (submission 20)
 Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
 
 - Each Claude and Codex terminal now remembers the conversation it last ran — also after you start a new one inside the agent. When the terminal opens again, that conversation is offered first as "Continue this tab's session", so with several agent terminals in one folder you no longer have to guess which session was whose. The full list of the folder's sessions is still there to pick from.

@@ -478,6 +478,20 @@ What's new를 `listing.md`에서 채우고 다시 열어 일치 확인(기능 15
   바뀐 것을 본 뒤 Save하면 1.27.0.0 하나만 남는다.
 - 업로드+분석은 이번에 약 8분 걸렸다(두 개가 동시에 올라간 탓일 수 있다).
 
+### 21차 제출 (1.27.1.0, 2026-11-14)
+
+내용: 설정과 사이드바 UX — 설정이 Terminal부터 열리고(CLI definitions·Shortcuts가 다음), 터미널 글꼴을 설치된 고정폭
+글꼴에서 미리보기와 함께 고른다. 터미널 정의는 이 PC에 있는 셸(pwsh·Git Bash는 설치된 경우에만)을 고르고 `claude` 같은
+명령만 입력하면 셸별 옵션(`-NoExit -Command`, `/K`, `-l -i -c`)이 붙는다. LLM 설정은 고른 백엔드의 항목만 보이고 Save·Test가
+하나씩(Local Test는 화면의 모델을 먼저 로드), 외부 서버의 모델은 서버가 알려 주는 목록에서 채팅 모델만 골라 보인다. 사이드바는
+ACTIVE SESSIONS가 워크스페이스 바로 아래, 현재 워크스페이스의 터미널은 한 줄에 셋. Partner Center는 Submission 18.
+개인정보 처리방침은 그대로 — 모델 목록은 사용자가 이미 설정한 LLM 서버의 `/v1/models`이고, 글꼴·셸 탐지는 로컬이다.
+선행: GitHub Pages `doc-v1.59.0`, GitHub 릴리스 `v0.27.1`(Windows·Linux 4개 자산 게시; macOS 잡은 `codesign`이
+"The timestamp service is not available"로 실패 — Apple 타임스탬프 서버의 일시 장애라 실패한 잡만 다시 실행했다).
+패키지 151.7 MB를 CDP `DOM.setFileInputFiles`로 **한 번만** 넣고(20차의 교훈) 패키지 목록에 `v1.27.1.0, X64`가 뜨는 것으로
+진행을 판단했다 — 업로드+분석 약 40초. Save 뒤 1.27.1.0만 Validated. What's new를 `listing.md`에서 채우고 다시 열어
+915자 일치 확인(기능 15줄은 그대로), 첫 Submit 클릭에 In certification. 로그인은 살아 있었다.
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>
