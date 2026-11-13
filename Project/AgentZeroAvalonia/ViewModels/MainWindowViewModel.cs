@@ -272,6 +272,7 @@ public partial class MainWindowViewModel : ObservableObject
         RemotePageShown(value == AppPage.Remote);
         RaiseSidebar();
         if (value == AppPage.Plugins) Plugins.NotifyShown();
+        if (value == AppPage.Settings) Settings.NotifyShown();
     }
 
     partial void OnActiveWorkspaceChanged(WorkspaceViewModel? oldValue, WorkspaceViewModel? newValue)

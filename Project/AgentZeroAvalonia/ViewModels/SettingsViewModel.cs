@@ -9,6 +9,7 @@ using Agent.Common.Module;
 using Agent.Common.Security;
 using Agent.Common.Services;
 using AgentZeroAvalonia.Security;
+using AgentZeroAvalonia.Services;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,7 +17,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AgentZeroAvalonia.ViewModels;
 
-public enum SettingsSection { Llm, Mcp, Cli, Terminal, Voice, Models, Notifications, Budget, Shortcuts }
+/// <summary>Declared in the order the page lists them (the palette walks this enum): the terminal
+/// settings first, because the terminal is what the app is for.</summary>
+public enum SettingsSection { Terminal, Cli, Shortcuts, Llm, Mcp, Voice, Models, Notifications, Budget }
 
 /// <summary>A catalog model for the local-LLM combo.</summary>
 public sealed record ModelChoice(LlmModelCatalogEntry Entry)
@@ -47,6 +50,48 @@ public partial class CliDefinitionItem : ObservableObject
     [ObservableProperty] private string? _sshKeyPath;
     [ObservableProperty] private string? _newPassword;
 
+    // ── Shell + command: the shell-specific "run this, then stay open" flags are written by
+    //    ShellLaunch, so a person types `claude`, not `-NoExit -Command claude` ──
+    /// <summary>What to start in the shell (<c>claude</c>); empty for the bare shell.</summary>
+    [ObservableProperty] private string _runCommand = "";
+    /// <summary>Edit the stored arguments by hand — on by itself when they are not what ShellLaunch writes.</summary>
+    [ObservableProperty] private bool _rawArguments;
+
+    public ShellFamily Family => ShellLaunch.FamilyOf(ExePath);
+    public bool IsShell => Family != ShellFamily.Other;
+    /// <summary>The command box drives the arguments (a known shell, not in raw mode).</summary>
+    public bool UsesRunCommand => IsShell && !RawArguments;
+    public bool ShowArguments => !UsesRunCommand;
+    /// <summary>What the tab will actually run, so the composed flags are visible, not hidden.</summary>
+    public string LaunchPreview => string.IsNullOrWhiteSpace(Arguments) ? ExePath.Trim() : $"{ExePath.Trim()} {Arguments!.Trim()}";
+
+    partial void OnExePathChanged(string value)
+    {
+        Recompose();
+        OnPropertyChanged(nameof(Family));
+        OnPropertyChanged(nameof(IsShell));
+        OnPropertyChanged(nameof(UsesRunCommand));
+        OnPropertyChanged(nameof(ShowArguments));
+        OnPropertyChanged(nameof(LaunchPreview));
+    }
+
+    partial void OnRunCommandChanged(string value) => Recompose();
+    partial void OnArgumentsChanged(string? value) => OnPropertyChanged(nameof(LaunchPreview));
+
+    partial void OnRawArgumentsChanged(bool value)
+    {
+        // Back from raw: keep a hand edit that still reads as a command, else rebuild from the box.
+        if (!value && ShellLaunch.TryExtract(ExePath, Arguments, out var command)) RunCommand = command;
+        Recompose();
+        OnPropertyChanged(nameof(UsesRunCommand));
+        OnPropertyChanged(nameof(ShowArguments));
+    }
+
+    private void Recompose()
+    {
+        if (UsesRunCommand) Arguments = ShellLaunch.Compose(ExePath, RunCommand);
+    }
+
     public CliDefinitionItem(CliDefinition e)
     {
         Id = e.Id;
@@ -62,6 +107,8 @@ public partial class CliDefinitionItem : ObservableObject
         _usePublicKey = !string.Equals(e.SshAuthMethod, SshCommandBuilder.AuthMethodPassword, StringComparison.OrdinalIgnoreCase);
         _sshKeyPath = e.SshKeyPath;
         _storedEncryptedPassword = e.EncryptedPassword;
+        if (ShellLaunch.TryExtract(e.ExePath, e.Arguments, out var command)) _runCommand = command;
+        else _rawArguments = ShellLaunch.FamilyOf(e.ExePath) != ShellFamily.Other;
     }
 
     public string PasswordHint => string.IsNullOrEmpty(_storedEncryptedPassword) ? "(none)" : "(unchanged)";
@@ -102,7 +149,7 @@ public partial class CliDefinitionItem : ObservableObject
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
-    [ObservableProperty] private SettingsSection _section = SettingsSection.Llm;
+    [ObservableProperty] private SettingsSection _section = SettingsSection.Terminal;
 
     public bool IsLlm => Section == SettingsSection.Llm;
     public bool IsCli => Section == SettingsSection.Cli;
@@ -142,6 +189,8 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsShortcuts));
         if (value == SettingsSection.Shortcuts) Shortcuts.Load();
         if (value == SettingsSection.Budget) Budget.Refresh();
+        if (value == SettingsSection.Terminal) EnsureInstalledFonts();
+        if (value == SettingsSection.Llm) EnsureExternalModels();
         OnPropertyChanged(nameof(IsLlm));
         OnPropertyChanged(nameof(IsCli));
         OnPropertyChanged(nameof(IsTerminal));
@@ -208,9 +257,95 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowOpenAI));
         OnPropertyChanged(nameof(ShowLMStudio));
         OnPropertyChanged(nameof(ShowOllama));
+        // Another server serves other models: the old list would only mislead.
+        ExternalModels.Clear();
+        if (_modelsRequested) _ = RefreshExternalModelsAsync();
     }
 
-    partial void OnUseExternalChanged(bool value) { if (value) UseLocal = false; }
+    // ── External model list: what the server says it serves, so the name is picked, not recalled ──
+    public ObservableCollection<string> ExternalModels { get; } = new();
+    [ObservableProperty] private string _modelListStatus = "";
+    [ObservableProperty] private bool _isListingModels;
+    private bool _modelsRequested;
+    private int _modelListVersion;
+    private int _hiddenModels;
+
+    /// <summary>First time the LLM page shows External, ask the server once.</summary>
+    private void EnsureExternalModels()
+    {
+        if (_modelsRequested || !UseExternal) return;
+        _modelsRequested = true;
+        _ = RefreshExternalModelsAsync();
+    }
+
+    partial void OnExternalModelChanged(string value) => NoteModelNotListed();
+
+    private void NoteModelNotListed()
+    {
+        if (ExternalModels.Count == 0 || IsListingModels) return;
+        var name = ExternalModel.Trim();
+        var listed = $"{ExternalModels.Count} chat models from {Provider}"
+                     + (_hiddenModels > 0 ? $" ({_hiddenModels} embedding / speech / image / snapshot hidden)" : "");
+        ModelListStatus = name.Length > 0 && !ExternalModels.Contains(name, StringComparer.OrdinalIgnoreCase)
+            ? $"{listed} · \"{name}\" is not one of them — check the name"
+            : listed;
+    }
+
+    /// <summary>
+    /// GET {base}/v1/models with the URL and key on screen (not the saved ones — the point is to
+    /// check what was just typed). A newer request wins: switching provider mid-request must not
+    /// fill the list with the previous server's models.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshExternalModelsAsync()
+    {
+        _modelsRequested = true;
+        var version = ++_modelListVersion;
+        IsListingModels = true;
+        ModelListStatus = $"Asking {Provider} for its models…";
+        try
+        {
+            var provider = CollectLlm().CreateExternalProvider();
+            if (provider is null) { ModelListStatus = "Pick a provider first."; return; }
+            List<string> names;
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                var models = await Task.Run(() => provider.ListModelsAsync(cts.Token));
+                var all = models.Select(m => m.Id).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                names = ChatModelFilter.Filter(all).ToList();
+                _hiddenModels = all.Count - names.Count;
+            }
+            finally
+            {
+                (provider as IDisposable)?.Dispose();
+            }
+            if (version != _modelListVersion) return;
+            ExternalModels.Clear();
+            foreach (var n in names) ExternalModels.Add(n);
+            IsListingModels = false;
+            if (names.Count == 0)
+                ModelListStatus = _hiddenModels > 0
+                    ? $"{Provider} lists {_hiddenModels} models, none of them a chat model — type the name if one is."
+                    : $"{Provider} lists no models — load or pull one there, or type the name.";
+            else NoteModelNotListed();
+        }
+        catch (Exception ex)
+        {
+            if (version != _modelListVersion) return;
+            ModelListStatus = $"Could not list models ({ex.GetType().Name}: {ex.Message}) — check the URL / key, or type the name.";
+        }
+        finally
+        {
+            if (version == _modelListVersion) IsListingModels = false;
+        }
+    }
+
+    partial void OnUseExternalChanged(bool value)
+    {
+        if (value) UseLocal = false;
+        if (value && IsLlm) EnsureExternalModels();
+    }
     partial void OnUseLocalChanged(bool value) { if (value) UseExternal = false; }
 
     // Local (Windows)
@@ -316,7 +451,6 @@ public partial class SettingsViewModel : ObservableObject
             var s = CollectLlm();
             LlmSettingsStore.Save(s);
             LlmStatus = $"Saved · backend={s.ActiveBackend} · {(s.ActiveBackend == LlmActiveBackend.External ? s.External.Provider + " / " + s.ResolveExternalModel() : s.ModelId)} · tool chain up to {s.ResolveAgentLoopMaxTurns()} turns · keys are stored protected ({SecretProtection.Protector.GetType().Name}).";
-            LocalStatus = LlmStatus;
             AppLogger.Log($"[Settings] LLM saved | {LlmStatus}");
         }
         catch (Exception ex)
@@ -325,8 +459,14 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// One Test for both backends: save what is on screen, then ask the active backend for a
+    /// one-word reply. For Local that means the model the page names, with the options the page
+    /// shows — loaded first if nothing is, reloaded if something else (or the same file with other
+    /// options) is, since a test of the previous load says nothing about these settings.
+    /// </summary>
     [RelayCommand]
-    private async Task TestExternalAsync()
+    private async Task TestLlmAsync()
     {
         if (IsTesting) return;
         IsTesting = true;
@@ -335,23 +475,46 @@ public partial class SettingsViewModel : ObservableObject
         {
             var s = CollectLlm();
             LlmSettingsStore.Save(s);
-            var provider = s.CreateExternalProvider();
-            var model = s.ResolveExternalModel();
-            if (provider is null || string.IsNullOrEmpty(model))
+            string label;
+            var loadNote = "";
+            if (s.ActiveBackend == LlmActiveBackend.Local)
             {
-                LlmStatus = "Not configured: pick a provider and a model" + (s.External.Provider == ExternalProviderNames.OpenAI ? " and enter the API key." : ".");
-                return;
+                if (SelectedModel is null) { LlmStatus = "Not configured: pick a local model."; return; }
+                var path = LlmModelLocator.ResolveExistingOrTarget(SelectedModel.Entry);
+                if (!File.Exists(path)) { LlmStatus = "The model file is not on disk — Download it first."; return; }
+                label = $"Local / {SelectedModel.Entry.DisplayName} ({s.Backend})";
+                if (!LoadedAsConfigured(s, path))
+                {
+                    if (LlmService.State == LlmServiceState.Loaded) await LlmService.UnloadAsync();
+                    LlmStatus = $"Testing… loading {SelectedModel.Entry.DisplayName} ({s.Backend})";
+                    var load = System.Diagnostics.Stopwatch.StartNew();
+                    await LlmService.LoadAsync(s, path);
+                    loadNote = $" · loaded in {load.ElapsedMilliseconds} ms";
+                    LocalStatus = "Loaded · AI mode can use the local model now.";
+                }
             }
+            else
+            {
+                var model = s.ResolveExternalModel();
+                if (s.CreateExternalProvider() is null || string.IsNullOrEmpty(model))
+                {
+                    LlmStatus = "Not configured: pick a provider and a model" + (s.External.Provider == ExternalProviderNames.OpenAI ? " and enter the API key." : ".");
+                    return;
+                }
+                label = $"{s.External.Provider} / {model}";
+            }
+
+            var timeout = TimeSpan.FromSeconds(s.ActiveBackend == LlmActiveBackend.Local ? 120 : 45);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var reply = await Task.Run(async () =>
             {
                 await using var session = LlmGateway.OpenSession();
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+                using var cts = new CancellationTokenSource(timeout);
                 return await session.SendAsync("Reply with exactly the word OK.", cts.Token);
             });
             var preview = reply.Trim();
             if (preview.Length > 80) preview = preview[..80] + "…";
-            LlmStatus = $"OK · {s.External.Provider} / {model} answered in {sw.ElapsedMilliseconds} ms: \"{preview}\"";
+            LlmStatus = $"OK · {label} answered in {sw.ElapsedMilliseconds} ms{loadNote}: \"{preview}\"";
         }
         catch (Exception ex)
         {
@@ -361,6 +524,16 @@ public partial class SettingsViewModel : ObservableObject
         {
             IsTesting = false;
         }
+    }
+
+    /// <summary>The local engine is up with this file and the options that shape a load.</summary>
+    private static bool LoadedAsConfigured(LlmRuntimeSettings s, string path)
+    {
+        if (LlmService.State != LlmServiceState.Loaded || LlmService.Llm is null) return false;
+        var c = LlmService.CurrentSettings;
+        return string.Equals(LlmService.LoadedModelPath, path, StringComparison.OrdinalIgnoreCase)
+            && c.Backend == s.Backend && c.ContextSize == s.ContextSize
+            && c.GpuLayerCount == s.GpuLayerCount && c.VulkanDeviceIndex == s.VulkanDeviceIndex;
     }
 
     [RelayCommand]
@@ -440,6 +613,16 @@ public partial class SettingsViewModel : ObservableObject
     public bool SshEditable { get; }
 
     public bool CanDeleteCli => SelectedCli is { IsBuiltIn: false, Id: > 0 };
+
+    private IReadOnlyList<string>? _shellChoices;
+    /// <summary>The shells on this machine (pwsh only when installed, zsh only where it exists) for the picker.</summary>
+    public IReadOnlyList<string> ShellChoices => _shellChoices ??= SafeDetectShells();
+
+    private static IReadOnlyList<string> SafeDetectShells()
+    {
+        try { return InstalledShells.Detect(); }
+        catch (Exception ex) { AppLogger.Log($"[Settings] shell detection failed | {ex.Message}"); return []; }
+    }
 
     partial void OnSelectedCliChanged(CliDefinitionItem? oldValue, CliDefinitionItem? newValue)
     {
@@ -617,7 +800,7 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void NewCli()
     {
-        var item = new CliDefinitionItem(new CliDefinition { Name = "New CLI", ExePath = OperatingSystem.IsWindows() ? "cmd.exe" : Agent.Common.Platform.PosixShell.Current.Default() });
+        var item = new CliDefinitionItem(new CliDefinition { Name = "New CLI", ExePath = OperatingSystem.IsWindows() ? "powershell.exe" : Agent.Common.Platform.PosixShell.Current.Default() });
         CliDefinitions.Add(item);
         SelectedCli = item;
         CliStatus = "Fill in the definition and click Save.";
@@ -736,6 +919,76 @@ public partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<string> ThemeNames { get; } = TerminalThemeCatalog.Names;
     [ObservableProperty] private string _fontFamily = "";
+
+    // ── Font picker: the installed families, so the stack is chosen rather than typed ──
+    private IReadOnlyList<InstalledFont> _installedFonts = [];
+    private bool _syncingFont;
+
+    /// <summary>What the picker lists: monospace families only unless <see cref="ShowAllFonts"/>.</summary>
+    [ObservableProperty] private IReadOnlyList<InstalledFont> _fontChoices = [];
+    [ObservableProperty] private InstalledFont? _selectedFont;
+    /// <summary>A proportional font breaks the terminal grid, so the list starts monospace-only.</summary>
+    [ObservableProperty] private bool _showAllFonts;
+    [ObservableProperty] private string _fontListStatus = "Loading installed fonts…";
+
+    private bool _fontsRequested;
+
+    /// <summary>The Settings page came into view — Terminal is the first section, so the font
+    /// list is read here rather than when the view model is built at startup.</summary>
+    public void NotifyShown()
+    {
+        if (IsTerminal) EnsureInstalledFonts();
+        if (IsLlm) EnsureExternalModels();
+    }
+
+    /// <summary>Reads the font list the first time the Terminal page opens — not at startup,
+    /// since measuring every family loads every typeface.</summary>
+    private void EnsureInstalledFonts()
+    {
+        if (_fontsRequested) return;
+        _fontsRequested = true;
+        _ = LoadInstalledFontsAsync();
+    }
+
+    private async Task LoadInstalledFontsAsync()
+    {
+        var fonts = await InstalledFontCatalog.LoadAsync().ConfigureAwait(true);
+        _installedFonts = fonts;
+        RefreshFontChoices();
+    }
+
+    private void RefreshFontChoices()
+    {
+        var primary = TerminalFontStack.Primary(FontFamily);
+        // The font in use stays listed even when the filter would hide it — a picker that
+        // cannot show the current value reads as "nothing is set".
+        FontChoices = _installedFonts
+            .Where(f => ShowAllFonts || f.IsMonospace || string.Equals(f.Name, primary, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var mono = _installedFonts.Count(f => f.IsMonospace);
+        FontListStatus = _installedFonts.Count == 0
+            ? "Installed fonts could not be read — edit the stack below."
+            : ShowAllFonts ? $"{_installedFonts.Count} fonts ({mono} monospace)" : $"{mono} monospace fonts";
+        SyncSelectedFont();
+    }
+
+    private void SyncSelectedFont()
+    {
+        var primary = TerminalFontStack.Primary(FontFamily);
+        _syncingFont = true;
+        try { SelectedFont = FontChoices.FirstOrDefault(f => string.Equals(f.Name, primary, StringComparison.OrdinalIgnoreCase)); }
+        finally { _syncingFont = false; }
+    }
+
+    partial void OnShowAllFontsChanged(bool value) => RefreshFontChoices();
+
+    partial void OnSelectedFontChanged(InstalledFont? value)
+    {
+        if (_syncingFont || value is null) return;
+        FontFamily = TerminalFontStack.WithPrimary(FontFamily, value.Name);
+    }
+
+    partial void OnFontFamilyChanged(string value) => SyncSelectedFont();
     [ObservableProperty] private decimal? _fontSize = 14;
     [ObservableProperty] private decimal? _lineHeight = 1.0m;
     [ObservableProperty] private bool _cursorBlink;
