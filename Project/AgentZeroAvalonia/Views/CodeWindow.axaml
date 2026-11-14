@@ -8,10 +8,12 @@
         Icon="avares://AgentZeroLite/Assets/agentzero.ico"
         Width="1000" Height="640" MinWidth="480" MinHeight="240"
         Background="#1E1E1E"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="Manual">
 
-    <!-- The code view as its own window — the floating bot's arrangement: no state here,
-         the DataContext is the same CodeViewModel the docked tab uses. -->
+    <!-- The code view as its own window — a side window like a detached terminal or plugin:
+         no owner (an owned window stayed on top of the main window and read as a dialog), and
+         the way back is a button in the strip, not only the close box. No state here: the
+         DataContext is the same CodeViewModel the docked tab uses. -->
     <Window.Styles>
         <!-- MainWindow's panel-tab look (its styles are window-local). -->
         <Style Selector="Button.ptab">
@@ -37,16 +39,30 @@
     </Window.Styles>
 
     <DockPanel>
-        <!-- The dock's CODE | GIT LOG | DIFF tabs, for when the panel floats. -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="4,2">
-            <Button Classes="ptab" Classes.selected="{Binding ShowFilesPane}" Content="📄 CODE"
-                    Command="{Binding ShowFilesCommand}" />
-            <Button Classes="ptab" Classes.selected="{Binding ShowGitLog}" Content="⎇ GIT LOG"
-                    IsEnabled="{Binding GitLog.IsAvailable}" ToolTip.Tip="{Binding GitLog.TabTip}"
-                    ToolTip.ShowOnDisabled="True" Command="{Binding ShowHistoryCommand}" />
-            <Button Classes="ptab" Classes.selected="{Binding ShowDiff}" Content="± DIFF"
-                    Command="{Binding ShowChangesCommand}" />
-        </StackPanel>
+        <!-- The dock's CODE | GIT LOG | DIFF tabs, for when the panel floats; pin and the way
+             back on the right (the detached terminal's and plugin's strip). -->
+        <Border DockPanel.Dock="Top" Background="{DynamicResource CyberBgToolbar}"
+                BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
+                            VerticalAlignment="Center" Margin="0,0,6,0">
+                    <ToggleButton x:Name="PinButton" Content="📌" Padding="6,2" FontSize="11"
+                                  ToolTip.Tip="Always on top — keep it beside your terminals" />
+                    <Button x:Name="DockBackButton" Content="↩ Dock back" Padding="8,2" FontSize="11"
+                            Foreground="{DynamicResource CyberCyanBrush}"
+                            ToolTip.Tip="Return the code view to the bottom panel (closing the window does the same)" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="2" Margin="4,2">
+                    <Button Classes="ptab" Classes.selected="{Binding ShowFilesPane}" Content="📄 CODE"
+                            Command="{Binding ShowFilesCommand}" />
+                    <Button Classes="ptab" Classes.selected="{Binding ShowGitLog}" Content="⎇ GIT LOG"
+                            IsEnabled="{Binding GitLog.IsAvailable}" ToolTip.Tip="{Binding GitLog.TabTip}"
+                            ToolTip.ShowOnDisabled="True" Command="{Binding ShowHistoryCommand}" />
+                    <Button Classes="ptab" Classes.selected="{Binding ShowDiff}" Content="± DIFF"
+                            Command="{Binding ShowChangesCommand}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
         <views:CodeView />
     </DockPanel>
 </Window>

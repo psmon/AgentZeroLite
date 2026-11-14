@@ -60,6 +60,7 @@ public partial class TerminalsView : UserControl
             _vm.TabClosed -= OnTabClosed;
             _vm.WorkspaceRemoved -= OnWorkspaceRemoved;
             _vm.FocusPaneRequested -= OnFocusPane;
+            _vm.FindRequested -= OnFindRequested;
             _vm.RestartRequested -= Restart;
             _vm.TerminalAppearanceChanged -= OnAppearanceChanged;
             _vm.HotkeysChanged -= OnHotkeysChanged;
@@ -72,12 +73,19 @@ public partial class TerminalsView : UserControl
         _vm.TabClosed += OnTabClosed;
         _vm.WorkspaceRemoved += OnWorkspaceRemoved;
         _vm.FocusPaneRequested += OnFocusPane;
+        _vm.FindRequested += OnFindRequested;
         _vm.RestartRequested += Restart;
         _vm.TerminalAppearanceChanged += OnAppearanceChanged;
         _vm.HotkeysChanged += OnHotkeysChanged;
         _vm.CliDefinitions.CollectionChanged += (_, _) => NewTerminalMenuButton.Flyout = BuildDefinitionsFlyout(null);
         NewTerminalMenuButton.Flyout = BuildDefinitionsFlyout(null);
         OnActiveTerminalChanged();
+    }
+
+    /// <summary>The find chord or the palette: open the find bar in that tab's renderer.</summary>
+    private void OnFindRequested(TerminalTabViewModel tab)
+    {
+        if (_controls.TryGetValue(tab, out var control)) control.OpenFind();
     }
 
     /// <summary>Settings saved a new appearance: every open renderer gets the config message (live, no restart).</summary>
@@ -489,6 +497,7 @@ public partial class TerminalsView : UserControl
         control.TerminalClicked += (_, _) => _vm?.SelectTab(tab);
         control.HotkeyRequested += (_, name) => _vm?.HandleHotkey(name);
         control.RestartRequested += (_, _) => Restart(ws, tab);
+        control.NotificationReceived += (_, note) => _vm?.OnTerminalNotification(tab, note);
         control.IsVisible = false;
         _controls[tab] = control;
         SurfaceHost.Children.Add(control);
@@ -509,12 +518,13 @@ public partial class TerminalsView : UserControl
         }
 
         // Claude / Codex: offer the sessions the agent recorded for this folder before its
-        // process starts. The control is already registered, so a second EnsureStarted
+        // process starts — also behind a profile wrapper such as claude-sam, whose sessions
+        // live in its own folder. The control is already registered, so a second EnsureStarted
         // for this tab while the question is open is a no-op.
-        if (!def.IsRemote && AgentCliTools.Match(def) is { } tool && AgentSessionCatalog.Supports(tool)
-            && AgentResumeSettingsStore.Load().Asks(tool))
+        if (!def.IsRemote && AgentResumeTarget.Of(def) is { } target
+            && AgentResumeSettingsStore.Load().Asks(target.Tool))
         {
-            _ = LaunchAfterResumeChoiceAsync(ws, tab, control, def, spec, tool);
+            _ = LaunchAfterResumeChoiceAsync(ws, tab, control, def, spec, target);
             return;
         }
         Launch(ws, tab, control, def, spec);
@@ -524,14 +534,15 @@ public partial class TerminalsView : UserControl
     private static readonly SemaphoreSlim ResumeQuestion = new(1, 1);
 
     private async Task LaunchAfterResumeChoiceAsync(WorkspaceViewModel ws, TerminalTabViewModel tab,
-        XtermWebViewTerminalControl control, CliDefinition def, TerminalLaunchSpec spec, AgentCliTool tool)
+        XtermWebViewTerminalControl control, CliDefinition def, TerminalLaunchSpec spec, AgentResumeTarget target)
     {
         bool StillOurs() => _controls.TryGetValue(tab, out var c) && ReferenceEquals(c, control);
 
+        var tool = target.Tool;
         var launch = spec;
         try
         {
-            var sessions = await Task.Run(() => AgentSessionCatalog.List(tool, ws.DirectoryPath, spec.Env));
+            var (sessions, tabLast) = await Task.Run(() => ListWithTabLast(target, tab, ws.DirectoryPath, spec.Env));
             if (sessions.Count > 0 && StillOurs())
             {
                 ResumeChoice? choice = null;
@@ -541,7 +552,7 @@ public partial class TerminalsView : UserControl
                 {
                     if (StillOurs() && await DialogOwnerAsync() is { } owner)
                     {
-                        var dialog = new ResumeSessionDialog(tool.Name, $"{ws.DisplayName}/{tab.Title} · {ws.DirectoryPath}", sessions);
+                        var dialog = new ResumeSessionDialog(target.DisplayName, $"{ws.DisplayName}/{tab.Title} · {ws.DirectoryPath}", sessions, tool.Name, tabLast);
                         choice = await dialog.ShowDialog<ResumeChoice?>(owner) ?? dialog.Result;
                     }
                 }
@@ -561,13 +572,16 @@ public partial class TerminalsView : UserControl
                 }
                 if (choice?.SessionId is { } id)
                 {
-                    var resumed = AgentResumeLaunch.WithResume(def, tool, id) is { } d
+                    var resumed = target.WithResume(def, id) is { } d
                         ? TerminalLaunchPlanner.Plan(d, ws.DirectoryPath, AppContext.BaseDirectory, out _)
                         : null;
                     if (resumed is not null)
                     {
                         launch = resumed;
-                        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} resumes {tool.Name} session {id}");
+                        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} resumes {target.DisplayName} session {id}"
+                                      + (tabLast?.Id == id ? " (this tab's last)" : ""));
+                        // Known now, before the agent's live status names it: a tab closed right away keeps it.
+                        _vm?.RememberTabSession(ws, tab, new AgentSessionRef(tool.Command, target.ConfigDir ?? "", id, ws.DirectoryPath));
                     }
                     else AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title}: could not put a resume of {id} into '{def.Arguments}' — starting new");
                 }
@@ -579,6 +593,23 @@ public partial class TerminalsView : UserControl
         }
 
         if (StillOurs()) Launch(ws, tab, control, def, launch);
+    }
+
+    /// <summary>
+    /// The folder's sessions and, among them, the one this tab last ran. With several tabs in one
+    /// folder the tab's conversation can be older than the newest 30, so a remembered id missing
+    /// from the first page is looked for in a longer one before it is given up.
+    /// </summary>
+    private static (IReadOnlyList<AgentSessionInfo> Sessions, AgentSessionInfo? TabLast) ListWithTabLast(
+        AgentResumeTarget target, TerminalTabViewModel tab, string cwd, IReadOnlyDictionary<string, string>? env)
+    {
+        const int page = 30;
+        var sessions = target.ListSessions(cwd, env, page);
+        var last = TabSessionMemory.Pick(tab.AgentSessions, target.Tool, sessions);
+        if (last is null && sessions.Count >= page && TabSessionMemory.Has(tab.AgentSessions, target.Tool)
+            && TabSessionMemory.Pick(tab.AgentSessions, target.Tool, target.ListSessions(cwd, env, 300)) is { } older)
+            return (sessions.Append(older).ToList(), older);
+        return (sessions, last);
     }
 
     /// <summary>The window a dialog can be modal to — the main window, once it is on screen.</summary>

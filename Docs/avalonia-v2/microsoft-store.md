@@ -140,10 +140,15 @@ cd Project\AgentZeroAvalonia\msix
 
 ## 5. 알려진 이슈와 후속 과제
 
-- **WebView2 런타임**: Windows 11과 대부분의 Windows 10에는 이미 있지만 보장되지 않는다.
-  없으면 터미널 탭이 뜨지 않는다. 후속: 시작 시 런타임을 확인하고 설치 링크를 안내.
-- **읽기 전용 설치 폴더**: Store 판은 `C:\Program Files\WindowsApps\…` 에 설치된다. 코드는 설치 폴더를 읽기만 한다.
-  단, 워크스페이스 없이 연 터미널 탭의 시작 폴더가 exe 폴더라 그 탭에서는 파일을 못 쓴다. 후속: 기본 작업 폴더를 홈으로.
+- **WebView2 런타임** (2026-11-03 처리): Windows 11과 대부분의 Windows 10에는 이미 있지만 보장되지 않는다
+  (오래된 Windows 10, LTSC/Server, WSUS·오프라인 이미지). MSIX는 WebView2를 의존성으로 걸 수 없다.
+  이제 런타임이 없으면 모든 터미널 탭이 이유를 보여 주고 **Install WebView2 runtime** 버튼을 제공한다
+  (ZeroCommon `Platform/WebView2Runtime`). 버튼은 Microsoft 부트스트래퍼를 받아 Microsoft 서명을 확인하고,
+  패키지 안에서는 breakaway 정책으로 `/silent /install` 을 실행한다. 다운로드 페이지 링크와
+  `-cli webview2 status|install` 도 있다. 남은 확인: 개발자 모드로 등록한 패키지에서 런타임이 없는 PC를 대상으로
+  breakaway 설치를 실측해야 한다(런타임이 있는 PC에서는 `AGENTZERO_FAKE_NO_WEBVIEW2=1` 로 배너와 흐름만 확인).
+- **읽기 전용 설치 폴더** (9차 제출에서 처리): Store 판은 `C:\Program Files\WindowsApps\…` 에 설치되고, 코드는 설치 폴더를 읽기만 한다.
+  워크스페이스 없이 연 터미널 탭은 이제 홈 폴더에서 시작한다(`PtyHostFactory` 의 `UsableCwd(spec.Cwd) ?? HomeFolder()`).
 - **일반판과 동시 실행 불가**: 같은 단일 인스턴스 뮤텍스를 쓰므로 Store 판과 일반 설치판(WPF·Avalonia)을 동시에
   띄울 수 없다. 데이터 공유가 목적은 아니다(§0) — 한 PC에서 두 판을 같이 쓰는 경우는 고려하지 않는다.
 - **자동 업데이트**: Store 판은 Store가 업데이트한다. GitHub 릴리스 판과 버전 번호 체계(§2)가 다르다는 점만 기억.
@@ -421,6 +426,74 @@ KittenTTS 2 테스트 하나로 실패 → 테스트가 Windows 문구만 기대
 업로드+분석 약 45초, Save에 1.26.7.0만 Validated, 목록 What's new·기능 14줄을 `listing.md`에서 채우고 다시 읽어 일치 확인,
 첫 Submit 클릭에 In certification. 로그인은 이번에도 풀려 있어 운영자가 다시 로그인했다(Edge `pw-edge-partner`, 9333 —
 `msedge --remote-debugging-port=9333 --user-data-dir=%LOCALAPPDATA%\pw-edge-partner`로 띄운다).
+
+### 18차 제출 (1.26.8.0, 2026-11-03)
+
+내용: WebView2 런타임이 없는 PC에서 터미널이 빈 화면 대신 이유와 **Install WebView2 runtime** 버튼을 보여 준다(§5),
+터미널 내 검색(Ctrl+Shift+F), 터미널 프로그램의 알림(OSC 9 / 777 / 99)을 같은 팝업으로. Partner Center는 Submission 15.
+개인정보 처리방침에 WebView2 설치(go.microsoft.com) 행을 먼저 추가했다(`doc-v1.55.0`, Pages 게시 확인). GitHub 릴리스
+`v0.26.8`이 선행됐다(5개 job 모두 성공, Setup.exe의 WebView2 설치 단계가 CI에서 처음 컴파일됨). 패키지 151.6 MB를
+CDP `DOM.setFileInputFiles`로 넣었고 업로드+분석에 약 45초가 걸렸다. Save 뒤에는 1.26.8.0만 Validated(1.26.7.0은 "higher-versioned
+package" 안내와 함께 자동 제거)였다. What's new와 기능 15줄은 `listing.md`에서 채웠는데, 칸이 14개라 "Add more"로 하나를 늘렸다.
+다시 열어 읽어 보니 둘 다 일치했고, 첫 Submit 클릭에 In certification이 됐다. 로그인은 이번에도 풀려 있어서 운영자가 다시
+로그인했다. 이번 제출의 자동화는 같은 9333 세션 위의 작은 스크립트 네 개로 했다: 개요/링크 읽기, 버튼 클릭, CDP 업로드,
+`listing.md` → 목록 채우기와 대조. 목록 페이지의 입력칸은 `#releaseNotes`와 `#feature-N`이고, 페이지가 열린 뒤
+몇 초가 지나야 나타난다.
+
+### 19차 제출 (1.26.9.0, 2026-11-09)
+
+내용: 코드 뷰를 소유자 없는 독립 창으로 띄우기(📌 항상 위, ↩ Dock back), 폴더를 펼치거나 고를 때 그 폴더만 다시 읽는
+트리 부분 갱신(⟳도 제자리 병합), 이미지 화면 맞춤(1:1 전환), 설정·플러그인 페이지가 사이드바 없이 전체 폭을 씀, 워크스페이스
+저장을 한 트랜잭션으로(저장 도중 실패하면 목록이 비던 버그), 프로필 래퍼 탭의 세션 재개. Partner Center는 Submission 16.
+새 권한·네트워크 흐름이 없어 개인정보 처리방침은 고치지 않았다. GitHub 릴리스 `v0.26.9`를 먼저 냈는데, **macos 잡이 단계
+하나 없이 취소**됐다 — `release.yml`이 은퇴한 `macos-14` 러너를 쓰고 있었다(agent-one 워크플로는 이미 macos-15로 옮긴
+뒤였다). Windows·Linux 파일은 정상 게시, `macos-15`로 고쳤다. 패키지 151.6 MB를 CDP `DOM.setFileInputFiles`로 넣어
+업로드+분석 약 40초, Save 뒤 1.26.9.0만 Validated, What's new를 `listing.md`에서 채우고 다시 열어 일치 확인(기능 15줄은
+그대로), 첫 Submit 클릭에 In certification. 로그인은 이번에도 풀려 있어 운영자가 다시 로그인했다.
+
+이번에 확인한 것:
+
+- 개요의 **Start update**와 **Submit for certification**은 `he-button` 웹 컴포넌트다 — `button`/`a`로 찾으면 없다.
+  Packages 페이지의 Save는 `input.btn-primary[value=Save]`, 목록 페이지의 Save는 `button.btn-primary`로 서로 다르다.
+- 목록 페이지 주소는 `…/submissions/<id>/listings?languageid=4&languagecode=en-us`(Store listings 항목은
+  `managelanguages`로 간다). 목록 편집은 `#releaseNotes`에 값을 넣고 `input`/`change` 이벤트를 보내면 Save에 반영된다.
+
+### 20차 제출 (1.27.0.0, 2026-11-13)
+
+내용: Claude / Codex 탭마다 마지막으로 진행한 대화를 기억해(에이전트 안의 `/new` 전환 포함) 다시 열 때 *Continue this
+tab's session*으로 먼저 내놓는다 — 한 폴더에 에이전트 탭이 여럿일 때 어느 세션이 어느 탭의 것인지 고르지 않아도 된다.
+같은 릴리스의 Remote(브라우저에서 터미널)는 Store판에서 컴파일되지 않으므로 What's new에 넣지 않았고, 함께 들어간 터미널
+전환 타임아웃 수정도 Remote 액터(`ZeroCommon/Remote/RemoteHubActor`) 쪽이라 빼었다. Partner Center는 Submission 17.
+새 권한·네트워크 흐름이 없어 개인정보 처리방침은 그대로(세션 id는 이미 읽던 Claude/Codex 파일에서 오고 로컬 DB에만 저장).
+선행: GitHub Pages `doc-v1.58.0`, GitHub 릴리스 `v0.27.0`(5개 자산 모두 게시, macOS `.pkg` 포함). 패키지 151.6 MB,
+What's new를 `listing.md`에서 채우고 다시 열어 일치 확인(기능 15줄은 그대로), 첫 Submit 클릭에 In certification.
+이번에는 로그인이 살아 있었다(9333 Edge를 새로 띄웠을 때 이미 로그인 상태).
+
+이번에 확인한 것:
+
+- **업로더는 파일을 받는 즉시 `input[type=file]`을 비운다.** `DOM.setFileInputFiles` 직후 `files.length`가 0이라 실패로
+  보고 다시 넣었더니, 두 번 모두 서버에 올라가 "Multiple uploaded files contain the same package"로 막혔다. 진행 여부는
+  입력칸이 아니라 패키지 목록(파일명 + 진행 막대, 끝나면 `v1.27.0.0, X64`)으로 판단한다. 중복은 두 행 중 하나의
+  **Remove**(새 패키지에 붙은 버튼 — 평소에는 누르지 않는다)로 지우고, 그 행이 "will be removed after you save"로
+  바뀐 것을 본 뒤 Save하면 1.27.0.0 하나만 남는다.
+- 업로드+분석은 이번에 약 8분 걸렸다(두 개가 동시에 올라간 탓일 수 있다).
+
+### 21차 제출 (1.27.1.0, 2026-11-14)
+
+내용: 설정과 사이드바 UX — 설정이 Terminal부터 열리고(CLI definitions·Shortcuts가 다음), 터미널 글꼴을 설치된 고정폭
+글꼴에서 미리보기와 함께 고른다. 터미널 정의는 이 PC에 있는 셸(pwsh·Git Bash는 설치된 경우에만)을 고르고 `claude` 같은
+명령만 입력하면 셸별 옵션(`-NoExit -Command`, `/K`, `-l -i -c`)이 붙는다. LLM 설정은 고른 백엔드의 항목만 보이고 Save·Test가
+하나씩(Local Test는 화면의 모델을 먼저 로드), 외부 서버의 모델은 서버가 알려 주는 목록에서 채팅 모델만 골라 보인다. 사이드바는
+ACTIVE SESSIONS가 워크스페이스 바로 아래, 현재 워크스페이스의 터미널은 한 줄에 셋. Partner Center는 Submission 18.
+개인정보 처리방침은 그대로 — 모델 목록은 사용자가 이미 설정한 LLM 서버의 `/v1/models`이고, 글꼴·셸 탐지는 로컬이다.
+선행: GitHub Pages `doc-v1.59.0`, GitHub 릴리스 `v0.27.1`(Windows·Linux 4개 자산 게시; macOS 잡은 `codesign`이
+"The timestamp service is not available"로 실패 — Apple 타임스탬프 서버의 일시 장애라 실패한 잡만 다시 실행했더니, 서명은
+통과하고 **공증이 HTTP 403 "A required agreement is missing or has expired"**로 막혔다. Apple Developer 계정의 갱신된
+약관(developer.apple.com → Account → Agreements)에 계정 소유자가 동의해야 풀리며, 그 뒤 실패한 잡을 다시 실행하면 `.pkg`가
+같은 릴리스에 붙는다 — Store 제출과는 무관).
+패키지 151.7 MB를 CDP `DOM.setFileInputFiles`로 **한 번만** 넣고(20차의 교훈) 패키지 목록에 `v1.27.1.0, X64`가 뜨는 것으로
+진행을 판단했다 — 업로드+분석 약 40초. Save 뒤 1.27.1.0만 Validated. What's new를 `listing.md`에서 채우고 다시 열어
+915자 일치 확인(기능 15줄은 그대로), 첫 Submit 클릭에 In certification. 로그인은 살아 있었다.
 
 ## 참고
 

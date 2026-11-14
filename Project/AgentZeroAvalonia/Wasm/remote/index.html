@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>AgentZero Remote</title>
+  <link rel="icon" href="./favicon.ico" />
+  <link rel="stylesheet" href="./vendor/xterm.css" />
+  <link rel="stylesheet" href="./remote.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <span class="title">AgentZero <b>Remote</b></span>
+      <span id="status" class="status">connecting…</span>
+      <select id="termSelect" title="Terminal" aria-label="Terminal"></select>
+    </header>
+    <div id="termWrap"><div id="term"></div></div>
+    <div id="keys" aria-label="Keys">
+      <button data-key="esc">Esc</button>
+      <button data-key="tab">Tab</button>
+      <button data-key="shifttab">⇧Tab</button>
+      <button data-key="ctrlc">Ctrl+C</button>
+      <button data-key="up">↑</button>
+      <button data-key="down">↓</button>
+      <button data-key="left">←</button>
+      <button data-key="right">→</button>
+      <button data-key="cr">Enter</button>
+    </div>
+    <form id="compose" autocomplete="off">
+      <input id="line" type="text" placeholder="Type a line and press Send (Enter)" enterkeyhint="send" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <div id="pair">
+    <div class="card">
+      <h2>Pair this browser</h2>
+      <p>In AgentZero open <b>📡 Remote</b>, press <b>Issue pairing code</b>, and type the code here.</p>
+      <input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="8 digits" />
+      <div class="err" id="pairErr"></div>
+      <button id="pairBtn">Pair</button>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
+
+  <script src="./vendor/xterm.js"></script>
+  <script src="./vendor/addon-fit.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

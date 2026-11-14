@@ -67,4 +67,40 @@ public class SettingsViewModelTests
         Assert.True(s.CursorBlink);
         Assert.NotEqual("Nope", s.ThemeName);                         // unknown theme falls back to the default
     }
+
+    [Fact]
+    public void Cli_definition_takes_a_command_and_writes_the_shell_flags_itself()
+    {
+        var item = new CliDefinitionItem(new CliDefinition { ExePath = "powershell.exe", Arguments = "-NoExit -Command claude" });
+        Assert.Equal("claude", item.RunCommand);            // the seeded row reads as its command
+        Assert.True(item.UsesRunCommand);
+
+        item.RunCommand = "codex";
+        Assert.Equal("-NoExit -Command codex", item.Arguments);
+        item.ExePath = "cmd.exe";                            // another shell, same command
+        Assert.Equal("/K codex", item.Arguments);
+        item.ExePath = "/bin/bash";
+        Assert.Equal("-l -i -c \"codex; exec bash -l\"", item.Arguments);
+        Assert.Equal("/bin/bash -l -i -c \"codex; exec bash -l\"", item.LaunchPreview);
+
+        var custom = new CliDefinitionItem(new CliDefinition { ExePath = "pwsh.exe", Arguments = "-NoLogo -NoExit -Command claude" });
+        Assert.True(custom.RawArguments);                    // hand-written flags are shown, never rewritten
+        Assert.False(custom.UsesRunCommand);
+        Assert.Equal("-NoLogo -NoExit -Command claude", custom.Arguments);
+
+        var program = new CliDefinitionItem(new CliDefinition { ExePath = "claude", Arguments = "--resume" });
+        Assert.False(program.IsShell);                       // a program run directly keeps its own arguments
+        Assert.True(program.ShowArguments);
+    }
+
+    [Fact]
+    public async Task Font_catalog_always_offers_the_bundled_font()
+    {
+        // Headless there may be no font manager at all; the font the app ships must still be listed.
+        var fonts = await AgentZeroAvalonia.Services.InstalledFontCatalog.LoadAsync();
+        var bundled = Assert.Single(fonts, f => f.Name == AgentZeroAvalonia.Services.InstalledFontCatalog.BundledFamily);
+        Assert.True(bundled.IsBundled);
+        Assert.True(bundled.IsMonospace);
+        Assert.Equal(fonts.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase).Select(f => f.Name), fonts.Select(f => f.Name));
+    }
 }

@@ -9,11 +9,10 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <!-- Remote access (Remote/) is a WPF feature still in preparation: the HTTP/WebSocket server is
-       WPF's RemoteServerHost, and the Avalonia host never starts the hub. IncludeRemote=false leaves
-       it out; the Avalonia csproj passes that for an osx-* RuntimeIdentifier (the Developer ID and
-       Mac App Store bundles). A Windows download build will carry it once it ships; every other
-       build, the tests included, keeps it. -->
+  <!-- Remote access (Remote/): the actors, auth and wire protocol behind both hosts' Remote page.
+       IncludeRemote=false leaves it out — the store builds (Microsoft Store MSIX, Mac App Store)
+       pass it on the command line, so it arrives here as a global property. The download builds
+       and the tests keep it. -->
   <PropertyGroup Condition="'$(IncludeRemote)' == 'false'">
     <DefineConstants>$(DefineConstants);NO_REMOTE</DefineConstants>
   </PropertyGroup>

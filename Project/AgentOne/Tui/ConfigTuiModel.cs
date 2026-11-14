@@ -57,7 +57,7 @@ public sealed class ConfigTuiModel
         ["provider", "baseUrl", "apiKey", "apiKeyEnv"],
         [],
         ["reasoningBaseUrl", "reasoningApiKey", "reasoningModel"],
-        ["maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "commandTimeoutSeconds", "saveSessions"],
+        ["maxSteps", "temperature", "timeoutSeconds", "webTimeoutSeconds", "commandTimeoutSeconds", "browserCdpUrl", "saveSessions"],
         ["smartMode", "jevApiKey", "jevBaseUrl", "jevModel", "jevConfidenceFloor"]
     ];
 
@@ -235,6 +235,7 @@ public sealed class ConfigTuiModel
         "timeoutSeconds" => "per model request, 1..3600",
         "webTimeoutSeconds" => "per web page, 1..600 · a slow site should cost seconds, not the whole turn",
         "commandTimeoutSeconds" => "per run_command, 1..3600 · a build or a test run is the long one; it is killed past this",
+        "browserCdpUrl" => "browser_* attach to this Chrome when it answers (started with --remote-debugging-port) · off = always open their own",
         "saveSessions" => "write a JSONL transcript per run under ~/.agent-one/sessions",
         _ => ""
     };

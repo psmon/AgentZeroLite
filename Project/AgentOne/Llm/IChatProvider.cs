@@ -30,9 +30,26 @@ public class ChatProviderException(string message, Exception? inner = null)
 /// about the request, so the same call may well succeed if it is sent again —
 /// which is why callers offer a retry instead of treating it as final.
 /// </summary>
-public sealed class ChatProviderStalledException(string message, int receivedChars = 0, Exception? inner = null)
+public sealed class ChatProviderStalledException(string message, int receivedChars = 0, Exception? inner = null,
+    bool dropped = false, bool degenerate = false)
     : ChatProviderException(message, inner)
 {
+    /// <summary>
+    /// The model was still sending, but nothing a turn can use: reasoning with
+    /// no end, or an answer stuck in a cycle. Cut off by the provider and, like
+    /// a drop, retried on its own before anyone is asked.
+    /// </summary>
+    public bool Degenerate { get; } = degenerate;
+
     /// <summary>How much of the reply had arrived before it stopped; 0 when nothing came.</summary>
     public int ReceivedChars { get; } = receivedChars;
+
+    /// <summary>
+    /// The connection itself failed — reset, closed mid-stream, unreachable —
+    /// rather than going quiet. Measured (2026-11-06, music-harness): a
+    /// mid-stream drop surfaced as a raw IOException, which nothing caught: the
+    /// turn vanished with no result and no memory, after it had written a file.
+    /// A drop is retried on its own a couple of times before anyone is asked.
+    /// </summary>
+    public bool Dropped { get; } = dropped;
 }

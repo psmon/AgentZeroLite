@@ -1,5 +1,6 @@
 using System.Text;
 using AgentOne.Tools;
+using AgentOne.Tools.Cli;
 
 namespace AgentOne.Agent;
 
@@ -15,9 +16,23 @@ public static class SystemPrompt
     /// or null. Without it a new chat in the same folder knew nothing of the
     /// project it had been building a minute earlier.
     /// </param>
-    public static string Build(string workspaceRoot, string? memory = null)
+    /// <param name="guide">
+    /// The workspace's own instructions for agents (AGENTS.md / CLAUDE.md, <see cref="WorkspaceGuide"/>), or null.
+    /// </param>
+    public static string Build(string workspaceRoot, string? memory = null, WorkspaceGuideText? guide = null)
     {
         var sb = new StringBuilder(Core(workspaceRoot));
+
+        if (guide is not null)
+        {
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.AppendLine($"This workspace's own instructions for agents ({string.Join(", ", guide.Files)}) — the owner's rules for");
+            sb.AppendLine("this project. When a request matches what they describe (a dispatch table, a procedure, a file layout),");
+            sb.AppendLine("follow them: read_file the documents they point to BEFORE planning or building, and keep their");
+            sb.AppendLine("conventions for where outputs go. They never override the rules above about tools and safety.");
+            sb.AppendLine(guide.Text);
+        }
 
         if (!string.IsNullOrWhiteSpace(memory))
         {
@@ -65,6 +80,39 @@ public static class SystemPrompt
         sb.AppendLine("  not ../, not an absolute path, not another worktree or clone: those writes are refused.");
         var shell = ShellInfo.Current;
         sb.AppendLine($"- run_command runs in {shell.Describe}. {shell.Hints}");
+        // Measured (2026-11-07, music-harness): asked to generate a song on a site the
+        // workspace drives with its own script, the model wrote the three fields out,
+        // then a prompt document, and told the user it was their turn to generate.
+        sb.AppendLine("- When the user asks you to DO something — generate, run, upload, record, render, build — and the");
+        sb.AppendLine("  workspace holds a script or a CLI that does it (read its header or --help first), run it with");
+        sb.AppendLine("  run_command. Writing instructions for the user to do it by hand is not doing it. The gate asks the");
+        sb.AppendLine("  user by itself before anything that needs their approval (spending credits, deleting) runs.");
+        // Measured (2026-11-07, music-harness): asked to review six generated takes, the
+        // model said it cannot listen to audio and handed the user a checklist — in a
+        // workspace whose earlier songs each carry the scripts that measured their takes.
+        sb.AppendLine("- You CAN examine audio and video: ffprobe / ffmpeg (length, loudness, silence, frames), a speech");
+        sb.AppendLine("  recognizer such as whisper to check sung or spoken words, and the workspace's own measuring scripts.");
+        sb.AppendLine("  Never say you cannot hear or see a media file, and never hand the judgement back with a checklist.");
+        sb.AppendLine("- When the workspace has done this kind of work before — earlier projects in sibling folders, logs of");
+        sb.AppendLine("  how they were made — find how it was done (list the folders, read the newest similar log) and reuse");
+        sb.AppendLine("  its scripts and environments, adapted, before inventing a method or asking the user.");
+        sb.AppendLine("- Read a file with read_file and search with grep / find_files — not with a shell command");
+        sb.AppendLine("  (Get-Content, cat, Select-String), even when a plan spells one out.");
+        sb.AppendLine("- You CAN use a real web browser. browser_open opens a page (a new tab in the user's own Chrome when it");
+        sb.AppendLine("  runs with remote debugging, otherwise a browser of your own); browser_snapshot / browser_read /");
+        sb.AppendLine("  browser_find show it; browser_click / browser_fill / browser_press act on it by the [ref=eN] refs of the");
+        sb.AppendLine("  latest snapshot. Use them whenever a page needs a browser — YouTube, a logged-in site, a page built by");
+        sb.AppendLine("  JavaScript — or the user asks for Playwright. Never say you cannot see or use a browser, never ask the");
+        sb.AppendLine("  user to start Chrome or run a script for you, and never write a Playwright script the browser_* tools");
+        sb.AppendLine("  can replace. When the user says they opened a page, browser_tabs finds it.");
+
+        var known = KnownCli.PromptLines(KnownCli.Status);
+        if (known.Length > 0)
+        {
+            sb.AppendLine("- Command-line tools installed on this machine — you already know them; use them with run_command");
+            sb.AppendLine("  instead of searching the web for how. cli_guide {\"name\":\"…\"} gives the exact commands:");
+            sb.AppendLine(known);
+        }
         sb.AppendLine();
         sb.AppendLine("Tools:");
 

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:AgentZeroAvalonia.ViewModels"
+             xmlns:svc="using:AgentZeroAvalonia.Services"
              xmlns:tel="using:Agent.Common.Telemetry"
              x:Class="AgentZeroAvalonia.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
@@ -58,15 +59,15 @@
                 BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0">
             <StackPanel Margin="0,10">
                 <TextBlock Text="SETTINGS" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextDim}" Margin="12,4,12,8" />
+                <Button Classes="nav" Classes.selected="{Binding IsTerminal}" Content="Terminal" Command="{Binding ShowTerminalCommand}" />
+                <Button Classes="nav" Classes.selected="{Binding IsCli}" Content="CLI definitions" Command="{Binding ShowCliCommand}" />
+                <Button Classes="nav" Classes.selected="{Binding IsShortcuts}" Content="Shortcuts" Command="{Binding ShowShortcutsCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsLlm}" Content="LLM" Command="{Binding ShowLlmCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsMcp}" Content="MCP" Command="{Binding ShowMcpCommand}" />
-                <Button Classes="nav" Classes.selected="{Binding IsCli}" Content="CLI definitions" Command="{Binding ShowCliCommand}" />
-                <Button Classes="nav" Classes.selected="{Binding IsTerminal}" Content="Terminal" Command="{Binding ShowTerminalCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsVoice}" Content="Voice" Command="{Binding ShowVoiceCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsModels}" Content="Models" Command="{Binding ShowModelsCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsNotifications}" Content="Notifications" Command="{Binding ShowNotificationsCommand}" />
                 <Button Classes="nav" Classes.selected="{Binding IsBudget}" Content="Budget" Command="{Binding ShowBudgetCommand}" />
-                <Button Classes="nav" Classes.selected="{Binding IsShortcuts}" Content="Shortcuts" Command="{Binding ShowShortcutsCommand}" />
             </StackPanel>
         </Border>
 
@@ -82,51 +83,43 @@
                                      IsEnabled="{Binding LocalSupported}" ToolTip.Tip="{Binding LocalTooltip}" />
                     </StackPanel>
 
+                    <!-- Only the chosen backend's settings are shown; Temperature and the
+                         turn budget apply to both and sit below, outside either group. -->
+                    <StackPanel IsVisible="{Binding UseExternal}">
                     <TextBlock Classes="h2" Text="EXTERNAL" />
-                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                         <TextBlock Classes="lbl" Grid.Row="0" Text="Provider" />
                         <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Providers}" SelectedItem="{Binding Provider}" MinWidth="220" HorizontalAlignment="Left" />
                         <TextBlock Classes="lbl" Grid.Row="1" Text="Model" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ExternalModel}" Watermark="google/gemma-4-e4b" />
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="↻" Margin="6,0,0,0" Command="{Binding RefreshExternalModelsCommand}"
+                                        IsEnabled="{Binding !IsListingModels}"
+                                        ToolTip.Tip="Ask the server for its models again (uses the URL and key on screen)" />
+                                <!-- Editable: pick what the server serves, or type a name it does not list. -->
+                                <ComboBox IsEditable="True" ItemsSource="{Binding ExternalModels}" Text="{Binding ExternalModel, Mode=TwoWay}"
+                                          PlaceholderText="google/gemma-4-e4b" MaxDropDownHeight="360" HorizontalAlignment="Stretch" />
+                            </DockPanel>
+                            <TextBlock FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}" Text="{Binding ModelListStatus}"
+                                       IsVisible="{Binding ModelListStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
                         <TextBlock Classes="lbl" Grid.Row="2" Text="Max tokens / turn" />
                         <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ExternalMaxTokens}" Minimum="256" Maximum="32768" Increment="256" HorizontalAlignment="Left" Width="160" />
-                        <TextBlock Classes="lbl" Grid.Row="3" Text="Temperature" />
-                        <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Temperature}" Minimum="0" Maximum="2" Increment="0.1" FormatString="0.0" HorizontalAlignment="Left" Width="160" />
-                        <TextBlock Classes="lbl" Grid.Row="4" Text="OpenAI API key" IsVisible="{Binding ShowOpenAI}" />
-                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding OpenAIApiKey}" PasswordChar="●" IsVisible="{Binding ShowOpenAI}" Watermark="sk-..." />
-                        <TextBlock Classes="lbl" Grid.Row="5" Text="OpenAI base URL" IsVisible="{Binding ShowOpenAI}" />
-                        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding OpenAIBaseUrl}" IsVisible="{Binding ShowOpenAI}" Watermark="(default)" />
-                        <TextBlock Classes="lbl" Grid.Row="6" Text="LM Studio base URL / key" IsVisible="{Binding ShowLMStudio}" />
-                        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowLMStudio}">
+                        <TextBlock Classes="lbl" Grid.Row="3" Text="OpenAI API key" IsVisible="{Binding ShowOpenAI}" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding OpenAIApiKey}" PasswordChar="●" IsVisible="{Binding ShowOpenAI}" Watermark="sk-..." />
+                        <TextBlock Classes="lbl" Grid.Row="4" Text="OpenAI base URL" IsVisible="{Binding ShowOpenAI}" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding OpenAIBaseUrl}" IsVisible="{Binding ShowOpenAI}" Watermark="(default)" />
+                        <TextBlock Classes="lbl" Grid.Row="5" Text="LM Studio base URL / key" IsVisible="{Binding ShowLMStudio}" />
+                        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowLMStudio}">
                             <TextBox Text="{Binding LMStudioBaseUrl}" Width="260" Watermark="http://localhost:1234/v1" />
                             <TextBox Text="{Binding LMStudioApiKey}" Width="160" PasswordChar="●" Watermark="key (optional)" />
                         </StackPanel>
-                        <TextBlock Classes="lbl" Grid.Row="7" Text="Ollama base URL" IsVisible="{Binding ShowOllama}" />
-                        <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding OllamaBaseUrl}" IsVisible="{Binding ShowOllama}" Watermark="(default)" />
+                        <TextBlock Classes="lbl" Grid.Row="6" Text="Ollama base URL" IsVisible="{Binding ShowOllama}" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding OllamaBaseUrl}" IsVisible="{Binding ShowOllama}" Watermark="(default)" />
                     </Grid>
-                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-                        <Button Content="Save" Command="{Binding SaveLlmCommand}" />
-                        <Button Content="Test connection" Command="{Binding TestExternalCommand}" IsEnabled="{Binding !IsTesting}" />
                     </StackPanel>
-                    <TextBlock Classes="status" Text="{Binding LlmStatus}" />
 
-                    <!-- The loop is ours and the model is theirs, so this sits outside both
-                         backend groups: it applies whichever one is active. Bounds mirror
-                         LlmRuntimeSettings.Min/MaxAgentLoopMaxTurns, which clamp the stored
-                         value again for hand-edited files. -->
-                    <TextBlock Classes="h2" Text="AGENT LOOP (AI MODE)" />
-                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto">
-                        <TextBlock Classes="lbl" Grid.Row="0" Text="Tool chain turns" />
-                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                            <NumericUpDown Value="{Binding AgentLoopMaxTurns}" Minimum="1" Maximum="200" Increment="1" Width="160" />
-                            <Button Content="Save" Command="{Binding SaveLlmCommand}" />
-                        </StackPanel>
-                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
-                                   Foreground="{DynamicResource TextDim}"
-                                   Text="One turn is one model call plus the tool it asks for, so reading a file, running a command and answering costs three. Raise it for long jobs — when the budget runs out the run ends with 'max iterations reached without done'. Applies to both backends." />
-                    </Grid>
-
-                    <StackPanel IsVisible="{Binding LocalSupported}">
+                    <StackPanel IsVisible="{Binding UseLocal}">
                         <TextBlock Classes="h2" Text="LOCAL MODEL (WINDOWS)" />
                         <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
                             <TextBlock Classes="lbl" Grid.Row="0" Text="Model" />
@@ -154,7 +147,6 @@
                             <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding LocalState}" FontSize="11" Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" />
                         </Grid>
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-                            <Button Content="Save options" Command="{Binding SaveLlmCommand}" />
                             <Button Content="Download" Command="{Binding DownloadModelCommand}" IsEnabled="{Binding !IsDownloading}" />
                             <Button Content="Load" Command="{Binding LoadModelCommand}" />
                             <Button Content="Unload" Command="{Binding UnloadModelCommand}" />
@@ -163,6 +155,32 @@
                                   Content="Load at startup (in the background; otherwise the first AI-mode request loads it)" />
                         <TextBlock Classes="status" Text="{Binding LocalStatus}" />
                     </StackPanel>
+
+                    <!-- The loop is ours and the model is theirs, so this sits outside both
+                         backend groups: it applies whichever one is active. Bounds mirror
+                         LlmRuntimeSettings.Min/MaxAgentLoopMaxTurns, which clamp the stored
+                         value again for hand-edited files. -->
+                    <TextBlock Classes="h2" Text="AGENT LOOP (AI MODE)" />
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto">
+                        <TextBlock Classes="lbl" Grid.Row="2" Text="Temperature" />
+                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Temperature}" Minimum="0" Maximum="2" Increment="0.1" FormatString="0.0" HorizontalAlignment="Left" Width="160" Margin="0,8,0,0"
+                                       ToolTip.Tip="Sampling temperature — used by whichever backend is active." />
+                        <TextBlock Classes="lbl" Grid.Row="0" Text="Tool chain turns" />
+                        <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding AgentLoopMaxTurns}" Minimum="1" Maximum="200" Increment="1" Width="160" HorizontalAlignment="Left" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextDim}"
+                                   Text="One turn is one model call plus the tool it asks for, so reading a file, running a command and answering costs three. Raise it for long jobs — when the budget runs out the run ends with 'max iterations reached without done'. Applies to both backends." />
+                    </Grid>
+
+                    <!-- One Save and one Test for the whole page, whichever backend is chosen:
+                         Save writes every field above; Test saves, then asks the chosen backend
+                         for a one-word reply (Local loads the model the page names first). -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
+                        <Button Content="Save" Command="{Binding SaveLlmCommand}" />
+                        <Button Content="Test" Command="{Binding TestLlmCommand}" IsEnabled="{Binding !IsTesting}"
+                                ToolTip.Tip="Saves, then sends one short prompt to the chosen backend (Local: loads the selected model first if needed)." />
+                    </StackPanel>
+                    <TextBlock Classes="status" Text="{Binding LlmStatus}" />
                 </StackPanel>
 
                 <!-- ═══ CLI DEFINITIONS ═══ -->
@@ -190,18 +208,32 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" DataContext="{Binding SelectedCli}" x:DataType="vm:CliDefinitionItem" IsVisible="{Binding !!.}">
                         <TextBlock Classes="h2" Text="DEFINITION" />
-                        <Grid Classes="form" ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <Grid Classes="form" ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
                             <TextBlock Classes="lbl" Grid.Row="0" Text="Name" />
                             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name}" />
-                            <TextBlock Classes="lbl" Grid.Row="1" Text="Executable" />
+                            <TextBlock Classes="lbl" Grid.Row="1" Text="Shell" />
                             <DockPanel Grid.Row="1" Grid.Column="1">
-                                <Button DockPanel.Dock="Right" x:Name="PickExeButton" Content="…" Margin="6,0,0,0" />
-                                <TextBox Text="{Binding ExePath}" Watermark="cmd.exe / /bin/zsh / claude" />
+                                <Button DockPanel.Dock="Right" x:Name="PickExeButton" Content="…" Margin="6,0,0,0"
+                                        ToolTip.Tip="Choose a program file" />
+                                <!-- The shells found on this machine; editable, so any other program can be typed too. -->
+                                <ComboBox IsEditable="True" HorizontalAlignment="Stretch"
+                                          ItemsSource="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ShellChoices}"
+                                          Text="{Binding ExePath, Mode=TwoWay}" PlaceholderText="powershell.exe / /bin/zsh / a program" />
                             </DockPanel>
-                            <TextBlock Classes="lbl" Grid.Row="2" Text="Arguments" />
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Arguments}" />
-                            <TextBlock Classes="lbl" Grid.Row="3" Text="" />
-                            <CheckBox Grid.Row="3" Grid.Column="1" Content="Reduced motion (ask the CLI not to animate)" IsChecked="{Binding ReducedMotion}" />
+                            <TextBlock Classes="lbl" Grid.Row="2" Text="Run command" IsVisible="{Binding UsesRunCommand}" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RunCommand}" IsVisible="{Binding UsesRunCommand}"
+                                     PlaceholderText="claude   (empty: just the shell)"
+                                     ToolTip.Tip="Started in the shell when the tab opens; the shell stays open after it exits." />
+                            <TextBlock Classes="lbl" Grid.Row="3" Text="Arguments" IsVisible="{Binding ShowArguments}" />
+                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Arguments}" IsVisible="{Binding ShowArguments}" />
+                            <TextBlock Classes="lbl" Grid.Row="4" Text="Runs" />
+                            <StackPanel Grid.Row="4" Grid.Column="1" Spacing="2">
+                                <TextBlock Text="{Binding LaunchPreview}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}"
+                                           FontFamily="JetBrains Mono, Cascadia Mono, Consolas, monospace" VerticalAlignment="Center" />
+                                <CheckBox Content="Edit the raw arguments" IsChecked="{Binding RawArguments}" IsVisible="{Binding IsShell}" FontSize="11" />
+                            </StackPanel>
+                            <TextBlock Classes="lbl" Grid.Row="5" Text="" />
+                            <CheckBox Grid.Row="5" Grid.Column="1" Content="Reduced motion (ask the CLI not to animate)" IsChecked="{Binding ReducedMotion}" />
                         </Grid>
                         <!-- Agent CLI: is the tool this definition launches actually on the
                              machine? A valid row for a missing program opens a tab that
@@ -259,19 +291,47 @@
                 <!-- ═══ TERMINAL ═══ -->
                 <StackPanel IsVisible="{Binding IsTerminal}" MaxWidth="640" HorizontalAlignment="Left">
                     <TextBlock Classes="h1" Text="Terminal appearance" />
-                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
-                        <TextBlock Classes="lbl" Grid.Row="0" Text="Font family" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding FontFamily}" Watermark="JetBrains Mono, Cascadia Mono, Consolas, monospace" />
-                        <TextBlock Classes="lbl" Grid.Row="1" Text="Font size" />
-                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding FontSize}" Minimum="8" Maximum="32" Increment="1" Width="140" HorizontalAlignment="Left" />
-                        <TextBlock Classes="lbl" Grid.Row="2" Text="Line height" />
-                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding LineHeight}" Minimum="0.8" Maximum="2" Increment="0.05" FormatString="0.00" Width="140" HorizontalAlignment="Left" />
-                        <TextBlock Classes="lbl" Grid.Row="3" Text="Theme" />
-                        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding ThemeName}" MinWidth="200" HorizontalAlignment="Left" />
-                        <TextBlock Classes="lbl" Grid.Row="4" Text="" />
-                        <CheckBox Grid.Row="4" Grid.Column="1" Content="Blink the cursor" IsChecked="{Binding CursorBlink}" />
-                        <TextBlock Classes="lbl" Grid.Row="5" Text="" />
-                        <CheckBox Grid.Row="5" Grid.Column="1" Content="WebGL renderer (applies to terminals opened afterwards)" IsChecked="{Binding UseWebGl}" />
+                    <Grid Classes="form" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Classes="lbl" Grid.Row="0" Text="Font" />
+                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+                            <DockPanel>
+                                <CheckBox DockPanel.Dock="Right" Content="Show all fonts" IsChecked="{Binding ShowAllFonts}" Margin="10,0,0,0"
+                                          ToolTip.Tip="A proportional font breaks the terminal's character grid; the list shows monospace fonts unless this is ticked." />
+                                <ComboBox ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
+                                          PlaceholderText="(not an installed font — see the stack below)"
+                                          MaxDropDownHeight="360" HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="svc:InstalledFont">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding Name}" FontFamily="{Binding Family}" FontSize="13" />
+                                                <TextBlock Text="bundled" IsVisible="{Binding IsBundled}" FontSize="10"
+                                                           Foreground="{DynamicResource TextDim}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </DockPanel>
+                            <TextBlock FontSize="10" Foreground="{DynamicResource TextDim}" Text="{Binding FontListStatus}" />
+                        </StackPanel>
+                        <TextBlock Classes="lbl" Grid.Row="1" Text="Preview" />
+                        <Border Grid.Row="1" Grid.Column="1" Padding="8,6" CornerRadius="4" Background="#1E1E1E"
+                                IsVisible="{Binding SelectedFont, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <TextBlock Text="AaBbCc 0O 1lI {}[] =&gt; ├─┤ 한글 テスト" Foreground="#D4D4D4"
+                                       FontFamily="{Binding SelectedFont.Family, FallbackValue={x:Null}}" FontSize="{Binding FontSize}" />
+                        </Border>
+                        <TextBlock Classes="lbl" Grid.Row="2" Text="Font stack" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding FontFamily}" PlaceholderText="JetBrains Mono, Cascadia Mono, Consolas, monospace"
+                                 ToolTip.Tip="CSS font stack: the font picked above comes first, the rest catch glyphs it lacks (Hangul, box drawing, icons)." />
+                        <TextBlock Classes="lbl" Grid.Row="3" Text="Font size" />
+                        <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding FontSize}" Minimum="8" Maximum="32" Increment="1" Width="140" HorizontalAlignment="Left" />
+                        <TextBlock Classes="lbl" Grid.Row="4" Text="Line height" />
+                        <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding LineHeight}" Minimum="0.8" Maximum="2" Increment="0.05" FormatString="0.00" Width="140" HorizontalAlignment="Left" />
+                        <TextBlock Classes="lbl" Grid.Row="5" Text="Theme" />
+                        <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding ThemeName}" MinWidth="200" HorizontalAlignment="Left" />
+                        <TextBlock Classes="lbl" Grid.Row="6" Text="" />
+                        <CheckBox Grid.Row="6" Grid.Column="1" Content="Blink the cursor" IsChecked="{Binding CursorBlink}" />
+                        <TextBlock Classes="lbl" Grid.Row="7" Text="" />
+                        <CheckBox Grid.Row="7" Grid.Column="1" Content="WebGL renderer (applies to terminals opened afterwards)" IsChecked="{Binding UseWebGl}" />
                     </Grid>
                     <TextBlock Classes="h1" Text="Session resume" Margin="0,16,0,0" />
                     <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextDim}"
@@ -297,6 +357,8 @@
                         <StackPanel Spacing="4" Margin="22,0,0,0" IsEnabled="{Binding Enabled}">
                             <CheckBox Content="when an agent is blocked (input or approval)" IsChecked="{Binding OnBlocked}" />
                             <CheckBox Content="when an agent finished and I have not looked" IsChecked="{Binding OnDone}" />
+                            <CheckBox Content="when a program in a terminal sends a notification (OSC 9 / 777 / 99 — Gemini CLI, OpenCode, scripts)"
+                                      IsChecked="{Binding OnNotify}" />
                             <CheckBox Content="only while AgentZero is not the active window" IsChecked="{Binding OnlyWhenInactive}" />
                             <TextBlock Classes="h2" Text="HOW" />
                             <CheckBox Content="{Binding FlashLabel}" IsChecked="{Binding FlashWindow}" />

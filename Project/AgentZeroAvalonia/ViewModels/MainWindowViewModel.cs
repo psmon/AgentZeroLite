@@ -24,6 +24,7 @@ public enum AppPage
     Settings,
     Wearable,
     Plugins,
+    Remote,
 }
 
 /// <summary>
@@ -100,6 +101,9 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>Move focus to the pane in a direction — needs the view's rectangles.</summary>
     public event Action<FocusDirection>? FocusPaneRequested;
 
+    /// <summary>Open the find bar in the active terminal (Ctrl+Shift+F from outside it, or the palette).</summary>
+    public event Action<TerminalTabViewModel>? FindRequested;
+
     /// <summary>Relaunch one tab's process (context menu / CLI).</summary>
     public event Action<WorkspaceViewModel, TerminalTabViewModel>? RestartRequested;
 
@@ -166,6 +170,7 @@ public partial class MainWindowViewModel : ObservableObject
             Wearable = new WearableViewModel(configuration);
 
         Plugins = new PluginsViewModel();
+        InitRemote();
 
         Settings = new SettingsViewModel();
         Settings.CliDefinitionsChanged += ReloadCliDefinitions;
@@ -218,6 +223,24 @@ public partial class MainWindowViewModel : ObservableObject
     public bool IsSettingsPage => Page == AppPage.Settings;
     public bool IsWearablePage => Page == AppPage.Wearable;
     public bool IsPluginsPage => Page == AppPage.Plugins;
+    public bool IsRemotePage => Page == AppPage.Remote;
+
+    /// <summary>
+    /// The Remote page (browser control of the terminals) exists only in the download builds:
+    /// the Store MSIX and the Mac App Store build compile it out (<c>-p:IncludeRemote=false</c>),
+    /// so they never open a listening socket. See <c>MainWindowViewModel.Remote.cs</c>.
+    /// </summary>
+#if REMOTE_CONTROL
+    public bool RemoteSupported => true;
+#else
+    public bool RemoteSupported => false;
+#endif
+
+    /// <summary>Builds the Remote page where it is compiled in (<c>MainWindowViewModel.Remote.cs</c>).</summary>
+    partial void InitRemote();
+
+    /// <summary>Tells the Remote page whether it is on screen (it polls only then).</summary>
+    partial void RemotePageShown(bool visible);
 
     /// <summary>The Plugins page (the WPF host's WebDev page) — web plugins over the shared JS bridge.</summary>
     public PluginsViewModel Plugins { get; }
@@ -245,7 +268,11 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsWearablePage));
         OnPropertyChanged(nameof(IsPluginsPage));
+        OnPropertyChanged(nameof(IsRemotePage));
+        RemotePageShown(value == AppPage.Remote);
+        RaiseSidebar();
         if (value == AppPage.Plugins) Plugins.NotifyShown();
+        if (value == AppPage.Settings) Settings.NotifyShown();
     }
 
     partial void OnActiveWorkspaceChanged(WorkspaceViewModel? oldValue, WorkspaceViewModel? newValue)
@@ -276,7 +303,27 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand] private void ShowSettings() => Page = Page == AppPage.Settings ? AppPage.Terminals : AppPage.Settings;
     [RelayCommand] private void ShowWearable() => Page = Page == AppPage.Wearable ? AppPage.Terminals : AppPage.Wearable;
     [RelayCommand] private void ShowPlugins() => Page = Page == AppPage.Plugins ? AppPage.Terminals : AppPage.Plugins;
+    [RelayCommand] private void ShowRemote() => Page = Page == AppPage.Remote || !RemoteSupported ? AppPage.Terminals : AppPage.Remote;
     [RelayCommand] private void ToggleSidebar() => SidebarExpanded = !SidebarExpanded;
+
+    /// <summary>
+    /// The workspace sidebar belongs to the Terminals page only. Settings, Wearable and Plugins
+    /// are app-wide — nothing on them depends on which workspace is picked — so they take the
+    /// whole width right of the activity bar instead of sitting beside a workspace list.
+    /// <see cref="SidebarExpanded"/> is the person's choice for the Terminals page and is kept.
+    /// </summary>
+    public bool WorkspaceSidebarVisible => IsTerminalsPage && SidebarExpanded;
+
+    /// <summary>The slim "›" strip that brings the sidebar back — Terminals page only, like the sidebar.</summary>
+    public bool WorkspaceSidebarStripVisible => IsTerminalsPage && !SidebarExpanded;
+
+    partial void OnSidebarExpandedChanged(bool value) => RaiseSidebar();
+
+    private void RaiseSidebar()
+    {
+        OnPropertyChanged(nameof(WorkspaceSidebarVisible));
+        OnPropertyChanged(nameof(WorkspaceSidebarStripVisible));
+    }
     [RelayCommand] private void ToggleBot()
     {
         BotVisible = !BotVisible;
@@ -363,7 +410,11 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 var ws = CreateWorkspace(snap.DirectoryPath, snap.DisplayName);
                 foreach (var t in snap.Tabs)
-                    ws.Tabs.Add(CreateTab(ws, t.Title, t.CliDefinitionId, FindDefinition(t.CliDefinitionId)));
+                {
+                    var tab = CreateTab(ws, t.Title, t.CliDefinitionId, FindDefinition(t.CliDefinitionId));
+                    tab.AgentSessions = t.AgentSessions;
+                    ws.Tabs.Add(tab);
+                }
                 ws.RestoreLayout(snap.DockLayoutJson);
                 Workspaces.Add(ws);
                 TerminalActorBinder.RegisterWorkspace(ws);
@@ -706,6 +757,9 @@ public partial class MainWindowViewModel : ObservableObject
             case HotkeyTable.BotEmbedToggle: ToggleBotEmbedded(); break;
             case HotkeyTable.CodeToggle: ToggleCode(); break;
             case HotkeyTable.PaletteOpen: OpenPalette(); break;
+            case HotkeyTable.TerminalFind:
+                if (ActiveWorkspace?.ActiveTab is { } findIn) FindRequested?.Invoke(findIn);
+                break;
             case HotkeyTable.NextTab: CycleTab(+1); break;
             case HotkeyTable.PrevTab: CycleTab(-1); break;
             case HotkeyTable.MoveTabNextPane: MoveActiveTabToNextPane(); break;

@@ -78,6 +78,7 @@ public partial class MainWindowViewModel
         items.Add(new PaletteItem("Go to", "Terminals", "", () => Page = AppPage.Terminals));
         items.Add(new PaletteItem("Go to", "Plugins", "", () => Page = AppPage.Plugins));
         if (Wearable is not null) items.Add(new PaletteItem("Go to", "Wearable", "", () => Page = AppPage.Wearable));
+        if (RemoteSupported) items.Add(new PaletteItem("Go to", "Remote", "", () => Page = AppPage.Remote));
         foreach (var section in Enum.GetValues<SettingsSection>())
         {
             var s = section;

@@ -185,6 +185,25 @@ public partial class MainWindowViewModel
 
     public void ReloadAttentionSettings() => AttentionSettings = AttentionSettingsStore.Load();
 
+    /// <summary>
+    /// A program in <paramref name="tab"/> sent a notification (OSC 9 / 777 / 99). Unlike the
+    /// detected states it is an event, so it is announced now, through the same popup and flash
+    /// and under the same settings; <see cref="AttentionNotifier.ObserveNotification"/> holds the rules.
+    /// </summary>
+    public void OnTerminalNotification(TerminalTabViewModel tab, TerminalNotification note)
+    {
+        for (int g = 0; g < Workspaces.Count; g++)
+        {
+            var t = Workspaces[g].Tabs.IndexOf(tab);
+            if (t < 0) continue;
+            var alert = _attention.ObserveNotification(g, t, tab.Title, note, AttentionSettings, IsAppActive(), DateTime.UtcNow);
+            if (alert is null) return;
+            AppLogger.Log($"[Attention] {Workspaces[g].DisplayName}/{tab.Title}=Notify | {note.Text}");
+            AttentionRaised?.Invoke([(alert, Workspaces[g].DisplayName)]);
+            return;
+        }
+    }
+
     private void RaiseAttention()
     {
         var alerts = _attention.Observe(_agentTracker.Snapshot(), AttentionSettings, IsAppActive(), DateTime.UtcNow);
@@ -212,7 +231,7 @@ public partial class MainWindowViewModel
         var s = AttentionSettings;
         var settings = new System.Text.Json.Nodes.JsonObject
         {
-            ["enabled"] = s.Enabled, ["onBlocked"] = s.OnBlocked, ["onDone"] = s.OnDone,
+            ["enabled"] = s.Enabled, ["onBlocked"] = s.OnBlocked, ["onDone"] = s.OnDone, ["onNotify"] = s.OnNotify,
             ["onlyWhenInactive"] = s.OnlyWhenInactive, ["flashWindow"] = s.FlashWindow,
             ["popup"] = s.Popup, ["popupSeconds"] = s.ResolvePopupSeconds(),
         };
@@ -254,6 +273,26 @@ public partial class MainWindowViewModel
     /// <summary>The <c>agent-state</c> CLI reply — the WPF host's contract.</summary>
     public string AgentStateJson() => _agentTracker.ToCliJson();
 
+    /// <summary>
+    /// Store, on each running tab, the agent conversation its live status names (Claude's status
+    /// file, Codex's rollout — matched to the tab through its process tree), so the tab's next
+    /// start can offer that conversation by name rather than only the folder's whole list.
+    /// </summary>
+    private void RememberTabSessions(List<(int G, int T, WorkspaceViewModel W, TerminalTabViewModel Tab)> running)
+    {
+        foreach (var r in running)
+            if (_agentTracker.Lookup(r.G, r.T)?.Session is { } session)
+                RememberTabSession(r.W, r.Tab, session);
+    }
+
+    /// <summary>Record <paramref name="session"/> as the tab's newest conversation and save when that changed anything.</summary>
+    public void RememberTabSession(WorkspaceViewModel ws, TerminalTabViewModel tab, AgentSessionRef session)
+    {
+        if (!tab.RememberSession(session)) return;
+        AppLogger.Log($"[Terminals] {ws.DisplayName}/{tab.Title} remembers {session.Agent} session {session.SessionId}");
+        Persist();
+    }
+
     /// <summary>One detection pass + list sync. Cheap when nothing changed.</summary>
     public void RefreshActiveSessions()
     {
@@ -273,6 +312,7 @@ public partial class MainWindowViewModel
                         running.Add((g, t, Workspaces[g], Workspaces[g].Tabs[t]));
 
             PublishSessionsFeed(active);
+            RememberTabSessions(running);
 
             var signature = string.Join("|", running.Select(r =>
                 $"{r.W.DisplayName}/{r.Tab.Title}/{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(r.Tab)}"))

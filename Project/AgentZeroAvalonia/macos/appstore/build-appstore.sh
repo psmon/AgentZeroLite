@@ -2,7 +2,8 @@
 # Mac App Store build: publish folder -> sandboxed AgentZeroLite.app -> signed .pkg for upload.
 #
 # Usage: build-appstore.sh <publish-dir> <out-dir> [version] [build-number]
-#   e.g. build-appstore.sh publish-avalonia/osx-arm64 publish-avalonia/appstore 0.25.8 1
+#   e.g. build-appstore.sh publish-avalonia/osx-arm64-mas publish-avalonia/appstore 0.25.8 1
+#   The publish must leave Remote out: dotnet publish … -r osx-arm64 -p:IncludeRemote=false
 #
 # Environment:
 #   MAS_SIGN_ID     "Apple Distribution: <Team> (<TEAMID>)"            (required)
@@ -27,6 +28,14 @@ macos="$(cd "$here/.." && pwd)"
 
 if [ -z "$version" ] && [ -f "$src/version.txt" ]; then version="$(tr -d '[:space:]' < "$src/version.txt")"; fi
 version="${version:-0.0.0}"
+
+# Remote (the terminals from a browser) is not part of the App Store edition: publish with
+# -p:IncludeRemote=false. A publish that still carries its web client was made for the
+# Developer ID .pkg and would ship a LAN listener App Review has to ask about.
+if [ -d "$src/Wasm/remote" ]; then
+  echo "error: $src was published with Remote — publish again with -p:IncludeRemote=false" >&2
+  exit 1
+fi
 
 mkdir -p "$out"
 app="$out/AgentZeroLite.app"

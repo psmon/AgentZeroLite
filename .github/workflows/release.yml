@@ -118,7 +118,8 @@ jobs:
 
   macos:
     needs: version
-    runs-on: macos-14
+    # macos-14 was retired (2026-11): v0.26.9's macos job was cancelled before a step ran.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

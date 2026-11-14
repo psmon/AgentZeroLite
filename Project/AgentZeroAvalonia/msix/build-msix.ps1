@@ -97,8 +97,11 @@ New-Item -ItemType Directory -Force $stage | Out-Null
 
 # IncludeWearableHost=false: the BLE host is not part of the Store edition yet (its own
 # certification question - capabilities, size); see the csproj.
-dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:IncludeWearableHost=false -o $stage
+# IncludeRemote=false: Remote (the terminals from a browser) listens on the LAN; the Store edition
+# leaves it out - the page, its server and its web client are not compiled or packaged.
+dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:IncludeWearableHost=false -p:IncludeRemote=false -o $stage
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
+if (Test-Path (Join-Path $stage 'Wasm\remote')) { throw "Wasm\remote is in the Store stage - Remote must be compiled out (-p:IncludeRemote=false)" }
 
 Copy-Item (Join-Path $here "Assets") (Join-Path $stage "Assets") -Recurse -Force
 Remove-Item (Join-Path $stage "Assets\StoreListing*.png") -ErrorAction SilentlyContinue   # listing art, not package content

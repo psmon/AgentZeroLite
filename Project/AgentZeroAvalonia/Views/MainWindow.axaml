@@ -70,6 +70,26 @@
             <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <!-- SESSIONS chips: three to a row, the focused tab outlined and tinted in the accent. -->
+        <Style Selector="Border.ws.chip">
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+        </Style>
+        <Style Selector="Border.ws.chip.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberCyanBrush}" />
+            <Setter Property="Background" Value="#263794FF" />
+        </Style>
+        <Style Selector="Button.side.chip">
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Border.ws.chip.selected TextBlock.title">
+            <Setter Property="Foreground" Value="{DynamicResource CyberCyanBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
         <Style Selector="Button.sidex">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -166,6 +186,9 @@
                                 IsVisible="{Binding WearableSupported}" />
                         <Button Classes="activity" Classes.selected="{Binding IsPluginsPage}"
                                 Content="🧩" ToolTip.Tip="Plugins" Command="{Binding ShowPluginsCommand}" />
+                        <Button Classes="activity" Classes.selected="{Binding IsRemotePage}"
+                                Content="📡" ToolTip.Tip="Remote — use the terminals from a browser" Command="{Binding ShowRemoteCommand}"
+                                IsVisible="{Binding RemoteSupported}" />
                     </StackPanel>
                     <Button DockPanel.Dock="Bottom" Classes="activity" Classes.selected="{Binding IsSettingsPage}"
                             Content="⚙" ToolTip.Tip="Settings" VerticalAlignment="Bottom"
@@ -176,7 +199,7 @@
             <!-- Sidebar collapsed: a slim strip whose only job is to bring it back. -->
             <Border Grid.Column="1" Grid.Row="0" Width="18" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0"
-                    IsVisible="{Binding !SidebarExpanded}">
+                    IsVisible="{Binding WorkspaceSidebarStripVisible}">
                 <Button Classes="fold" Content="›" VerticalAlignment="Top" HorizontalAlignment="Center"
                         Margin="0,6,0,0" ToolTip.Tip="Show workspaces" Command="{Binding ToggleSidebarCommand}" />
             </Border>
@@ -186,7 +209,7 @@
                  dock leaves the sidebar less height than its lists need. -->
             <Border Grid.Column="1" Grid.Row="0" Width="220" Background="{DynamicResource CyberBgPanel}"
                     BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,1,0"
-                    IsVisible="{Binding SidebarExpanded}">
+                    IsVisible="{Binding WorkspaceSidebarVisible}">
                 <DockPanel Margin="0,6,0,0">
                     <DockPanel DockPanel.Dock="Top" Margin="12,2,4,2">
                         <Button DockPanel.Dock="Right" Classes="fold" Content="‹"
@@ -265,22 +288,9 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Border Height="1" Background="{DynamicResource BorderColor}" Margin="10,8" />
-                    <TextBlock Text="{Binding ActiveWorkspace.DisplayName, StringFormat='SESSIONS · {0}', FallbackValue=SESSIONS}" FontSize="10" FontWeight="Bold" TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
-                    <ItemsControl ItemsSource="{Binding ActiveWorkspace.Tabs}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:TerminalTabViewModel">
-                                <Border Classes="ws session" Classes.selected="{Binding IsActive}">
-                                    <Button Classes="side" Content="{Binding Title}" ToolTip.Tip="{Binding HealthText}"
-                                            Command="{Binding ActivateCommand}" />
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
                     <!-- ACTIVE SESSIONS: every running terminal of every workspace, with the agent
-                         state detected on its screen (the WPF SESSIONS panel). Click = go there. -->
+                         state detected on its screen (the WPF SESSIONS panel). Click = go there.
+                         Placed right under the workspaces: it is the list used most. -->
                     <Border Height="1" Background="{DynamicResource BorderColor}" Margin="10,8" />
                     <TextBlock Text="{Binding ActiveSessionsHeader}" FontSize="10" FontWeight="Bold"
                                Foreground="{DynamicResource TextDim}" Margin="12,4" />
@@ -313,12 +323,42 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                    <!-- SESSIONS: the active workspace's tabs, the same choice the tab strip makes, as
+                         chips three to a row — a workspace with six tabs takes two lines, not six. The
+                         focused one carries the accent; the full title and health are in the tooltip. -->
+                    <Border Height="1" Background="{DynamicResource BorderColor}" Margin="10,8" />
+                    <TextBlock Text="{Binding ActiveWorkspace.DisplayName, StringFormat='SESSIONS · {0}', FallbackValue=SESSIONS}" FontSize="10" FontWeight="Bold" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource TextDim}" Margin="12,4" />
+                    <ItemsControl ItemsSource="{Binding ActiveWorkspace.Tabs}" Margin="8,0,8,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TerminalTabViewModel">
+                                <Border Classes="ws chip" Classes.selected="{Binding IsActive}">
+                                    <Button Classes="side chip" Command="{Binding ActivateCommand}">
+                                        <ToolTip.Tip>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding HealthText}" FontSize="11" />
+                                            </StackPanel>
+                                        </ToolTip.Tip>
+                                        <TextBlock Classes="title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                                    </Button>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     </StackPanel>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <!-- Content: one page at a time -->
+            <!-- Content: one page at a time. Only Terminals shows the workspace sidebar (column 1);
+                 the app-wide pages hide it, so the Auto column collapses and they get its width. -->
             <Panel Grid.Column="2" Grid.Row="0">
                 <views:TerminalsView IsVisible="{Binding IsTerminalsPage}" />
                 <Panel IsVisible="{Binding IsSettingsPage}">
@@ -330,6 +370,8 @@
                 <Panel IsVisible="{Binding IsPluginsPage}">
                     <views:PluginsView DataContext="{Binding Plugins}" />
                 </Panel>
+                <!-- The Remote page is added from code-behind where it is compiled in (download builds only). -->
+                <Panel x:Name="RemotePageHost" IsVisible="{Binding IsRemotePage}" />
             </Panel>
 
             <!-- AgentBot: a sibling row spanning everything but the activity bar, as in the

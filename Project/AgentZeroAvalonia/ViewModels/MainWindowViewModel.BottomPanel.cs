@@ -102,10 +102,21 @@ public partial class MainWindowViewModel
         if (!BottomDockVisible) BotMaximized = false;
     }
 
-    /// <summary>📄 on the activity bar / Ctrl+Alt+E: open the code view in front, or close it when it is already in front.</summary>
+    /// <summary>
+    /// 📄 on the activity bar / Ctrl+Alt+E: open the code view in front, or close it when it is
+    /// already in front. A floating view is brought forward instead: its window has no owner, so
+    /// clicking 📄 in the main window has just put the main window over it — "in front" can no
+    /// longer be told, and closing what the person was looking for would be the wrong guess.
+    /// It goes away through its own ↩ Dock back / close box, then ✕ on the tab.
+    /// </summary>
     [RelayCommand]
     public void ToggleCode()
     {
+        if (CodeVisible && !CodeDocked)
+        {
+            CodeFloatRequested?.Invoke(true);   // raise the window that is already open
+            return;
+        }
         if (CodeVisible && (ShowCodeInDock || !CodeDocked))
         {
             CodeVisible = false;

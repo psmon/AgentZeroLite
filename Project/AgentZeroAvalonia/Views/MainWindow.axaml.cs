@@ -27,6 +27,12 @@ public partial class MainWindow : Window
             AttachAttention(Vm);
             if (Vm is { } vm)
                 vm.ClipboardWriter = text => Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
+#if REMOTE_CONTROL
+            // Download builds only — the Store builds compile the page out, so the window
+            // names it nowhere in markup.
+            RemotePageHost.Children.Clear();
+            if (Vm?.Remote is { } remote) RemotePageHost.Children.Add(new RemoteView { DataContext = remote });
+#endif
         };
         BotSplitter.DragCompleted += (_, _) => RememberBotPaneHeight();
 
@@ -81,7 +87,10 @@ public partial class MainWindow : Window
 
     private CodeWindow? _codeWindow;
 
-    /// <summary>The code view's own window (⧉ on its tab) — the floating bot's arrangement.</summary>
+    /// <summary>
+    /// The code view's own window (⧉ on its tab). Unowned, like a detached terminal or plugin,
+    /// so it can sit behind the main window; asked to float while open, it is raised.
+    /// </summary>
     private void OnCodeFloatRequested(bool floating)
     {
         if (_botVm is null) return;
@@ -95,10 +104,16 @@ public partial class MainWindow : Window
             }
             return;
         }
-        if (_codeWindow is not null) { _codeWindow.Activate(); return; }
+        if (_codeWindow is not null)
+        {
+            if (_codeWindow.WindowState == WindowState.Minimized) _codeWindow.WindowState = WindowState.Normal;
+            _codeWindow.Activate();
+            return;
+        }
         _codeWindow = new CodeWindow { DataContext = _botVm.Code };
         _codeWindow.EmbedRequested += () => _botVm.EmbedCode();
-        _codeWindow.Show(this);
+        _codeWindow.PlaceNear(this);
+        _codeWindow.Show();
     }
 
     private void OnBotVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

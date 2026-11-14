@@ -131,7 +131,7 @@ public sealed class StageActor : ReceiveActor
         });
 
 #if !NO_REMOTE
-        // Remote access is not built into the macOS bundles (ZeroCommon.csproj, NO_REMOTE).
+        // Remote access is not built into the store builds (ZeroCommon.csproj, NO_REMOTE).
         Receive<CreateRemoteHub>(msg =>
         {
             if (_remoteActor is not null)

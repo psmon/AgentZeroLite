@@ -1,3 +1,5 @@
+using AgentOne.Tools;
+
 namespace AgentOne.Agent;
 
 /// <summary>
@@ -9,6 +11,9 @@ namespace AgentOne.Agent;
 public sealed class AgentLoopGuards(int repeatNudgeBudget = 1, int parseNudgeBudget = 2)
 {
     private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
+
+    /// <summary>The call that ran last, for verbs that repeat only when called twice in a row.</summary>
+    private string? _last;
 
     public int RepeatNudgesLeft { get; private set; } = repeatNudgeBudget;
     public int ParseNudgesLeft { get; private set; } = parseNudgeBudget;
@@ -68,9 +73,23 @@ public sealed class AgentLoopGuards(int repeatNudgeBudget = 1, int parseNudgeBud
     }
 
     /// <summary>True when this exact call was already made in this run.</summary>
-    public bool IsRepeat(ToolCall call) => _seen.Contains(call.Signature());
+    /// <remarks>
+    /// "Exact" depends on the verb (<see cref="ToolCatalog.RepeatOf"/>): a look at a page that may have changed is
+    /// a repeat only straight after the same look; an action like pressing End to load more never is.
+    /// </remarks>
+    public bool IsRepeat(ToolCall call) => ToolCatalog.RepeatOf(call.Tool) switch
+    {
+        RepeatRule.Free => false,
+        RepeatRule.AfterChange => _last == call.Signature(),
+        _ => _seen.Contains(call.Signature())
+    };
 
-    public void Record(ToolCall call) => _seen.Add(call.Signature());
+    public void Record(ToolCall call)
+    {
+        var signature = call.Signature();
+        _seen.Add(signature);
+        _last = signature;
+    }
 
     /// <summary>
     /// Un-records a call that never ran, so asking for it again is not counted
@@ -80,7 +99,12 @@ public sealed class AgentLoopGuards(int repeatNudgeBudget = 1, int parseNudgeBud
     /// is intercepted by the repeat nudge and never reaches the family check
     /// that would have let the route give way.
     /// </summary>
-    public void Forget(ToolCall call) => _seen.Remove(call.Signature());
+    public void Forget(ToolCall call)
+    {
+        var signature = call.Signature();
+        _seen.Remove(signature);
+        if (_last == signature) _last = null;
+    }
 
     /// <summary>Consumes one repeat nudge. False means the budget is gone and the run should stop.</summary>
     public bool TryConsumeRepeatNudge()

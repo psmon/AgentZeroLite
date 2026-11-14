@@ -18,6 +18,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
     private readonly HttpClient _http;
     private readonly string _model;
     private readonly double? _temperature;
+    private readonly int? _maxTokens;
     private readonly string _keySource;
     private readonly string _keyAdvice;
     private readonly bool _hasKey;
@@ -34,6 +35,9 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         // ("unsupported_value", only the default 1), gpt-4o-mini took it. The model name
         // decides, not the base URL, so OpenRouter's "openai/gpt-5" is covered too.
         _temperature = IsReasoningModel(config.Model) ? null : config.Temperature;
+        // Same rule as temperature: OpenAI reasoning models reject max_tokens (they use
+        // max_completion_tokens), so leave it out for them. 0 means "server default".
+        _maxTokens = IsReasoningModel(config.Model) || config.MaxTokens <= 0 ? null : config.MaxTokens;
 
         _http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: true);
         _http.BaseAddress = new Uri(config.BaseUrl.TrimEnd('/') + "/");
@@ -49,7 +53,22 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", resolved.Value!);
 
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("agent-one");
+
+        // The strong model is asked to think: a design or a redo plan legitimately
+        // reasons far longer than a tool step. Measured (2026-11-07): qwen's redo
+        // plan was cut at 60 000 characters of reasoning, 15 minutes in.
+        if (config.KeySlot == CredentialStore.Slot.Reasoning)
+        {
+            ThinkingLimitChars = ReasoningThinkingLimitChars;
+            ThinkingLimitTime = ReasoningThinkingLimitTime;
+        }
     }
+
+    /// <summary>The strong model's reasoning budget before a reply counts as a runaway.</summary>
+    public const int ReasoningThinkingLimitChars = 240_000;
+
+    /// <summary>The strong model's reasoning time before a reply counts as a runaway.</summary>
+    public static readonly TimeSpan ReasoningThinkingLimitTime = TimeSpan.FromMinutes(40);
 
     /// <summary>OpenAI reasoning models — gpt-5 and later (not the -chat variants) and o1/o3/o4* — take only the default temperature.</summary>
     internal static bool IsReasoningModel(string? model)
@@ -82,6 +101,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             Model = _model,
             Messages = [.. messages],
             Temperature = _temperature,
+            MaxTokens = _maxTokens,
             Stream = false
         };
 
@@ -97,10 +117,16 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         }
         catch (HttpRequestException ex)
         {
-            throw new ChatProviderException($"cannot reach {_http.BaseAddress}chat/completions: {ex.Message}", ex);
+            throw new ChatProviderStalledException($"cannot reach {_http.BaseAddress}chat/completions: {ex.Message}", 0, ex, dropped: true);
         }
 
-        var body = await response.Content.ReadAsStringAsync(ct);
+        string body;
+        try { body = await response.Content.ReadAsStringAsync(ct); }
+        catch (Exception ex) when (ex is IOException or HttpRequestException)
+        {
+            throw new ChatProviderStalledException(
+                $"{_http.BaseAddress}chat/completions: the connection dropped mid-answer: {ex.Message}", 0, ex, dropped: true);
+        }
 
         if (!response.IsSuccessStatusCode)
             throw new ChatProviderException($"HTTP {(int)response.StatusCode} from provider: {Trim(body)}");
@@ -138,6 +164,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             Model = _model,
             Messages = [.. messages],
             Temperature = _temperature,
+            MaxTokens = _maxTokens,
             Stream = true
         };
 
@@ -157,7 +184,7 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         }
         catch (HttpRequestException ex)
         {
-            throw new ChatProviderException($"cannot reach {_http.BaseAddress}chat/completions: {ex.Message}", ex);
+            throw new ChatProviderStalledException($"cannot reach {_http.BaseAddress}chat/completions: {ex.Message}", 0, ex, dropped: true);
         }
 
         using (response)
@@ -169,6 +196,11 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             }
 
             var whole = new System.Text.StringBuilder();
+            var thinkTail = new System.Text.StringBuilder();
+            int thinking = 0, thinkingChecked = 0, contentChecked = 0;
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            ChatProviderStalledException Degenerate(string what, int received) =>
+                new($"{_model} {what} — the call was cut off", received, degenerate: true);
 
             // HttpClient.Timeout stops at the headers when they are read first, so
             // the body has no clock of its own. Measured (2026-09-29): a design
@@ -187,18 +219,59 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
 
                 while (await reader.ReadLineAsync(idle.Token) is { } line)
                 {
-                    idle.CancelAfter(idleLimit);
-
+                    // Reset the idle clock only on a real SSE data frame. A server that
+                    // keeps the socket warm with comment lines (": ping") or blank
+                    // separators while the model produces no token would otherwise reset
+                    // the clock on every keep-alive and never time out — the call then
+                    // hangs forever on a stream that is technically "not silent" but is
+                    // sending nothing. Only forward progress (a data frame) earns more time.
                     if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+
+                    idle.CancelAfter(idleLimit);
 
                     var payload = line[5..].Trim();
                     if (payload.Length == 0 || payload == "[DONE]") continue;
 
-                    var piece = ChunkContent(payload);
+                    var (piece, thought) = ChunkParts(payload);
+
+                    // A thinking model streams its reasoning first, and every such
+                    // frame is forward progress to the idle clock above — so a
+                    // reasoning that never ends never times out. Measured
+                    // (2026-11-07, gemma-4 on LM Studio): one step sat 44 minutes
+                    // on "thinking about what came back" with nothing on screen.
+                    if (thought.Length > 0)
+                    {
+                        thinking += thought.Length;
+                        thinkTail.Append(thought);
+                        if (thinkTail.Length > 8_192) thinkTail.Remove(0, thinkTail.Length - 4_096);
+                        if (whole.Length == 0 && thinking > ThinkingLimitChars)
+                            throw Degenerate($"thought for {thinking:N0} chars without starting an answer", whole.Length);
+                        // A slow server makes a character budget a long wait: measured
+                        // (2026-11-07) gemma at ~15 tok/s sat 34 minutes on one step's
+                        // reasoning, still under the budget. Time bounds it too.
+                        if (whole.Length == 0 && started.Elapsed > ThinkingLimitTime)
+                            throw Degenerate($"thought for {started.Elapsed.TotalMinutes:0} minutes ({thinking:N0} chars) without starting an answer", whole.Length);
+                        if (thinking - thinkingChecked >= 2_000)
+                        {
+                            thinkingChecked = thinking;
+                            if (RepeatingTail(thinkTail) is { } period)
+                                throw Degenerate($"its reasoning went into a loop (a {period}-char cycle)", whole.Length);
+                        }
+                    }
+
                     if (piece.Length == 0) continue;
 
                     whole.Append(piece);
                     onDelta(piece);
+
+                    // The same collapse in the answer itself ("을 아수 을 아수 …"):
+                    // tokens keep flowing, so only the content shows it.
+                    if (whole.Length - contentChecked >= 2_000)
+                    {
+                        contentChecked = whole.Length;
+                        if (RepeatingTail(whole) is { } period)
+                            throw Degenerate($"its answer went into a loop (a {period}-char cycle)", whole.Length);
+                    }
                 }
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -206,6 +279,14 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
                 throw new ChatProviderStalledException(
                     $"{_http.BaseAddress}chat/completions stopped sending for {idleLimit.TotalSeconds:0}s " +
                     $"({whole.Length:N0} chars received)", whole.Length);
+            }
+            catch (Exception ex) when (ex is IOException or HttpRequestException)
+            {
+                // "The response ended prematurely", a reset socket: the request
+                // was fine, the line was not. The same messages may be sent again.
+                throw new ChatProviderStalledException(
+                    $"{_http.BaseAddress}chat/completions: the connection dropped mid-answer " +
+                    $"({whole.Length:N0} chars received): {ex.Message}", whole.Length, ex, dropped: true);
             }
 
             if (whole.Length == 0)
@@ -220,6 +301,48 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
     /// skipped rather than fatal: providers interleave keep-alives and metadata
     /// frames, and losing the run over one of those would be absurd.
     /// </summary>
+    /// <summary>Reasoning past this many characters, with no answer begun, is a runaway — not thinking.</summary>
+    public int ThinkingLimitChars { get; init; } = 60_000;
+
+    /// <summary>Reasoning longer than this, with no answer begun, is a runaway too — the everyday model's step is not a design.</summary>
+    public TimeSpan ThinkingLimitTime { get; init; } = TimeSpan.FromMinutes(12);
+
+    /// <summary>The window a repetition must fill to count as a loop, and the longest cycle looked for.</summary>
+    internal const int LoopWindow = 1_600, LoopMaxPeriod = 256;
+
+    /// <summary>
+    /// The period of a cycle the text's tail is stuck in, or null. Exact
+    /// repetition over 1 600 characters is not prose: a sentence, a table rule
+    /// or a code line repeats a few times, not forty.
+    /// </summary>
+    internal static int? RepeatingTail(System.Text.StringBuilder text)
+    {
+        if (text.Length < LoopWindow + LoopMaxPeriod) return null;
+        var s = text.ToString(text.Length - LoopWindow - LoopMaxPeriod, LoopWindow + LoopMaxPeriod);
+        var tail = s.AsSpan(LoopMaxPeriod);
+        for (var p = 1; p <= LoopMaxPeriod; p++)
+        {
+            if (!tail.SequenceEqual(s.AsSpan(LoopMaxPeriod - p, LoopWindow))) continue;
+            // A run of one character (a long ---- rule, spaces) is layout, not a loop.
+            return tail.ToString().Distinct().Count() <= 2 ? null : p;
+        }
+        return null;
+    }
+
+    /// <summary>The answer text and the reasoning text of one SSE payload; empty when it carries neither.</summary>
+    internal static (string Content, string Reasoning) ChunkParts(string payload)
+    {
+        try
+        {
+            var delta = JsonSerializer.Deserialize(payload, AgentOneWireJson.Default.ChatCompletionChunk)?.Choices?.FirstOrDefault()?.Delta;
+            return (delta?.Content ?? "", delta?.ReasoningContent ?? delta?.Reasoning ?? "");
+        }
+        catch (JsonException)
+        {
+            return ("", "");
+        }
+    }
+
     internal static string ChunkContent(string payload)
     {
         try

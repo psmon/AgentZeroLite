@@ -22,6 +22,19 @@ public class HotkeyTableTests
     }
 
     [Fact]
+    public void Find_is_ctrl_shift_f_never_plain_ctrl_f()
+    {
+        // Plain Ctrl+F is readline's forward-char inside every shell tab; the find chord must not take it.
+        var find = Assert.Single(HotkeyTable.Build(null, isMac: false), h => h.Name == HotkeyTable.TerminalFind);
+        Assert.True(find.Ctrl && find.Shift && !find.Alt && !find.Meta);
+        Assert.Equal("F", find.Key);
+        Assert.Contains(HotkeyTable.Commands, c => c.Id == HotkeyTable.TerminalFind);   // palette + Shortcuts page
+
+        var mac = Assert.Single(HotkeyTable.Build(null, isMac: true), h => h.Name == HotkeyTable.TerminalFind);
+        Assert.True(mac.Meta && mac.Shift && !mac.Ctrl);
+    }
+
+    [Fact]
     public void Mac_turns_ctrl_into_cmd()
     {
         var table = HotkeyTable.Build(null, isMac: true);

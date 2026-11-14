@@ -85,6 +85,9 @@
                         <Button Classes="bar" Content="{Binding PreviewToggleLabel}" IsVisible="{Binding IsMarkdown}"
                                 Command="{Binding TogglePreviewCommand}"
                                 ToolTip.Tip="Markdown: switch between the rendered view (with mermaid diagrams) and the source" />
+                        <Button Classes="bar" Content="{Binding ImageFitLabel}" IsVisible="{Binding IsImage}"
+                                Command="{Binding ToggleImageFitCommand}"
+                                ToolTip.Tip="Image: fit to the pane, or actual size with scroll bars (double-click the image does the same)" />
                         <Button x:Name="CopyPathButton" Classes="bar" Content="⧉ path" ToolTip.Tip="Copy the path — relative to the workspace or absolute" />
                         <Button x:Name="OpenExternalButton" Classes="bar" Content="↗ open" ToolTip.Tip="{Binding OpenButtonTip}" />
                     </StackPanel>
@@ -135,8 +138,13 @@
                         </ItemsControl>
                     </ScrollViewer>
                 </DockPanel>
-                <ScrollViewer IsVisible="{Binding IsImage}" HorizontalScrollBarVisibility="Auto">
-                    <Image x:Name="Picture" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" />
+                <!-- Fit (default): scroll bars off so the image is measured against the pane and
+                     shrunk to it (DownOnly — a small icon stays its size). 1:1: scroll bars on,
+                     no stretch. Set from code (ApplyImageFit) when ImageFit changes. -->
+                <ScrollViewer x:Name="PictureScroll" IsVisible="{Binding IsImage}"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+                    <Image x:Name="Picture" Stretch="Uniform" StretchDirection="DownOnly"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10" />
                 </ScrollViewer>
             </Panel>
         </DockPanel>

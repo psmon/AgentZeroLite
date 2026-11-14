@@ -11,13 +11,33 @@ namespace AgentOne.Tools;
 /// never writable, whatever is asked. The root is the only place a file is
 /// ever created or changed.
 ///
+/// The search also covers what Claude Code would load here
+/// (<see cref="ClaudeSkillScope"/>): the project's <c>.claude</c> definitions,
+/// the user's skills and the enabled plugins' install folders. Those are
+/// readable, and a search of the whole workspace walks them — and the
+/// workspace paths they name — before everything else.
+///
 /// Every path the model supplies is resolved and rejected if it lands outside
 /// — symlinks included, because the containment check is made on the fully
 /// resolved real path.
 /// </summary>
-public sealed class LocalFileToolbelt(string root) : IToolbelt
+public sealed class LocalFileToolbelt : IToolbelt
 {
     public const int MaxWriteChars = 512 * 1024;
+    public const int MaxListedSkills = 30;
+
+    private readonly Lazy<ClaudeSkillScope> _skills;
+
+    /// <param name="root">The workspace root.</param>
+    /// <param name="skills">The Claude skills to search; null detects them from disk on first use.</param>
+    public LocalFileToolbelt(string root, ClaudeSkillScope? skills = null)
+    {
+        Root = Path.GetFullPath(root);
+        _skills = new Lazy<ClaudeSkillScope>(() => skills ?? ClaudeSkillScope.Detect(Root));
+    }
+
+    /// <summary>The Claude skills, commands, agents and plugins found for this workspace.</summary>
+    public ClaudeSkillScope Skills => _skills.Value;
 
     private readonly List<string> _readGrants = [];
 
@@ -43,7 +63,7 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
     public const int MaxGrepLineChars = 200;
     public const int MaxGrepFileBytes = 2 * 1024 * 1024;
 
-    public string Root { get; } = Path.GetFullPath(root);
+    public string Root { get; }
 
     public string Scope => Root;
 
@@ -88,6 +108,8 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
 
         if (count == 0) sb.Append("  (empty)\n");
         else if (count > MaxListEntries) sb.Append($"  ... truncated at {MaxListEntries} entries\n");
+
+        if (full.Equals(Root, PathComparison)) AppendSkills(sb);
 
         return ToolResult.Success(sb.ToString().TrimEnd('\n'));
     }
@@ -142,13 +164,13 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         if (!TryResolve(relative, out var full, out var error)) return ToolResult.Failure(error);
         if (!Directory.Exists(full)) return ToolResult.Failure($"not a directory: {Display(full)}");
 
-        var matches = Walk(full)
+        var matches = SearchFiles(full)
             .Where(f => FileSystemName.MatchesSimpleExpression(pattern, Path.GetFileName(f), ignoreCase: true))
             .Take(MaxFindResults + 1)
             .ToList();
 
         if (matches.Count == 0)
-            return ToolResult.Success($"no files matching '{pattern}' under {Display(full)}");
+            return ToolResult.Success($"no files matching '{pattern}' under {Display(full)}{SkillsNote(full)}");
 
         var sb = new StringBuilder();
         sb.Append(Math.Min(matches.Count, MaxFindResults)).Append(" file(s) matching '")
@@ -159,7 +181,7 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
 
         if (matches.Count > MaxFindResults) sb.Append($"  … truncated at {MaxFindResults}\n");
 
-        return ToolResult.Success(sb.ToString().TrimEnd('\n'));
+        return ToolResult.Success(sb.ToString().TrimEnd('\n') + SkillsNote(full));
     }
 
     /// <summary>
@@ -173,7 +195,7 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         if (!TryResolve(relative, out var full, out var error)) return ToolResult.Failure(error);
 
         var files = Directory.Exists(full)
-            ? Walk(full).Where(f => FileSystemName.MatchesSimpleExpression(glob, Path.GetFileName(f), ignoreCase: true))
+            ? SearchFiles(full).Where(f => FileSystemName.MatchesSimpleExpression(glob, Path.GetFileName(f), ignoreCase: true))
             : File.Exists(full) ? [full] : Enumerable.Empty<string>();
 
         var sb = new StringBuilder();
@@ -198,13 +220,80 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         }
 
         if (hits == 0)
-            return ToolResult.Success($"'{needle}' not found in {scanned} file(s) under {Display(full)}");
+            return ToolResult.Success($"'{needle}' not found in {scanned} file(s) under {Display(full)}{SkillsNote(full)}");
 
         var header = hits >= MaxGrepHits
             ? $"first {hits} matches for '{needle}' (more may exist):\n"
             : $"{hits} match(es) for '{needle}':\n";
 
-        return ToolResult.Success(header + sb.ToString().TrimEnd('\n'));
+        return ToolResult.Success(header + sb.ToString().TrimEnd('\n') + SkillsNote(full));
+    }
+
+    /// <summary>
+    /// The files a search of <paramref name="full"/> looks at. A search of the
+    /// whole workspace walks the Claude skill folders first, then the workspace
+    /// paths those skills name, then everything else — each file once — so under
+    /// a hit cap the guidance a skill relies on is not crowded out by logs.
+    /// A search of a subfolder is that subfolder only.
+    /// </summary>
+    private IEnumerable<string> SearchFiles(string full)
+    {
+        if (!full.Equals(Root, PathComparison) || Skills.IsEmpty)
+        {
+            foreach (var file in Walk(full)) yield return file;
+            yield break;
+        }
+
+        var seen = new HashSet<string>(GrantComparer);
+        foreach (var file in SkillsFirst())
+            if (seen.Add(file)) yield return file;
+    }
+
+    private IEnumerable<string> SkillsFirst()
+    {
+        foreach (var source in Skills.Sources)
+            foreach (var file in Walk(source.Directory)) yield return file;
+
+        foreach (var linked in Skills.LinkedPaths)
+        {
+            if (File.Exists(linked)) yield return linked;
+            else foreach (var file in Walk(linked)) yield return file;
+        }
+
+        foreach (var file in Walk(Root)) yield return file;
+    }
+
+    /// <summary>Footer of a whole-workspace search saying the skills were included, so a miss is not read as "there are none".</summary>
+    private string SkillsNote(string full) =>
+        full.Equals(Root, PathComparison) && !Skills.IsEmpty
+            ? $"\n(searched Claude skills first: {Skills.Summary()} — list_files . names them)"
+            : "";
+
+    /// <summary>The Claude skills found for this workspace, under the root's listing.</summary>
+    private void AppendSkills(StringBuilder sb)
+    {
+        if (Skills.IsEmpty) return;
+
+        if (Skills.Skills.Count > 0)
+        {
+            sb.Append("\nClaude skills for this workspace (find_files/grep search them; read_file opens them):\n");
+            foreach (var skill in Skills.Skills.Take(MaxListedSkills))
+            {
+                sb.Append("  ").Append(skill.Name);
+                if (skill.Kind != SkillKind.Skill) sb.Append(" [").Append(skill.Kind.ToString().ToLowerInvariant()).Append(']');
+                if (skill.Origin.Kind == SkillOriginKind.Plugin) sb.Append(" [plugin ").Append(skill.Origin.Label).Append(']');
+                else if (skill.Origin.Kind == SkillOriginKind.User) sb.Append(" [user]");
+                if (skill.Description.Length > 0) sb.Append(" — ").Append(skill.Description);
+                sb.Append("\n    ").Append(Display(skill.Path)).Append('\n');
+            }
+            if (Skills.Skills.Count > MaxListedSkills)
+                sb.Append($"  … {Skills.Skills.Count - MaxListedSkills} more\n");
+        }
+
+        if (Skills.LinkedPaths.Count > 0)
+            sb.Append("Workspace paths the skills point to: ")
+              .Append(string.Join(", ", Skills.LinkedPaths.Select(Display)))
+              .Append('\n');
     }
 
     /// <summary>Every file under a directory, minus the folders nobody wants searched.</summary>
@@ -226,7 +315,7 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
             try
             {
                 foreach (var sub in Directory.GetDirectories(dir).OrderBy(d => d, StringComparer.Ordinal))
-                    if (!IsExcluded(Path.GetFileName(sub)))
+                    if (!IsExcluded(Path.GetFileName(sub)) && !IsClaudeNoise(dir, sub) && !IsEngineCache(dir, sub))
                         stack.Push(sub);
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException) { /* skip */ }
@@ -251,10 +340,31 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
         }
     }
 
-    /// <summary>Directories that are noise for an agent and expensive to walk.</summary>
+    /// <summary>
+    /// Directories that are noise for an agent and expensive to walk. A
+    /// dot-folder is noise except <c>.claude</c>: that is where a project keeps
+    /// its skills, commands and agents — skipping it hid every one of them.
+    /// </summary>
     private static bool IsExcluded(string name) =>
-        name.StartsWith('.') ||
+        (name.StartsWith('.') && !name.Equals(".claude", StringComparison.OrdinalIgnoreCase)) ||
         name is "bin" or "obj" or "node_modules" or "dist" or "build" or "__pycache__";
+
+    /// <summary>
+    /// A Unity project's generated folders (beside its <c>Assets</c> and
+    /// <c>ProjectSettings</c>): the import cache alone is gigabytes of binary.
+    /// Measured (2026-11-07, music-harness with three Unity projects): one
+    /// whole-workspace grep took 223 s. Named only where a Unity project is, so
+    /// a folder called Library anywhere else is still searched.
+    /// </summary>
+    internal static bool IsEngineCache(string parent, string sub) =>
+        Path.GetFileName(sub) is "Library" or "Temp" or "Logs" or "UserSettings"
+        && Directory.Exists(Path.Combine(parent, "Assets"))
+        && Directory.Exists(Path.Combine(parent, "ProjectSettings"));
+
+    /// <summary>What Claude Code keeps under .claude that is not a definition: worktree checkouts, transcripts, history.</summary>
+    private static bool IsClaudeNoise(string parent, string sub) =>
+        Path.GetFileName(parent).Equals(".claude", StringComparison.OrdinalIgnoreCase) &&
+        Path.GetFileName(sub) is "worktrees" or "projects" or "file-history" or "shell-snapshots" or "todos" or "logs";
 
     private bool TryResolve(string relative, out string full, out string error, bool forWrite = false)
     {
@@ -277,13 +387,16 @@ public sealed class LocalFileToolbelt(string root) : IToolbelt
             {
                 // Reading a granted folder is fine; writing there never is. The
                 // message says which, so the model does not try a workaround.
-                if (!forWrite && _readGrants.Any(g => IsInside(real, g)))
+                // A detected skill's own folder (a plugin install, the user's
+                // skills) reads the same way: a skill's references sit beside it.
+                var readable = _readGrants.Any(g => IsInside(real, g)) || Skills.ReadRoots.Any(g => IsInside(real, g));
+                if (!forWrite && readable)
                 {
                     full = real;
                     return true;
                 }
 
-                error = forWrite && _readGrants.Any(g => IsInside(real, g))
+                error = forWrite && readable
                     ? $"{relative} is outside the workspace root and read-only: files are only ever written under {Root}"
                     : $"path escapes the workspace root ({Root}): {relative}";
                 return false;

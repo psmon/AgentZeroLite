@@ -4,10 +4,20 @@ using Agent.Common.Platform;
 namespace Agent.Common.Agents;
 
 /// <summary>Why a terminal is asking for the user.</summary>
-public enum AttentionKind { Blocked, Done }
+public enum AttentionKind
+{
+    Blocked,
+    Done,
 
-/// <summary>One "this agent needs you" moment, raised on the transition into it.</summary>
-public sealed record AttentionAlert(int Group, int Tab, string Title, AttentionKind Kind);
+    /// <summary>The program in the tab sent a notification itself (OSC 9 / 777 / 99).</summary>
+    Notify,
+}
+
+/// <summary>
+/// One "this agent needs you" moment, raised on the transition into it. <paramref name="Message"/>
+/// is the program's own text for <see cref="AttentionKind.Notify"/>, null otherwise.
+/// </summary>
+public sealed record AttentionAlert(int Group, int Tab, string Title, AttentionKind Kind, string? Message = null);
 
 /// <summary>
 /// What the user wants to hear about when an agent starts needing them (herdr H2 — "never hunt
@@ -23,6 +33,12 @@ public sealed class AttentionSettings
 
     /// <summary>An agent finished a turn the user has not looked at.</summary>
     public bool OnDone { get; set; } = true;
+
+    /// <summary>
+    /// A program in a tab asked for a notification (OSC 9 / 777 / 99) — how agents AgentZero
+    /// cannot read the state of (Gemini CLI, OpenCode, a build script) still reach the user.
+    /// </summary>
+    public bool OnNotify { get; set; } = true;
 
     /// <summary>
     /// Stay quiet while the app's window is the active one — the sidebar already shows it.
@@ -47,6 +63,7 @@ public sealed class AttentionSettings
     {
         AttentionKind.Blocked => OnBlocked,
         AttentionKind.Done => OnDone,
+        AttentionKind.Notify => OnNotify,
         _ => false,
     };
 }
@@ -132,6 +149,33 @@ public sealed class AttentionNotifier
 
         _primed = true;
         return alerts;
+    }
+
+    /// <summary>
+    /// The same message from the same terminal again within this window is one alert: agents
+    /// re-send on every redraw of a waiting prompt, and a loop printing BELs must not spam.
+    /// </summary>
+    public static readonly TimeSpan NotifyRepeatWindow = TimeSpan.FromSeconds(10);
+
+    private readonly Dictionary<string, DateTime> _lastNotify = new();
+
+    /// <summary>
+    /// A program-sent notification (<see cref="TerminalNotification"/>): announced at once — it
+    /// is an event, not a state the next pass would see — under the same switches as the rest
+    /// (master, <see cref="AttentionSettings.OnNotify"/>, only-when-inactive), deduplicated per
+    /// terminal and text for <see cref="NotifyRepeatWindow"/>.
+    /// </summary>
+    public AttentionAlert? ObserveNotification(int group, int tab, string title, TerminalNotification note,
+        AttentionSettings settings, bool appActive, DateTime nowUtc)
+    {
+        if (!settings.Wants(AttentionKind.Notify) || (settings.OnlyWhenInactive && appActive)) return null;
+        var key = $"{group}:{tab}:{title}|{note.Text}";
+        if (_lastNotify.TryGetValue(key, out var last) && nowUtc - last < NotifyRepeatWindow) return null;
+        _lastNotify[key] = nowUtc;
+        if (_lastNotify.Count > 256)
+            foreach (var stale in _lastNotify.Where(kv => nowUtc - kv.Value >= NotifyRepeatWindow).Select(kv => kv.Key).ToList())
+                _lastNotify.Remove(stale);
+        return new AttentionAlert(group, tab, title, AttentionKind.Notify, note.Text);
     }
 
     private static string KeyOf(TerminalAgentState s) => $"{s.Group}:{s.Tab}:{s.Title}";

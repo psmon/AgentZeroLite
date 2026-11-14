@@ -1,4 +1,5 @@
-﻿using Agent.Common.Data;
+﻿using Agent.Common.Agents;
+using Agent.Common.Data;
 using Agent.Common.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,7 +40,8 @@ public sealed record CliTabSnapshot(
     string? SshAuthMethod = null,
     string? SshKeyPath = null,
     string? EncryptedPassword = null,
-    bool ReducedMotion = false);
+    bool ReducedMotion = false,
+    string? AgentSessions = null);
 
 public sealed record CliGroupSnapshot(
     string DirectoryPath,
@@ -126,9 +128,29 @@ public static class CliWorkspacePersistence
         db.SaveChanges();
     }
 
+    /// <summary>
+    /// Replaces the stored workspaces and tabs with <paramref name="groups"/> — all of it or none.
+    /// </summary>
+    /// <remarks>
+    /// The delete and the inserts run in one transaction. Measured (2026-11-09): the delete was
+    /// its own committed SaveChanges, a CLI process held the database for a moment, the next
+    /// insert failed with "SQLite Error 5: database is locked", and the profile came back with
+    /// no workspaces at all — ten workspaces and fourteen tabs gone. A failed save now leaves the
+    /// previous rows exactly as they were.
+    /// </remarks>
     public static void SaveCliGroups(IReadOnlyList<ICliGroupInfo> groups)
     {
         using var db = new AppDbContext();
+        using var transaction = db.Database.BeginTransaction();
+
+        // A host whose tabs keep no session memory (IAgentSessionMemory) must not erase the one
+        // another host recorded: its tab keeps the stored value while it is still the same tab
+        // (same workspace, position, title and definition).
+        var previous = db.CliTabs
+            .Where(tab => tab.AgentSessions != null)
+            .Select(tab => new { tab.Group.DirectoryPath, tab.SortOrder, tab.Title, tab.CliDefinitionId, tab.AgentSessions })
+            .ToList();
+
         db.CliTabs.RemoveRange(db.CliTabs);
         db.CliGroups.RemoveRange(db.CliGroups);
         db.SaveChanges();
@@ -151,17 +173,25 @@ public static class CliWorkspacePersistence
             for (int tabIndex = 0; tabIndex < group.TabsView.Count; tabIndex++)
             {
                 var tab = group.TabsView[tabIndex];
+                var definitionId = tab.CliDefinitionId > 0 ? tab.CliDefinitionId : 1;
+                var sessions = tab is IAgentSessionMemory memory
+                    ? memory.AgentSessions
+                    : previous.FirstOrDefault(p => p.SortOrder == tabIndex && p.Title == tab.Title
+                        && p.CliDefinitionId == definitionId
+                        && string.Equals(p.DirectoryPath, group.DirectoryPath, StringComparison.OrdinalIgnoreCase))?.AgentSessions;
                 db.CliTabs.Add(new CliTab
                 {
                     GroupId = dbGroup.Id,
                     Title = tab.Title,
-                    CliDefinitionId = tab.CliDefinitionId > 0 ? tab.CliDefinitionId : 1,
+                    CliDefinitionId = definitionId,
                     SortOrder = tabIndex,
+                    AgentSessions = sessions,
                 });
             }
         }
 
         db.SaveChanges();
+        transaction.Commit();
     }
 
     public static IReadOnlyList<CliGroupSnapshot> LoadCliGroups()
@@ -187,7 +217,8 @@ public static class CliWorkspacePersistence
                         tab.CliDefinition.SshAuthMethod,
                         tab.CliDefinition.SshKeyPath,
                         tab.CliDefinition.EncryptedPassword,
-                        tab.CliDefinition.ReducedMotion))
+                        tab.CliDefinition.ReducedMotion,
+                        tab.AgentSessions))
                     .ToList(),
                 group.ActiveTabIndex,
                 group.LayoutJson))

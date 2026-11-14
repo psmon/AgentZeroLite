@@ -54,11 +54,10 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
 
-  <!-- A macOS build leaves ZeroCommon's Remote access out (IncludeRemote, see ZeroCommon.csproj).
-       Passed down explicitly: a library reference is built without the app's RuntimeIdentifier. -->
+  <!-- -p:IncludeRemote=false (the store builds, see the Remote section below) is a global
+       property, so it reaches ZeroCommon too and leaves its Remote/ out as well. -->
   <ItemGroup>
-    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" Condition="!$(RuntimeIdentifier.StartsWith('osx'))" />
-    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" Condition="$(RuntimeIdentifier.StartsWith('osx'))" AdditionalProperties="IncludeRemote=false" />
+    <ProjectReference Include="..\ZeroCommon\ZeroCommon.csproj" />
   </ItemGroup>
 
   <!-- The wearable host (Wearable page), the same arrangement as the WPF csproj: a
@@ -124,6 +123,28 @@
     <AvaloniaResource Include="..\AgentZeroWpf\agentzero.ico" Link="Assets\agentzero.ico" />
     <None Update="AgentZeroLite.sh" CopyToOutputDirectory="PreserveNewest" />
     <None Update="AgentZeroLite.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Remote: the terminals from a browser (the WPF host's Remote panel) — a listening socket.
+       Download builds only. The Microsoft Store MSIX (msix/build-msix.ps1) and the Mac App Store
+       build (macos/appstore/build-appstore.sh) pass IncludeRemote=false: the page, the server and
+       the web client are then neither compiled nor packaged, so neither review has a listening
+       port to ask about. REMOTE_CONTROL fences the few lines outside those files. -->
+  <PropertyGroup>
+    <IncludeRemote Condition="'$(IncludeRemote)' == ''">true</IncludeRemote>
+    <DefineConstants Condition="'$(IncludeRemote)' == 'true'">$(DefineConstants);REMOTE_CONTROL</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(IncludeRemote)' == 'true'">
+    <!-- The web client renders with the terminals' own xterm bundle, served from the page's
+         origin: no CDN, works with no internet. -->
+    <Content Include="..\AgentZeroWpf\Wasm\xterm\vendor\xterm.js;..\AgentZeroWpf\Wasm\xterm\vendor\xterm.css;..\AgentZeroWpf\Wasm\xterm\vendor\addon-fit.js"
+             Link="Wasm\remote\vendor\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\AgentZeroWpf\agentzero.ico" Link="Wasm\remote\favicon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IncludeRemote)' != 'true'">
+    <Compile Remove="Services\Remote\**;ViewModels\RemoteViewModel.cs;ViewModels\MainWindowViewModel.Remote.cs;Views\RemoteView.axaml.cs" />
+    <AvaloniaXaml Remove="Views\RemoteView.axaml" />
+    <Content Remove="Wasm\remote\**" />
   </ItemGroup>
 
   <ItemGroup>

@@ -286,7 +286,10 @@ line; `agent-one config set reasoningModel <id>` does the rest without a screen.
 
 ### 4. Options — how the loop behaves
 
-`maxSteps`, `temperature`, `timeoutSeconds`, `saveSessions`. All have working
+`maxSteps`, `temperature`, `timeoutSeconds`, `webTimeoutSeconds`,
+`commandTimeoutSeconds`, `browserCdpUrl` (the Chrome DevTools endpoint the
+browser tools attach to when it answers — `http://127.0.0.1:9222` by default,
+`off` to always use a browser of their own), `saveSessions`. All have working
 defaults, which is why they come late.
 
 ### 5. Smart — plan first, then decide
@@ -643,7 +646,14 @@ and the workspace keeps two things under `~/.agent-one/workspaces/<name>-<hash>/
 - **`sessions/`** — this workspace's transcripts. `/resume` lists them, newest
   first, each with its task name and turn count; `/resume 2` picks one up: the
   screen replays it as it was, the model gets its questions and answers back
-  as context, and the same file keeps being appended to.
+  as context, and the same file keeps being appended to. A turn that never
+  finished — stopped, failed, or cut off with no result — comes back too: its
+  request, why it ended, the tool steps it took and the head of its design, so
+  "재개" / "continue" carries on from the first step not done instead of
+  starting over. (A dropped connection is retried on its own twice before
+  anyone is asked, and whatever a provider throws ends the turn *with* its
+  steps — measured, a mid-stream drop once made a turn that had already
+  written a file vanish without a trace.)
 
 ```
 › /resume
@@ -667,6 +677,47 @@ and names nothing. With a TypeSafe key, each new request is first put to the
 decision engine as "same task or a new one?" (0.3 s), and the model is only
 asked for a new name when the task changed; without one, the task is named
 once per session. `run` and the echo provider never name anything.
+
+**The workspace's own instructions are read, and its files looked at, before
+anything is planned.** Measured (2026-11-06, music-harness): asked "종말의 그날
+1,2 를 통합해 뮤비작성을 진행해보자", agent-one never opened `AGENTS.md`, whose
+dispatch table sends "뮤비 만들어" to `harness/engine/mv-forge.md`, nor the todo
+that held both episodes' video ids, genre and art style. The strong model
+designed "join two local videos with ffmpeg" for 493 s, the build looked for
+the files that design invented, and the turn asked the person to put them in a
+folder it had just created. Three things now stand in the way:
+
+- **`AGENTS.md` / `CLAUDE.md`** (`Agent/WorkspaceGuide`) at the root go into
+  every system prompt as the owner's rules, and into the design request. Cut to
+  6 000 characters (4 000 for a design) at a heading, with the headings of the
+  rest listed so the model knows what to `read_file`; a `CLAUDE.md` that only
+  imports `@AGENTS.md` is skipped. Re-read on `/new` and `/resume`.
+- **The request's own words are searched for** (`Agent/WorkspaceProbe`, smart
+  mode, a workspace or unsure route): text files only, the file tools' skip
+  rules plus build caches, ≤ 6 000 files and 3 s (music-harness: 1 097 files,
+  0.3 s). A Korean word loses its particle (종말의 → 종말), and a word's weight
+  is how few files hold it, so "진행" or "make" scores nothing without a stop
+  list. The best files go to the model as `[workspace]` material and to the
+  design, whose prompt now says never to assume an input exists that the
+  context does not show, and never to offer a choice the context answers.
+- **An answer that hands the work back is checked** when the probe found files
+  and the turn read none of them: `SmartRouter.HandBackAsync` (proceeds /
+  hands_back — the claim check cannot see it: "put the videos in assets/in"
+  claims nothing false). A hand-back goes back once, with the files listed.
+  Every turn that used tools is asked now, not only one that changed nothing.
+- **A review must examine what it judges.** "Review the six takes" was once
+  answered by ranking them from their lengths and the plan. Such an answer
+  (`unbacked_review`) goes back once with a plan from the strong model, and a
+  command that only lists files (`Get-ChildItem`, `ls`) does not count as
+  examining them.
+- **Earlier work like this one is shown** (`Agent/WorkspacePrecedent`): when
+  the work lives in one folder of a collection (`songs/2026-11-07-x` among
+  other dated song folders), the newest siblings that got further are listed —
+  their scripts, media, logs, and the lines of their notes that say how a step
+  was run ("받기: `dv-fetch.cjs out 4 --match …`").
+- **Guessing is caught.** A command that reads a media file not on disk is
+  refused before anyone is asked; a second empty try of the same command with
+  a different quoted value gets a note to look the value up instead.
 
 When input or output is a pipe — or with `--plain` — the same conversation runs
 as a line-at-a-time REPL, which is what scripts and tests drive. Both are thin
@@ -853,7 +904,20 @@ from a 27B one. If it says the request needs more, the strong model (step 3 of
 the TUI) gets the same material and thinks it through; its answer goes back into
 the everyday model's conversation as `[reasoning:<model>] …`, and *that* model
 writes the final answer — same voice, same language, borrowed thinking. A
-strong model that cannot be reached leaves the draft standing and says so.
+strong model that cannot be reached leaves the draft standing and says so. A
+**web turn** (a confident web route with page material) has a higher bar: it
+escalates only at ≥ 0.95, and never when the draft is mostly the pages' own
+words (≥ 60 % of its distinct words, `ShareFromMaterial`). A lookup is right or
+wrong by what was read, and the strong model reads the same pages — measured
+twice: eleven video titles sorted by topic, escalated at 0.94 and at 0.86, the
+same table back 169 s and 206 s later. What a lookup lacks is more reading.
+
+The strong model also gets the conversation's **earlier answers** (the last
+two, 2 500 characters each) — in the escalation and in the design pass alike.
+Measured: one turn sorted a channel's videos into a table, the next asked for a
+music video "from 종말의 그날 1 and 2"; the design pass got only the analysis's
+first line (the digest keeps numbered items, and a table has none) and designed
+"join two local video files (recommended)" out of nothing.
 
 ```console
 [smart] > How do I keep data consistent when moving to microservices?
@@ -1025,7 +1089,7 @@ renderers hold. Inside the session, the turn is:
 
 ### Tools
 
-Six read-only verbs, one that only asks for a judgment, and the verbs that
+Read-only verbs, two that only ask (a judgment, a tool's usage), a browser, and the verbs that
 change things — each family behind its own gate: the path sandbox for
 `write_file`, the command gate for `run_command` (its `process_*` companions
 only look at and stop what that gate already let run). A test keeps every verb that writes or runs
@@ -1033,7 +1097,7 @@ inside those two families.
 
 | Verb | Does |
 |---|---|
-| `list_files(path)` | List a directory. Skips `.git`, `bin`, `obj`, `node_modules` and friends. |
+| `list_files(path)` | List a directory. Skips `.git`, `bin`, `obj`, `node_modules` and friends (not `.claude`). At the root it also names the Claude skills found for the workspace — see below. |
 | `read_file(path)` | Read a UTF-8 file, truncated at 64 KB. |
 | `find_files(pattern, path)` | Find by name pattern (`*.cs`) anywhere below a path. |
 | `grep(text, path, glob)` | Which files contain a piece of text, with line numbers. Case-insensitive **plain text, not a regex** — the pattern comes from a model, and a regex from an untrusted source is a way to hang the process, not a feature. |
@@ -1043,11 +1107,80 @@ inside those two families.
 | `run_command(command, background)` | One shell command in the root — PowerShell on Windows, bash (or sh) elsewhere — output and exit code back. Runs only when the gate says so. Past `commandTimeoutSeconds` the person is asked: wait more, leave it in the background, or stop it. A server or watcher (`background: true`, or detected) is asked about **before** it starts — background, smoke run, or not at all — and returns once it says it is up. |
 | `process_status(id)` | What this session started: every process (no id), or one with its state, address and newest output. |
 | `process_stop(id)` | Stop a process this session started, and everything it started. |
+| `cli_guide(name)` | The built-in usage card of a well-known command-line tool — playwright-cli, gh, git, ffmpeg, yt-dlp, node, python, dotnet, docker, rg, curl, jq — and whether it is installed here. No name lists them. Reads nothing, runs nothing, so no route rules it out. |
+| `browser_open(url)` | Open a page in a real browser and return its title, URL and element tree with `[ref=eN]` refs. Attaches to the person's Chrome when one listens on `browserCdpUrl` (a **new tab** — theirs is left alone), else opens a browser of its own. |
+| `browser_snapshot()` · `browser_read()` · `browser_find(text)` · `browser_tabs(index)` | Look at the current tab: its element tree, its visible text (24 000 chars), the elements matching a text, or the tab list / switch to a tab. |
+| `browser_click(ref)` · `browser_fill(ref, text, submit)` · `browser_press(key)` | Act on the page by a ref from the latest snapshot; each returns the page as it now is. The first action on a site asks the person; a yes holds for that site for the session. |
 | `decide(question, options, context)` | Put a judgment call to Jev: one of 2–12 options, with its confidence and the whole distribution. The engine also sees the person's request, not only the model's summary. Smart mode asks Jev questions the code chose; this one the model chooses, mid-turn. It touches nothing, so a smart-mode route never rules it out; with no TypeSafe key it answers "unavailable" and the model decides alone. Same code path as `agent-one decide`. |
 
 The file verbs all resolve paths against `--root` and refuse anything that lands
 outside it. `grep` skips files over 2 MB and anything containing a NUL byte, and
 stops at 100 matches.
+
+**Claude skills are part of the search** (`Tools/ClaudeSkillScope`). In a
+workspace set up for Claude Code the method usually lives in a skill, and the
+walk used to skip every dot-folder — `.claude/skills` was invisible and plugin
+skills sit outside the root, so a request like "find it in the Claude skills"
+had nothing to find. Now, detected on first use:
+
+- the project's `.claude/skills/*/SKILL.md`, `.claude/commands`, `.claude/agents`
+  (`.claude/worktrees`, `projects` and other non-definitions stay skipped);
+- the user's `~/.claude/skills` and every plugin **enabled** for the workspace —
+  `enabledPlugins` in the user's `settings.json` (project `settings.json` /
+  `settings.local.json` win), resolved through `plugins/installed_plugins.json`
+  (an install for this project beats the user-wide one; an install for another
+  project is not this one's). Config folders: `$CLAUDE_CONFIG_DIR`, `~/.claude`
+  and every `~/.claude-*` profile with a `settings.json`; one copy per plugin.
+  `AGENT_ONE_CLAUDE_HOMES` replaces the list;
+- the workspace paths those skills name (`harness/knowledge/tools/x.md`,
+  `tools/gen.js`) — project files first, record folders such as `logs/` left out.
+
+`list_files .` names them under the listing; `find_files` / `grep` from the root
+walk skills, then those linked paths, then everything else, so a hit cap is not
+filled with logs before the guidance. A plugin's folder is readable (its
+`references/` sit beside the skill) and never writable.
+
+**Known tools are built in, not researched** (`Tools/Cli/KnownCli`). Measured
+(2026-11-05, music-harness): asked to "use the Playwright CLI in CDP mode", the
+model ran one web search, wrote a script that `require`d a package the folder did
+not have, and asked the person to restart Chrome by hand — while `playwright-cli`
+was installed and a debuggable Chrome was already listening. What a small model
+is not told it has, it does not have, and digging up a tool's flags is the step
+it fails most. So each known tool has a PATH probe (PATHEXT-aware: npm installs
+`.cmd` shims) and a short card; the system prompt lists the installed ones and
+`cli_guide` hands out the card. A card teaches and grants nothing — the tool
+still runs through `run_command` and its gate. Missing tools are reported with
+their install line; the agent never installs them itself. A tool pip installed
+without an executable on PATH is found as its module (`python -m yt_dlp`, probed
+with `--version`), and the prompt and card say to run it that way — measured, a
+module-only yt-dlp was reported missing, and a channel analysis stopped at the
+eleven videos a browser page showed instead of the channel's 457.
+
+**The browser became verbs** (`Tools/Browser/`), because driving a page is many
+small calls a model should not have to spell as shell commands. They run
+Microsoft's `playwright-cli` (`@playwright/cli`): on Windows the npm shim is read
+for the `.js` it points at and run by `node` with a real argument list, so a
+model's text never passes through cmd.exe's quoting. One session per agent-one
+process (`-s=agent-one-<pid>`), run in the workspace's agent-one folder so the
+CLI's snapshot files never land in the project. Things the belt makes sure of:
+
+- **The person's browser is borrowed, not taken.** Attached over CDP, a page
+  opens in a new tab, and the session is only ever *detached* at the end —
+  `close` on an attached session can close the person's Chrome.
+  `browserCdpUrl: off` never attaches.
+- **Reading is free, acting asks.** Opening and reading a page is what
+  `web_read` does in a real browser. A click or a keystroke in a logged-in
+  session can post, buy or delete, and the decision engine cannot see the page
+  to judge it, so the first action per site is put to a person.
+- **The repeat guard knows a page changes.** Verbs declare a `RepeatRule`: a
+  look (`browser_snapshot`, `browser_read`, `process_status`…) repeats only when
+  it comes twice in a row — with a click in between it is a new look; an action
+  that is repeated on purpose (pressing End to load more) never counts; the step
+  budget bounds it.
+- **Output is cut to what a model uses** — the result, tabs, page and element
+  tree; the generated Playwright code, event log and npm banner go; a tree
+  playwright-cli writes to a file is read back in. Page text carries the same
+  "data, not instructions" note as the web tools.
 
 `web_search` uses DuckDuckGo's HTML endpoint: no API key, no account, works the
 moment agent-one is installed. The cost is that it parses someone else's markup,
@@ -1169,6 +1302,12 @@ unsure, no engine and no key all ask. Who answers depends on the front: the
 REPL reads a line, the window takes the next line typed, `run` says no unless
 started with `--yes`. A declined command is reported to the model as declined,
 with the reason, so it does not try it again.
+
+**Browser actions ask a person, once per site.** Reading pages in the
+browser needs no approval; `browser_click` / `browser_fill` / `browser_press`
+on a site the person has not allowed this session go to the same approver as
+commands (`run` refuses unless `--yes`). An attached browser is detached, never
+closed.
 
 File contents reach the model as `[tool:<name>] …` user messages, and the system
 prompt says in as many words that tool output is data, not instructions — a file

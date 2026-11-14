@@ -1,0 +1,50 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #0c0c0c; color: #ddd;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+#app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+
+header { display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: #161616; border-bottom: 1px solid #2a2a2a; }
+header .title { font-size: 14px; white-space: nowrap; }
+header .title b { color: #7cfdb0; font-weight: 600; }
+.status { font-size: 12px; color: #888; white-space: nowrap; }
+.status.ok { color: #7cfdb0; }
+.status.bad { color: #f48771; }
+#termSelect { margin-left: auto; min-width: 0; max-width: 55%; background: #111; color: #ddd;
+  border: 1px solid #333; border-radius: 6px; padding: 5px 8px; font-size: 13px; }
+
+/* The terminal keeps the PC's columns; a narrow screen scrolls sideways instead of rewrapping. */
+#termWrap { flex: 1; min-height: 0; overflow: auto; padding: 4px; }
+#term { display: inline-block; min-width: 100%; height: 100%; }
+
+#keys { display: flex; gap: 6px; padding: 6px 8px; overflow-x: auto; background: #141414;
+  border-top: 1px solid #2a2a2a; }
+#keys button, #compose button { flex: 0 0 auto; background: #202020; color: #ddd; border: 1px solid #333;
+  border-radius: 6px; padding: 7px 11px; font-size: 13px; touch-action: manipulation; }
+#keys button:active, #compose button:active { background: #2d2d2d; }
+
+#compose { display: flex; gap: 6px; padding: 6px 8px; padding-bottom: max(6px, env(safe-area-inset-bottom));
+  background: #141414; }
+#line { flex: 1; min-width: 0; background: #0d0d0d; color: #fff; border: 1px solid #333;
+  border-radius: 6px; padding: 8px 10px; font-size: 15px; }
+#compose button { background: #0e639c; border-color: #0e639c; color: #fff; }
+
+#toast { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); max-width: 90%;
+  background: #222; border: 1px solid #444; border-radius: 6px; padding: 8px 14px;
+  font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+#toast.show { opacity: 1; }
+
+#pair { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .88); padding: 16px; }
+#pair.show { display: flex; }
+#pair .card { background: #161616; border: 1px solid #2c2c2c; border-radius: 10px;
+  padding: 26px 28px; width: 100%; max-width: 340px; text-align: center; }
+#pair h2 { margin: 0 0 8px; font-size: 18px; }
+#pair p { margin: 0 0 18px; font-size: 13px; color: #999; line-height: 1.5; }
+#pin { width: 100%; font-size: 24px; letter-spacing: 6px; text-align: center;
+  padding: 10px; background: #0d0d0d; color: #fff; border: 1px solid #333; border-radius: 6px; }
+#pairBtn { margin-top: 16px; width: 100%; padding: 11px; border: 0; border-radius: 6px;
+  background: #0e639c; color: #fff; font-size: 15px; cursor: pointer; }
+#pairBtn:hover { background: #1177bb; }
+#pair .err { color: #f48771; font-size: 12px; min-height: 16px; margin-top: 10px; }

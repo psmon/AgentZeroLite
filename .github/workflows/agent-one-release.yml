@@ -64,9 +64,10 @@ jobs:
           - os: ubuntu-latest
             rid: linux-x64
             archive: tar.gz
-          - os: macos-14
+          - os: macos-15
             rid: osx-arm64
             archive: tar.gz
+          # macos-14 was retired too (2026-11: "macos-14-arm64-us-default is not supported").
           # osx-x64 (Intel Mac) is not built: the macos-13 runner pool it needed
           # was retired, and CodeScan dropped it for the same reason. The npm
           # installer says so on an Intel Mac instead of failing on a 404.

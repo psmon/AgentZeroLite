@@ -70,6 +70,9 @@ internal sealed class CliCommandRouter
     /// <summary>Agent-needs-you notifications: <c>attention status|test</c> (verb) → reply; null in tests.</summary>
     public Func<string, Task<string>>? AttentionCommand { get; set; }
 
+    /// <summary>The Remote page: <c>remote status|start|stop|pin</c> (verb) → reply; null where it is compiled out (Store builds) and in tests.</summary>
+    public Func<string, Task<string>>? RemoteCommand { get; set; }
+
     public CliCommandRouter(IClassicDesktopStyleApplicationLifetime? desktop) => _desktop = desktop;
 
     public Task<string> HandleAsync(string json, CancellationToken ct)
@@ -162,6 +165,12 @@ internal sealed class CliCommandRouter
                         return AttentionCommand is null
                             ? Task.FromResult(CliIpcProtocol.ErrorJson("notifications are not available in this host"))
                             : AttentionCommand(Str(root, "verb").ToLowerInvariant());
+
+                    case "remote":
+                    case "remote-pin":   // the WPF host's verb
+                        return RemoteCommand is null
+                            ? Task.FromResult(CliIpcProtocol.ErrorJson("remote control is not part of this edition (the Store builds leave it out — use the download from GitHub Releases)"))
+                            : RemoteCommand(command == "remote-pin" ? "pin" : Str(root, "verb").ToLowerInvariant());
 
                     default:
                         return Task.FromResult(CliIpcProtocol.ErrorJson($"unknown command '{command}' (not ported to the Avalonia host yet)"));

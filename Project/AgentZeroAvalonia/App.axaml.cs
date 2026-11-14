@@ -113,6 +113,9 @@ public partial class App : Application
                 CodeCommand = vm.CodeCommandAsync,
                 WorktreeCommand = vm.WorktreeCommandAsync,
                 AttentionCommand = verb => Dispatcher.UIThread.InvokeAsync(() => vm.AttentionCommand(verb)).GetTask(),
+#if REMOTE_CONTROL
+                RemoteCommand = verb => Dispatcher.UIThread.InvokeAsync(() => vm.RemoteCommand(verb)).GetTask(),
+#endif
             };
             _cliServer = CliServer.Start(router);
 
@@ -126,6 +129,9 @@ public partial class App : Application
             desktop.MainWindow.Opened += (_, _) =>
                 _ = Agent.Common.Models.ModelResidency.PreloadAtStartupAsync(m => AppLogger.Log(m));
             vm.Wearable?.AutoStart();
+#if REMOTE_CONTROL
+            vm.Remote?.AutoStart();
+#endif
             vm.StartAgentStateMonitor();
             vm.StartWorktreeMonitor();
             vm.StartCostMonitor();
@@ -136,6 +142,9 @@ public partial class App : Application
                 try { vm.FlushPersist(); } catch { }
                 try { vm.Bot.Detach(); } catch { }
                 try { vm.Wearable?.Shutdown(); } catch { }
+#if REMOTE_CONTROL
+                try { vm.Remote?.Shutdown(); } catch { }
+#endif
                 try { _cliServer?.Dispose(); } catch { }
                 StopTelemetryCollectors();
                 // stdio MCP servers are child processes; end them with the app. Off the UI

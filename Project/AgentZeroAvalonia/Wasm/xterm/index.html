@@ -28,14 +28,49 @@
     }
     html, body { margin: 0; height: 100%; background: #1e1e1e; overflow: hidden; }
     #term { position: absolute; inset: 0; padding: 4px; box-sizing: border-box; }
+    /* Find bar (Ctrl+Shift+F). Drawn by the page, not by Avalonia: the WebView is a native
+       child window and nothing the host draws can sit on top of it (macOS above all). */
+    #find {
+      position: absolute; top: 6px; right: 18px; z-index: 10;
+      display: flex; align-items: center; gap: 4px; padding: 4px 6px;
+      background: #252526; border: 1px solid #454545; border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.45);
+      font: 12px -apple-system, 'Segoe UI', sans-serif; color: #cccccc;
+    }
+    #find[hidden] { display: none; }
+    #find input {
+      width: 200px; padding: 3px 6px; border: 1px solid #3c3c3c; border-radius: 2px;
+      background: #3c3c3c; color: #cccccc; font: inherit; outline: none;
+    }
+    #find input:focus { border-color: #007fd4; }
+    #find input.none { border-color: #be1100; }
+    #find .count { min-width: 64px; text-align: center; color: #9d9d9d; }
+    #find button {
+      min-width: 22px; height: 22px; padding: 0 4px; border: 1px solid transparent; border-radius: 3px;
+      background: transparent; color: #cccccc; font: inherit; cursor: pointer;
+    }
+    #find button:hover { background: #3a3d41; }
+    #find button.on { border-color: #007fd4; background: #094771; }
   </style>
 </head>
 <body>
   <div id="term"></div>
+  <div id="find" hidden>
+    <input id="find-q" type="text" placeholder="Find" spellcheck="false" autocomplete="off">
+    <span id="find-count" class="count"></span>
+    <button id="find-case" title="Match case">Aa</button>
+    <button id="find-regex" title="Regular expression">.*</button>
+    <button id="find-prev" title="Previous match (Shift+Enter)">&#8593;</button>
+    <button id="find-next" title="Next match (Enter)">&#8595;</button>
+    <button id="find-close" title="Close (Esc)">&#10005;</button>
+  </div>
   <script src="vendor/xterm.js"></script>
   <script src="vendor/addon-fit.js"></script>
   <script src="vendor/addon-web-links.js"></script>
   <script src="vendor/addon-webgl.js"></script>
+  <!-- @xterm/addon-search 0.15.0 (MIT, addons/LICENSE.addon-search.txt) — the release paired
+       with the vendored @xterm/xterm 5.5.0. This host's own file: WPF has no find yet. -->
+  <script src="addons/addon-search.js"></script>
   <script>
     // Set from the host's query string before term.js decides on a renderer.
     window.__azUseWebgl = /(?:\?|&)webgl=1(?:&|$)/.test(location.search);

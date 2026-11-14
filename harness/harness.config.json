@@ -3,7 +3,7 @@
   "$schemaVersion": "1.2.0",
   "name": "AgentZero Lite Harness",
   "description": "QA & research garden for AgentZero Lite — Windows-native multi-CLI shell with on-device LLM experiments and prompt-injection-aware security review",
-  "version": "1.14.2",
+  "version": "1.15.0",
   "agents": [
     "tamer",
     "security-guard",
@@ -14,7 +14,8 @@
     "music-curator",
     "voice-curator",
     "device-smith",
-    "agent-loop-auditor"
+    "agent-loop-auditor",
+    "agentone-observer"
   ],
   "engine": [
     "release-build-pipeline",
@@ -39,10 +40,11 @@
     "music-curator",
     "voice-curator",
     "device-smith",
-    "agent-loop-auditor"
+    "agent-loop-auditor",
+    "agentone-observer"
   ],
   "missions_dir": "harness/missions/",
   "missions_log_dir": "harness/logs/mission-records/",
   "created": "2026-04-25",
-  "lastUpdated": "2026-10-30"
+  "lastUpdated": "2026-11-03"
 }

@@ -394,6 +394,14 @@ Project/AgentZeroAvalonia/bin/Debug/net10.0/AgentZeroLite.exe -cli selftest all 
 What differs from the WPF host, and why:
 
 - **Terminal**: xterm.js inside `NativeWebView`, served by `LocalAssetServer` (loopback, token path) because the Avalonia WebView cannot map a folder; the PTY is `ConPtyHost` (a copy of `ManagedConPtyHost`) on Windows and `PortaPtyHost` (Porta.Pty) on macOS behind ZeroCommon's `IPtyHost`/`XtermTerminalSession`. Two ConPTY facts the WPF copy never hit: a parent whose stdio is a pipe hands its std handles to the child (blanked around `CreateProcess`), and pipe EOF is not the exit signal (a process-handle watcher is).
+- **WebView2 is not guaranteed on Windows** (older Windows 10, LTSC/Server, managed images) and an MSIX cannot
+  depend on it: `ZeroCommon/Platform/WebView2Runtime` probes `pv` and installs Microsoft's signature-checked
+  bootstrapper (breakaway inside a package); the terminal banner and `-cli webview2 status|install` use it,
+  `AGENTZERO_FAKE_NO_WEBVIEW2=1` fakes a missing runtime. Two renderer facts from the same wave: **`Control.Focus()`
+  on a `NativeWebView` does not give WebView2's window the keyboard** — `Terminal/WebViewKeyboardFocus` calls
+  `ICoreWebView2Controller::MoveFocus` (vtable slot 12); and the inbox ConPTY **passes OSC 9 / 777 through**, so
+  `term.js` hands them to `TerminalNotificationParser` → `AttentionNotifier.ObserveNotification` (find bar:
+  `terminal.find`, Ctrl+Shift+F, `@xterm/addon-search` 0.15.0 in `Wasm/xterm/addons/`).
 - **Split panes**: `WorkspaceLayout<T>` + one Canvas that positions every renderer over its pane slot — no native re-parenting. The stored `CliGroup.LayoutJson` is byte-identical to what WPF writes.
 - **CLI**: same request/response JSON as WPF over the pipe `AgentZeroLite.cli` (not WM_COPYDATA), so `-cli help agentzero` applies; extra verbs `bot-ask`, `layout`, `mcp`, `plugin`, `worktree` (the sidebar's git worktrees: `list|open|close`) and `code` (the code view — the bottom panel is tabbed,
   🤖 BOT | 📄 CODE, sharing one dock; file rules in ZeroCommon `Workspace/WorkspaceFiles`).
@@ -455,6 +463,15 @@ What differs from the WPF host, and why:
   settings installer create their processes with the desktop-app breakaway policy (`ZeroCommon/Services/
   DesktopAppBreakaway.cs`, applied only when `IsPackagedProcess()`), so npm -g / claude / git write the real
   profile. Packaging, verification and submission history: `Docs/avalonia-v2/microsoft-store.md`.
+- **Remote (📡, the terminals from a browser) is in the download builds only.** `IncludeRemote` (csproj, default
+  true) defines `REMOTE_CONTROL`; false compiles out `Services/Remote/`, the page and `Wasm/remote/`. The Store MSIX
+  (`build-msix.ps1`, which also fails if `Wasm\remote` reached the stage) and the Mac App Store build (publish with
+  `-p:IncludeRemote=false`; `build-appstore.sh` refuses a publish that has `Wasm/remote`) leave it out — a LAN
+  listener is a review question (Apple asks why the app listens) those editions do not need. Keep new Remote code
+  inside those files or behind `#if REMOTE_CONTROL`. The server is our own HTTP/WebSocket on a `TcpListener`
+  (`RemoteServer`: no http.sys URL reservation or UAC prompt, same code on macOS/Linux); the actors, the PIN/token
+  auth and the wire protocol are WPF's, in `ZeroCommon/Remote`, plus two frames of ours (`attached`, `size`) so the
+  browser draws at the pseudo-console's size (`Terminal/TerminalGeometry`, recorded when the renderer fits).
 - **macOS ships two ways** (`Docs/avalonia-v2/macos-distribution.md`): a Developer ID signed + notarized `.pkg`
   (`macos/build-app.sh` `SIGN_ID`, `build-pkg.sh`, `notarize.sh`; `release.yml` does it when the `MACOS_DEVID_*` /
   `ASC_*` secrets exist) and the **Mac App Store** build (`macos/appstore/build-appstore.sh`: App Sandbox, the
@@ -498,7 +515,7 @@ What differs from the WPF host, and why:
   (created), never the bare lookup. Local GUI check on Windows: Docker Desktop exposes WSLg's X socket at
   `/run/desktop/mnt/host/wslg/.X11-unix`; `linux/test/run-gui.sh` / `install-test.sh` / `run-tests.sh` use it.
 - **Local LLM is Windows-only** (LLamaSharp DLLs); macOS uses External providers. Gemma 4's native tool-call syntax is converted to the JSON envelope by `GemmaNativeToolCall` (ZeroCommon, benefits both hosts).
-- CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-14, `.app` bundle via `macos/build-app.sh`) runs **on request
+- CI: `.github/workflows/avalonia-build.yml` (windows-latest + macos-15, `.app` bundle via `macos/build-app.sh`) runs **on request
   only**: a `ci-*` tag (push `ci-<version>` when macOS compatibility needs checking) or the Run workflow button — not
   per push and not for a `v*` release tag. macOS GUI checks need a person: `Docs/avalonia-v2/macos-smoke.md`.
 - **Releases ship this host since v0.25.4** (`release.yml`, `v*` tag): `AgentZeroLite-v<ver>-Setup.exe`
@@ -734,7 +751,15 @@ call as a command for scripts and other agents — one JSON object out, exit 0/1
 — and shares the option reader and result shape (`Llm/Decision/DecisionInput`)
 with the tool, so the two cannot disagree. The two families
 that change something are `ToolCatalog.GuardedFamilies`, and a test keeps every
-writing/running verb inside them. **Writes never leave the root**; a folder the
+writing/running verb inside them. **Claude skills are searched, not skipped**
+(`Tools/ClaudeSkillScope`): the walk used to drop every dot-folder, so in a
+Claude-skill-based workspace `.claude/skills` was invisible and plugin skills
+(outside the root) unreachable — five turns rebuilt a method from one script found
+by luck. Project `.claude/{skills,commands,agents}`, user skills and **enabled**
+plugins (`enabledPlugins` → `installed_plugins.json`) are detected, plus the
+workspace paths those skills name; `list_files .` names them and a root
+`find_files`/`grep` walks them first. Details: `Project/AgentOne/README.md` §Tools.
+**Writes never leave the root**; a folder the
 user names by absolute path (`Tools/PathGrants`) is granted for *reading* only,
 for the session. **Commands go through a gate** (`ChatSession.GateAsync`):
 `Agent/CommandRisk` patterns (rm -rf /, sudo, format, piped installers,
@@ -976,6 +1001,16 @@ never quietly builds without its plan on a stall. Unattended (`run`, a
 background session nobody is attached to) the recommendation is retry twice
 (`UnattendedStallRetries`), then the last option, so a dead endpoint cannot
 retry forever. Tests: `StallRetryTests`.
+**A dropped connection is a stall too, and a turn never vanishes** (`ResumeAfterDropTests`). Measured (2026-11-06):
+mid-stream, a long MV build's connection dropped after it had written the lore file; the `IOException` escaped
+(`StreamAsync` caught only the idle cancel), and the turn ended with no result, no memory, no steps. Now an
+`IOException`/`HttpRequestException` while sending or reading is `ChatProviderStalledException { Dropped = true }`,
+retried on its own twice (5 s, 20 s; `DroppedRetryDelay`) before `Chooser` is asked; `AgentLoop` turns anything else a
+provider throws into `ProviderError` **with the steps so far**; and `ChatSession.Resume` restores a turn with no
+successful result as its request + `UnfinishedNote` (why, the tool steps it took, the design's head), so "재개" after a
+restart carries on from the first step not done — a short request right after an unfinished turn also gets the build's
+repeat allowance. `WrongScript` now counts the request's script as a share of the answer's prose (code and inline
+code removed, ≥ 10 %): an English answer whose only Hangul was a title used to pass.
 
 **A report is held against the tool record before anything builds on it.**
 Measured (2026-09-29): asked to write and run unit tests, the model called no
@@ -1054,6 +1089,82 @@ unclear, above all for a delete or overwrite; an escalation of a short exchange
 non-Latin script (Korean, Japanese, Chinese, Russian, Arabic, Thai) the answer
 does not contain at all — `AgentLoop.Request` carries the person's words, because
 the prompt a run gets is often English guidance or a `[check]`.
+
+**Known tools are built in, and the browser is verbs** (`Tools/Cli/`, `Tools/Browser/`,
+`BrowserToolTests`). Measured (2026-11-05, music-harness): told "use the Playwright CLI in CDP mode", the
+model web-searched once, wrote a script `require`-ing a package the folder lacked and asked the person to
+restart Chrome — with `playwright-cli` installed and a debuggable Chrome already on 9222. Now `KnownCli` probes
+PATH (PATHEXT, npm `.cmd` shims) for a curated list (playwright-cli, gh, git, ffmpeg, yt-dlp, node, python,
+dotnet, docker, rg, curl, jq), the system prompt names the installed ones and `cli_guide` (family `guide`,
+route-exempt) returns a usage card; a card grants nothing — tools still run through `run_command`'s gate, and
+a missing one is reported with its install line, never installed. The browser family (`browser_open /
+snapshot / read / find / tabs / click / fill / press`) drives `@playwright/cli` (Windows: the shim's `.js` run
+by `node` with an argument list, so model text never meets cmd.exe quoting), session `agent-one-<pid>`, cwd
+`<workspace store>/browser` so its snapshot files stay out of the project. When `browserCdpUrl` (default
+`http://127.0.0.1:9222`, `off`) answers, it **attaches** to the person's Chrome and opens a **new tab**; the
+session is only ever **detached**, never closed (`close` on an attached session can close their browser).
+Reading is ungated; the first click/fill/press per site goes to the approver (`BrowserGateAsync`), a yes holds
+for that site for the session. Both working routes (web, workspace) admit the family, and a successful browser
+action backs an "I did it" claim like a command. `ToolSpec.Repeat` (`RepeatRule`): looks (`browser_snapshot`,
+`browser_read`, `process_status`…) are a repeat only twice in a row, actions repeated on purpose (End to load
+more) never — the old rule ended a browsing turn on the second snapshot after a click.
+
+**The workspace is read before anything is planned** (`Agent/WorkspaceGuide`, `Agent/WorkspaceProbe`,
+`WorkspaceGroundingTests`). Measured (2026-11-06, music-harness): "종말의 그날 1,2 를 통합해 뮤비작성" — agent-one
+never opened AGENTS.md (its dispatch table sends "뮤비 만들어" to `harness/engine/mv-forge.md`) nor the todo holding
+both episodes' ids, genre and art style; the strong model designed "join two local videos with ffmpeg" for 493 s,
+and the turn asked the person to supply the files it had invented. Now: root `AGENTS.md` / `CLAUDE.md` go into every
+system prompt (6 000 chars, cut at a heading with the rest's headings listed; an `@AGENTS.md`-only CLAUDE.md is
+skipped; re-read on reset) and into the design request (4 000); in smart mode a workspace/unsure route first searches
+the request's own words in text files (particle-stripped Korean, IDF-weighted so generic words score nothing, ≤ 6 000
+files / 3 s) and hands the best files to the model as `[workspace]` material and to the design, whose prompt forbids
+assuming inputs the context does not show; and when the probe found files the turn never read, `HandBackAsync`
+(proceeds / hands_back) sends a hand-back answer back once with those files (`ChecksClaims` is its test switch,
+`ProbesWorkspace` the probe's). **Analysis → work in one session** is the case this serves: the design pass and the
+escalation now get the conversation's last two answers (`EarlierAnswers`, 2 500 chars each) — the design used to get
+only `Digest()` (an answer's first line + numbered items; a table has none), so "make the MV from those two episodes"
+was designed blind. memory.md keeps an answer as de-marked-up text (`MemoryText`: no `**`/`###`/table rules, cells
+joined with " · ", 600 chars) instead of 300 raw characters; the worth-saving option names looked-up facts (titles,
+dates, ids, links) as knowledge; an escalated turn keeps the draft's steps (memory said "did: (no tools)" after a
+`browser_open`). Session logs are NOT searched automatically — an earlier session is reached by `/resume`. A web turn
+(steered web route with page material) escalates only at ≥ 0.95 and never when the draft is ≥ 60 % the pages' own
+words (`ShareFromMaterial`) — measured 0.94 / 0.86, the same table back after 169 s / 206 s. Also
+`KnownCliTool.PythonModule` finds a pip-only tool (`python -m yt_dlp`); PowerShell hints say a command inside `-and`
+needs its own parentheses. Measured on the e2e runs of the same chain: a design-carrying run (`AgentLoop.Building`)
+gets 3 repeat nudges that name the next step instead of "use it, or answer with final" (one re-read of a todo ended a
+50-step build at step 12 with nothing written); gemma's `key:="…"` / `key="…"` is a string (`GemmaNativeCall` —
+PowerShell was handed `="Get-Content AGENTS.md"` three times); the design and system prompts say files are read with
+read_file, never Get-Content/cat, and the design stays under ~3 000 characters (a 7 351-char one took 1 002 s).
+
+**A report is held to what the tools examined, and the next step comes from earlier work like it**
+(2026-11-07 e2e, music-harness: generate on deevid → review the takes; `ResumeAfterDropTests.cs`). The review step
+failed for a day in ways each fix below names: the everyday model ranked six takes from their lengths and the plan,
+read its own earlier unmeasured report back as evidence, guessed `--match` values, and handed "upload the mp3s" back.
+- **Review claims** — `SmartRouter.UnbackedReview` (judging files/media no tool examined); a listing command
+  (`ChatSession.ListsOnly`: Get-ChildItem, ls, Select-Object…) examines nothing, so it no longer backs a review — the
+  engine's 0.97 was ignored once because `Get-ChildItem` had succeeded; an unsure `backed` (< floor) yields to an
+  unbacked runner-up with ≥ 25 % (`UnsureBackedYields`, measured "backed" at 0.31). The redo is planned by the strong
+  model (`PlanRedoAsync`) over `DesignContext`.
+- **Precedent** (`Agent/WorkspacePrecedent`) — the work folder's newest siblings that got further (songs/2026-11-05-x
+  beside songs/2026-11-07-y): their files, script folders, media, the logs named after them, and **`how:` lines** — the
+  lines of their notes/logs that name a script ("받기: `dv-fetch.cjs out 4 --match …`", "측정: `mv/judge-takes.py`").
+  Names alone were not enough: the model never opened notes.md. A fresh session takes the work folder from what the
+  turn looked at most (`WorkFolderLookedAt`), not only from writes.
+- **Hand-back** is asked of every tool-using smart turn (writing + running no longer exempts it: a turn wrote two
+  reports, ran ffprobe over nothing and asked for an upload).
+- **Commands** — reading a media file that is not on disk is refused before anyone is asked
+  (`MissingMediaInputs`; output flags and the last of several media paths are writes); trying a second different
+  quoted value of the same command after an empty result gets a note to look the value up instead
+  (`AgentLoop.GuessNote`, script path normalised to its name; `CameBackEmpty` counts `ERR`/`no match` text because
+  `…; Pop-Location` exits 0).
+- **Model limits** — the everyday model's reasoning is also bounded by time (`ThinkingLimitTime` 12 min, strong model
+  40 min; gemma at ~15 tok/s sat 34 min under the 60 000-char cap) and the strong model's char cap is 240 000; a bare
+  file name found anywhere in the workspace is not "missing" (`ExistsAnywhere` — the false verdict overwrote a Korean
+  lyrics.md in English); a broken call in a ```json fence is an envelope, not an answer.
+Outcome: agent-one found the download script, fixed its path and reached deevid's history, but never fetched the
+takes — the match text it needed (the prompt's first words, recorded in `harness/knowledge/tools/input-types.md`) was
+never looked up. Repeated failed turns also poison what comes next: their reports, memory.md and graph facts are read
+back as evidence.
 
 ## Documentation pairs — update both languages together
 

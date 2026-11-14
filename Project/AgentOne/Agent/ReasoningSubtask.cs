@@ -36,7 +36,9 @@ public static partial class ReasoningSubtask
         "or changed, or commands or tests were run, and the material does not show it, say it has not been done — " +
         "never restate it as done. Do not mention the assistant, the draft, or this hand-off.";
 
-    public static string Request(string request, string material, string draft) =>
+    /// <param name="earlier">The conversation's earlier answers the request may build on, or empty.</param>
+    public static string Request(string request, string material, string draft, string earlier = "") =>
+        (earlier.Length == 0 ? "" : earlier + "\n\n") +
         "Request:\n" + request +
         "\n\nMaterial gathered by tools:\n" + (material.Length == 0 ? "(none)" : material) +
         "\n\nDraft answer by the assistant:\n" + draft;
@@ -50,10 +52,10 @@ public static partial class ReasoningSubtask
     /// </param>
     public static async Task<string> RunAsync(
         IChatProvider reasoning, string basicModel, string request, string material, string draft,
-        CancellationToken ct, Action<int>? onProgress = null)
+        CancellationToken ct, Action<int>? onProgress = null, string earlier = "")
     {
         return await CompleteAsync(reasoning,
-            [ChatMessage.System(SystemPrompt(basicModel)), ChatMessage.User(Request(request, material, draft))],
+            [ChatMessage.System(SystemPrompt(basicModel)), ChatMessage.User(Request(request, material, draft, earlier))],
             ct, onProgress);
     }
 
@@ -74,6 +76,19 @@ public static partial class ReasoningSubtask
         "project root), what each file is responsible for, the commands to run and in what order, and the checks " +
         "that prove it works. Be concrete and short — a numbered list of steps the assistant can follow one by one. " +
         "Include code only where a signature or a config line must be exact. Write in the user's language. " +
+        // Measured (2026-11-06, music-harness): with no look at the project, the
+        // design assumed two local video files "(recommended)" — they did not
+        // exist, while a todo in the workspace held everything the request meant.
+        "Build on what the context shows about the project: when it names the workspace's own instructions or " +
+        "documents, the design follows them and starts by reading the ones that matter. Never assume a file, asset " +
+        "or input exists unless the context shows it — where it is unknown, the first step is to look for it. " +
+        "Never offer the user a choice the context already answers. " +
+        // Measured (2026-11-06): a 7 351-character design spelled every read as a
+        // `Get-Content` command, took 1 002 s to write, and the build stalled on
+        // the first of those commands.
+        "The assistant reads files with read_file and searches with grep/find_files — name the files to read, never " +
+        "a shell command (Get-Content, cat, Select-String) for reading. Keep the design under about 3 000 characters: " +
+        "steps and paths, not prose. " +
         "Plain prose or markdown — no JSON. Do not mention the assistant or this hand-off. " +
         $"If the design hinges on a choice only the user can make — a framework, a storage engine, a structure — begin " +
         $"with one line \"{DecisionMarker}:\" followed by the options as a numbered list, one per line, each a short " +

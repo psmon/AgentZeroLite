@@ -10,6 +10,10 @@
             <DockPanel>
                 <Button x:Name="RestartButton" DockPanel.Dock="Right" Content="Restart terminal"
                         FontSize="11" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <Button x:Name="DownloadPageButton" DockPanel.Dock="Right" Content="Download page"
+                        IsVisible="False" FontSize="11" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <Button x:Name="InstallRuntimeButton" DockPanel.Dock="Right" Content="Install WebView2 runtime"
+                        IsVisible="False" FontSize="11" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center" />
                 <TextBlock x:Name="HealthText" Foreground="#f0c674" FontSize="12"
                            VerticalAlignment="Center" TextWrapping="Wrap" />
             </DockPanel>

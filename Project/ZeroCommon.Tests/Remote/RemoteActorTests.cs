@@ -93,4 +93,28 @@ public sealed class RemoteActorTests : TestKit
             probe.ExpectMsg<RemoteSessionCreated>(TimeSpan.FromMilliseconds(500));
         });
     }
+
+    [Fact]
+    public void Hub_reattaches_the_same_key_to_another_terminal()
+    {
+        // A browser switching terminals keeps its connection key; the hub replaces the actor.
+        // The stopped child's name stays reserved until it has terminated, so the replacement
+        // must not reuse it (measured: InvalidActorNameException, the attach Ask timed out).
+        var hub = Sys.ActorOf(Props.Create(() => new RemoteHubActor(maxConnections: 1)));
+        var probe = CreateTestProbe();
+        var first = new FakeTerminalSession("FIRST");
+        var second = new FakeTerminalSession("SECOND");
+
+        hub.Tell(new CreateRemoteSession("a", first, _ => { }), probe.Ref);
+        probe.ExpectMsg<RemoteSessionCreated>();
+        hub.Tell(new CreateRemoteSession("a", second, _ => { }), probe.Ref);
+        var created = probe.ExpectMsg<RemoteSessionCreated>();
+
+        created.SessionRef.Tell(new RemoteInputText("x"));
+        AwaitAssert(() => Assert.Contains("x", second.Writes));
+        Assert.Empty(first.Writes);
+
+        hub.Tell(new QueryRemoteStatus(), probe.Ref);
+        Assert.Equal(1, probe.ExpectMsg<RemoteStatusReply>().Active);
+    }
 }

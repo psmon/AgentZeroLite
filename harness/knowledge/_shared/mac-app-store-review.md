@@ -6,16 +6,16 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 
 ---
 
-## 0. 현재 상태 (2026-11-03)
+## 0. 현재 상태 (2026-11-14)
 
 | 항목 | 값 |
 |---|---|
 | 앱 | AgentZero Lite · App Store Connect 앱 ID **6825237056** · 번들 ID `com.psmon.agentzerolite` · 팀 `HA39FQRUZG`(sang man park, 개인) |
-| 제출 | **3차** — 0.26.7 (빌드 **4**) · 같은 submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a` 재제출 · 2026-11-03 10:40 KST · `WAITING_FOR_REVIEW` |
-| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d` · 빌드 ID `9abe9264-9355-423a-b6e3-266040464e0a`(빌드 4) |
+| 제출 | **4차** — 0.27.1 (빌드 **5**) · submission `fe965f27-89ed-4738-b5ab-b0e82582fcb6`(빈 초안을 `asc review submit`이 재사용) · 2026-11-14 11:20 KST · `WAITING_FOR_REVIEW` |
+| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d`(버전 문자열만 0.26.7 → 0.27.1) · 빌드 ID `fe79bc67-e699-44ea-b80b-a7be3e3cdfcc`(빌드 5) |
 | 출시 방식 | **MANUAL** — 승인돼도 운영자가 출시를 눌러야 공개 |
 | 판매 지역 | 전 지역 **중국 본토 제외**(가이드라인 5) |
-| 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다. 빈 초안 submission `fe965f27-…`(항목 0, 취소 불가 상태) — 무시 |
+| 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다 |
 
 ### 심사 이력
 
@@ -23,7 +23,8 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 |---|---|---|---|
 | 1 | 0.25.8 (2), 10-21 제출 | **반려** 2026-10-28 (MacBook Pro 14 Nov 2024) | **2.4.5(i)** 임시 예외 `home-relative-path.read-write "/"`·`absolute-path.read-write "/usr/local/"` 거부(`/opt/homebrew/`는 지적 없음) → 두 예외 삭제, 폴더 선택 + security-scoped bookmark(`SandboxFolderAccess`, `files.bookmarks.app-scope`). **5 Legal(중국)** 메타데이터의 "OpenAI" → 단어 삭제 + 중국 본토 판매 제외. Resolution Center에 조치 답변 |
 | 2 | 0.26.6 (3), 10-30 재제출 | **반려** 2026-10-31 (자동 분석, 사람 심사 전) | **2.4.5** `com.apple.security.network.server`에 맞는 기능이 안 보인다 → 실측(샌드박스 + 이 엔타이틀먼트 없음: `127.0.0.1` bind가 `EPERM`) 결과 터미널 렌더러(`LocalAssetServer`)·Markdown 미리보기·플러그인(`PluginAssetServer`)의 loopback 서버에 필수라 **삭제하지 않고 설명**: 심사 메모(`listing.md`)에 용도·검증법(`lsof`) 추가, Resolution Center 답변. 최신 소스 0.26.7 빌드 4로 재제출 |
-| 3 | 0.26.7 (4), 11-03 재제출 | 대기 | — |
+| 3 | 0.26.7 (4), 11-03 재제출 | **운영자 철회** 2026-11-14 (11일간 `WAITING_FOR_REVIEW`, 심사 시작 전) | 대기 중 개정 Apple Developer Program License Agreement 미수락으로 API·공증이 403("A required agreement is missing or has expired") → 계정 소유자가 developer.apple.com/account에서 수락. 수락 후 운영자 지시로 최신 소스로 교체: `asc review submissions-cancel`(→ `DEVELOPER_REJECTED`) → 버전 문자열 0.27.1 → 빌드 5 첨부 → 제출 |
+| 4 | 0.27.1 (5), 11-14 제출 | 대기 | — |
 
 확인 기록: 2026-11-03 2차 반려 확인(웹 세션 만료 → 운영자 재로그인 후 읽음). 2026-10-25 웹(App Store Connect → 앱 심사)으로 확인 — 여전히 `심사 대기 중`, 메시지 없음.
 
@@ -68,12 +69,13 @@ Playwright로 연다: 스크래치패드의 `apple-pw/browser.mjs`(정식 Chrome
 ```sh
 export DOTNET_ROOT=$HOME/.dotnet PATH=$HOME/.dotnet:$PATH          # 이 맥: PATH의 dotnet은 9.0뿐
 security unlock-keychain -p "$(cat .secret/certs/signing-keychain-password.txt)" ~/Library/Keychains/agentzero-signing.keychain-db
-dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -o publish-avalonia/osx-arm64
+# 스토어판은 Remote(브라우저 원격 제어, LAN listen)를 빼고 publish한다 — build-appstore.sh가 Wasm/remote가 있으면 거부
+dotnet publish Project/AgentZeroAvalonia/AgentZeroAvalonia.csproj -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -p:IncludeRemote=false -o publish-avalonia/osx-arm64-mas
 # 로컬 샌드박스 확인(선택): MAS_SANDBOX_TEST=1 … build-appstore.sh … → open publish-avalonia/appstore-test/AgentZeroLite.app
 MAS_SIGN_ID="Apple Distribution: sang man park (HA39FQRUZG)" \
 MAS_PKG_ID="3rd Party Mac Developer Installer: sang man park (HA39FQRUZG)" \
 MAS_PROFILE=.secret/certs/AgentZeroLite_MAS.provisionprofile \
-  sh Project/AgentZeroAvalonia/macos/appstore/build-appstore.sh publish-avalonia/osx-arm64 publish-avalonia/appstore <ver> <build+1>
+  sh Project/AgentZeroAvalonia/macos/appstore/build-appstore.sh publish-avalonia/osx-arm64-mas publish-avalonia/appstore <ver> <build+1>
 asc builds upload --app 6825237056 --pkg publish-avalonia/appstore/AgentZeroLite-<ver>-<build>-appstore.pkg --version <ver> --build-number <build> --wait
 asc versions attach-build --app 6825237056 --platform MAC_OS --version-id <버전ID> --build-id <새 빌드ID>
 asc review submit --app 6825237056 --version-id <버전ID> --build-id <새 빌드ID> --dry-run   # wouldSubmit:true 확인
@@ -90,7 +92,12 @@ asc review submissions-submit --id <반려된 submission ID> --confirm       # �
 ```
 버전 문자열을 새 빌드에 맞춘 뒤(`asc versions update --version-id … --version <ver>`) 빌드를 붙이고, 그다음 위 세 줄.
 
-- 빌드 번호는 실패한 업로드까지 포함해 매번 올린다(1: ITMS-90296, 2: 1차 반려, 3: 2차 제출, 4: 3차 제출 → 다음은 **5**).
+- 빌드 번호는 실패한 업로드까지 포함해 매번 올린다(1: ITMS-90296, 2: 1차 반려, 3: 2차 제출, 4: 3차 제출, 5: 4차 제출 → 다음은 **6**).
+- 이 맥에서 `.secret/`은 워크트리가 아니라 메인 체크아웃(`~/code/AgentZeroLite/.secret`)에만 있다 — 워크트리에서
+  빌드할 때는 키체인 암호·프로파일을 그 절대 경로로 넘긴다.
+- 제출 대기 중인 빌드를 새 빌드로 바꾸려면: `asc review submissions-cancel --id <submission> --confirm`(버전 →
+  `DEVELOPER_REJECTED`) → `asc versions update … --version <ver>` → `attach-build` → `asc review submit … --confirm`.
+  대기 순서는 처음부터 다시 시작한다.
 - `dotnet publish`가 `Project/version.txt`나 `Project/AgentOne/version.txt`를 올리면 커밋 전에 되돌린다.
 - 반려 대응으로 엔타이틀먼트를 바꾸면 `MAS_SANDBOX_TEST=1` 번들로 GUI 기동·`-cli status`·zsh 탭을 먼저 확인한다
   (워크스페이스는 컨테이너 DB `CliGroups`에 한 줄 넣으면 된다). 확인 뒤 테스트 데이터는 지운다.

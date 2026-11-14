@@ -304,6 +304,107 @@ public class FileDeliverableTests : IDisposable
     }
 
     [Fact]
+    public async Task AFileWrittenInASubfolderIsNotMissingWhenNamedByItsBasename()
+    {
+        // Measured (2026-11-04, zero-test): the turn wrote the report to
+        // security-assessment/report/endpoint_enumeration_report.html and the
+        // final answer referred to it by basename. An exact-string check had
+        // wrote = {the subpath} and the answer naming {the basename}, so the
+        // real, finished file was declared "not on disk" — which triggered an
+        // apology, a wasted escalation, and a discarded result. A file written
+        // this turn is forgiven however the answer qualifies its path.
+        var provider = new ScriptedChatProvider(
+            Write("security-assessment/report/endpoint_enumeration_report.html", "<h1>report</h1>"),
+            Answer("endpoint_enumeration_report.html 파일에 보고서를 작성 완료했습니다."));
+
+        var run = await Loop(provider).RunAsync("리포트 작성해줘", CancellationToken.None);
+
+        Assert.True(run.Succeeded);
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "unwritten");
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "missing");
+        Assert.DoesNotContain("⚠", run.Text);
+        Assert.True(File.Exists(Path.Combine(_root, "security-assessment", "report", "endpoint_enumeration_report.html")));
+    }
+
+    [Fact]
+    public async Task AnUntouchedSiblingOfAWrittenFileIsNotMissing()
+    {
+        // Measured (2026-11-05, music-harness): the turn rewrote songs/x/guide.md
+        // and named its siblings lyrics.md and notes.md, which were already on
+        // disk. Only root/lyrics.md was checked, so both were "not on disk" and
+        // the model rewrote two good files to satisfy the guard.
+        Directory.CreateDirectory(Path.Combine(_root, "songs", "x"));
+        File.WriteAllText(Path.Combine(_root, "songs", "x", "lyrics.md"), "la la");
+        File.WriteAllText(Path.Combine(_root, "songs", "notes.md"), "notes");
+        var provider = new ScriptedChatProvider(
+            Write("songs/x/guide.md", "guide"),
+            Answer("guide.md 를 고쳤고 lyrics.md 와 notes.md 는 그대로 둡니다."));
+
+        var run = await Loop(provider).RunAsync("지침서 고쳐줘", CancellationToken.None);
+
+        Assert.True(run.Succeeded);
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "unwritten");
+        Assert.DoesNotContain("⚠", run.Text);
+    }
+
+    [Fact]
+    public async Task AFileTheTurnReadIsNotMissingWhenNamedByItsBasename()
+    {
+        // Measured (2026-11-05, music-harness): the turn read and ran
+        // stage-unity/Tools/deevid/dv-gen.cjs and the answer said "dv-gen.cjs 로
+        //생성" — flagged "not on disk", which drove an apology and an escalation.
+        Directory.CreateDirectory(Path.Combine(_root, "tools", "gen"));
+        File.WriteAllText(Path.Combine(_root, "tools", "gen", "dv-gen.cjs"), "// gen");
+        var provider = new ScriptedChatProvider(
+            """{"tool":"read_file","args":{"path":"tools/gen/dv-gen.cjs"}}""",
+            Write("songs/x/guide.md", "guide"),
+            Answer("guide.md 를 고치고 dv-gen.cjs 로 생성할 준비를 마쳤습니다."));
+
+        var run = await Loop(provider).RunAsync("생성 준비해", CancellationToken.None);
+
+        Assert.True(run.Succeeded);
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "unwritten");
+        Assert.DoesNotContain("⚠", run.Text);
+    }
+
+    [Fact]
+    public async Task AFileInsideAFolderTheTurnListedIsNotMissing()
+    {
+        // Measured (2026-11-05): a download script saved deevid-assets.json into
+        // songs/x/out (listed earlier in the turn) and the answer named it.
+        Directory.CreateDirectory(Path.Combine(_root, "songs", "x", "out"));
+        File.WriteAllText(Path.Combine(_root, "songs", "x", "out", "assets.json"), "{}");
+        var provider = new ScriptedChatProvider(
+            """{"tool":"list_files","args":{"path":"songs/x/out"}}""",
+            Write("songs/x/notes.md", "takes saved"),
+            Answer("assets.json 과 테이크를 받아 notes.md 에 기록했습니다."));
+
+        var run = await Loop(provider).RunAsync("받아와", CancellationToken.None);
+
+        Assert.True(run.Succeeded);
+        Assert.DoesNotContain(run.Steps, s => s.Tool == "unwritten");
+        Assert.DoesNotContain("⚠", run.Text);
+    }
+
+    [Fact]
+    public async Task ANamedFileThatWasNeverWrittenIsStillCaughtAcrossSubfolders()
+    {
+        // The suffix tolerance must not forgive a genuinely absent file: writing
+        // one basename does not excuse a different file the answer also claims.
+        var provider = new ScriptedChatProvider(
+            Write("out/done.html", "<h1>ok</h1>"),
+            Answer("done.html 과 missing.html 을 모두 작성했습니다."),
+            Answer("done.html 만 작성했고 missing.html 은 쓰지 않았습니다."));
+
+        var run = await Loop(provider).RunAsync("두 파일 만들어줘", CancellationToken.None);
+
+        Assert.True(run.Succeeded);
+        var caught = run.Steps.Single(s => s.Tool == "unwritten");
+        Assert.Contains("missing.html", caught.Detail);
+        Assert.DoesNotContain("done.html", caught.Detail);     // that basename really was written
+    }
+
+    [Fact]
     public async Task AFinalFamilySetIsARuleTheModelCannotTalkItsWayOutOf()
     {
         // The wrap-up and the post-escalation pass are deliberate no-tool

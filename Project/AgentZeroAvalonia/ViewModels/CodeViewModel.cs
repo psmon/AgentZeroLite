@@ -9,14 +9,17 @@ using CommunityToolkit.Mvvm.Input;
 namespace AgentZeroAvalonia.ViewModels;
 
 /// <summary>
-/// One entry of the code view's tree. A folder loads its children the first time it is
-/// expanded (off the UI thread — a workspace can live on a network drive), so opening a big
-/// repository costs one folder, not the whole tree.
+/// One entry of the code view's tree. A folder reads its children when it is expanded (off the
+/// UI thread — a workspace can live on a network drive), so opening a big repository costs one
+/// folder, not the whole tree — and it reads them <b>again</b> on every expand, and when it is
+/// selected, merging the result into the nodes already there (<see cref="ListReconcile"/>):
+/// a file created since shows up without ⟳, and nothing that is open below it is lost.
 /// </summary>
 public sealed partial class FileNodeViewModel : ObservableObject
 {
     private readonly CodeViewModel _owner;
     private bool _loaded;
+    private int _syncGeneration;
 
     public FileNodeViewModel(CodeViewModel owner, WorkspaceEntry entry)
     {
@@ -46,19 +49,48 @@ public sealed partial class FileNodeViewModel : ObservableObject
 
     [ObservableProperty] private bool _isExpanded;
 
+    /// <summary>The children have been read at least once (the placeholder is gone).</summary>
+    public bool IsLoaded => _loaded && FullPath.Length > 0;
+
+    /// <summary>Tree identity: a folder and a file of the same name are different nodes.</summary>
+    internal string Key => FullPath.Length == 0 ? "" : (IsDirectory ? "d:" : "f:") + Name;
+
+    internal static string KeyOf(WorkspaceEntry e) => (e.IsDirectory ? "d:" : "f:") + e.Name;
+
     partial void OnIsExpandedChanged(bool value)
     {
         OnPropertyChanged(nameof(Icon));
-        if (value && IsDirectory && !_loaded) _ = LoadAsync();
+        if (value && IsDirectory) _ = LoadAsync();
     }
 
-    internal async Task LoadAsync()
+    /// <summary>
+    /// Read this folder's entries and merge them into <see cref="Children"/>: kept nodes stay
+    /// the same objects (their expansion and loaded children survive), gone ones go, new ones
+    /// appear in place. Overlapping calls: the last one wins.
+    /// </summary>
+    internal async Task<ListReconcile.Result> LoadAsync()
     {
-        if (_loaded) return;
+        if (!IsDirectory || FullPath.Length == 0) return default;
+        var generation = ++_syncGeneration;
+        var patterns = _owner.Patterns;
+        var path = FullPath;
+        var entries = await Task.Run(() => PathAvailability.DirectoryExistsFast(path)
+            ? WorkspaceFiles.List(path, patterns)
+            : null);
+        if (generation != _syncGeneration || entries is null) return default;
         _loaded = true;
-        var entries = await Task.Run(() => WorkspaceFiles.List(FullPath, _owner.Patterns));
-        Children.Clear();
-        foreach (var e in entries) Children.Add(new FileNodeViewModel(_owner, e));
+        var result = ListReconcile.Reconcile(Children, entries, n => n.Key, KeyOf, e => new FileNodeViewModel(_owner, e));
+        if (result.Changed)
+            AppLogger.Log($"[Code] folder synced | {Name} | +{result.Added} -{result.Removed}");
+        return result;
+    }
+
+    /// <summary>Re-read this folder and every expanded folder below it (⟳ keeps the tree as it is).</summary>
+    internal async Task SyncExpandedAsync()
+    {
+        if (!IsLoaded) return;   // never opened: the next expand reads it fresh anyway
+        await LoadAsync();
+        await Task.WhenAll(Children.Where(c => c.IsDirectory && c.IsExpanded).Select(c => c.SyncExpandedAsync()));
     }
 
     private static string FileIcon(string name) => Path.GetExtension(name).ToLowerInvariant() switch
@@ -219,6 +251,18 @@ public sealed partial class CodeViewModel : ObservableObject
     [RelayCommand] private void TogglePreview() => MarkdownPreview = !MarkdownPreview;
 
     /// <summary>
+    /// Images open fitted to the pane (shrunk to fit, never blown up past their own size) and
+    /// can be switched to actual size with scroll bars; the choice holds for the next image.
+    /// </summary>
+    [ObservableProperty] private bool _imageFit = true;
+
+    public string ImageFitLabel => ImageFit ? "1:1" : "⤢ Fit";
+
+    partial void OnImageFitChanged(bool value) => OnPropertyChanged(nameof(ImageFitLabel));
+
+    [RelayCommand] private void ToggleImageFit() => ImageFit = !ImageFit;
+
+    /// <summary>
     /// A link clicked in the preview: a web address goes to the browser (returned for the view
     /// to launch), a workspace file opens here. Anything else is ignored.
     /// </summary>
@@ -236,8 +280,15 @@ public sealed partial class CodeViewModel : ObservableObject
 
     partial void OnSelectedNodeChanged(FileNodeViewModel? value)
     {
-        if (value is { FullPath.Length: > 0 })
-            _ = value.IsDirectory ? ShowFolderAsync(value.FullPath) : OpenAsync(value.FullPath);
+        if (value is not { FullPath.Length: > 0 }) return;
+        if (!value.IsDirectory)
+        {
+            _ = OpenAsync(value.FullPath);
+            return;
+        }
+        _ = ShowFolderAsync(value.FullPath);
+        // Opening a folder that was read before refreshes its branch too, not only the listing.
+        if (value.IsLoaded) _ = value.LoadAsync();
     }
 
     /// <summary>
@@ -319,15 +370,65 @@ public sealed partial class CodeViewModel : ObservableObject
         await ShowFolderAsync(root);
     }
 
+    /// <summary>
+    /// ⟳: bring the tree up to date <b>in place</b> — the top level and every expanded folder are
+    /// read again and merged (<see cref="ListReconcile"/>), so expansion, selection and the open
+    /// file stay where they were. It used to rebuild the tree from nothing, which collapsed every
+    /// folder and lost the place, so a partial look at new files cost the whole position.
+    /// The open file is read again only if it changed; a listed folder is listed again.
+    /// </summary>
     [RelayCommand]
-    private async Task Refresh()
+    public async Task Refresh()
     {
-        // A new generation: the same root is read again, and any load still running is dropped.
-        await (_rootLoad = LoadRootAsync(Root, RootName, ++_rootGeneration));
+        var root = Root;
+        if (string.IsNullOrEmpty(root)) return;
+        if (Nodes.Count == 0)
+        {
+            // Nothing to keep (the first load failed — offline drive): load from scratch.
+            await (_rootLoad = LoadRootAsync(root, RootName, ++_rootGeneration));
+            return;
+        }
+
+        var generation = _rootGeneration;
+        var (ok, patterns, entries) = await Task.Run(() =>
+        {
+            if (!PathAvailability.DirectoryExistsFast(root)) return (false, (IReadOnlySet<string>)new HashSet<string>(), (IReadOnlyList<WorkspaceEntry>)Array.Empty<WorkspaceEntry>());
+            var p = WorkspaceFiles.LoadIgnorePatterns(root);
+            return (true, (IReadOnlySet<string>)p, WorkspaceFiles.List(root, p));
+        });
+        if (generation != _rootGeneration || !string.Equals(root, Root, StringComparison.OrdinalIgnoreCase)) return;
+        if (!ok)
+        {
+            Note = $"'{root}' is not reachable (offline drive?).";
+            return;
+        }
+        Patterns = patterns;
+        _ = GitLog.LoadAsync(root);   // the old full reload read the history again too
+        var top = ListReconcile.Reconcile(Nodes, entries, n => n.Key, FileNodeViewModel.KeyOf, e => new FileNodeViewModel(this, e));
+        await Task.WhenAll(Nodes.Where(n => n.IsDirectory && n.IsExpanded).Select(n => n.SyncExpandedAsync()));
+        AppLogger.Log($"[Code] refreshed in place | {RootName} | top +{top.Added} -{top.Removed}");
+
+        if (IsFolderView && CurrentFolder is { } folder)
+        {
+            if (await ShowFolderAsync(folder) is not null) await ShowFolderAsync(root);   // the folder is gone
+        }
+        else if (HasFile && CurrentPath is { } file)
+        {
+            if (await OpenAsync(file, reload: true) is not null) ClearFile("The file is no longer there.");
+        }
     }
 
-    /// <summary>Open a file: a path inside the workspace (absolute, or relative to it). Returns an error, or null.</summary>
-    public async Task<string?> OpenAsync(string path)
+    /// <summary>
+    /// True while <see cref="TextChanged"/> is raised for a re-read of the file already open —
+    /// the editor keeps its scroll position then instead of jumping to the top.
+    /// </summary>
+    public bool IsReload { get; private set; }
+
+    /// <summary>
+    /// Open a file: a path inside the workspace (absolute, or relative to it). Returns an error, or null.
+    /// <paramref name="reload"/>: re-read the open file (⟳) — nothing happens when it did not change.
+    /// </summary>
+    public async Task<string?> OpenAsync(string path, bool reload = false)
     {
         if (string.IsNullOrEmpty(Root)) return "no workspace is open";
         var full = Path.IsPathRooted(path) ? path : Path.Combine(Root, path);
@@ -348,6 +449,8 @@ public sealed partial class CodeViewModel : ObservableObject
             });
             if (generation != _openGeneration) return null; // a newer click won
             if (content is null) return "no such file";
+            reload = reload && HasFile && string.Equals(CurrentPath, full, StringComparison.OrdinalIgnoreCase);
+            if (reload && content.Kind == Kind && content.Text == Text && html == Html) return null;   // unchanged
             IsFolderView = false;
             CurrentFolder = null;
             CurrentPath = full;
@@ -358,7 +461,9 @@ public sealed partial class CodeViewModel : ObservableObject
             PreviewInfo = "";
             Note = content.Note ?? "";
             HasFile = true;
-            TextChanged?.Invoke();
+            IsReload = reload;
+            try { TextChanged?.Invoke(); }
+            finally { IsReload = false; }
             return null;
         }
         catch (Exception ex)
@@ -399,6 +504,7 @@ public sealed partial class CodeViewModel : ObservableObject
             ["folder"] = IsFolderView && CurrentFolder is not null ? CurrentTitle : null,
             ["view"] = IsFolderView ? "folder" : !HasFile ? null : IsPreview ? "preview" : IsImage ? "image" : IsTextView ? "text" : "note",
             ["preview"] = PreviewInfo.Length == 0 ? null : PreviewInfo,
+            ["imageFit"] = IsImage ? ImageFit : null,
             ["chars"] = Text.Length,
             ["topLevel"] = Nodes.Count,
             ["gitLog"] = new System.Text.Json.Nodes.JsonObject

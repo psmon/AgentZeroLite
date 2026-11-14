@@ -246,5 +246,5 @@ public class AppDbContext : DbContext
     /// codex that <c>bash -l -i -c</c> (and every terminal the user opens) finds.
     /// </summary>
     internal static string PosixAgentArguments(string launch, string shellName)
-        => $"-l -i -c \"{launch}; exec {shellName} -l\"";
+        => ShellLaunch.PosixArguments(launch, shellName);
 }

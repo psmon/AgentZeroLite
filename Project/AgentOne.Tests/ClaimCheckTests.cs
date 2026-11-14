@@ -179,19 +179,41 @@ public class ClaimCheckSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task FilesACommandMadeAreNotAnUnbackedChange()
+    {
+        // Measured (2026-11-05): a download script saved the takes, the answer
+        // said "다운로드했습니다", and the claim check sent it back because no
+        // write_file had run. A successful command can make files.
+        var basic = new ScriptedChatProvider(
+            """{"tool":"run_command","args":{"command":"echo hi"}}""",
+            """{"tool":"final","args":{"text":"테이크 4개를 다운로드했습니다."}}""");
+        var engine = new ScriptedDecisionEngine(
+            Choose(SmartRouter.WorkInWorkspace),
+            Choose(SmartRouter.SafeOption),
+            Choose(SmartRouter.UnbackedChange));
+        using var session = Session(basic, engine);
+
+        var run = await session.SubmitAsync("테이크 받아와", CancellationToken.None);
+
+        Assert.DoesNotContain(run!.Steps, s => s.Tool == "unbacked");
+        Assert.Equal(2, basic.CallCount);
+    }
+
+    [Fact]
     public async Task ATurnThatWroteAndRanIsNotAsked()
     {
         var basic = new ScriptedChatProvider(
             """{"tool":"write_file","args":{"path":"a.txt","content":"x"}}""",
-            """{"tool":"run_command","args":{"command":"echo hi"}}""",
-            """{"tool":"final","args":{"text":"a.txt 를 만들고 echo 를 실행했습니다."}}""");
+            """{"tool":"run_command","args":{"command":"hostname"}}""",
+            """{"tool":"final","args":{"text":"a.txt 를 만들고 hostname 을 실행했습니다."}}""");
         var engine = new ScriptedDecisionEngine(
             Choose(SmartRouter.WorkInWorkspace),   // no reasoning model, so no scope question
             Choose(SmartRouter.SafeOption),
             Choose(SmartRouter.UnbackedRun));
         using var session = Session(basic, engine);
 
-        await session.SubmitAsync("a.txt 만들고 echo hi 실행해", CancellationToken.None);
+        // A program, not a listing: echo/ls only list, and listing backs no review.
+        await session.SubmitAsync("a.txt 만들고 hostname 실행해", CancellationToken.None);
 
         Assert.DoesNotContain(SmartRouter.ClaimQuestion, engine.Questions);
     }

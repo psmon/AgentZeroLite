@@ -231,6 +231,9 @@ namespace Agent.Common.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("AgentSessions")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("CliDefinitionId")
                         .HasColumnType("INTEGER");
 

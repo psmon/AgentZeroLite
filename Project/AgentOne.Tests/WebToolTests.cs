@@ -170,7 +170,10 @@ public class CompositeToolbeltTests
             (ToolCatalog.EditFamily, files),
             (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(5))),
             (ToolCatalog.ExecFamily, new ShellToolbelt(root, TimeSpan.FromSeconds(5))),
-            (ToolCatalog.DecideFamily, new DecisionToolbelt(null, 0.6)));
+            (ToolCatalog.DecideFamily, new DecisionToolbelt(null, 0.6)),
+            // A scripted playwright-cli: a real one would attach to whatever Chrome is on 9222.
+            (ToolCatalog.BrowserFamily, new AgentOne.Tools.Browser.BrowserToolbelt(new FakeBrowserDriver(), "off")),
+            (ToolCatalog.GuideFamily, new AgentOne.Tools.Cli.KnownCliToolbelt()));
     }
 
     [Fact]

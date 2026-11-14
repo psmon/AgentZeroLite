@@ -75,14 +75,9 @@ public sealed class AgentKindDetector
         if (AgentCliTools.Match(definition) is { } tool) return Wire(tool);
 
         // "claude-sam", "codex-work": the multi-account wrappers people define (a shell function or
-        // script that sets the profile and runs the tool). Same token rule as CliToolMention —
-        // a path's folder name does not count, only a command word.
-        foreach (var word in Words(definition.ExePath).Concat(Words(definition.Arguments)))
-            foreach (var t in AgentCliTools.All)
-                if (word.StartsWith(t.Command + "-", StringComparison.OrdinalIgnoreCase)
-                    || word.StartsWith(t.Command + "_", StringComparison.OrdinalIgnoreCase))
-                    return Wire(t);
-        return null;
+        // script that sets the profile and runs the tool). The rule lives in AgentProfileCommand,
+        // which the resume picker uses too.
+        return AgentProfileCommand.Find(definition) is { } wrapper ? Wire(wrapper.Tool) : null;
     }
 
     /// <summary>The old rule: a title that starts with a tool's name ("Codex", "Claude-2").</summary>
@@ -95,20 +90,4 @@ public sealed class AgentKindDetector
     }
 
     private static string Wire(AgentCliTool tool) => tool.Name.ToLowerInvariant();
-
-    private static readonly char[] Separators = { ' ', '\t', '"', '\'', ';', '&', '|', '(', ')', '<', '>', '`' };
-
-    private static IEnumerable<string> Words(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) yield break;
-        foreach (var token in text.Split(Separators, StringSplitOptions.RemoveEmptyEntries))
-        {
-            var name = token;
-            var slash = name.LastIndexOfAny(new[] { '\\', '/' });
-            if (slash >= 0) name = name[(slash + 1)..];
-            var dot = name.LastIndexOf('.');
-            if (dot > 0) name = name[..dot];
-            if (name.Length > 0) yield return name;
-        }
-    }
 }

@@ -65,6 +65,18 @@ public static class AgentSessionCatalog
         return Array.Empty<AgentSessionInfo>();
     }
 
+    /// <summary>
+    /// The sessions <paramref name="tool"/> has for <paramref name="cwd"/> in one named profile
+    /// folder — a wrapper's (<see cref="AgentProfileCommand"/>), whose folder is set inside the
+    /// wrapper and so is not in the tab's environment.
+    /// </summary>
+    public static IReadOnlyList<AgentSessionInfo> ListIn(AgentCliTool tool, string cwd, string configDir, int max = 30)
+    {
+        if (ReferenceEquals(tool, AgentCliTools.Claude)) return ListClaude(cwd, configDir, max);
+        if (ReferenceEquals(tool, AgentCliTools.Codex)) return ListCodex(cwd, configDir, max);
+        return Array.Empty<AgentSessionInfo>();
+    }
+
     /// <summary>Whether <see cref="List"/> knows how to read this tool's store.</summary>
     public static bool Supports(AgentCliTool? tool) =>
         ReferenceEquals(tool, AgentCliTools.Claude) || ReferenceEquals(tool, AgentCliTools.Codex);
