@@ -34,11 +34,17 @@ public sealed class AskCommand
         var name = wait ? "agent-one session wait" : "agent-one ask";
         bool yes = false, json = false, jsonl = false, quiet = false, detach = false, noStart = false, resume = false;
         var rest = new List<string>();
+        string? answersFile = null;
 
-        foreach (var arg in args)
+        for (var index = 0; index < args.Length; index++)
         {
+            var arg = args[index];
             switch (arg)
             {
+                case "--answers":
+                    if (index + 1 >= args.Length) { Console.Error.WriteLine($"{name}: --answers needs a file"); return 2; }
+                    answersFile = Path.GetFullPath(args[++index]);
+                    break;
                 case "-y" or "--yes": yes = true; break;
                 case "--json": json = true; break;
                 case "--jsonl": jsonl = true; break;
@@ -182,7 +188,38 @@ public sealed class AskCommand
             return Task.CompletedTask;
         }
 
-        Task<string> Answer(PipeEvent e)
+        // Measured (2026-11-16): an agent driving agent-one from a script could only approve everything
+        // (--yes) or nothing — a generation that spends credits and a harmless listing got the same answer.
+        // --answers <file> is the operator's line for someone who is not at a terminal: each question waits
+        // for the next line appended to that file. Lines already there when the call starts are not answers.
+        var answersRead = 0;
+        if (answersFile is not null)
+        {
+            if (!File.Exists(answersFile)) File.WriteAllText(answersFile, "");
+            answersRead = ReadAnswerLines(answersFile).Count;
+        }
+
+        async Task<string> Answer(PipeEvent e)
+        {
+            if (answersFile is not null && !(yes && e.Event == "ask"))
+            {
+                if (chatty) Console.WriteLine($"  (waiting for a line appended to {answersFile})");
+                while (true)
+                {
+                    var lines = ReadAnswerLines(answersFile);
+                    if (lines.Count > answersRead)
+                    {
+                        var line = lines[answersRead++].Trim();
+                        if (chatty) { Console.WriteLine($"  answered: {line}"); progress.Restart(); }
+                        return line;
+                    }
+                    await Task.Delay(500, ct);
+                }
+            }
+            return AnswerNow(e);
+        }
+
+        string AnswerNow(PipeEvent e)
         {
             string reply;
             if (e.Event == "ask")
@@ -196,7 +233,7 @@ public sealed class AskCommand
                 if (!interactive && chatty) Console.WriteLine("  (taking the recommendation — not interactive)");
             }
             if (chatty) progress.Restart();
-            return Task.FromResult(reply);
+            return reply;
         }
 
         var request = wait
@@ -260,6 +297,20 @@ public sealed class AskCommand
             Console.Error.WriteLine(Summary(result));
 
         return code;
+    }
+
+    /// <summary>The complete lines of the answers file — a line still being written (no newline yet) is not one.</summary>
+    private static List<string> ReadAnswerLines(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            var lines = reader.ReadToEnd().Replace("\r", "").Split('\n').ToList();
+            lines.RemoveAt(lines.Count - 1); // what follows the last newline: empty, or unfinished
+            return lines;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return []; }
     }
 
     /// <summary>

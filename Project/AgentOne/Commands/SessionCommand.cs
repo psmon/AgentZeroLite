@@ -354,6 +354,7 @@ public sealed class SessionCommand
               --detach      hand it over and return at once; `session wait` collects the result
               --json        print the result event only       --jsonl  every event as it happens, result last
               -y, --yes     approve commands without asking     -q       no progress, no summary
+              --answers <file>  not at a terminal: each approval or choice waits for the next line appended to <file>
               --no-start    fail instead of starting a session  --resume a session this call starts resumes the last conversation
               chat options (-r, --smart, -m, …) apply only when this call starts the session.
             A command needing approval is asked here (or approved with --yes; refused when nobody is

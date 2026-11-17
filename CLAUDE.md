@@ -1166,6 +1166,46 @@ takes — the match text it needed (the prompt's first words, recorded in `harne
 never looked up. Repeated failed turns also poison what comes next: their reports, memory.md and graph facts are read
 back as evidence.
 
+**A checkout of its own, tools found before installed, and results checked as they are made**
+(2026-11-16 e2e in a music-harness **worktree**: compose → generate on deevid → download → pick → onset →
+on-device images → Python composite; tests `GitWorkspaceTests`, `WritePrecedentTests`, `ToolLocatorTests`,
+`WriteCheckTests`, `MediaCheckTests`). The workspace was mid-work on a feature branch and agent-one had no notion of
+a checkout; each item below is one measured failure of that run.
+- **`--worktree <name>`** (`Services/GitWorkspace`): the root is fixed at session start and nothing is written
+  outside it, so separation cannot be asked of the model mid-session. The flag creates or reuses
+  `<repo>-worktrees/<name>` on branch `agent-one/<name>` from the current commit and works there. Detection reads
+  git's own files (no process; a `.git` folder with no HEAD is not a repository — a stray one in a home folder made
+  everything under it "a checkout"); the prompt names the branch and whose the main checkout is; a linked worktree
+  may **read** the main checkout (git-ignored media and environments stay there). Git-ignored local configuration
+  (`.env`, `.env.local`, `.secret`, `.secrets`) is **copied** in when the worktree's own rules ignore it and it is
+  small — never through the model: the alternative a model finds is reading the key into its context.
+- **Look before installing** (`Tools/Cli/ToolLocator`, a list of `IToolFinder`s meant to grow: PATH, Python
+  environments of the workspace / main checkout / user, node packages, the workspace's own scripts; aliases so
+  `whisper` finds an installed `faster_whisper`). One search, three users: the `find_tool` verb
+  (`agent-one tools find <name>` for a person), the gate — an install of something found is refused before anyone
+  is asked, and no install is ever auto-approved — and the note on a "no such module / command" failure.
+- **Precedent on disk** (`Agent/WritePrecedent`): a new file named like its siblings is sent back once with the
+  newest of them (a guide.md in a format of the model's own beside sixty the generation script parses); a folder the
+  root lacks but the tree has further down is pointed out; a work folder short of what most siblings hold is
+  `unfinished`; a command that rejects the session's own file answers "fix the file, not the command". The same
+  path written again always goes through.
+- **Checked as made**: `Tools/WriteCheck` parses a written `.json` here and a `.py`/`.js` with the interpreter
+  already present (a script ended `full()"` — the envelope's quote — and was rewritten identically three times);
+  `Tools/MediaCheck` samples frames of media a command wrote (a 223 s 1080p video of one flat colour was reported
+  as passed on duration and size). No interpreter or ffmpeg means no check, never an install.
+- **Loop guards corrected**: a successful `write_file` makes earlier commands runnable again
+  (`AgentLoopGuards.WorkspaceChanged` — fix-the-file-then-rerun was answered "you already made that call" and ended
+  two turns); `MissingMediaInputs` reads each statement of a chained command on its own (three renames with `;`
+  were refused); the hand-back question has a third option, `promises_later` ("next I will analyse and pick" with
+  nothing made), with its own order; the everyday model's reasoning budget is 24 000 characters (was 60 000: ten
+  minutes per runaway) and a cut-off reply records its last thoughts, an unparsed one its head and tail; a long tool
+  call shows "writing a tool call · N chars" instead of reading as a hang; child processes get
+  `PYTHONUTF8`/`PYTHONIOENCODING` (a script died in its last `print` under cp949); the prompt carries today's date.
+- **`ask --answers <file>`**: a caller with no terminal approves one command at a time by appending lines — `--yes`
+  was all or nothing, and a generation that spends credits must not ride on the same yes as a listing.
+- Second day (2026-11-17), the same run closed end to end — `out/mv-…-v2.mp4`, 1080p30, the song's full 222.9 s, scenes per the plan with lyrics — but the composite needed three code-level hints from the operator (a zoom argument of 0.0 passed positionally, `cues.json` iterated as a list when it is an object of arrays, a made-up `--dur`). Two more fixes came of it: `WriteCheck` removes a single stray envelope quote when that alone makes the file parse (seven identical rewrites in a row carried it), and the prompt and the runaway retry say not to draft a file in the reasoning (the budget was spent five times drafting a 120-line script there).
+- Still open: a blank render is caught, but a render with pictures and **no text**, or one **shorter than its audio**, is not; a pick was justified by duration alone while its report spoke of hook and groove (`backed` at 0.96, since ffprobe had run); and an operator driving `ask` from Git Bash must pass the request on stdin — MSYS rewrites `C:/…` paths inside an argument.
+
 ## Documentation pairs — update both languages together
 
 Three READMEs exist in two languages, and a change to one is not done until

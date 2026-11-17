@@ -23,6 +23,31 @@ public class GemmaNativeCallTests
         Assert.Equal("# Phase 1 Knowledge\n\n## Assumptions\n- \"quoted\" and {braces}, commas.\n", call.Arg("content"));
     }
 
+    [Fact]
+    public void APythonFileInTripleQuotesIsTakenWholeDocstringsAndAll()
+    {
+        // Measured (2026-11-16): `content:"""import sys…"""` — the first quote was read as an empty
+        // string, the call was unreadable, and the turn reported a file saved that was never written.
+        const string file = "import sys, os\n\"\"\"Docstring, with a \"quote\" and {braces}.\"\"\"\nprint(\"a\\n\", {'k': 1})\n";
+        var reply = "<|tool_call>call:write_file{args:{content:\"\"\"" + file + "\"\"\",path:\"mv/mograph.py\"}}<tool_call|>";
+
+        Assert.True(ToolCall.TryParse(reply, out var call, out var error), error);
+
+        Assert.Equal("write_file", call.Tool);
+        Assert.Equal("mv/mograph.py", call.Arg("path"));
+        Assert.Equal(file, call.Arg("content"));
+    }
+
+    [Fact]
+    public void TripleQuotesAsTheLastArgumentAndAfterALayoutLineBreak()
+    {
+        var reply = "<|tool_call>call:write_file{args:{path:\"a.py\",content:\"\"\"\nx = 1\n\"\"\"}}<tool_call|>";
+
+        Assert.True(ToolCall.TryParse(reply, out var call, out var error), error);
+
+        Assert.Equal("x = 1\n", call.Arg("content"));
+    }
+
     [Theory]
     [InlineData("<|tool_call>call: list_files{}<tool_call|>", "list_files", "", "")]
     [InlineData("<|tool_call>call:read_file{path:\"src/a.cs\"}", "read_file", "path", "src/a.cs")]

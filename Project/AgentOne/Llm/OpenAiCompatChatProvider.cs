@@ -199,8 +199,11 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             var thinkTail = new System.Text.StringBuilder();
             int thinking = 0, thinkingChecked = 0, contentChecked = 0;
             var started = System.Diagnostics.Stopwatch.StartNew();
+            // What it was thinking when it was cut off goes into the message (and so the
+            // session log): measured (2026-11-16), five runaways in one evening left nothing
+            // to tell a loop of doubt from a plan being written out in the wrong channel.
             ChatProviderStalledException Degenerate(string what, int received) =>
-                new($"{_model} {what} — the call was cut off", received, degenerate: true);
+                new($"{_model} {what} — the call was cut off" + ThoughtTail(thinkTail), received, degenerate: true);
 
             // HttpClient.Timeout stops at the headers when they are read first, so
             // the body has no clock of its own. Measured (2026-09-29): a design
@@ -302,7 +305,16 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
     /// frames, and losing the run over one of those would be absurd.
     /// </summary>
     /// <summary>Reasoning past this many characters, with no answer begun, is a runaway — not thinking.</summary>
-    public int ThinkingLimitChars { get; init; } = 60_000;
+    public int ThinkingLimitChars { get; init; } = 24_000;
+
+    /// <summary>The end of a cut-off reasoning, flattened to one line, for the log.</summary>
+    private static string ThoughtTail(System.Text.StringBuilder tail)
+    {
+        if (tail.Length == 0) return "";
+        var text = tail.ToString();
+        text = string.Join(' ', text[Math.Max(0, text.Length - 400)..].Split((char[])['\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries));
+        return text.Length == 0 ? "" : " · last thoughts: …" + text;
+    }
 
     /// <summary>Reasoning longer than this, with no answer begun, is a runaway too — the everyday model's step is not a design.</summary>
     public TimeSpan ThinkingLimitTime { get; init; } = TimeSpan.FromMinutes(12);

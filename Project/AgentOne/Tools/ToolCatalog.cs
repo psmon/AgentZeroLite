@@ -152,6 +152,13 @@ public static class ToolCatalog
             ["name"],
             """{"tool":"cli_guide","args":{"name":"ffmpeg"}}"""),
 
+        new("find_tool", GuideFamily,
+            "Look for a tool on THIS machine before installing anything: a command, a Python module or a node package — on PATH, " +
+            "in the Python environments the workspace (and its main checkout) and the user already have, in node packages, " +
+            "and among the workspace's own scripts. Returns where it is and the exact way to run it.",
+            ["name"],
+            """{"tool":"find_tool","args":{"name":"whisper"}}"""),
+
         new("browser_open", BrowserFamily,
             "Open a URL in a real browser (a new tab in the user's own Chrome when it runs with remote debugging, " +
             "otherwise a browser of your own) and return the page: title, URL and its element tree with [ref=eN] refs. " +

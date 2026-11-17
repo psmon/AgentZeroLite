@@ -45,14 +45,16 @@ public class StreamStallTests
     [Fact]
     public async Task AStreamThatKeepsTalkingIsNotCutEvenPastTheIdleLimitInTotal()
     {
-        // Six chunks 120 ms apart: 720 ms in all, never 300 ms of silence.
-        var parts = Enumerable.Range(0, 6).Select(i => (TimeSpan.FromMilliseconds(120), Chunk("p" + i))).ToList();
+        // Twenty-five chunks 100 ms apart: 2.5 s in all, never 2 s of silence. The margin is wide on
+        // purpose — at 120 ms against 300 the test failed whenever other tests' child processes
+        // (git, python, node) held the scheduler for a moment.
+        var parts = Enumerable.Range(0, 25).Select(i => (TimeSpan.FromMilliseconds(100), Chunk("p" + i))).ToList();
         parts.Add((TimeSpan.Zero, "data: [DONE]\n\n"));
-        using var provider = Provider(() => new ScriptedStream(parts, hangAtEnd: false), TimeSpan.FromMilliseconds(300));
+        using var provider = Provider(() => new ScriptedStream(parts, hangAtEnd: false), TimeSpan.FromSeconds(2));
 
         var reply = await provider.CompleteAsync([ChatMessage.User("hi")], CancellationToken.None, _ => { });
 
-        Assert.Equal("p0p1p2p3p4p5", reply);
+        Assert.Equal(string.Concat(Enumerable.Range(0, 25).Select(i => "p" + i)), reply);
     }
 
     [Fact]

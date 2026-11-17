@@ -119,6 +119,7 @@ that invocation only:
 
 ```
 -r, --root <dir>      Workspace the tools may read and write (default: cwd)
+    --worktree <name> Work in a git worktree of its own (see "A checkout of its own")
 -p, --provider <name> echo | openai
 -m, --model <name>    Model id
     --base-url <url>  OpenAI-compatible endpoint
@@ -477,7 +478,10 @@ turn's own verdict. A
 question comes back to the first caller still attached: a command to approve
 (`y`, or `--yes` up front) or a design choice to make (a number, Enter for the
 recommendation); with nobody attached a command is refused and a choice takes
-the recommendation. The conversation, the log and the workspace memory are the
+the recommendation. A caller that is not at a terminal and does not want
+`--yes`'s blanket approval passes `--answers <file>`: each question is printed
+and then waits for the next line appended to that file (`y`, `n`, a number, or
+words), so a driving agent approves one command at a time. The conversation, the log and the workspace memory are the
 same as the window's. One session at a time; a second `start` is refused while
 the first is alive, and a stale record from a crash is cleared. Exit codes:
 0 answered · 1 failed or stopped · 2 usage · 3 busy.
@@ -725,6 +729,36 @@ renderers over one `ChatSession` — as is `run`, a single turn of the same
 session — so a turn routes, runs, judges its draft and escalates identically in
 all three. That is not an aesthetic choice: three copies of that logic would
 drift within a week.
+
+### A checkout of its own
+
+The workspace root is fixed when a session starts and nothing is ever written
+outside it, so "do this apart from what is already here" cannot be asked of the
+model mid-session — the separation has to exist before the first turn.
+`--worktree <name>` makes it:
+
+```
+agent-one chat --worktree song-1          # from anywhere inside the repository
+agent-one ask  --worktree song-1 "…"      # the background session starts there too
+```
+
+- The worktree is `<repo>-worktrees/<name>`, beside the repository, on branch
+  `agent-one/<name>`, created from the commit the current checkout is on. Asking
+  again — from the main checkout or from inside the worktree — reuses it.
+- The checkout you started from is not touched: its branch, its uncommitted
+  changes and its git-ignored files stay where they are.
+- Git-ignored files (generated media, caches) are not copied. A session in a
+  linked worktree may **read** the main checkout from the start — the same
+  read-only grant a folder named by absolute path gets — and still writes only
+  under its own root.
+- The system prompt names the checkout: its branch, whether it is the main
+  checkout or a linked worktree, and whose the main checkout is. A worktree has
+  its own workspace store (`~/.agent-one/workspaces/…`), so its memory, sessions
+  and knowledge graph are its own as well.
+
+Detection reads git's own files and starts no process; only creating a worktree
+runs `git`. Tests: `GitWorkspaceTests`.
+
 
 ### Looking back: the dashboard
 
@@ -1108,6 +1142,7 @@ inside those two families.
 | `process_status(id)` | What this session started: every process (no id), or one with its state, address and newest output. |
 | `process_stop(id)` | Stop a process this session started, and everything it started. |
 | `cli_guide(name)` | The built-in usage card of a well-known command-line tool — playwright-cli, gh, git, ffmpeg, yt-dlp, node, python, dotnet, docker, rg, curl, jq — and whether it is installed here. No name lists them. Reads nothing, runs nothing, so no route rules it out. |
+| `find_tool(name)` | Looks for a tool on **this machine** before anything is installed — a command, a Python module or a node package: PATH, the Python environments the workspace (and the main checkout it is a worktree of) and the user already have, node packages, and the workspace's own scripts for it. Returns where it is and the exact way to run it. `agent-one tools find <name>` is the same search for a person. |
 | `browser_open(url)` | Open a page in a real browser and return its title, URL and element tree with `[ref=eN]` refs. Attaches to the person's Chrome when one listens on `browserCdpUrl` (a **new tab** — theirs is left alone), else opens a browser of its own. |
 | `browser_snapshot()` · `browser_read()` · `browser_find(text)` · `browser_tabs(index)` | Look at the current tab: its element tree, its visible text (24 000 chars), the elements matching a text, or the tab list / switch to a tab. |
 | `browser_click(ref)` · `browser_fill(ref, text, submit)` · `browser_press(key)` | Act on the page by a ref from the latest snapshot; each returns the page as it now is. The first action on a site asks the person; a yes holds for that site for the session. |
@@ -1155,6 +1190,68 @@ without an executable on PATH is found as its module (`python -m yt_dlp`, probed
 with `--version`), and the prompt and card say to run it that way — measured, a
 module-only yt-dlp was reported missing, and a channel analysis stopped at the
 eleven videos a browser page showed instead of the channel's 457.
+
+**Look before installing** (`Tools/Cli/ToolLocator.cs`, `ToolLocatorTests`).
+Measured (2026-11-16, music-harness): the workspace runs Whisper through its own
+scripts in an environment prepared months earlier (`.local/whisper-env`,
+faster-whisper). agent-one ran `python -m whisper` on the system Python, got "No
+module named 'whisper'", asked to `pip install openai-whisper`, and when that was
+declined told the user to install it themselves. Nothing had looked. So looking
+is built in, as a list of finders that is meant to grow (`ToolLocator.Finders`:
+add an `IToolFinder`, add it to the list):
+
+| Finder | Looks in |
+|---|---|
+| `path` | executables on PATH (PATHEXT-aware) |
+| `python-env` | any folder with a `pyvenv.cfg` up to three levels under the workspace **and the main checkout a worktree came from** (dot folders included), plus the user's own: `~/.virtualenvs`, conda / miniforge envs, pipx, uv tools, per-user Python installs. A package is matched by its import name or its dist-info name (`opencv-python` ↔ `cv2`) |
+| `node` | `node_modules` of the workspace and main checkout, and the global npm folder |
+| `workspace` | the workspace's own scripts named after the tool (`Tools/whisper/align.py`) — a project that wraps a tool has usually settled the environment question in the wrapper |
+
+Names have aliases (`whisper` ↔ `openai-whisper` ↔ `faster-whisper`, `PIL` ↔
+`pillow`, …): a **related** package that is already installed answers for the one
+asked for, marked `~` instead of `✓`. The search is used in three places, so it
+cannot be skipped by a model that forgets the verb:
+
+- **`find_tool`** — the model asks; the card gives the exact command
+  (`"…/whisper-env/Scripts/python.exe" your_script.py`).
+- **The command gate** — `ToolLocator.InstallTargets` reads `pip install`,
+  `python -m pip install`, `uv pip`, `pipx`, `conda`, `npm i`, `winget`, `choco`,
+  `scoop`, `brew`, `apt`. An install of something the search finds is **refused
+  before anyone is asked**, with the card. An install of something it does not
+  find always goes to a person (never auto-approved as "safe"), and the question
+  says the machine was searched first.
+- **A failed command** — "No module named 'x'", "'x' is not recognized",
+  "x: command not found", "Cannot find module 'x'" come back with the card, or
+  with "not on this machine — do not install it yourself, say what is missing".
+
+**Checked the moment it is made.** Three checks answer from the file itself, with
+no model call, and their text rides on the tool result that caused them:
+
+- **`WriteCheck`** — a written `.json` is parsed here; a `.py` / `.js` by the
+  interpreter already on the machine. Measured: a Python script was written with
+  the JSON envelope's quote left after its last line (`full()"`); the write said
+  ok and the model rewrote the same text three times before the repeat guard
+  ended the turn. The note names the last line when it looks like envelope
+  residue.
+- **`MediaCheck`** — after a command, pictures and videos it wrote in the folders
+  it named are sampled with the machine's ffmpeg (three moments of a video,
+  shrunk to a grey thumbnail). Measured: a 223-second 1920×1080 music video was
+  rendered, measured for duration and size and reported as passed — every frame
+  was one flat colour. Frames that are all nearly uniform come back with their
+  brightness numbers and "do not report this file as done".
+- **`WritePrecedent`** — a *new* file whose name its sibling folders already use
+  (`songs/<new>/guide.md` beside sixty `guide.md`) is sent back once with the
+  newest of them to model its structure on; a path that opens a folder the root
+  lacks but the tree has further down (`knowledge/…` vs `harness/knowledge/…`) is
+  pointed there; a work folder short of what most of its siblings hold is
+  "unfinished" and the final answer is sent back while the nudge keeps producing
+  files; and a command that rejects a file the session itself wrote comes back
+  with "fix the file, not the command" and the sibling that command has accepted.
+  Writing the same path again always goes through — a refusal that cannot be
+  overruled is a dead end.
+
+Neither interpreter nor ffmpeg is ever installed for these: missing means no
+check. Tests: `WriteCheckTests`, `MediaCheckTests`, `WritePrecedentTests`.
 
 **The browser became verbs** (`Tools/Browser/`), because driving a page is many
 small calls a model should not have to spell as shell commands. They run

@@ -46,6 +46,9 @@ public static class SystemPrompt
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>The clock, replaceable by a test.</summary>
+    internal static Func<DateTime> Today { get; set; } = () => DateTime.Now;
+
     private static string Core(string workspaceRoot)
     {
         var sb = new StringBuilder();
@@ -74,10 +77,20 @@ public static class SystemPrompt
         sb.AppendLine("  actually succeeded in this turn. If a tool was refused, say so plainly instead of claiming");
         sb.AppendLine("  the work is done.");
         sb.AppendLine("- write_file takes the WHOLE file as a JSON string: escape newlines as \\n and quotes as \\\".");
+        // Measured (2026-11-16): the everyday model drafted a 120-line script in its reasoning, then again,
+        // and was cut off at the reasoning budget five times without ever sending the write.
+        sb.AppendLine("- Think briefly. Never draft a file, a script or a tool call in your reasoning before sending it:");
+        sb.AppendLine("  reasoning is discarded, so the draft is wasted and must be generated again. Write a file ONCE, directly");
+        sb.AppendLine("  in write_file's content, and end the content exactly where the file ends — no quote or brace after it.");
         sb.AppendLine("- Use forward slashes in paths and commands (src/app.py, ./run.ps1) — PowerShell accepts them, and a");
         sb.AppendLine("  backslash inside JSON starts an escape (\".\\run.ps1\" turns \\r into a carriage return).");
         sb.AppendLine("- write_file can only write inside the workspace root. Never plan or write a file outside it —");
         sb.AppendLine("  not ../, not an absolute path, not another worktree or clone: those writes are refused.");
+        // Measured (2026-11-16): asked for a song, the model dated its folder a day ahead —
+        // nothing had told it the date, and the workspace names its work by date.
+        sb.AppendLine($"- Today is {Today():yyyy-MM-dd} ({Today():dddd}), local time. Use it for dated file and folder names; never guess a date.");
+        var git = Services.GitWorkspace.PromptLines(workspaceRoot);
+        if (git.Length > 0) sb.AppendLine(git);
         var shell = ShellInfo.Current;
         sb.AppendLine($"- run_command runs in {shell.Describe}. {shell.Hints}");
         // Measured (2026-11-07, music-harness): asked to generate a song on a site the
@@ -113,6 +126,10 @@ public static class SystemPrompt
             sb.AppendLine("  instead of searching the web for how. cli_guide {\"name\":\"…\"} gives the exact commands:");
             sb.AppendLine(known);
         }
+        sb.AppendLine("- NEVER install anything (pip, npm, winget, brew, apt…) before looking for it: find_tool {" + "\"name\":\"…\"" + "} searches");
+        sb.AppendLine("  this machine — PATH, the Python environments the workspace and the user already have, node packages, the");
+        sb.AppendLine("  workspace's own scripts — and returns the exact way to run what it finds. An install command for something");
+        sb.AppendLine("  that is already here is refused. A workspace that wraps a tool in its own script wants that script used.");
         sb.AppendLine();
         sb.AppendLine("Tools:");
 

@@ -519,6 +519,8 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
     public const string Proceeds = "proceeds";
     public const string HandsBack = "hands_back";
 
+    public const string PromisesLater = "promises_later";
+
     public const string HandBackQuestion =
         "Does the answer stop and hand the work back to the user, instead of doing or answering what was asked?";
 
@@ -530,7 +532,14 @@ public sealed class SmartRouter(IDecisionEngine engine, double confidenceFloor, 
         new(HandsBack,
             "The answer asks the user to provide, find or place files, data, links or details, to do a step " +
             "themselves, or to pick between versions or options it laid out — instead of going ahead with the " +
-            "default or the one it would recommend — before the work can go on.")
+            "default or the one it would recommend — before the work can go on."),
+        // Measured (2026-11-16): asked to download, measure and pick a take, the turn downloaded
+        // two files, read their lengths and ended on "next I will analyse each take and copy the
+        // best one to out/pick.mp3, then report". It asked the user for nothing, so "hands back"
+        // did not fit and the answer passed at 0.80 — with the asked-for file never made.
+        new(PromisesLater,
+            "The answer ends by saying what it WILL do next — analyse, compare, choose, write, copy, report back — " +
+            "while the result that was asked for has not been produced yet. It is a plan for a later turn, not the work.")
     ];
 
     /// <summary>

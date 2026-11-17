@@ -43,6 +43,17 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     /// </summary>
     public string? Root { get; set; }
 
+    /// <summary>Files read so far in this conversation — what <see cref="WritePrecedent"/> asks about before a new file.</summary>
+    private readonly HashSet<string> _read = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>New files already sent back once for a look at their precedent; the second write goes through.</summary>
+    private readonly HashSet<string> _precedentAsked = new(StringComparer.OrdinalIgnoreCase);
+
+    private const string RunawayNudge = "[check] Your last reply was all reasoning and never produced an answer, so it was cut off.";
+
+    /// <summary>Files written so far in this conversation.</summary>
+    private readonly HashSet<string> _wrote = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Starts a fresh conversation. Called once per chat session, or once per run.</summary>
     /// <param name="memory">The workspace's memory to open with; null keeps whatever the last Reset used.</param>
     /// <summary>The pause between steps: the person holds the loop here, and may hand it a refinement on resume.</summary>
@@ -84,6 +95,9 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     {
         if (memory is not null) _memory = memory;
         _messages.Clear();
+        _read.Clear();
+        _precedentAsked.Clear();
+        _wrote.Clear();
         _messages.Add(ChatMessage.System(SystemPrompt.Build(toolbelt.Scope, _memory, Guide)));
     }
 
@@ -93,6 +107,12 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
     /// — the answer is what the model needs to continue from, and the memory
     /// says what was done.
     /// </summary>
+    /// <summary>A file an earlier turn of a resumed session wrote: still this session's own.</summary>
+    public void RememberWritten(string path)
+    {
+        if (Normalize(path) is { Length: > 0 } normal) _wrote.Add(normal);
+    }
+
     public void Restore(string prompt, string answer)
     {
         if (_messages.Count == 0) Reset();
@@ -137,6 +157,8 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
         // Commands by shape (quoted values blanked), to see values being guessed.
         var tried = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var languageNudged = false;
+        // Files written when the "unfinished" check last spoke; it speaks again only after progress.
+        var unfinishedAt = 0;
 
         for (int step = 1; step <= maxSteps; step++)
         {
@@ -171,10 +193,23 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                     if (Streaming && AnswerDelta is not null)
                     {
                         var current = streamer;
+                        // A tool call is not streamed to the screen (its text is not the
+                        // answer), so a long one — a whole file inside write_file — showed
+                        // as "thinking" for as long as it took to write. Measured
+                        // (2026-11-16): fifteen silent minutes at ~15 tok/s read as a hang
+                        // and the turn was cancelled. The size is progress worth showing.
+                        int received = 0, reported = 0;
                         onDelta = fragment =>
                         {
                             var visible = current.Push(fragment);
                             if (visible.Length > 0) AnswerDelta?.Invoke(visible);
+
+                            received += fragment.Length;
+                            if (visible.Length == 0 && received - reported >= 1_500)
+                            {
+                                reported = received;
+                                ActivityStarted?.Invoke($"writing a tool call · {received:N0} chars so far");
+                            }
                         };
                     }
 
@@ -197,6 +232,16 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
 
                     ActivityStarted?.Invoke($"retrying after a stall ({retries + 1})");
                     stepClock.Restart();
+
+                    // The same messages bring the same runaway. Measured (2026-11-16): after a
+                    // failed command the everyday model reasoned 60,000 characters without
+                    // starting an answer, twice, ten minutes each. The retry asks for less.
+                    if (ex.Degenerate && _messages.Count > 0 && !_messages[^1].Content.StartsWith(RunawayNudge, StringComparison.Ordinal))
+                        _messages.Add(ChatMessage.User(RunawayNudge +
+                            " Do not deliberate, and do not draft a file or a tool call in your reasoning first: reasoning is thrown " +
+                            "away, and a file drafted there has to be written a second time. Pick the single next action and reply " +
+                            "with ONE JSON object for it now — a file goes straight into write_file's content, once — " +
+                            "one tool call, or \"final\" if you are done or stuck."));
                 }
                 catch (ChatProviderException ex)
                 {
@@ -248,7 +293,10 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                 }
                 else
                 {
-                    Emit(steps, step, "(unparsed)", parseError, ok: false, stepClock.ElapsedMilliseconds);
+                    // The reply itself goes into the record: measured (2026-11-16), three unparsed replies in a
+                    // row ended a turn and the log held only "no JSON object found" — nothing to tell a
+                    // truncated envelope from prose or from a quote that closed the string early.
+                    Emit(steps, step, "(unparsed)", parseError + " · reply: " + Excerpt(raw), ok: false, stepClock.ElapsedMilliseconds);
                     if (!guards.TryConsumeParseNudge())
                         return Finish(StopReason.ParseFailure, $"model never produced a valid envelope ({parseError})", steps, sw);
 
@@ -310,6 +358,27 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                           + "updated a file you did not write. Write each file now with write_file (one call per "
                           + "file, the WHOLE file as the content), then answer. If the user only wanted to SEE the "
                           + "code and not have it saved, reply with \"final\" again and say so plainly."));
+                    continue;
+                }
+
+                // The folder this turn worked in is short of what every folder beside it holds:
+                // the work is not finished, whatever the answer calls it. Repeated while the
+                // nudge keeps producing files, like the one above; the first that produces
+                // nothing lets the answer through.
+                if (Root is not null && wrote.Count > unfinishedAt
+                    && WritePrecedent.Unfinished(Root, wrote) is { } gap)
+                {
+                    unfinishedAt = wrote.Count;
+                    Emit(steps, step, "unfinished",
+                        $"{gap.Folder} lacks {string.Join(", ", gap.Missing)} — {gap.Siblings} folders beside it have them", ok: false, stepClock.ElapsedMilliseconds);
+                    _messages.Add(ChatMessage.Assistant(raw));
+                    _messages.Add(ChatMessage.User(
+                        $"[check] Not finished: the folders beside {gap.Folder} each hold {string.Join(", ", gap.Missing)} " +
+                        $"(for example {gap.Example}/), and {gap.Folder} does not. In this workspace a piece of work like this " +
+                        "consists of those files. Do not hand the remaining steps back to the user and do not stop at a plan: " +
+                        $"carry on now — read_file {gap.Example}/{gap.Missing[0]} for the structure, do the steps that produce " +
+                        "each missing file, and write them with write_file under these exact names. Answer with \"final\" " +
+                        "when they exist. Only if the user explicitly asked for less than the whole piece, answer again and say so."));
                     continue;
                 }
 
@@ -417,6 +486,14 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                         "ask for it once more and it will be allowed.");
                 }
             }
+            else if (call.Tool == "write_file" && Root is not null && call.Arg("path") is { Length: > 0 } target
+                     && _precedentAsked.Add(Normalize(target))
+                     && WritePrecedent.Check(Root, target, _read, _wrote) is { } precedent)
+            {
+                // It never ran, so writing the same path again is insistence, not repetition.
+                guards.Forget(call);
+                result = ToolResult.Failure(precedent);
+            }
             else
             {
                 try
@@ -434,14 +511,39 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
             }
 
             if (result.Ok && call.Tool == "write_file" && call.Arg("path") is { Length: > 0 } written)
+            {
                 wrote.Add(Normalize(written));
+                _wrote.Add(Normalize(written));
+                guards.WorkspaceChanged();
+            }
             else if (result.Ok)
                 NoteTouched(call, touched);
+            if (result.Ok && call.Tool == "read_file" && call.Arg("path") is { Length: > 0 } readPath)
+                _read.Add(Normalize(readPath));
 
             Emit(steps, step, call.Tool, Summarize(call, result), result.Ok, stepClock.ElapsedMilliseconds);
 
             var guessNote = call.Tool == "run_command" && call.Arg("command") is { Length: > 0 } ran
                 ? GuessNote(ran, CameBackEmpty(result), tried) : null;
+            if (!result.Ok && Root is not null && call.Tool == "run_command" && call.Arg("command") is { Length: > 0 } failed
+                && WritePrecedent.BlameNote(Root, failed, result.Text, _wrote) is { } blame)
+                guessNote = guessNote is null ? blame : guessNote + "\n\n" + blame;
+            if (!result.Ok && Root is not null && call.Tool == "run_command"
+                && Tools.Cli.ToolLocator.NoteForFailure(result.Text, Tools.Cli.ToolSearch.For(Root)) is { } located)
+                guessNote = guessNote is null ? located : guessNote + "\n\n" + located;
+            // What a command rendered is looked at, not only measured for length.
+            if (result.Ok && Root is not null && call.Tool == "run_command" && call.Arg("command") is { Length: > 0 } rendered
+                && Tools.MediaCheck.Note(Root, rendered, DateTime.UtcNow - stepClock.Elapsed) is { } blank)
+                guessNote = guessNote is null ? blank : guessNote + "\n\n" + blank;
+            // A file its own language cannot parse is said so with the write, not three runs later.
+            if (result.Ok && Root is not null && call.Tool == "write_file" && call.Arg("path") is { Length: > 0 } checkedPath
+                && Tools.WriteCheck.Note(Root, checkedPath) is { } unparsable)
+            {
+                guessNote = unparsable;
+                // The same text again would be the same broken file; let the model send a corrected one.
+                // (A "[note]" means the check repaired it itself: nothing to send again.)
+                if (unparsable.StartsWith("[check]", StringComparison.Ordinal)) guards.Forget(call);
+            }
 
             _messages.Add(ChatMessage.Assistant(raw));
             _messages.Add(ChatMessage.User($"[tool:{call.Tool}] {result.Text}" + (guessNote is null ? "" : "\n\n" + guessNote)));
@@ -643,6 +745,13 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
             }).Any();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return false; }
+    }
+
+    /// <summary>The head and tail of a reply, on one line, for the log.</summary>
+    internal static string Excerpt(string raw, int each = 260)
+    {
+        var flat = string.Join(' ', raw.Split((char[])['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();
+        return flat.Length <= each * 2 ? flat : $"{flat[..each]} …[{flat.Length - each * 2:N0} chars]… {flat[^each..]}";
     }
 
     /// <summary>The paths a successful read/list/find/grep/run call names, for <see cref="WasTouchedAndExists"/>.</summary>

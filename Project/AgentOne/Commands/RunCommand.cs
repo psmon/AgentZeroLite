@@ -154,6 +154,8 @@ public sealed class RunCommand
 
             Options:
               -r, --root <dir>        Workspace the tools may read and write (default: cwd)
+                  --worktree <name>   Work in a git worktree of its own: <repo>-worktrees/<name>, branch
+                                      agent-one/<name>, created from the current commit when missing
               -p, --provider <name>   echo | openai            (default: from config)
               -m, --model <name>      Model id                 (default: from config)
                   --base-url <url>    OpenAI-compatible endpoint base URL

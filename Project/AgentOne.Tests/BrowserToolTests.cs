@@ -353,6 +353,22 @@ public class RepeatRuleTests
         guards.Record(Call("list_files", "path", "."));
         Assert.True(guards.IsRepeat(Call("read_file", "path", "a.md")));
     }
+
+    [Fact]
+    public void ACommandRunAgainAfterAFileWasWrittenIsANewLook()
+    {
+        // Measured (2026-11-16): a compositor failed for want of timeline.json; the model wrote
+        // it and ran the compositor again — "you already made that exact call", and the turn ended.
+        var guards = new AgentLoopGuards();
+        guards.Record(Call("run_command", "command", "python mograph.py test"));
+        guards.Record(Call("read_file", "path", "a.md"));
+        Assert.True(guards.IsRepeat(Call("run_command", "command", "python mograph.py test")));
+
+        guards.WorkspaceChanged();
+
+        Assert.False(guards.IsRepeat(Call("run_command", "command", "python mograph.py test")));
+        Assert.True(guards.IsRepeat(Call("read_file", "path", "a.md")));
+    }
 }
 
 public class KnownCliTests

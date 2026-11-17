@@ -217,6 +217,12 @@ public sealed partial class ChatSession : IAgentSession
         _engine = new CountingEngine(engine, _state);
 
         _files = new LocalFileToolbelt(_root);
+
+        // A linked worktree holds only what git tracks. The media and caches earlier
+        // work left behind are in the main checkout, so that one is readable from the
+        // start — read-only, like every grant: the root is still the only place written.
+        if (GitWorkspace.Detect(_root) is { Linked: true } git && Directory.Exists(git.MainCheckout) && _state.Grant(git.MainCheckout))
+            _files.GrantRead(git.MainCheckout);
         _shell = new ShellToolbelt(_root, TimeSpan.FromSeconds(config.CommandTimeoutSeconds)) { Gate = GateAsync, Choose = ChooseIndexAsync };
         _shell.Activity += what => ActivityStarted?.Invoke(what);
         _shell.ProcessChanged += OnProcessChanged;
@@ -236,7 +242,7 @@ public sealed partial class ChatSession : IAgentSession
             (ToolCatalog.WebFamily, new WebToolbelt(TimeSpan.FromSeconds(config.WebTimeoutSeconds))),
             (ToolCatalog.ExecFamily, _shell),
             (ToolCatalog.BrowserFamily, _browser),
-            (ToolCatalog.GuideFamily, new KnownCliToolbelt()),
+            (ToolCatalog.GuideFamily, new KnownCliToolbelt(root: _root)),
             // Counted like smart mode's own questions, and judged against the person's words.
             (ToolCatalog.DecideFamily, new DecisionToolbelt(_smartAvailable ? _engine : null, config.JevConfidenceFloor)
             {
@@ -434,6 +440,8 @@ public sealed partial class ChatSession : IAgentSession
         cut = path.IndexOf(" ->", StringComparison.Ordinal);
         if (cut >= 0) path = path[..cut];
         if (WorkspacePrecedent.WorkFolderOf(_root, path.Trim()) is { } folder) _workFolder = folder;
+        // A resumed session still knows which files are its own (see WritePrecedent.BlameNote).
+        _loop.RememberWritten(path.Trim());
     }
 
     /// <summary>
@@ -1476,8 +1484,10 @@ public sealed partial class ChatSession : IAgentSession
     private async Task<(AgentRun Run, bool SentBack)> CheckHandBackAsync(string request, AgentRun run, ProbeResult? unread, CancellationToken ct)
     {
         var judged = await _router.HandBackAsync(request, run.Text, ct);
-        var handsBack = judged is { Ok: true, Choice: SmartRouter.HandsBack };
+        var promises = judged is { Ok: true, Choice: SmartRouter.PromisesLater };
+        var handsBack = promises || judged is { Ok: true, Choice: SmartRouter.HandsBack };
         var verdict = !handsBack ? (judged.Ok ? "the answer carries the work" : $"unavailable ({judged.Message})")
+            : promises ? "promises the work for later — sent back to do it now"
             : unread is not null ? "hands the work back without looking — sent back with the workspace's files"
             : "hands the work back — sent back to go ahead";
         _log?.Decision("hand-back", judged, verdict);
@@ -1491,7 +1501,13 @@ public sealed partial class ChatSession : IAgentSession
         StepCompleted?.Invoke(sentBack);
         ActivityStarted?.Invoke(unread is not null ? "looking in the workspace before asking the user" : "going ahead instead of asking");
 
-        var order = unread is not null
+        var order = promises
+            ? "[check] Your answer ends by saying what you WILL do next, but the result that was asked for does not exist " +
+              "yet. There is no later turn: nothing runs after your answer, and the user is left with a promise. Do those " +
+              "steps NOW with your tools, one call at a time — run the measurements, make the choice yourself by what " +
+              "they show, write or copy the files that were asked for — and answer only when the result is on disk, " +
+              "saying what you measured and why you chose." + PrecedentSuffix()
+            : unread is not null
             ? "[check] Your answer hands the work back to the user, but you have not looked at what this workspace " +
               "already holds. These files mention the request:\n" +
               string.Join("\n", unread.Hits.Select(h => $"- {h.Path}:{h.Line}: {h.Text}")) + "\n" +
@@ -1503,7 +1519,9 @@ public sealed partial class ChatSession : IAgentSession
               "you would recommend (the workspace's instructions decide when they say); write the files and run what the " +
               "work needs. The gate asks the user by itself before anything that needs their approval runs. Ask the user " +
               "only what truly only they can answer, and say why." + PrecedentSuffix();
-        if (await PlanRedoAsync(request, unread is not null
+        if (await PlanRedoAsync(request, promises
+                ? "it ended on a promise of later steps instead of doing them"
+                : unread is not null
                 ? "it asked the user for what the workspace already holds"
                 : "it handed the work, or a choice, back to the user instead of doing it", unread, ct) is { } plan)
             order += "\n\n" + plan;
@@ -1830,7 +1848,7 @@ public sealed partial class ChatSession : IAgentSession
 
     private static readonly HashSet<string> OutputFlags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "--out", "-o", "--output", "-outfile", "-destination", ">", ">>", "out-file", "set-content", "--save", "--dest",
+        "--out", "-o", "--output", "-outfile", "-destination", "-newname", ">", ">>", "out-file", "set-content", "--save", "--dest",
     };
 
     /// <summary>
@@ -1851,15 +1869,23 @@ public sealed partial class ChatSession : IAgentSession
                 try { bases.Add(Path.GetFullPath(Path.Combine(root, tokens[i + 1]))); }
                 catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { }
 
+        // "The last of several is written" holds per statement, not per command line. Measured
+        // (2026-11-16): three renames chained with ';' — 0.png → bg_room_night.png, 1.png → … —
+        // were refused twice because the first two new names "were not on disk".
         var media = new List<(string Token, bool Written)>();
-        for (var i = 0; i < tokens.Length; i++)
+        foreach (var statement in command.Split([";", "&&", "||", "\n"], StringSplitOptions.RemoveEmptyEntries))
         {
-            var token = tokens[i].Trim('&', '|');
-            if (token.IndexOfAny(['*', '?', '$', '{', '<']) >= 0 || !MediaExtensions.Contains(Path.GetExtension(token))) continue;
-            var written = i > 0 && (OutputFlags.Contains(tokens[i - 1]) || tokens[i - 1].EndsWith('>'));
-            media.Add((token, written));
+            var words = statement.Split([' ', '\t', '"', '\'', '(', ')', ','], StringSplitOptions.RemoveEmptyEntries);
+            var first = media.Count;
+            for (var i = 0; i < words.Length; i++)
+            {
+                var token = words[i].Trim('&', '|');
+                if (token.IndexOfAny(['*', '?', '$', '{', '<']) >= 0 || !MediaExtensions.Contains(Path.GetExtension(token))) continue;
+                var written = i > 0 && (OutputFlags.Contains(words[i - 1]) || words[i - 1].EndsWith('>'));
+                media.Add((token, written));
+            }
+            if (media.Count - first >= 2) media[^1] = (media[^1].Token, true);
         }
-        if (media.Count >= 2) media[^1] = (media[^1].Token, true);
 
         var missing = new List<string>();
         foreach (var (token, written) in media)
@@ -1886,6 +1912,22 @@ public sealed partial class ChatSession : IAgentSession
                 $"it reads {string.Join(", ", absent)}, which is not on disk (nobody was asked). Find the real files " +
                 "first with list_files / find_files, or run the step that produces them, then run it on those.");
 
+        // Installing is asked of nobody while the thing is already on this machine.
+        // Measured (2026-11-16): `pip install openai-whisper` went to the person while the
+        // workspace's main checkout held an environment with faster-whisper and the scripts
+        // that use it.
+        var installNote = "";
+        if (ToolLocator.InstallTargets(command) is { Count: > 0 } targets)
+        {
+            var search = ToolSearch.For(_root);
+            var present = targets.Select(t => (Name: t, Hits: ToolLocator.Find(t, search))).Where(t => t.Hits.Count > 0).ToList();
+            if (present.Count > 0)
+                return GateVerdict.Deny(
+                    "nothing needs installing (nobody was asked). " +
+                    string.Join("\n", present.Select(t => ToolLocator.Card(t.Name, t.Hits))));
+            installNote = $" · searched this machine for {string.Join(", ", targets)} first: not found";
+        }
+
         var risk = CommandRisk.Inspect(command);
         string reason;
 
@@ -1902,9 +1944,12 @@ public sealed partial class ChatSession : IAgentSession
             _log?.Decision("safety", safety.Decision, verdict);
             Decided?.Invoke(new SmartNote("safety", safety.Decision, verdict));
 
-            if (safety.Safe) return GateVerdict.Allow($"judged safe (confidence {safety.Decision.Confidence:0.00})");
+            // Installing software on the person's machine is theirs to decide, however safe it reads.
+            if (safety.Safe && installNote.Length == 0)
+                return GateVerdict.Allow($"judged safe (confidence {safety.Decision.Confidence:0.00})");
 
-            reason = safety.Decision.Ok
+            reason = safety.Safe ? "it installs software on this machine"
+                : safety.Decision.Ok
                 ? $"the decision engine judged it {safety.Decision.Choice} (confidence {safety.Decision.Confidence:0.00})"
                 : "the decision engine could not judge it";
         }
@@ -1913,7 +1958,7 @@ public sealed partial class ChatSession : IAgentSession
             reason = "no decision engine to judge it";
         }
 
-        return await AskAsync(command, reason, ct);
+        return await AskAsync(command, reason + installNote, ct);
     }
 
     /// <summary>

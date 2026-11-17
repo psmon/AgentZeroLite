@@ -89,6 +89,30 @@ public sealed class AgentLoopGuards(int repeatNudgeBudget = 1, int parseNudgeBud
         var signature = call.Signature();
         _seen.Add(signature);
         _last = signature;
+        if (call.Tool == "run_command") _commands.Add(signature);
+    }
+
+    /// <summary>Commands run so far — the calls whose result a change on disk makes stale.</summary>
+    private readonly HashSet<string> _commands = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// A file was written: every command run before it may now give a different result, so
+    /// running one again is a new look, not a repetition.
+    ///
+    /// Measured twice (2026-11-16): the generation script rejected guide.md, the model rewrote
+    /// guide.md and ran the script again; a compositor failed for want of timeline.json, the
+    /// model wrote timeline.json and ran it again. Both re-runs were answered "you already made
+    /// that exact call", and the second ended the turn on the repeat guard. Fix the file, run it
+    /// again is the whole of how work on a machine proceeds.
+    /// </summary>
+    public void WorkspaceChanged()
+    {
+        foreach (var signature in _commands)
+        {
+            _seen.Remove(signature);
+            if (_last == signature) _last = null;
+        }
+        _commands.Clear();
     }
 
     /// <summary>

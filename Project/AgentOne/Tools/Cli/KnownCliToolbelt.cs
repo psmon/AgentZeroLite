@@ -8,14 +8,29 @@ namespace AgentOne.Tools.Cli;
 /// (<see cref="KnownCli"/>) and whether it is installed here. It reads no file
 /// and runs nothing, so a route never rules it out.
 /// </summary>
-public sealed class KnownCliToolbelt(IReadOnlyList<KnownCliStatus>? status = null) : IToolbelt
+/// <param name="root">The workspace root <c>find_tool</c> searches from; null searches PATH and the user's folders only.</param>
+public sealed class KnownCliToolbelt(IReadOnlyList<KnownCliStatus>? status = null, string? root = null) : IToolbelt
 {
+    /// <summary>Replaceable by a test, which must not depend on what this machine has installed.</summary>
+    internal ToolSearch? Search { get; init; }
+
     private IReadOnlyList<KnownCliStatus> Status => status ?? KnownCli.Status;
 
     public string Scope => "built-in usage of known command-line tools";
 
     public Task<ToolResult> InvokeAsync(ToolCall call, CancellationToken ct)
     {
+        if (string.Equals(call.Tool, "find_tool", StringComparison.OrdinalIgnoreCase))
+        {
+            var wanted = call.Arg("name").Trim();
+            if (wanted.Length == 0)
+                return Task.FromResult(ToolResult.Failure("find_tool needs a name: a command, a Python module or a node package"));
+            var search = Search ?? (root is null
+                ? new ToolSearch([], Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetEnvironmentVariable("PATH") ?? "")
+                : ToolSearch.For(root));
+            return Task.FromResult(ToolResult.Success(ToolLocator.Card(wanted, ToolLocator.Find(wanted, search))));
+        }
+
         if (!string.Equals(call.Tool, "cli_guide", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(ToolResult.Failure($"unknown tool '{call.Tool}'"));
 

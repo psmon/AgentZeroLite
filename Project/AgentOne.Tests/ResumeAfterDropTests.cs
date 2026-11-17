@@ -398,6 +398,34 @@ public class HandBackAfterWorkTests : IDisposable
         Assert.Contains(SmartRouter.HandBackQuestion, engine.Questions);
         Assert.Contains(run!.Steps, s => s.Tool == "handed-back");
     }
+
+    [Fact]
+    public async Task ATurnThatEndsOnWhatItWillDoNextIsSentBackToDoItNow()
+    {
+        // Measured (2026-11-16): asked to download, measure and pick a take, the turn
+        // downloaded two files, read their lengths and ended "next I will analyse each
+        // take and copy the best one to out/pick.mp3". It asked the user for nothing,
+        // so it passed as "carries the work" — and pick.mp3 was never made.
+        var basic = new ScriptedChatProvider(
+            """{"tool":"write_file","args":{"path":"lengths.md","content":"# lengths"}}""",
+            """{"tool":"run_command","args":{"command":"hostname"}}""",
+            """{"tool":"final","args":{"text":"두 테이크를 받았습니다. 다음 단계: 정밀 분석 후 out/pick.mp3 로 채택하겠습니다."}}""",
+            """{"tool":"write_file","args":{"path":"pick.txt","content":"take-1"}}""",
+            """{"tool":"final","args":{"text":"take-1 을 채택했습니다 (pick.txt)."}}""");
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.SafeOption), Choose(SmartRouter.PromisesLater), Choose(SmartRouter.ClaimsBacked));
+        var config = new AgentConfig();
+        config.TrySet("smartMode", "on", out _);
+        config.TrySet("saveSessions", "false", out _);
+        using var session = new ChatSession(config, _root, streaming: false, basic, engine, true)
+            { NamesTasks = false, UsesGraph = false, UsesPdsa = false };
+
+        var run = await session.SubmitAsync("재개", CancellationToken.None);
+
+        Assert.Contains(run!.Steps, s => s.Tool == "handed-back");
+        Assert.Contains("There is no later turn", basic.Calls[3][^1].Content);
+        Assert.True(File.Exists(Path.Combine(_root, "pick.txt")));
+        Assert.StartsWith("take-1", run.Text);
+    }
 }
 
 [Collection(AgentOneHomeCollection.Name)]
@@ -695,7 +723,7 @@ public class BareNameAnywhereTests : IDisposable
         config.TrySet("reasoningModel", "big", out _);
         using var everyday = new OpenAiCompatChatProvider(config);
         using var strong = new OpenAiCompatChatProvider(config.ForReasoning());
-        Assert.Equal(60_000, everyday.ThinkingLimitChars);
+        Assert.Equal(24_000, everyday.ThinkingLimitChars);
         Assert.Equal(OpenAiCompatChatProvider.ReasoningThinkingLimitChars, strong.ThinkingLimitChars);
     }
 }
@@ -823,6 +851,10 @@ public class MissingMediaInputTests : IDisposable
     [InlineData("ffmpeg -i songs/x/out/take-1.mp3 songs/x/out/take-1.wav")]
     [InlineData("python cut.py songs/x/out/take-1.mp3 --out songs/x/out/clip.mp3")]
     [InlineData("Get-ChildItem songs/x/out/*.mp3")]
+    // Measured (2026-11-16): renames chained with ';' — each statement's last media path is the new name.
+    [InlineData("Rename-Item 'songs/x/out/take-1.mp3' 'a.mp3'; Rename-Item 'songs/x/out/take-1.mp3' 'b.mp3'; Rename-Item 'songs/x/out/take-1.mp3' 'c.mp3'")]
+    [InlineData("Rename-Item -Path songs/x/out/take-1.mp3 -NewName pick.mp3")]
+    [InlineData("cp songs/x/out/take-1.mp3 songs/x/out/pick.mp3 && ffprobe songs/x/out/take-1.mp3")]
     public void RealInputsGlobsAndOutputsPass(string command) =>
         Assert.Empty(ChatSession.MissingMediaInputs(command, _root));
 }

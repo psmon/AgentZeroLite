@@ -114,6 +114,14 @@ public sealed class ProcessActor : ReceiveActor, IWithTimers
         start.StandardErrorEncoding = Encoding.UTF8;
         start.CreateNoWindow = true;
 
+        // The pipes above are read as UTF-8, so a child must write UTF-8. Python does not
+        // on Windows: with its output redirected it encodes in the ANSI code page. Measured
+        // (2026-11-16): a workspace script transcribed a whole song and then died in its
+        // last print() — "'cp949' codec can't encode character '\xe9'" — and every Korean
+        // line it had printed came back as mojibake. Only set when the person has not.
+        foreach (var (name, value) in new[] { ("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8") })
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name))) start.Environment[name] = value;
+
         var process = new Process { StartInfo = start };
         try
         {

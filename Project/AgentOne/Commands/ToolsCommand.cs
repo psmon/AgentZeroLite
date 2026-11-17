@@ -28,6 +28,17 @@ public sealed class ToolsCommand
                 }
                 return 0;
 
+            case "find":
+                if (args.Length < 2)
+                {
+                    Console.Error.WriteLine("agent-one tools find: needs a name (a command, a Python module, a node package)");
+                    return 2;
+                }
+                // The same search the agent's find_tool verb and the install gate run, from this folder.
+                var hits = Tools.Cli.ToolLocator.Find(args[1], Tools.Cli.ToolSearch.For(Directory.GetCurrentDirectory()));
+                Console.WriteLine(Tools.Cli.ToolLocator.Card(args[1], hits));
+                return hits.Count > 0 ? 0 : 1;
+
             case "show":
                 if (args.Length < 2)
                 {
@@ -64,6 +75,7 @@ public sealed class ToolsCommand
             agent-one tools list          List the verbs the agent can call (default)
             agent-one tools show <name>   Detail for one verb
             agent-one tools prompt        Print the exact system prompt the model receives
+            agent-one tools find <name>   Look for a tool on this machine, the way the agent does before installing
             """);
     }
 }

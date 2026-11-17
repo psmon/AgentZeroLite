@@ -32,9 +32,13 @@ public sealed class AgentOptions
     /// </summary>
     public List<string> Flags { get; } = [];
 
+    /// <summary>What <c>--worktree</c> did, for the caller to show; empty without the flag.</summary>
+    public string WorktreeNote { get; private set; } = "";
+
     public static bool TryParse(string[] args, out AgentOptions options, out string error)
     {
         var parsed = new AgentOptions();
+        string? worktree = null;
         options = parsed;
         error = "";
 
@@ -93,6 +97,11 @@ public sealed class AgentOptions
                     options.Root = Path.GetFullPath(root);
                     break;
 
+                case "--worktree":
+                    worktree = Next();
+                    if (worktree is null) { error = "--worktree needs a name"; return false; }
+                    break;
+
                 case "-p" or "--provider":
                     if (!Apply(config, "provider", Next(), ref error)) return false;
                     break;
@@ -133,6 +142,16 @@ public sealed class AgentOptions
         }
 
         options.Config = config;
+
+        // After the loop, so `--worktree x -r repo` and `-r repo --worktree x` mean the same.
+        // Help never creates anything.
+        if (worktree is not null && !options.Help)
+        {
+            if (!GitWorkspace.TryEnsureWorktree(options.Root, worktree, out var path, out var note, out error)) return false;
+            options.Root = path;
+            options.WorktreeNote = note;
+            Console.Error.WriteLine("agent-one: " + note);
+        }
         return true;
     }
 

@@ -117,6 +117,8 @@ public static class GemmaNativeCall
 
         if (string.CompareOrdinal(s, i, StringFence, 0, StringFence.Length) == 0)
             return (value = ReadFenced(s, ref i)) is not null;
+        if (string.CompareOrdinal(s, i, TripleQuote, 0, TripleQuote.Length) == 0)
+            return (value = ReadTripleQuoted(s, ref i)) is not null;
         if (s[i] == '"')
             return (value = ReadJsonString(s, ref i)) is not null;
         if (s[i] == '{')
@@ -138,6 +140,38 @@ public static class GemmaNativeCall
         if (end < 0) return null;
         i = end + StringFence.Length;
         return s[start..end];
+    }
+
+    private const string TripleQuote = "\"\"\"";
+
+    /// <summary>
+    /// A Python-style triple-quoted string, taken verbatim. Measured (2026-11-16): asked to rewrite a
+    /// Python file, gemma sent <c>call:write_file{args:{content:"""import sys…""",path:"…"}}</c>; the
+    /// reader took the first quote for an empty JSON string, the call was unreadable, and the turn
+    /// ended reporting a file "modified and saved" that had not been written. The closing quotes are
+    /// the ones followed by the next argument or the end of the object — a docstring inside the file
+    /// is three quotes too.
+    /// </summary>
+    private static string? ReadTripleQuoted(string s, ref int i)
+    {
+        var start = i + TripleQuote.Length;
+        for (var end = s.IndexOf(TripleQuote, start, StringComparison.Ordinal); end >= 0;
+             end = s.IndexOf(TripleQuote, end + 1, StringComparison.Ordinal))
+        {
+            var after = end + TripleQuote.Length;
+            // """" closes one character later: the content ended with a quote of its own.
+            while (after < s.Length && s[after] == '"') { after++; end++; }
+            var next = after;
+            while (next < s.Length && char.IsWhiteSpace(s[next])) next++;
+            if (next < s.Length && s[next] is not (',' or '}') &&
+                string.CompareOrdinal(s, next, CloseMarker, 0, CloseMarker.Length) != 0) continue;
+
+            i = after;
+            var text = s[start..end];
+            // The line break straight after the opening quotes is layout, not content.
+            return text.StartsWith("\r\n", StringComparison.Ordinal) ? text[2..] : text.StartsWith('\n') ? text[1..] : text;
+        }
+        return null;
     }
 
     /// <summary>A JSON string literal starting at <paramref name="i"/>, decoded; raw control characters tolerated.</summary>
