@@ -13,6 +13,7 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 | 앱 | AgentZero Lite · App Store Connect 앱 ID **6825237056** · 번들 ID `com.psmon.agentzerolite` · 팀 `HA39FQRUZG`(sang man park, 개인) |
 | 제출 | **4차** — 0.27.1 (빌드 **5**) · submission `fe965f27-89ed-4738-b5ab-b0e82582fcb6`(빈 초안을 `asc review submit`이 재사용) · 2026-11-14 11:20 KST · `WAITING_FOR_REVIEW` |
 | 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d`(버전 문자열만 0.26.7 → 0.27.1) · 빌드 ID `fe79bc67-e699-44ea-b80b-a7be3e3cdfcc`(빌드 5) |
+| 소스 | 빌드 5 = 브랜치 `worktree-mas-review-2`의 `ddab379`(origin/main 0.27.1 병합 + Remote 제외를 `IncludeRemote` 전역 속성으로 바꾼 수정) · 태그 **`mas-0.27.1-b5`** |
 | 출시 방식 | **MANUAL** — 승인돼도 운영자가 출시를 눌러야 공개 |
 | 판매 지역 | 전 지역 **중국 본토 제외**(가이드라인 5) |
 | 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다 |
@@ -26,7 +27,15 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 | 3 | 0.26.7 (4), 11-03 재제출 | **운영자 철회** 2026-11-14 (11일간 `WAITING_FOR_REVIEW`, 심사 시작 전) | 대기 중 개정 Apple Developer Program License Agreement 미수락으로 API·공증이 403("A required agreement is missing or has expired") → 계정 소유자가 developer.apple.com/account에서 수락. 수락 후 운영자 지시로 최신 소스로 교체: `asc review submissions-cancel`(→ `DEVELOPER_REJECTED`) → 버전 문자열 0.27.1 → 빌드 5 첨부 → 제출 |
 | 4 | 0.27.1 (5), 11-14 제출 | 대기 | — |
 
-확인 기록: 2026-11-03 2차 반려 확인(웹 세션 만료 → 운영자 재로그인 후 읽음). 2026-10-25 웹(App Store Connect → 앱 심사)으로 확인 — 여전히 `심사 대기 중`, 메시지 없음.
+### 제출 소스 추적
+
+제출한 빌드마다 그 소스 커밋에 `mas-<버전>-b<빌드>` 태그를 단다(`git tag -a … && git push origin <태그>` — `v*`·`ci-*`가
+아니라 어떤 워크플로도 돌지 않는다). MS Store는 main을 따라 몇 판 앞서 나가므로, 반려 대응·재제출 때는 먼저
+`git log --oneline mas-0.27.1-b5..origin/main`으로 그 사이 main 변경을 보고 병합할지 정한다. 이 브랜치에만 있는
+수정(아직 main 미병합): `ZeroCommon.csproj`·`StageActor.cs`·`AgentZeroAvalonia.csproj`의 Remote 제외 방식.
+2026-11-19 기준 main은 태그 이후 1커밋(agent-one) 앞서 있다 — 앱 영향 없음.
+
+확인 기록: 2026-11-19 웹·API 모두 `심사 대기 중`(심사 시작 전; 운영자 재로그인 후 확인). 2026-11-03 2차 반려 확인(웹 세션 만료 → 운영자 재로그인 후 읽음). 2026-10-25 웹(App Store Connect → 앱 심사)으로 확인 — 여전히 `심사 대기 중`, 메시지 없음.
 
 `.secret/apple-asc.json`에 모든 ID가 있다. `asc`는 `agentzero` 프로필로 로그인돼 있다(시스템 키체인).
 
