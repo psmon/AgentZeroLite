@@ -61,8 +61,29 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
         {
             ThinkingLimitChars = ReasoningThinkingLimitChars;
             ThinkingLimitTime = ReasoningThinkingLimitTime;
+            FirstFrameTimeout = ReasoningFirstFrameTimeout;
+            // A server may hold the headers back until the prompt is read, too: the
+            // request's own timeout must not cut what the first-frame allowance permits.
+            if (_http.Timeout < ReasoningFirstFrameTimeout) _http.Timeout = ReasoningFirstFrameTimeout;
         }
+        _idle = TimeSpan.FromSeconds(config.TimeoutSeconds);
     }
+
+    /// <summary>The configured idle limit — kept apart from the request timeout, which the strong model widens.</summary>
+    private readonly TimeSpan _idle;
+
+    /// <summary>
+    /// How long the strong model may take before its first frame. Measured (2026-11-18, qwen3.8-27b
+    /// Q4 on LM Studio): a design request sat silent past the 120 s idle limit and was cut with 0
+    /// characters received — the server reads the whole prompt before it streams anything, and the
+    /// design prompt carries the workspace guide, the probe's files and the earlier answers (20 000
+    /// characters of AGENTS.md alone took 30 s to the first frame). Silence before the first frame is
+    /// the prompt being read; silence after it is a stall.
+    /// </summary>
+    public static readonly TimeSpan ReasoningFirstFrameTimeout = TimeSpan.FromMinutes(10);
+
+    /// <summary>The idle limit before the first data frame. Null: the same as the idle limit.</summary>
+    public TimeSpan? FirstFrameTimeout { get; init; }
 
     /// <summary>The strong model's reasoning budget before a reply counts as a runaway.</summary>
     public const int ReasoningThinkingLimitChars = 240_000;
@@ -211,9 +232,12 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             // with the socket open and no way out but Ctrl+C. Every line —
             // keep-alive comments included — restarts this timer; silence for a
             // whole timeout ends the read as a stall, which callers can retry.
-            var idleLimit = StreamIdleTimeout ?? _http.Timeout;
+            var idleLimit = StreamIdleTimeout ?? _idle;
+            var firstLimit = FirstFrameTimeout is { } first && first > idleLimit ? first : idleLimit;
+            var framed = false;
+            string? finish = null;
             using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            idle.CancelAfter(idleLimit);
+            idle.CancelAfter(firstLimit);
 
             try
             {
@@ -231,11 +255,13 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
                     if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
 
                     idle.CancelAfter(idleLimit);
+                    framed = true;
 
                     var payload = line[5..].Trim();
                     if (payload.Length == 0 || payload == "[DONE]") continue;
 
-                    var (piece, thought) = ChunkParts(payload);
+                    var (piece, thought, reason) = ChunkParts(payload);
+                    if (reason is not null) finish = reason;
 
                     // A thinking model streams its reasoning first, and every such
                     // frame is forward progress to the idle clock above — so a
@@ -280,20 +306,39 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 throw new ChatProviderStalledException(
-                    $"{_http.BaseAddress}chat/completions stopped sending for {idleLimit.TotalSeconds:0}s " +
+                    (framed
+                        ? $"{_http.BaseAddress}chat/completions stopped sending for {idleLimit.TotalSeconds:0}s "
+                        : $"{_http.BaseAddress}chat/completions sent no first frame within {firstLimit.TotalSeconds:0}s ") +
                     $"({whole.Length:N0} chars received)", whole.Length);
             }
             catch (Exception ex) when (ex is IOException or HttpRequestException)
             {
                 // "The response ended prematurely", a reset socket: the request
                 // was fine, the line was not. The same messages may be sent again.
+                // How far it had got says whether the server cut a long think (measured 2026-11-18: the
+                // strong model's design dropped at 416 s and 623 s with 0 answer characters).
                 throw new ChatProviderStalledException(
                     $"{_http.BaseAddress}chat/completions: the connection dropped mid-answer " +
-                    $"({whole.Length:N0} chars received): {ex.Message}", whole.Length, ex, dropped: true);
+                    $"({whole.Length:N0} chars received, {thinking:N0} chars of reasoning, {started.Elapsed.TotalSeconds:0}s): {ex.Message}",
+                    whole.Length, ex, dropped: true);
             }
 
+            // Measured (2026-11-18): a design call ran 750 s and ended with nothing but
+            // "streamed no content" — whether it hit a length cap or closed after reasoning
+            // could not be told afterwards. The finish reason, how much it thought and its
+            // last thoughts now go into the message, and so into the session log.
+            // A reply that thought and then closed with nothing said is the runaway in another shape:
+            // measured (2026-11-18), gemma drafted a whole build_timeline.py in its reasoning (10,401
+            // chars, finish_reason stop) and answered nothing — a ProviderError that ended a 57-step turn.
+            // As a degenerate stall it gets the loop's runaway retry and its "do not draft in reasoning".
+            if (whole.Length == 0 && thinking > 0)
+                throw Degenerate($"thought for {thinking:N0} chars and closed (finish_reason: {finish ?? "none"}) without an answer", 0);
+
             if (whole.Length == 0)
-                throw new ChatProviderException($"{_http.BaseAddress}chat/completions streamed no content");
+                throw new ChatProviderException(
+                    $"{_http.BaseAddress}chat/completions streamed no content" +
+                    $" (finish_reason: {finish ?? "none"}, {thinking:N0} chars of reasoning, {started.Elapsed.TotalSeconds:0}s)" +
+                    ThoughtTail(thinkTail));
 
             return whole.ToString();
         }
@@ -342,16 +387,17 @@ public sealed class OpenAiCompatChatProvider : IChatProvider, IModelCatalog, IDi
     }
 
     /// <summary>The answer text and the reasoning text of one SSE payload; empty when it carries neither.</summary>
-    internal static (string Content, string Reasoning) ChunkParts(string payload)
+    internal static (string Content, string Reasoning, string? FinishReason) ChunkParts(string payload)
     {
         try
         {
-            var delta = JsonSerializer.Deserialize(payload, AgentOneWireJson.Default.ChatCompletionChunk)?.Choices?.FirstOrDefault()?.Delta;
-            return (delta?.Content ?? "", delta?.ReasoningContent ?? delta?.Reasoning ?? "");
+            var choice = JsonSerializer.Deserialize(payload, AgentOneWireJson.Default.ChatCompletionChunk)?.Choices?.FirstOrDefault();
+            var delta = choice?.Delta;
+            return (delta?.Content ?? "", delta?.ReasoningContent ?? delta?.Reasoning ?? "", choice?.FinishReason);
         }
         catch (JsonException)
         {
-            return ("", "");
+            return ("", "", null);
         }
     }
 

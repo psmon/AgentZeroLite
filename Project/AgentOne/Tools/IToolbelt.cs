@@ -7,6 +7,15 @@ public readonly record struct ToolResult(bool Ok, string Text)
 {
     public static ToolResult Success(string text) => new(true, text);
     public static ToolResult Failure(string text) => new(false, text);
+
+    /// <summary>
+    /// A call turned back before it ran and before anyone was asked — read the script first, the file is
+    /// not there. Asking for it again once the cause is fixed is the expected next step, not repetition.
+    /// </summary>
+    public static ToolResult Held(string text) => new(false, text) { NotRun = true };
+
+    /// <summary>True when the call was held back unrun, so the repeat guard must not count it.</summary>
+    public bool NotRun { get; init; }
 }
 
 /// <summary>The agent's entire side-effect surface. Everything a run can touch goes through here.</summary>

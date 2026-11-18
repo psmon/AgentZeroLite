@@ -1206,6 +1206,35 @@ a checkout; each item below is one measured failure of that run.
 - Second day (2026-11-17), the same run closed end to end — `out/mv-…-v2.mp4`, 1080p30, the song's full 222.9 s, scenes per the plan with lyrics — but the composite needed three code-level hints from the operator (a zoom argument of 0.0 passed positionally, `cues.json` iterated as a list when it is an object of arrays, a made-up `--dur`). Two more fixes came of it: `WriteCheck` removes a single stray envelope quote when that alone makes the file parse (seven identical rewrites in a row carried it), and the prompt and the runaway retry say not to draft a file in the reasoning (the budget was spent five times drafting a 120-line script there).
 - Still open: a blank render is caught, but a render with pictures and **no text**, or one **shorter than its audio**, is not; a pick was justified by duration alone while its report spoke of hook and groove (`backed` at 0.96, since ffprobe had run); and an operator driving `ask` from Git Bash must pass the request on stdin — MSYS rewrites `C:/…` paths inside an argument.
 
+**The strong model plans, the disk checks what it planned, and what the person says is kept** (2026-11-18 e2e,
+second cycle, with qwen3.8-27b loaded as the strong model this time: a new song from nothing to
+`out/mv-v1-final.mp4`, 1080p30, 183.18 s against the pick's 183.19 s; log
+`harness/logs/agentone-observer/2026-11-18-22-00-cycle2-strong-small-music-to-mv.md`). The strong model's designs got the
+order of the work right and invented its facts — script options (`dv-fetch.cjs --out --limit`), paths
+(`python mv/transcribe.py` at the root), a service (SD-WebUI on 127.0.0.1:7860) — and the everyday model copied them.
+- **The gate checks a command against the disk before anyone is asked** (`ChatSession.GateAsync`, all as `GateVerdict.Hold`):
+  options a workspace script never spells (`UnknownScriptFlags`, only scripts that spell options literally), a script not on
+  disk with its namesakes in the tree (`MissingScripts`), and the first run of a script the conversation has neither read nor
+  written, with its header (`UnreadScripts`, once per script). Each statement is resolved from the folder it runs in
+  (`StatementsWithCwd`: cd / Set-/Push-/Pop-Location) — both "any folder" and "the root only" were measured wrong. A held call
+  is forgotten by the repeat guard on its **first** hold only (`ToolResult.NotRun`): forgetting every hold let one held
+  command come back 27 times.
+- **What the person says beside a yes or no reaches the model and every later design** (`ApprovalRequest.Note`, set by the
+  server, the REPL and the window; `ChatCommand.AnswerNote`; the last eight in `DesignContext`): "n — use --dry first" used
+  to arrive as "the user declined", and the next design repeated what had just been declined. `y — …` is a yes.
+- **Strong-model calls**: the reasoning slot gets 10 minutes to its first frame (a long design prompt is read before anything
+  streams; 120 s cut one at 0 chars); an empty or dropped reply says finish_reason, reasoning size, elapsed and last thoughts;
+  a reply that only thought and closed is a runaway retried as one (gemma drafted a whole script in its reasoning, a
+  ProviderError ended a 57-step turn).
+- Smaller fixes, each measured: a quote inside a JSON string that does not end it is escaped (`"네온 서울"을` in lyrics notes);
+  a write refreshes the tree's listings and the written file's reads for the repeat guard; a design-sized job is a build
+  even when its design failed; the workspace probe searches 48 of a request's words (the first 10 missed "로컬 이미지 API");
+  a URL is not a missing media input; MediaCheck reports a video it cannot read a frame from (an audio-only test clip).
+- Still open: the everyday model reuses an earlier song's scripts (judge, compositor) without adapting them, and cannot
+  debug its own new scripts — the last two stages took nine operator hints. The strong model is asked to plan, never to
+  debug. A redo plan does not see what is already on disk. A long unattended run needs the PC kept awake (Modern Standby
+  froze a 6-minute render for 1 h 45 min).
+
 ## Documentation pairs — update both languages together
 
 Three READMEs exist in two languages, and a change to one is not done until

@@ -112,6 +112,20 @@ public class WorkspaceProbeTests : IDisposable
     }
 
     [Fact]
+    public void ALongRequestsLastWordsAreSearchedToo()
+    {
+        // Measured (2026-11-18): the decisive words came after a recap of the song's state and were cut.
+        const string request = "songs/2026-11-18-neo-seoul-2077 곡을 마무리해줘. 지금까지: 가사·guide.md 완료, deevid 로 테이크 4개 " +
+            "생성·다운로드(out/take-*.mp3), 전사 완료(mv/transcript-*.json, plain-*.json), 이웃 곡 call-them-by-name 의 mv 스크립트를 " +
+            "mv/ 로 복사해 둠. 남은 일: 테이크 채택 → mv/plan.md → 온디바이스(로컬 이미지 API) 그림 → 2D 뮤직비디오 합성·전곡 렌더.";
+
+        var (terms, _) = WorkspaceProbe.TermsOf(request);
+
+        Assert.Contains("온디바이스", terms);
+        Assert.Contains("api", terms);
+    }
+
+    [Fact]
     public void TheFileThatNamesTheThingRanksFirstAndIgnoredFoldersAreNotSearched()
     {
         var result = WorkspaceProbe.Search(_root, "종말의 그날 1,2 를 통합해 뮤비작성을 진행해보자..");

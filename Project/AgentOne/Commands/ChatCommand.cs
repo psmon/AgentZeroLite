@@ -121,6 +121,7 @@ public sealed class ChatCommand
             Console.WriteLine($"  not run unasked because: {request.Reason}");
             var answer = LineEditor.Read("  approve (y/n) › ");
             var yes = answer.Kind == LineKind.Entered && IsYes(answer.Text);
+            if (answer.Kind == LineKind.Entered) request.Note = AnswerNote(answer.Text);
             progress.Restart();
             return Task.FromResult(yes);
         };
@@ -242,8 +243,34 @@ public sealed class ChatCommand
     }
 
     /// <summary>What counts as yes at an approval prompt, in the languages this tool is used in.</summary>
-    public static bool IsYes(string answer) =>
-        answer.Trim().ToLowerInvariant() is "y" or "yes" or "ok" or "approve" or "네" or "예" or "응" or "ㅇ" or "승인";
+    /// <summary>Whether an answer approves: its first word is a yes ("y", "y — go ahead", "네, 진행").</summary>
+    public static bool IsYes(string answer) => YesWord(SplitAnswer(answer).Word);
+
+    private static bool YesWord(string word) =>
+        word.ToLowerInvariant() is "y" or "yes" or "ok" or "approve" or "네" or "예" or "응" or "ㅇ" or "승인";
+
+    private static bool NoWord(string word) =>
+        word.ToLowerInvariant() is "n" or "no" or "deny" or "아니" or "아니오" or "아니요" or "ㄴ" or "거절";
+
+    /// <summary>
+    /// What follows the yes or no — "n — dry-run it first" gives "dry-run it first". An answer that
+    /// does not start with a yes or no word is all note (and so not a yes). Null when there is none.
+    /// </summary>
+    public static string? AnswerNote(string answer)
+    {
+        var (word, rest) = SplitAnswer(answer);
+        var note = YesWord(word) || NoWord(word) ? rest : answer.Trim();
+        return note.Length == 0 ? null : note;
+    }
+
+    private static (string Word, string Tail) SplitAnswer(string answer)
+    {
+        var text = answer.Trim();
+        var end = 0;
+        while (end < text.Length && char.IsLetter(text[end])) end++;
+        var rest = text[end..].TrimStart(' ', '\t', '—', '–', '-', ':', ',', '.', ';', '/');
+        return (text[..end], rest.Trim());
+    }
 
     public static void PrintHelp()
     {

@@ -369,6 +369,35 @@ public class RepeatRuleTests
         Assert.False(guards.IsRepeat(Call("run_command", "command", "python mograph.py test")));
         Assert.True(guards.IsRepeat(Call("read_file", "path", "a.md")));
     }
+
+    [Fact]
+    public void ALookAtTheTreeAfterAFileWasWrittenIsANewLook()
+    {
+        // Measured (2026-11-18): sent back by the unfinished check after writing a lore file, the
+        // model listed a folder it had listed before the write — "repeated call", and the turn ended.
+        var guards = new AgentLoopGuards();
+        guards.Record(Call("list_files", "path", "songs/new"));
+        guards.Record(Call("find_files", "pattern", "*.md"));
+        guards.Record(Call("grep", "text", "guide"));
+        guards.Record(Call("read_file", "path", "songs/new/notes.md"));
+        guards.Record(Call("read_file", "path", "other.md"));
+
+        guards.WorkspaceChanged(".\\songs\\new\\notes.md");
+
+        Assert.False(guards.IsRepeat(Call("list_files", "path", "songs/new")));
+        Assert.False(guards.IsRepeat(Call("find_files", "pattern", "*.md")));
+        Assert.False(guards.IsRepeat(Call("grep", "text", "guide")));
+        Assert.False(guards.IsRepeat(Call("read_file", "path", "songs/new/notes.md")));
+        Assert.True(guards.IsRepeat(Call("read_file", "path", "other.md")));
+    }
+
+    [Fact]
+    public void WithNoWriteATreeLookIsStillARepeat()
+    {
+        var guards = new AgentLoopGuards();
+        guards.Record(Call("list_files", "path", "songs/new"));
+        Assert.True(guards.IsRepeat(Call("list_files", "path", "songs/new")));
+    }
 }
 
 public class KnownCliTests

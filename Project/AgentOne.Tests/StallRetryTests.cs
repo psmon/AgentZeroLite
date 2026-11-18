@@ -58,6 +58,98 @@ public class StreamStallTests
     }
 
     [Fact]
+    public async Task SilenceBeforeTheFirstFrameIsThePromptBeingReadNotAStall()
+    {
+        // Measured (2026-11-18): the strong model's design call was cut at 120 s with 0 characters —
+        // the server was still reading a long prompt. Before the first frame the allowance is longer.
+        using var provider = new OpenAiCompatChatProvider(StallConfig(),
+            new StreamHandler(() => new ScriptedStream(
+                [(TimeSpan.FromMilliseconds(900), Chunk("design")), (TimeSpan.Zero, "data: [DONE]\n\n")], hangAtEnd: false)))
+        {
+            StreamIdleTimeout = TimeSpan.FromMilliseconds(300),
+            FirstFrameTimeout = TimeSpan.FromSeconds(5)
+        };
+
+        var reply = await provider.CompleteAsync([ChatMessage.User("hi")], CancellationToken.None, _ => { });
+
+        Assert.Equal("design", reply);
+    }
+
+    [Fact]
+    public async Task NoFirstFrameWithinItsAllowanceIsAStallThatSaysSo()
+    {
+        using var provider = new OpenAiCompatChatProvider(StallConfig(),
+            new StreamHandler(() => new ScriptedStream([], hangAtEnd: true)))
+        {
+            StreamIdleTimeout = TimeSpan.FromMilliseconds(200),
+            FirstFrameTimeout = TimeSpan.FromMilliseconds(400)
+        };
+
+        var stall = await Assert.ThrowsAsync<ChatProviderStalledException>(() =>
+            provider.CompleteAsync([ChatMessage.User("hi")], CancellationToken.None, _ => { }));
+
+        Assert.Contains("no first frame", stall.Message);
+    }
+
+    [Fact]
+    public async Task AfterTheFirstFrameTheIdleLimitAppliesAgain()
+    {
+        using var provider = new OpenAiCompatChatProvider(StallConfig(),
+            new StreamHandler(() => new ScriptedStream([(TimeSpan.Zero, Chunk("a"))], hangAtEnd: true)))
+        {
+            StreamIdleTimeout = TimeSpan.FromMilliseconds(300),
+            FirstFrameTimeout = TimeSpan.FromSeconds(30)
+        };
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var stall = await Assert.ThrowsAsync<ChatProviderStalledException>(() =>
+            provider.CompleteAsync([ChatMessage.User("hi")], CancellationToken.None, _ => { }));
+
+        Assert.Contains("stopped sending", stall.Message);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"took {clock.Elapsed}");
+    }
+
+    [Fact]
+    public void TheStrongModelWaitsLongerForItsFirstFrame()
+    {
+        var config = StallConfig().ForReasoning();
+        using var strong = new OpenAiCompatChatProvider(config);
+        using var everyday = new OpenAiCompatChatProvider(StallConfig());
+
+        Assert.Equal(OpenAiCompatChatProvider.ReasoningFirstFrameTimeout, strong.FirstFrameTimeout);
+        Assert.Null(everyday.FirstFrameTimeout);
+    }
+
+    [Fact]
+    public async Task AStreamThatEndsWithOnlyReasoningSaysWhyAndWhatItThought()
+    {
+        // Measured (2026-11-18): 750 s of a design call ended as "streamed no content" and nothing else.
+        const string thought = "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"plan the verses first\"}}]}\n\n";
+        const string end = "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\n";
+        using var provider = new OpenAiCompatChatProvider(StallConfig(),
+            new StreamHandler(() => new ScriptedStream(
+                [(TimeSpan.Zero, thought), (TimeSpan.Zero, end), (TimeSpan.Zero, "data: [DONE]\n\n")], hangAtEnd: false)))
+        { StreamIdleTimeout = TimeSpan.FromSeconds(5) };
+
+        // Measured the same day: gemma drafted a whole script in its reasoning and closed with no answer —
+        // a ProviderError that ended the turn. It is a runaway, retried as one.
+        var stall = await Assert.ThrowsAsync<ChatProviderStalledException>(() =>
+            provider.CompleteAsync([ChatMessage.User("hi")], CancellationToken.None, _ => { }));
+
+        Assert.True(stall.Degenerate);
+        Assert.Contains("finish_reason: length", stall.Message);
+        Assert.Contains("21 chars", stall.Message);
+        Assert.Contains("plan the verses first", stall.Message);
+    }
+
+    private static AgentConfig StallConfig()
+    {
+        var config = new AgentConfig();
+        config.TrySet("baseUrl", "http://stall.test/v1", out _);
+        return config;
+    }
+
+    [Fact]
     public async Task TheCallersOwnCancelIsACancelNotAStall()
     {
         using var provider = Provider(() => new ScriptedStream([], hangAtEnd: true), TimeSpan.FromSeconds(30));

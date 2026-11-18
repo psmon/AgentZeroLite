@@ -11,6 +11,11 @@ public readonly record struct GateVerdict(bool Allowed, string Reason)
 {
     public static GateVerdict Allow(string reason = "allowed") => new(true, reason);
     public static GateVerdict Deny(string reason) => new(false, reason);
+
+    /// <summary>Not run, and nobody was asked: a check the model can satisfy and then call again.</summary>
+    public static GateVerdict Hold(string reason) => new(false, reason) { Held = true };
+
+    public bool Held { get; init; }
 }
 
 /// <summary>
@@ -147,7 +152,8 @@ public sealed class ShellToolbelt(string root, TimeSpan timeout) : IToolbelt, ID
         if (Gate is null) return ToolResult.Failure("not run: no approval gate is configured for commands in this session");
 
         var verdict = await Gate(command, ct);
-        if (!verdict.Allowed) return ToolResult.Failure($"not run: {verdict.Reason}");
+        if (!verdict.Allowed)
+            return verdict.Held ? ToolResult.Held($"not run: {verdict.Reason}") : ToolResult.Failure($"not run: {verdict.Reason}");
 
         var service = IsTrue(call.Arg("background")) || CommandLifetime.LooksLongRunning(command, Root);
         return service ? await RunServiceAsync(command, ct) : await RunTaskAsync(command, ct);

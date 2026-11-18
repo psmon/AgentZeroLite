@@ -142,6 +142,7 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
         _messages.Add(ChatMessage.User(userPrompt));
 
         var guards = new AgentLoopGuards(repeatNudgeBudget: Building ? BuildingRepeatNudges : 1);
+        var heldOnce = new HashSet<string>(StringComparer.Ordinal);
         var steps = new List<AgentStep>();
         var sw = Stopwatch.StartNew();
 
@@ -440,9 +441,9 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                       + " plainly in \"final\" that it failed and why. Never report it as done."
                     : Building
                         ? "[error] You already made that exact call — its result is above in this conversation, and asking " +
-                          "again returns nothing new. Do not read it again. Carry on with the design: take its next step that " +
-                          "is not done yet — write that step's file with write_file, or run its command — and answer with " +
-                          "\"final\" only when the design's files exist."
+                          "again returns nothing new. Do not read it again. Carry on with the design (or, with none, the work " +
+                          "you were asked for): take its next step that is not done yet — write that step's file with " +
+                          "write_file, or run its command — and answer with \"final\" only when its files exist."
                         : "[error] You already made that exact call and have its result. Use it, or answer with \"final\"."));
                 continue;
             }
@@ -510,11 +511,17 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
                 }
             }
 
+            // Held back before it ran (a script not yet read, a file not there): the same call after the
+            // cause is fixed is the next step, not repetition — once. Measured (2026-11-18): a hold that
+            // was always forgotten let the same held command come back 27 times in a row, the repeat
+            // guard never seeing it; held a second time, the call counts like any other.
+            if (result.NotRun && heldOnce.Add(call.Signature())) guards.Forget(call);
+
             if (result.Ok && call.Tool == "write_file" && call.Arg("path") is { Length: > 0 } written)
             {
                 wrote.Add(Normalize(written));
                 _wrote.Add(Normalize(written));
-                guards.WorkspaceChanged();
+                guards.WorkspaceChanged(written);
             }
             else if (result.Ok)
                 NoteTouched(call, touched);
@@ -824,6 +831,9 @@ public sealed partial class AgentLoop(IChatProvider provider, IToolbelt toolbelt
 
     private static string Normalize(string path) =>
         path.Trim().Trim('`', '"', '\'', '(', ')', ',', ';', ':', '.').Replace('\\', '/').TrimStart('.', '/');
+
+    /// <summary>Whether this conversation has read or written the file (a path relative to <see cref="Root"/>).</summary>
+    public bool HasSeen(string path) => _read.Contains(Normalize(path)) || _wrote.Contains(Normalize(path));
 
     // csproj/sln/props/targets/xaml: measured, a claimed WebAutomationTests.csproj
     // passed unseen because the extension was not on this list.

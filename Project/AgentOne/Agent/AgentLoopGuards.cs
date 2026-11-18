@@ -90,10 +90,31 @@ public sealed class AgentLoopGuards(int repeatNudgeBudget = 1, int parseNudgeBud
         _seen.Add(signature);
         _last = signature;
         if (call.Tool == "run_command") _commands.Add(signature);
+        else if (call.Tool is "list_files" or "find_files" or "grep") _treeLooks.Add(signature);
+        else if (call.Tool == "read_file" && call.Arg("path") is { Length: > 0 } path) _reads[PathKey(path)] = signature;
     }
 
     /// <summary>Commands run so far — the calls whose result a change on disk makes stale.</summary>
     private readonly HashSet<string> _commands = new(StringComparer.Ordinal);
+
+    /// <summary>Listings and searches of the tree — a new file changes what they return.</summary>
+    private readonly HashSet<string> _treeLooks = new(StringComparer.Ordinal);
+
+    /// <summary>read_file calls by the path they read — writing that path changes what it returns.</summary>
+    private readonly Dictionary<string, string> _reads = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string PathKey(string path)
+    {
+        var p = path.Replace('\\', '/').Trim();
+        while (p.StartsWith("./", StringComparison.Ordinal)) p = p[2..];
+        return p.TrimEnd('/');
+    }
+
+    private void Unsee(string signature)
+    {
+        _seen.Remove(signature);
+        if (_last == signature) _last = null;
+    }
 
     /// <summary>
     /// A file was written: every command run before it may now give a different result, so
@@ -104,15 +125,22 @@ public sealed class AgentLoopGuards(int repeatNudgeBudget = 1, int parseNudgeBud
     /// model wrote timeline.json and ran it again. Both re-runs were answered "you already made
     /// that exact call", and the second ended the turn on the repeat guard. Fix the file, run it
     /// again is the whole of how work on a machine proceeds.
+    ///
+    /// The same holds for looking: a listing or search of the tree, and a read of the file that
+    /// was written, return something else afterwards. Measured (2026-11-18): after writing a lore
+    /// file the model was sent back by the unfinished check (guide.md, lyrics.md missing) and
+    /// listed a folder it had listed before the write to find its bearings — "repeated call", and
+    /// with the budget already spent on a rewrite, a 21-step turn ended on the repeat guard.
+    /// A read of a file the write did not touch stays a repeat.
     /// </summary>
-    public void WorkspaceChanged()
+    /// <param name="writtenPath">The file that was written, when known.</param>
+    public void WorkspaceChanged(string? writtenPath = null)
     {
-        foreach (var signature in _commands)
-        {
-            _seen.Remove(signature);
-            if (_last == signature) _last = null;
-        }
+        foreach (var signature in _commands) Unsee(signature);
         _commands.Clear();
+        foreach (var signature in _treeLooks) Unsee(signature);
+        _treeLooks.Clear();
+        if (writtenPath is { Length: > 0 } && _reads.Remove(PathKey(writtenPath), out var read)) Unsee(read);
     }
 
     /// <summary>

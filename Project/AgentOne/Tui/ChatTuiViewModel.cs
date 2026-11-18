@@ -58,6 +58,9 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
     /// <summary>A command waiting for the person's yes or no; the next line typed answers it.</summary>
     private TaskCompletionSource<bool>? _approval;
 
+    /// <summary>The request the parked line answers — its note carries what was typed beside y/n.</summary>
+    private ApprovalRequest? _approvalRequest;
+
     /// <summary>A design waiting for the person's pick; the next line typed answers it.</summary>
     private TaskCompletionSource<string>? _choice;
 
@@ -141,6 +144,7 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         {
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             _approval = tcs;
+            _approvalRequest = request;
             ct.Register(() => tcs.TrySetResult(false));
 
             Ui(() =>
@@ -381,6 +385,8 @@ public sealed class ChatTuiViewModel : ReactiveViewModel
         {
             _approval = null;
             var yes = ChatCommand.IsYes(text);
+            if (_approvalRequest is { } asked) asked.Note = ChatCommand.AnswerNote(text);
+            _approvalRequest = null;
             _lines.OnNext(new TranscriptLine(LineKind.User, yes ? "y — run it" : "n — skip it"));
             Model.SetAwaitingPerson(false);
             Model.SetBusy(true, "… continuing");

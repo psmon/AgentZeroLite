@@ -388,6 +388,7 @@ public sealed class SessionServer
             Broadcast(null, new PipeEvent { Event = "note", Text = $"not run — nobody attached to approve it (ask with --yes): {approval.Command}" });
             return false;
         }
+        approval.Note = Commands.ChatCommand.AnswerNote(answer);
         return Commands.ChatCommand.IsYes(answer);
     }
 

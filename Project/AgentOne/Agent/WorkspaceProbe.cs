@@ -46,7 +46,14 @@ public static class WorkspaceProbe
 
     /// <summary>A word in at most this share of the scanned files (or three) is rare enough to point at a file.</summary>
     internal const double RareShare = 0.005;
-    private const int MaxTerms = 10;
+    /// <summary>
+    /// How many of a request's words are searched. Measured (2026-11-18): a request that first recapped
+    /// the song's state and ended with "온디바이스(로컬 이미지 API) 그림" was searched for its first ten
+    /// words only — songs, neo, seoul, 곡, 마무리 … — so the workspace's local-image-api.md was never
+    /// handed to the design, which then invented an SD-WebUI on 127.0.0.1:7860. The IDF weighting, not
+    /// the position in the sentence, decides which words matter.
+    /// </summary>
+    internal const int MaxTerms = 48;
     private const int MaxFiles = 6_000;
     private const long MaxFileBytes = 512 * 1024;
     private static readonly TimeSpan Budget = TimeSpan.FromSeconds(3);

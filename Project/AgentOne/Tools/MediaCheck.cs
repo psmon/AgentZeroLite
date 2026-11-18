@@ -61,9 +61,19 @@ public static class MediaCheck
                     ? VideoTimes(ffmpeg, file).Select(t => (At: t, Spread: Spread(ffmpeg, file, t))).ToList()
                     : [(At: 0.0, Spread: Spread(ffmpeg, file, null))];
                 spreads = spreads.Where(s => s.Spread is not null).ToList();
-                if (spreads.Count == 0 || spreads.Any(s => s.Spread!.Value.Deviation >= FlatSpread && s.Spread.Value.Detail >= FlatDetail)) continue;
-
                 var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+
+                // A video ffmpeg cannot take a single frame from has no picture at all. Measured (2026-11-18):
+                // a compositor's test clip came out as 5.7 s of audio with no video stream, the command
+                // succeeded and this check, finding no frame to measure, said nothing.
+                if (spreads.Count == 0)
+                {
+                    if (isVideo) notes.Add($"{relative}: no frame could be read from it — it has no video stream (audio only?) " +
+                                           "or the stream is broken");
+                    continue;
+                }
+                if (spreads.Any(s => s.Spread!.Value.Deviation >= FlatSpread && s.Spread.Value.Detail >= FlatDetail)) continue;
+
                 var seen = string.Join(", ", spreads.Select(s =>
                     (isVideo ? $"at {s.At:0.#}s " : "") +
                     $"brightness {s.Spread!.Value.Mean:0}/255 ± {s.Spread.Value.Deviation:0.0}, edge detail {s.Spread.Value.Detail:0.0}"));

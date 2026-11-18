@@ -49,6 +49,23 @@ public class MediaCheckTests : IDisposable
     }
 
     [Fact]
+    public void A_video_file_with_only_audio_in_it_is_reported()
+    {
+        // Measured (2026-11-18): a compositor's test clip was 5.7 s of audio and no video stream; nothing was said.
+        if (Ffmpeg is null) return;
+        var start = new ProcessStartInfo(Ffmpeg) { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true, CreateNoWindow = true };
+        foreach (var arg in new[] { "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440", "-t", "2", "-c:a", "aac", Path.Combine(_root, "out", "test-clip.mp4") })
+            start.ArgumentList.Add(arg);
+        using (var process = Process.Start(start)!) { process.StandardError.ReadToEnd(); process.WaitForExit(); if (process.ExitCode != 0) return; }
+
+        var note = MediaCheck.Note(_root, "python mv/mograph.py test --out out/", DateTime.UtcNow.AddMinutes(-1));
+
+        Assert.NotNull(note);
+        Assert.Contains("out/test-clip.mp4", note);
+        Assert.Contains("no video stream", note);
+    }
+
+    [Fact]
     public void A_smooth_gradient_is_no_picture_either()
     {
         // Measured: a grey vignette frame had a brightness spread of 11 and passed the first rule.

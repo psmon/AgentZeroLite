@@ -111,8 +111,17 @@ public sealed class ToolCall
             switch (c)
             {
                 case '"':
-                    inString = false;
-                    sb.Append(c);
+                    // A quote that does not end the string is a quotation inside it. Measured
+                    // (2026-11-18): lyrics notes with `"네온 서울"을 반복` in a write_file's content —
+                    // "'0xEB' is invalid after a value", and the model spent 24 000 characters of
+                    // reasoning blaming its em dashes. A real closing quote is followed by , } ] :
+                    // or the end; anything else means the quote was meant as text.
+                    if (EndsString(json, i + 1))
+                    {
+                        inString = false;
+                        sb.Append(c);
+                    }
+                    else sb.Append("\\\"");
                     break;
                 case '\\':
                     var next = i + 1 < json.Length ? json[i + 1] : '\0';
@@ -137,6 +146,18 @@ public sealed class ToolCall
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>Whether what follows a quote at <paramref name="from"/> is what follows the end of a JSON string.</summary>
+    private static bool EndsString(string json, int from)
+    {
+        for (var j = from; j < json.Length; j++)
+        {
+            var n = json[j];
+            if (n is ' ' or '\t' or '\r' or '\n') continue;
+            return n is ',' or '}' or ']' or ':';
+        }
+        return true;
     }
 
     private static bool TryParseJson(string json, ToolCall call, out string error)
@@ -239,7 +260,9 @@ public sealed class ToolCall
             {
                 if (escaped) escaped = false;
                 else if (c == '\\') escaped = true;
-                else if (c == '"') inString = false;
+                // The same rule as Repair: a quote inside a string that is not followed by
+                // what ends a string is quoted text, so braces after it are still text.
+                else if (c == '"' && EndsString(text, i + 1)) inString = false;
                 continue;
             }
 

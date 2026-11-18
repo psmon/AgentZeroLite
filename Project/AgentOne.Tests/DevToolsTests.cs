@@ -412,6 +412,108 @@ public class DevSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task WhatThePersonSaidBesideTheirNoReachesTheModel()
+    {
+        // Measured (2026-11-18): "n — dry-run it first" reached the model as "the user declined", and it
+        // asked for the same credit-spending generation with another flag.
+        var provider = new ScriptedChatProvider("""{"tool":"run_command","args":{"command":"rm -rf /"}}""", Done);
+        var engine = new ScriptedDecisionEngine();
+        using var session = Session(provider, engine, smart: false);
+        session.Approver = (request, _) =>
+        {
+            request.Note = AgentOne.Commands.ChatCommand.AnswerNote("n — 먼저 --dry 로 확인해");
+            return Task.FromResult(AgentOne.Commands.ChatCommand.IsYes("n — 먼저 --dry 로 확인해"));
+        };
+
+        await session.SubmitAsync("clean up", CancellationToken.None);
+
+        Assert.Contains(provider.Calls[1], m => m.Content.Contains("declined") && m.Content.Contains("먼저 --dry 로 확인해"));
+    }
+
+    [Fact]
+    public async Task AWorkspaceScriptIsReadBeforeItsFirstRun()
+    {
+        // Measured (2026-11-18): dv-fetch.cjs called with options its first line does not have, and an
+        // earlier song's transcribe.py run on another song's takes — neither file had been opened.
+        Directory.CreateDirectory(Path.Combine(_root, "tools"));
+        File.WriteAllText(Path.Combine(_root, "tools", "fetch.py"), "# python fetch.py <outDir> [count]\nprint('fetched')\n");
+        const string run = """{"tool":"run_command","args":{"command":"python tools/fetch.py out 4"}}""";
+        var provider = new ScriptedChatProvider(run, run, Done);
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.SafeOption, 0.99), Choose(SmartRouter.SafeOption, 0.99));
+        using var session = Session(provider, engine, smart: false);
+        var asked = 0;
+        session.Approver = (_, _) => { asked++; return Task.FromResult(false); };
+
+        await session.SubmitAsync("fetch the takes", CancellationToken.None);
+
+        Assert.Contains("has not been read", provider.Calls[1][^1].Content);
+        Assert.Contains("python fetch.py <outDir> [count]", provider.Calls[1][^1].Content);
+        Assert.DoesNotContain("has not been read", provider.Calls[2][^1].Content);
+    }
+
+    [Fact]
+    public async Task TheSameHeldCallComingBackIsARepeatNotALoop()
+    {
+        // Measured (2026-11-18): a hold that was always forgotten let one held command come back 27 times.
+        const string run = """{"tool":"run_command","args":{"command":"python tools/absent.py --x"}}""";
+        var provider = new ScriptedChatProvider(Enumerable.Repeat(run, 12).Append(Done).ToArray());
+        var engine = new ScriptedDecisionEngine();
+        using var session = Session(provider, engine, smart: false);
+        session.Approver = (_, _) => Task.FromResult(false);
+
+        await session.SubmitAsync("run it", CancellationToken.None);
+
+        Assert.True(provider.Calls.Count <= 4, $"{provider.Calls.Count} model calls");
+    }
+
+    [Fact]
+    public async Task AScriptReadFirstRunsWithoutBeingHeld()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "tools"));
+        File.WriteAllText(Path.Combine(_root, "tools", "fetch.py"), "# python fetch.py <outDir> [count]\nprint('fetched')\n");
+        var provider = new ScriptedChatProvider(
+            """{"tool":"read_file","args":{"path":"tools/fetch.py"}}""",
+            """{"tool":"run_command","args":{"command":"python tools/fetch.py out 4"}}""", Done);
+        var engine = new ScriptedDecisionEngine(Choose(SmartRouter.SafeOption, 0.99));
+        using var session = Session(provider, engine, smart: false);
+        session.Approver = (_, _) => Task.FromResult(false);
+
+        await session.SubmitAsync("fetch the takes", CancellationToken.None);
+
+        Assert.DoesNotContain("has not been read", provider.Calls[2][^1].Content);
+    }
+
+    [Fact]
+    public async Task WhatThePersonSaidReachesTheNextDesign()
+    {
+        // Measured (2026-11-18): the design after "n — that script is another song's" called it again.
+        var provider = new ScriptedChatProvider("""{"tool":"run_command","args":{"command":"rm -rf /"}}""", Done);
+        using var session = Session(provider, new ScriptedDecisionEngine(), smart: false);
+        session.Approver = (request, _) => { request.Note = "judge-takes.py is another song's — write one for this song"; return Task.FromResult(false); };
+
+        await session.SubmitAsync("clean up", CancellationToken.None);
+
+        var context = session.DesignContext(null);
+        Assert.Contains("judge-takes.py is another song's — write one for this song", context);
+        Assert.Contains("declined", context);
+    }
+
+    [Theory]
+    [InlineData("y", true, null)]
+    [InlineData("n", false, null)]
+    [InlineData("y — 진행해", true, "진행해")]
+    [InlineData("n — 먼저 --dry 로 확인해", false, "먼저 --dry 로 확인해")]
+    [InlineData("네, 대신 로그를 남겨", true, "대신 로그를 남겨")]
+    [InlineData("no: use the venv", false, "use the venv")]
+    [InlineData("dry-run it first", false, "dry-run it first")]
+    [InlineData("", false, null)]
+    public void AnAnswerIsAYesOrNoAndWhatFollows(string answer, bool yes, string? note)
+    {
+        Assert.Equal(yes, AgentOne.Commands.ChatCommand.IsYes(answer));
+        Assert.Equal(note, AgentOne.Commands.ChatCommand.AnswerNote(answer));
+    }
+
+    [Fact]
     public async Task RepeatingACommandThatFailedIsToldSo()
     {
         // Measured: a failed command was repeated, the model was told "use the

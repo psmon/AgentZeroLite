@@ -855,8 +855,99 @@ public class MissingMediaInputTests : IDisposable
     [InlineData("Rename-Item 'songs/x/out/take-1.mp3' 'a.mp3'; Rename-Item 'songs/x/out/take-1.mp3' 'b.mp3'; Rename-Item 'songs/x/out/take-1.mp3' 'c.mp3'")]
     [InlineData("Rename-Item -Path songs/x/out/take-1.mp3 -NewName pick.mp3")]
     [InlineData("cp songs/x/out/take-1.mp3 songs/x/out/pick.mp3 && ffprobe songs/x/out/take-1.mp3")]
+    // Measured (2026-11-18): CDN links in a one-liner were read as missing local files.
+    [InlineData("python -c \"print(['https://cdn2.example.ai/user-wav/v2_f431.mp3'])\"")]
+    [InlineData("curl -o songs/x/out/take-2.mp3 https://cdn2.example.ai/a.mp3")]
     public void RealInputsGlobsAndOutputsPass(string command) =>
         Assert.Empty(ChatSession.MissingMediaInputs(command, _root));
+}
+
+public class UnknownScriptFlagTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "agent-one-flags-" + Guid.NewGuid().ToString("N")[..8]);
+
+    public UnknownScriptFlagTests()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "tools"));
+        File.WriteAllText(Path.Combine(_root, "tools", "fetch.cjs"),
+            "// node fetch.cjs <outDir> [count] --match <text>\nconst i = process.argv.indexOf('--match');\n");
+        File.WriteAllText(Path.Combine(_root, "tools", "loose.cjs"), "const argv = require('minimist')(process.argv.slice(2));\n");
+        File.WriteAllText(Path.Combine(_root, "tools", "cut.py"),
+            "import argparse\np = argparse.ArgumentParser()\np.add_argument('--input')\np.add_argument('--out-dir')\n");
+    }
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, recursive: true); } catch { /* best effort */ }
+    }
+
+    [Fact]
+    public void OptionsAPlanMadeUpAreNamed()
+    {
+        // Measured (2026-11-18): the redo plan's `--out … --limit 4` for a script that takes `<outDir> [count] --match`.
+        var found = ChatSession.UnknownScriptFlags("node tools/fetch.cjs --match \"네온\" --out songs/x/out --limit 4", _root);
+
+        var (script, flags) = Assert.Single(found);
+        Assert.Equal("tools/fetch.cjs", script);
+        Assert.Equal(["--out", "--limit"], flags);
+    }
+
+    [Theory]
+    [InlineData("node tools/fetch.cjs songs/x/out 4 --match \"네온 서울\"")]
+    [InlineData("node tools/loose.cjs --anything goes")]
+    [InlineData("python tools/cut.py --input a.mp3 --out-dir=clips")]
+    [InlineData("node tools/missing.cjs --whatever")]
+    [InlineData("git log --oneline")]
+    public void RealOptionsAndUnjudgedScriptsPass(string command) =>
+        Assert.Empty(ChatSession.UnknownScriptFlags(command, _root));
+
+    [Fact]
+    public void AScriptAPlanPlacedWhereThereIsNoneIsMissingAndItsNamesakesAreNamed()
+    {
+        // Measured (2026-11-18): `python mv/transcribe.py …` at the root; the script lives only in songs' folders.
+        Directory.CreateDirectory(Path.Combine(_root, "songs", "a", "mv"));
+        File.WriteAllText(Path.Combine(_root, "songs", "a", "mv", "transcribe.py"), "print(1)");
+
+        var (script, elsewhere) = Assert.Single(ChatSession.MissingScripts("python mv/transcribe.py --dir out", _root));
+
+        Assert.Equal("mv/transcribe.py", script);
+        Assert.Equal(["songs/a/mv/transcribe.py"], elsewhere);
+    }
+
+    [Fact]
+    public void AScriptFoundFromTheFolderTheCommandMovesIntoIsThere()
+    {
+        // Measured (2026-11-18): `Set-Location songs/x; python mv/judge-takes.py …` was held as "not on disk".
+        Directory.CreateDirectory(Path.Combine(_root, "songs", "b", "mv"));
+        File.WriteAllText(Path.Combine(_root, "songs", "b", "mv", "judge-takes.py"), "import argparse\n# --dir\n");
+
+        Assert.Empty(ChatSession.MissingScripts("Set-Location songs/b; python mv/judge-takes.py --dir out", _root));
+        Assert.Empty(ChatSession.MissingScripts("cd songs/b && python mv/judge-takes.py", _root));
+        Assert.Empty(ChatSession.UnknownScriptFlags("Set-Location -Path songs/b; python mv/judge-takes.py --dir out", _root));
+        Assert.Equal(["--out"], Assert.Single(ChatSession.UnknownScriptFlags("Set-Location songs/b; python mv/judge-takes.py --out x", _root)).Flags);
+    }
+
+    [Fact]
+    public void ARootPathRunFromTheFolderTheCommandMovedIntoIsMissing()
+    {
+        // Measured (2026-11-18): `Set-Location songs/x; node stage-unity/Tools/local-image/gen.js …` — the script
+        // is at the root, the command looks for it under songs/x.
+        Directory.CreateDirectory(Path.Combine(_root, "songs", "c"));
+
+        var (script, elsewhere) = Assert.Single(ChatSession.MissingScripts("Set-Location songs/c; node tools/fetch.cjs out", _root));
+
+        Assert.Contains("from songs/c", script);
+        Assert.Equal(["tools/fetch.cjs"], elsewhere);
+        Assert.Empty(ChatSession.MissingScripts("Push-Location songs/c; Pop-Location; node tools/fetch.cjs out", _root));
+    }
+
+    [Theory]
+    [InlineData("node tools/fetch.cjs out 4")]
+    [InlineData("python -c \"open('x.py')\"")]
+    [InlineData("Copy-Item new.py backup.py")]
+    [InlineData("ffmpeg -i a.mp3 b.wav")]
+    public void ScriptsOnDiskAndScriptNamesThatAreNotRunPass(string command) =>
+        Assert.Empty(ChatSession.MissingScripts(command, _root));
 }
 
 public class FencedEnvelopeTests

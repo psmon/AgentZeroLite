@@ -18,6 +18,30 @@ public class ToolCallTests
     }
 
     [Fact]
+    public void AQuotationInsideFileContentIsText()
+    {
+        // Measured (2026-11-18): gemma's lyrics notes quoted their own hook — "'0xEB' is invalid after
+        // a value" — and the model blamed its em dashes for 24 000 characters of reasoning.
+        const string raw = "{\"tool\":\"write_file\",\"args\":{\"path\":\"songs/x/lyrics-draft-1.md\",\"content\":\"# 초안\n훅 \"네온 서울\"을 두 번 {반복}.\n| 3 | 대조 | '사라질 우리' — \"빛\"과 그림자 |\"}}";
+
+        Assert.True(ToolCall.TryParse(raw, out var call, out var error), error);
+
+        Assert.Equal("write_file", call.Tool);
+        Assert.Equal("songs/x/lyrics-draft-1.md", call.Arg("path"));
+        Assert.Equal("# 초안\n훅 \"네온 서울\"을 두 번 {반복}.\n| 3 | 대조 | '사라질 우리' — \"빛\"과 그림자 |", call.Arg("content"));
+    }
+
+    [Fact]
+    public void AnUnevenQuotationStillFindsTheEnvelopesEnd()
+    {
+        const string raw = "{\"tool\":\"write_file\",\"args\":{\"path\":\"a.md\",\"content\":\"he said \"stop} here\"}}\nDone.";
+
+        Assert.True(ToolCall.TryParse(raw, out var call, out var error), error);
+
+        Assert.Equal("he said \"stop} here", call.Arg("content"));
+    }
+
+    [Fact]
     public void ParsesFencedJson()
     {
         var raw = """

@@ -19,7 +19,17 @@ public sealed record SmartNote(string Kind, Decision Decision, string Verdict);
 
 /// <summary>A command the gate would not run on its own; a person decides.</summary>
 /// <param name="Reason">Why it was not run unasked — what the risk check or the engine said.</param>
-public sealed record ApprovalRequest(string Command, string Reason, string WorkingDirectory);
+public sealed record ApprovalRequest(string Command, string Reason, string WorkingDirectory)
+{
+    /// <summary>
+    /// What the person said beside their yes or no ("n — dry-run it first"), set by the approver.
+    /// Measured (2026-11-18): an operator declined a credit-spending generation with "use --dry first";
+    /// the model was told only "the user declined" and asked for the same generation with another flag.
+    /// The request object travels by reference through the actor pair, so the note set by whoever
+    /// answered reaches the session that asked.
+    /// </summary>
+    public string? Note { get; set; }
+}
 
 /// <summary>A choice the strong model's design hinges on; a person picks before anything is built.</summary>
 /// <param name="Recommended">Index of the option the design recommends.</param>
@@ -425,6 +435,9 @@ public sealed partial class ChatSession : IAgentSession
     /// </summary>
     private bool _unfinished;
 
+    /// <summary>This turn's request was judged design-sized — a build, whether or not a design came back.</summary>
+    private bool _designSized;
+
     /// <summary>The last request long enough to stand on its own — what "진행해" / "go on" refers to.</summary>
     private string? _lastRequest;
 
@@ -776,6 +789,7 @@ public sealed partial class ChatSession : IAgentSession
                     prompt = prompt + Environment.NewLine + Environment.NewLine + consult.Material();
             }
 
+            _designSized = false;
             if (_reasoning is not null && mayBuild)
             {
                 var (design, stop) = await MaybeDesignAsync(line, probe, ct);
@@ -805,7 +819,10 @@ public sealed partial class ChatSession : IAgentSession
         var before = _loop.Messages.Count;
         AgentRun run;
         // "재개" after a build that did not finish is that build, resumed.
-        _loop.Building = designed || (_unfinished && !SmartRouter.Applies(line));
+        // A job judged design-sized is a build even when the strong model could not deliver the
+        // design. Measured (2026-11-18): both design calls failed, the everyday model built alone
+        // with the one repeat nudge a chat turn gets, and a 21-step turn ended on its second repeat.
+        _loop.Building = designed || _designSized || (_unfinished && !SmartRouter.Applies(line));
         try { run = await _loop.RunAsync(prompt, ct, families); }
         finally { _loop.Building = false; }
         _unfinished = !run.Succeeded;
@@ -1193,6 +1210,7 @@ public sealed partial class ChatSession : IAgentSession
         Decided?.Invoke(new SmartNote("scope", scope.Decision, verdict));
 
         if (!scope.NeedsDesign) return (null, false);
+        _designSized = true;
 
         ActivityStarted?.Invoke($"designing with {strong}");
         var clock = Stopwatch.StartNew();
@@ -1255,6 +1273,8 @@ public sealed partial class ChatSession : IAgentSession
                 : ask.Resolve(await Chooser(ask, ct));
             Noted?.Invoke($"decided: {chosen}");
             _log?.Step(new AgentStep(0, "decision", chosen, true));
+            // An answer in the person's own words (not one of the numbers) is a note for later designs too.
+            if (!decision.Options.Contains(chosen)) RememberPersonNote("the design's decision: " + ask.Question, chosen);
         }
 
         return (ReasoningSubtask.DesignFeedBack(strong, body, chosen), false);
@@ -1464,7 +1484,26 @@ public sealed partial class ChatSession : IAgentSession
             parts.Add($"The workspace's own instructions for agents ({string.Join(", ", guide.Files)}) — follow them:\n" + guide.Text);
         if (probe is { Found: true }) parts.Add(probe.Material());
         if (Precedent() is { Length: > 0 } precedent) parts.Add(precedent);
+        if (_personNotes.Count > 0)
+            parts.Add("What the person said when approving or declining commands in this conversation — it overrides " +
+                      "anything a file written earlier in this conversation or an earlier plan says:\n" +
+                      string.Join("\n", _personNotes.Select(n => "- " + n)));
         return string.Join("\n\n", parts);
+    }
+
+    /// <summary>
+    /// The words a person put beside their yes or no, newest last. Measured (2026-11-18): after "n — this
+    /// judge-takes.py is another song's" and "there is a documented local image API, no SD-WebUI", the next
+    /// design called the same script with the same options and configured SD-WebUI again — it saw the files
+    /// an earlier turn had written from the wrong plan, and none of what the person said.
+    /// </summary>
+    private readonly List<string> _personNotes = [];
+
+    private void RememberPersonNote(string command, string note)
+    {
+        var head = command.Length <= 120 ? command : command[..120] + "…";
+        _personNotes.Add($"on `{head}`: {note}");
+        if (_personNotes.Count > 8) _personNotes.RemoveAt(0);
     }
 
     /// <summary>Whether the turn already looked: a search of its own, or one of the probe's files read.</summary>
@@ -1859,15 +1898,73 @@ public sealed partial class ChatSession : IAgentSession
     /// download still failing, the model asked to transcribe "out/C2_v2.mp3" — a
     /// name it made up from its own ranking.
     /// </summary>
-    internal static List<string> MissingMediaInputs(string command, string root)
+    /// <summary>The root and every folder the command moves into (cd, pushd, Set-Location, Push-Location).</summary>
+    private static List<string> CommandBases(string command, string root)
     {
         var tokens = command.Split([' ', '\t', '\n', '"', '\'', ';', '(', ')', ','], StringSplitOptions.RemoveEmptyEntries);
         var bases = new List<string> { root };
         for (var i = 0; i + 1 < tokens.Length; i++)
             if (tokens[i] is "cd" || tokens[i].Equals("Push-Location", StringComparison.OrdinalIgnoreCase)
                                   || tokens[i].Equals("Set-Location", StringComparison.OrdinalIgnoreCase) || tokens[i] is "pushd")
-                try { bases.Add(Path.GetFullPath(Path.Combine(root, tokens[i + 1]))); }
+            {
+                var target = tokens[i + 1] is "-Path" or "-LiteralPath" && i + 2 < tokens.Length ? tokens[i + 2] : tokens[i + 1];
+                try { bases.Add(Path.GetFullPath(Path.Combine(root, target))); }
                 catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { }
+            }
+        return bases;
+    }
+
+    /// <summary>
+    /// Each statement of a command with the folder it runs in: the root until a cd / Set-Location /
+    /// Push-Location / pushd moves it, back on Pop-Location / popd. Measured (2026-11-18) both ways:
+    /// `Set-Location songs/x; python mv/judge-takes.py` was held as "not on disk" when scripts were looked
+    /// up from the root only, and `Set-Location songs/x; node stage-unity/Tools/local-image/gen.js` was let
+    /// through when they were looked up from any folder the command named — it can only fail from songs/x.
+    /// </summary>
+    private static List<(string[] Words, string Cwd)> StatementsWithCwd(string command, string root)
+    {
+        var result = new List<(string[], string)>();
+        var cwd = root;
+        var stack = new Stack<string>();
+        foreach (var statement in command.Split([";", "&&", "||", "\n", "|"], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var words = statement.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries).Select(w => w.Trim('"', '\'', '(', ')')).ToArray();
+            if (words.Length == 0) continue;
+            var verb = words[0];
+            if (verb is "cd" or "pushd" || verb.Equals("Set-Location", StringComparison.OrdinalIgnoreCase)
+                                       || verb.Equals("Push-Location", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = words.Skip(1).FirstOrDefault(w => !w.StartsWith('-'));
+                if (target is null) continue;
+                if (verb is "pushd" || verb.Equals("Push-Location", StringComparison.OrdinalIgnoreCase)) stack.Push(cwd);
+                try { cwd = Path.GetFullPath(Path.IsPathRooted(target) ? target : Path.Combine(cwd, target)); }
+                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { }
+                continue;
+            }
+            if (verb is "popd" || verb.Equals("Pop-Location", StringComparison.OrdinalIgnoreCase))
+            {
+                if (stack.Count > 0) cwd = stack.Pop();
+                continue;
+            }
+            result.Add((words, cwd));
+        }
+        return result;
+    }
+
+    /// <summary>The file a script token names from the folder its statement runs in, or null.</summary>
+    private static string? ResolveScript(string token, string cwd)
+    {
+        try
+        {
+            var full = Path.GetFullPath(Path.IsPathRooted(token) ? token : Path.Combine(cwd, token));
+            return File.Exists(full) ? full : null;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return null; }
+    }
+
+    internal static List<string> MissingMediaInputs(string command, string root)
+    {
+        var bases = CommandBases(command, root);
 
         // "The last of several is written" holds per statement, not per command line. Measured
         // (2026-11-16): three renames chained with ';' — 0.png → bg_room_night.png, 1.png → … —
@@ -1880,6 +1977,9 @@ public sealed partial class ChatSession : IAgentSession
             for (var i = 0; i < words.Length; i++)
             {
                 var token = words[i].Trim('&', '|');
+                // A URL is fetched, not read from disk. Measured (2026-11-18): a one-liner printing two
+                // CDN .mp3 links was refused as reading files "not on disk".
+                if (token.Contains("://", StringComparison.Ordinal)) continue;
                 if (token.IndexOfAny(['*', '?', '$', '{', '<']) >= 0 || !MediaExtensions.Contains(Path.GetExtension(token))) continue;
                 var written = i > 0 && (OutputFlags.Contains(words[i - 1]) || words[i - 1].EndsWith('>'));
                 media.Add((token, written));
@@ -1903,14 +2003,176 @@ public sealed partial class ChatSession : IAgentSession
         return missing;
     }
 
+    /// <summary>
+    /// Options passed to a workspace script that the script never spells — "--out" given to a
+    /// script whose source has "--match" and "--dry" but no "--out". Only scripts that spell their
+    /// options literally are judged (argparse, commander, args.includes('--x')); one that spells
+    /// none (minimist, a generic parser) could take anything and is left alone. Measured
+    /// (2026-11-18): the strong model's redo plan wrote `dv-fetch.cjs --match … --out … --limit 4`
+    /// for a script that takes `<outDir> [count] --match`, and the everyday model copied it.
+    /// </summary>
+    internal static List<(string Script, List<string> Flags)> UnknownScriptFlags(string command, string root)
+    {
+        var found = new List<(string, List<string>)>();
+        foreach (var (words, cwd) in StatementsWithCwd(command, root))
+        {
+            for (var i = 0; i < words.Length; i++)
+            {
+                var token = words[i].Trim('&');
+                if (!ScriptExtension().IsMatch(token)) continue;
+                if (ResolveScript(token, cwd) is not { } full) break;
+
+                string source;
+                try { source = File.ReadAllText(full); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { break; }
+                var spelled = SpelledOption().Matches(source).Select(m => m.Value).ToHashSet(StringComparer.Ordinal);
+                if (spelled.Count == 0) break;
+
+                var unknown = words.Skip(i + 1)
+                    .Select(w => w.Trim('"', '\'', '(', ')'))
+                    .Select(w => w.Split('=')[0])
+                    .Where(w => SpelledOption().IsMatch(w) && SpelledOption().Match(w).Value == w && !spelled.Contains(w))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+                if (unknown.Count > 0) found.Add((token, unknown));
+                break;
+            }
+        }
+        return found;
+    }
+
+    [GeneratedRegex(@"--[a-zA-Z][a-zA-Z0-9_-]*")]
+    private static partial Regex SpelledOption();
+
+    /// <summary>Scripts already held once for want of a read — the next run goes through.</summary>
+    private readonly HashSet<string> _scriptsHeld = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Workspace scripts this command runs that the conversation has neither read nor written, and that
+    /// were not held before. Measured (2026-11-18): `dv-fetch.cjs --out … --limit 4` for a script whose
+    /// first line says `<outDir> [count] --match`, and an earlier song's `transcribe.py --dir … --out …`
+    /// for a script that takes take names and works on its own song's folder — neither file was opened.
+    /// </summary>
+    internal List<string> UnreadScripts(string command)
+    {
+        var unread = new List<string>();
+        var rootFull = Path.GetFullPath(_root);
+        foreach (var (words, cwd) in StatementsWithCwd(command, _root))
+        {
+            for (var i = 0; i < words.Length; i++)
+            {
+                var token = words[i];
+                if (!ScriptExtension().IsMatch(token) || token.Contains("://", StringComparison.Ordinal)) continue;
+                if (i > 0 && !ScriptRunners.Contains(words[i - 1])) continue;
+                if (ResolveScript(token, cwd) is not { } full || !full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) break;
+                var relative = Path.GetRelativePath(rootFull, full).Replace('\\', '/');
+                if (!_loop.HasSeen(relative) && !_scriptsHeld.Contains(relative)) unread.Add(relative);
+                break;
+            }
+        }
+        return unread;
+    }
+
+    private static readonly HashSet<string> ScriptRunners = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "python", "python3", "py", "node", "pwsh", "powershell", "bash", "sh", "-File", "&", ".",
+    };
+
+    /// <summary>
+    /// Scripts a command runs that are not on disk, each with up to five files of the same name further
+    /// down the tree. Measured (2026-11-18): the strong model's redo plan named `mv/transcribe.py` at the
+    /// root — the script exists only inside earlier songs' folders — and the run was put to a person.
+    /// </summary>
+    internal static List<(string Script, List<string> Elsewhere)> MissingScripts(string command, string root)
+    {
+        var found = new List<(string, List<string>)>();
+        var rootFull = Path.GetFullPath(root);
+        foreach (var (words, cwd) in StatementsWithCwd(command, root))
+        {
+            for (var i = 0; i < words.Length; i++)
+            {
+                var token = words[i];
+                if (!ScriptExtension().IsMatch(token) || token.Contains("://", StringComparison.Ordinal)) continue;
+                if (i > 0 && !ScriptRunners.Contains(words[i - 1])) continue;
+                if (ResolveScript(token, cwd) is null)
+                {
+                    // Named from a folder the command moved into: say so, the path may be right from the root.
+                    var from = string.Equals(Path.GetFullPath(cwd), rootFull, StringComparison.OrdinalIgnoreCase)
+                        ? token
+                        : $"{token} (from {Path.GetRelativePath(rootFull, cwd).Replace('\\', '/')}, where the command moved)";
+                    found.Add((from, SameNamed(root, Path.GetFileName(token))));
+                }
+                break;
+            }
+        }
+        return found;
+    }
+
+    private static List<string> SameNamed(string root, string name)
+    {
+        var hits = new List<string>();
+        var clock = Stopwatch.StartNew();
+        var pending = new Stack<string>([root]);
+        while (pending.Count > 0 && hits.Count < 5 && clock.ElapsedMilliseconds < 1_500)
+        {
+            var dir = pending.Pop();
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(dir, name))
+                    if (hits.Count < 5) hits.Add(Path.GetRelativePath(root, file).Replace('\\', '/'));
+                foreach (var sub in Directory.EnumerateDirectories(dir))
+                {
+                    var leaf = Path.GetFileName(sub);
+                    if (leaf.StartsWith('.') || leaf is "node_modules" or "__pycache__" or "bin" or "obj" or "Library") continue;
+                    pending.Push(sub);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        return hits;
+    }
+
     private async Task<GateVerdict> GateAsync(string command, CancellationToken ct)
     {
         // A command over files that do not exist is not put to a person: it can only
         // fail, and asking spends their attention on a guess.
         if (MissingMediaInputs(command, _root) is { Count: > 0 } absent)
-            return GateVerdict.Deny(
+            return GateVerdict.Hold(
                 $"it reads {string.Join(", ", absent)}, which is not on disk (nobody was asked). Find the real files " +
                 "first with list_files / find_files, or run the step that produces them, then run it on those.");
+
+        // A workspace script run for the first time without having been read is held once, with
+        // its own header: what it takes and where it works are in the file, not in its name.
+        if (UnreadScripts(command) is { Count: > 0 } unread)
+        {
+            foreach (var script in unread) _scriptsHeld.Add(script);
+            var usage = ScriptNotes(command, _root);
+            return GateVerdict.Hold(
+                $"not run yet (nobody was asked): {string.Join(", ", unread)} has not been read in this conversation. " +
+                "read_file it first — the arguments it takes and the folder it works in — then run it the way it says" +
+                (usage.Length > 0 ? ". Its header:\n" + usage : ".") +
+                "\n(Running it again after that goes through.)");
+        }
+
+        // Nor a script that is not there.
+        if (MissingScripts(command, _root) is { Count: > 0 } gone)
+            return GateVerdict.Hold(
+                "not run (nobody was asked): " +
+                string.Join("; ", gone.Select(g => $"{g.Script} is not on disk" +
+                    (g.Elsewhere.Count > 0 ? $" — files of that name: {string.Join(", ", g.Elsewhere)}" : " — no file of that name in the workspace"))) +
+                ". Read one of those to see how it is used and whether it fits this work, or use find_tool; a plan that named this path guessed it.");
+
+        // Nor is a script called with options it does not have: the plan that named them guessed.
+        if (UnknownScriptFlags(command, _root) is { Count: > 0 } guessed)
+        {
+            var usage = ScriptNotes(command, _root);
+            return GateVerdict.Hold(
+                "not run (nobody was asked): " +
+                string.Join("; ", guessed.Select(g => $"{g.Script} has no {string.Join(", ", g.Flags)} anywhere in its source")) +
+                ". Call it the way the script itself says" +
+                (usage.Length > 0 ? ":\n" + usage : " — read_file it first.") +
+                "\nA plan or design that names other options guessed them.");
+        }
 
         // Installing is asked of nobody while the thing is already on this machine.
         // Measured (2026-11-16): `pip install openai-whisper` went to the person while the
@@ -1981,13 +2243,18 @@ public sealed partial class ChatSession : IAgentSession
             return GateVerdict.Deny($"nobody here to approve it — {reason}");
         }
 
-        var granted = await Approver(new ApprovalRequest(command, reason, _root), ct);
+        var request = new ApprovalRequest(command, reason, _root);
+        var granted = await Approver(request, ct);
         _state.CountApproval(granted);
-        Noted?.Invoke(granted ? $"approved: {command}" : $"declined: {command}");
+        var note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
+        if (note is not null) RememberPersonNote(command, (granted ? "approved — " : "declined — ") + note);
+        Noted?.Invoke((granted ? $"approved: {command}" : $"declined: {command}") + (note is null ? "" : $" — \"{note}\""));
 
-        return granted
-            ? GateVerdict.Allow("approved by the user")
-            : GateVerdict.Deny($"the user declined to run it — {reason}. Do not retry it; explain, or do it another way.");
+        if (granted)
+            return GateVerdict.Allow(note is null ? "approved by the user" : $"approved by the user, who added: \"{note}\"");
+        return GateVerdict.Deny(note is null
+            ? $"the user declined to run it — {reason}. Do not retry it; explain, or do it another way."
+            : $"the user declined to run it and said: \"{note}\". Do what they said — that is the next step, not this command with other options.");
     }
 
     // ---------------------------------------------------------- processes
