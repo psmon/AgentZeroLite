@@ -2,7 +2,7 @@
   "id": "agent-stage",
   "name": "Agent Stage",
   "entry": "index.html",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "icon": "🎬",
-  "description": "Live stage of your workspaces: every running terminal as an agent avatar, with motion graphics while Claude, Codex, Hermes & co. are working, and their sub-agents as a crew around it. Click an agent to jump to its terminal."
+  "description": "Live stage of your workspaces: every running terminal as an agent avatar, with motion graphics while Claude, Codex, Hermes & co. are working, and their sub-agents as a crew around it. A Claude in a garden harness (harness-kakashi) shows its experts at work. Click an agent to jump to its terminal."
 }

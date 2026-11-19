@@ -9,6 +9,7 @@
   --working: #e5c07b;
   --waiting: #e06c75;
   --done: #61afef;
+  --garden: #7fd18b;
 }
 
 * { box-sizing: border-box; }
@@ -59,6 +60,12 @@ body { display: flex; flex-direction: column; }
 .as-stat.waiting i { background: var(--waiting); box-shadow: 0 0 8px var(--waiting); }
 .as-stat.done i { background: var(--done); box-shadow: 0 0 8px var(--done); }
 .as-stat.crew i { background: var(--working); border-radius: 2px; transform: rotate(45deg); box-shadow: 0 0 6px var(--working); }
+/* a garden expert is a hexagon on the stage; the counter's mark is one too */
+.as-stat.garden i {
+  background: var(--garden); border-radius: 0; width: 9px; height: 9px;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  box-shadow: 0 0 8px var(--garden);
+}
 
 .as-tools { margin-left: auto; display: flex; gap: 12px; font-size: 11px; color: var(--dim); }
 .as-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; }
@@ -89,3 +96,4 @@ body { display: flex; flex-direction: column; }
   box-shadow: 0 6px 18px rgba(0,0,0,.45);
 }
 .as-tip small { color: var(--dim); display: block; margin-top: 2px; }
+.as-tip small.garden { color: var(--garden); }

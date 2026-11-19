@@ -77,6 +77,30 @@ public sealed class WorkspaceSessionsBridgeTests : IDisposable
     }
 
     [Fact]
+    public async Task A_claude_tab_in_a_garden_carries_the_harness_and_its_experts()
+    {
+        var lyricist = new HarnessExpert("lyricist", "작사가", "specialist", "가사 전문가");
+        WorkspaceSessionsFeed.Publish([
+            new WorkspaceView(0, "music", "/m", Active: true, [
+                new WorkspaceSessionView(0, 0, "Claude", "claude", "working", Focused: false, NeedsAttention: false,
+                    [new SubagentView("a1", null, "general-purpose", "lyricist review", 1, true, "working", null, 0, 1000, null, lyricist)],
+                    new HarnessView("Music Harness", "1.14.0", 14,
+                        [new HarnessDutyView("tamer", "정원지기", null, "command", "working", 900, null)]))]),
+        ]);
+
+        var s = (await Call("sessions.list")).GetProperty("result").GetProperty("workspaces")[0].GetProperty("sessions")[0];
+        var expert = s.GetProperty("subagents")[0].GetProperty("expert");
+        Assert.Equal("lyricist", expert.GetProperty("name").GetString());
+        Assert.Equal("작사가", expert.GetProperty("persona").GetString());
+        var h = s.GetProperty("harness");
+        Assert.Equal("Music Harness", h.GetProperty("name").GetString());
+        Assert.Equal(14, h.GetProperty("experts").GetInt32());
+        var duty = h.GetProperty("onDuty")[0];
+        Assert.Equal("command", duty.GetProperty("via").GetString());
+        Assert.False(duty.TryGetProperty("type", out _));
+    }
+
+    [Fact]
     public async Task Focus_goes_through_the_host_handler_and_needs_group_and_tab()
     {
         (int, int)? asked = null;

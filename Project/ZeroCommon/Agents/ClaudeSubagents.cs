@@ -17,9 +17,10 @@ public sealed record AgentSessionRef(string Agent, string ConfigDir, string Sess
 /// <param name="Tools">How many tool calls it has made.</param>
 /// <param name="StartedAt">Unix ms of its first record.</param>
 /// <param name="EndedAt">Unix ms it finished or was called stopped; null while working.</param>
+/// <param name="Expert">The garden-harness expert it was launched as (<see cref="KakashiHarness.ExpertOf"/>) — Claude only; null otherwise.</param>
 public sealed record SubagentView(
     string Id, string? ParentId, string Type, string Description, int Depth, bool Background,
-    string State, string? Tool, int Tools, long StartedAt, long? EndedAt);
+    string State, string? Tool, int Tools, long StartedAt, long? EndedAt, HarnessExpert? Expert = null);
 
 /// <summary>
 /// The sub-agents a Claude Code session is running, read from its own transcript files — no hook.
@@ -36,6 +37,7 @@ public sealed record SubagentView(
 public sealed class ClaudeSubagentReader
 {
     private readonly Func<DateTimeOffset> _now;
+    private readonly HarnessLocator? _harness;
     private readonly Dictionary<string, Transcript> _cache = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>How long a finished sub-agent stays in the list, so the stage can show what just ran.</summary>
@@ -47,7 +49,12 @@ public sealed class ClaudeSubagentReader
     /// <summary>The most a session reports — the newest first.</summary>
     public int MaxShown { get; init; } = 24;
 
-    public ClaudeSubagentReader(Func<DateTimeOffset>? now = null) => _now = now ?? (() => DateTimeOffset.Now);
+    /// <param name="harness">When given, a sub-agent launched as an expert of the session's garden harness says which.</param>
+    public ClaudeSubagentReader(Func<DateTimeOffset>? now = null, HarnessLocator? harness = null)
+    {
+        _now = now ?? (() => DateTimeOffset.Now);
+        _harness = harness;
+    }
 
     public static string FolderOf(AgentSessionRef s) =>
         Path.Combine(s.ConfigDir, "projects", ClaudeSessionLocator.Slug(s.Cwd), s.SessionId, "subagents");
@@ -88,6 +95,7 @@ public sealed class ClaudeSubagentReader
         foreach (var (_, t) in found)
             foreach (var call in t.AgentCalls) parentOf[call] = t.Id;
 
+        var roster = _harness?.Find(session.Cwd);
         var views = new List<SubagentView>();
         foreach (var (meta, t) in found)
         {
@@ -102,7 +110,7 @@ public sealed class ClaudeSubagentReader
 
             views.Add(new SubagentView(t.Id, meta.ToolUseId is { } id && parentOf.TryGetValue(id, out var p) ? p : null,
                 meta.Type, meta.Description, meta.Depth, meta.Background, state, t.LastTool, t.ToolCount,
-                t.StartedAt, ended));
+                t.StartedAt, ended, roster is null ? null : KakashiHarness.ExpertOf(roster, t.Prompt, meta.Description)));
         }
         return views.OrderBy(v => v.StartedAt).TakeLast(MaxShown).ToList();
     }
@@ -142,6 +150,9 @@ public sealed class ClaudeSubagentReader
         public int ToolCount { get; private set; }
         public List<string> AgentCalls { get; } = [];
 
+        /// <summary>The head of the first user message — the prompt it was launched with (whom it is to act as).</summary>
+        public string? Prompt { get; private set; }
+
         public void CatchUp()
         {
             try
@@ -180,6 +191,8 @@ public sealed class ClaudeSubagentReader
                     LastAt = ms;
                 }
                 if (!_handedBack) EndedAt = null;   // anything after an end_turn means it went on
+                if (type == "user" && Prompt is null && r.TryGetProperty("message", out var first))
+                    Prompt = TextOf(first, PromptChars);
                 if (type != "assistant" || !r.TryGetProperty("message", out var msg)) return;
 
                 if (msg.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
@@ -195,6 +208,30 @@ public sealed class ClaudeSubagentReader
             }
             catch (JsonException) { /* a torn line — skipped, the rest still folds */ }
         }
+    }
+
+    /// <summary>How much of a launch prompt is kept — its opening says whom the sub-agent is to act as.</summary>
+    internal const int PromptChars = 4000;
+
+    /// <summary>A message's text: <c>content</c> as a string, or its text parts joined; cut at <paramref name="max"/>.</summary>
+    internal static string TextOf(JsonElement message, int max)
+    {
+        if (message.ValueKind != JsonValueKind.Object || !message.TryGetProperty("content", out var content)) return "";
+        string text;
+        if (content.ValueKind == JsonValueKind.String) text = content.GetString() ?? "";
+        else if (content.ValueKind == JsonValueKind.Array)
+        {
+            var sb = new StringBuilder();
+            foreach (var c in content.EnumerateArray())
+                if (Str(c, "type") == "text" && Str(c, "text") is { } t)
+                {
+                    sb.Append(t).Append('\n');
+                    if (sb.Length >= max) break;
+                }
+            text = sb.ToString();
+        }
+        else return "";
+        return text.Length > max ? text[..max] : text;
     }
 
     /// <summary>The argument that says what a call is about, cut short (shared with <see cref="HermesSubagentReader"/>).</summary>

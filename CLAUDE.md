@@ -430,7 +430,18 @@ What differs from the WPF host, and why:
   message to `<home>/state.db` as the turn runs: last row user / tool / assistant-with-tool_calls → working, any
   other assistant row → done (measured; Ctrl+C leaves "Operation interrupted."). Its approval box is screen-only
   (`AgentManifestCatalog.Hermes`), and the Blocked check uses the *reporting* agent's rules, not the title's.
-  `CompositeLiveStatusSource` asks Claude's source, then Codex's, then Hermes'. Wrappers: `AgentZeroLite.ps1` / `AgentZeroLite.sh`.
+  `CompositeLiveStatusSource` asks Claude's source, then Codex's, then Hermes'. **Garden-harness experts (Claude
+  only, `"$schema": "kakashi-harness"` only)** — `Agents/KakashiHarness`: `HarnessLocator` finds
+  `harness/harness.config.json` at or above the session's cwd (stops at the repository root); a sub-agent is an
+  expert when its launch prompt (the first user line of its transcript) names exactly **one**
+  `harness/agents/<name>.md` of that garden — measured: reviewers are launched "You are acting as the **lyricist
+  (작사가)** specialist … read `harness/agents/lyricist.md`", while an Explore survey names several and is not one;
+  `ClaudeHarnessDutyReader` tails the main transcript (last 512 KB first, then appends) for experts the conversation
+  works as itself — a read of one agent file (Read, Grep, or Bash/PowerShell: measured, a build-doctor turn read
+  its definition with `cat` and showed no expert until shell reads counted), a write under `harness/logs/<name>/`,
+  or `/harness-creator` / its Skill (the gardener, `tamer`) — for one turn,
+  and an Edit/Write of an agent file is tending, not duty. Agent Stage draws them (`expert`, `harness.onDuty`).
+  Wrappers: `AgentZeroLite.ps1` / `AgentZeroLite.sh`.
 - **Agent CLI install lives in both hosts' settings** (`AgentCliTools` in ZeroCommon; the panel is
   `SettingsViewModel`/`SettingsView` here and the CLI Definitions tab of WPF's `SettingsPanel`): selecting a
   definition that launches Claude, Codex, AgentOne or Netclaw probes PATH and, when the tool is missing, installs it

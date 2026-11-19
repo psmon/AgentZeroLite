@@ -11,6 +11,11 @@
  *   · a Claude session's sub-agents (the Agent / Task tool) as a crew around its avatar — each
  *     launched from its parent along a tether, nested ones further out from theirs, a comet back
  *     to the parent when one hands its report in;
+ *   · a Claude tab working in a garden harness (harness-kakashi, "$schema": "kakashi-harness") wears
+ *     the garden's mark, and its experts are drawn as experts: a sub-agent launched as one is a
+ *     hexagon on a vine-green tether, labelled with its persona (작사가, Security Guard); an expert
+ *     the conversation takes on itself (it read harness/agents/<name>.md, or /harness-creator put the
+ *     gardener on) is an emblem worn at the avatar's side for that turn;
  *   · click an avatar (or one of its crew) → sessions.focus jumps to that terminal.
  * Outside the app (no bridge) or with ?demo in the URL it runs on simulated sessions.
  */
@@ -53,6 +58,22 @@
     stopped: { color: '#7F848E', label: 'stopped' },
   };
   const KEEP_MS = 120000;   // the host keeps a finished sub-agent this long; it fades over it
+
+  // The garden harness (Claude only): its experts are hexagons, its tethers a vine, its mark ❀.
+  const GARDEN = { color: '#7FD18B', gold: '#E8C66A', mark: '❀' };
+  const GARDENER = 'tamer';
+  const VIA = { read: 'read its definition', log: 'wrote its log', command: '/harness-creator', skill: 'harness-creator skill' };
+  /** How the garden calls an expert, short: "연기자(노래·연주 퍼포먼스)" → "연기자". */
+  function expertLabel(e) {
+    const p = (e.persona || '').replace(/\s*[(（].*$/, '').trim();
+    return (p || e.name).slice(0, 16);
+  }
+  function expertGlyph(e) {
+    if ((e.name || '').toLowerCase() === GARDENER) return GARDEN.mark;
+    const ch = [...expertLabel(e)][0] || '?';
+    return /[a-z]/i.test(ch) ? ch.toUpperCase() : ch;
+  }
+  function expertColor(e) { return `hsl(${hueOf((e.name || '').toLowerCase())},50%,60%)`; }
 
   const CODE_CHARS = ['{', '}', '<', '/>', ';', '()', '=>', '01', '#', '*', '[]', 'fn', '∑', 'λ'];
 
@@ -109,13 +130,38 @@
           transition(a, a.state, s.state);
         }
         Object.assign(a, { ws, session: s, agent: AGENTS[s.agent] ? s.agent : 'shell',
-                           state: s.state, title: s.title, focused: !!s.focused, attention: !!s.needsAttention });
-        syncKids(a, s.subagents || []);
+                           state: s.state, title: s.title, focused: !!s.focused, attention: !!s.needsAttention,
+                           garden: s.harness || null });
+        const shown = capExperts(s.subagents || [], (s.harness && s.harness.onDuty) || []);
+        a.moreExperts = shown.hidden;
+        syncKids(a, shown.subs);
+        syncDuties(a, shown.duties);
       }
     }
     for (const k of [...avatars.keys()]) if (!seen.has(k)) avatars.delete(k);
     updateStats();
     layout();
+  }
+
+  // At most MAX_EXPERTS experts per avatar — expert sub-agents and the experts its conversation wears,
+  // together. A garden has 10+ experts and a review can raise them all; past the cap the finished ones
+  // leave first (longest finished first), then the longest-running working ones. Who was left out is
+  // kept for the "+N" chip and its tooltip. Sub-agents that are not experts (Explore, Plan…) are untouched.
+  const MAX_EXPERTS = 5;
+  function capExperts(subs, duties) {
+    const all = [
+      ...subs.filter(k => k.expert).map(k => ({ kind: 'sub', v: k, name: expertLabel(k.expert) })),
+      ...duties.map(d => ({ kind: 'duty', v: d, name: expertLabel(d) })),
+    ];
+    if (all.length <= MAX_EXPERTS) return { subs, duties, hidden: [] };
+    const rank = (e) => e.v.state === 'working' ? [0, -(e.v.startedAt || 0)] : [1, -(e.v.endedAt || e.v.startedAt || 0)];
+    all.sort((p, q) => { const a = rank(p), b = rank(q); return a[0] - b[0] || a[1] - b[1]; });
+    const keep = new Set(all.slice(0, MAX_EXPERTS).map(e => e.v));
+    return {
+      subs: subs.filter(k => !k.expert || keep.has(k)),
+      duties: duties.filter(d => keep.has(d)),
+      hidden: all.slice(MAX_EXPERTS).map(e => ({ name: e.name, state: e.v.state })),
+    };
   }
 
   // The crew of one avatar, kept by id across polls so a sub-agent keeps its place and motion.
@@ -141,18 +187,39 @@
     for (const id of [...kids.keys()]) if (!seen.has(id)) kids.delete(id);
   }
 
+  // Experts the conversation itself works as — kept by name, so a duty keeps its seat and motion.
+  function syncDuties(a, list) {
+    const duties = a.duties || (a.duties = new Map());
+    const seen = new Set();
+    for (const d of list) {
+      seen.add(d.name);
+      let e = duties.get(d.name);
+      if (!e) {
+        e = { name: d.name, x: NaN, y: NaN, born: now(), spin: Math.random() * 6.28, state: d.state, fresh: true };
+        duties.set(d.name, e);   // fresh: drawn first at the avatar, so it is seen being put on
+      } else if (e.state !== d.state && isFinite(e.x)) {
+        if (d.state === 'done') { burst(e.x, e.y, [GARDEN.color, GARDEN.gold], 14, 2); e.handback = true; }
+        else if (d.state === 'working') { e.fresh = true; e.born = now(); }   // back on for a new turn
+      }
+      Object.assign(e, { duty: d, state: d.state });
+    }
+    for (const n of [...duties.keys()]) if (!seen.has(n)) duties.delete(n);
+  }
+
   // What tells one crew member from another. A typed sub-agent (Explore, Plan, …) is its type;
   // general-purpose ones are told apart by the task's first word — measured: a harness spawned
   // eight general-purpose reviewers ("lyricist review of …", "genre-scout review of …"), and by
   // type alone they were eight identical dots.
   function kidRole(sub) {
+    if (sub.expert) return expertLabel(sub.expert);
     const type = sub.type || 'agent';
     if (type.toLowerCase() !== 'general-purpose') return type;
     const m = /^[\p{L}\p{N}][\p{L}\p{N}_-]*/u.exec((sub.description || '').trim());
     return m ? m[0].slice(0, 18) : type;
   }
-  function kidColor(sub) { return `hsl(${hueOf(kidRole(sub).toLowerCase())},62%,62%)`; }
+  function kidColor(sub) { return sub.expert ? expertColor(sub.expert) : `hsl(${hueOf(kidRole(sub).toLowerCase())},62%,62%)`; }
   function kidGlyph(sub) {
+    if (sub.expert) return expertGlyph(sub.expert);
     const known = KIND_GLYPH[(sub.type || '').toLowerCase()];
     return known && sub.type.toLowerCase() !== 'general-purpose' ? known : kidRole(sub).charAt(0).toUpperCase();
   }
@@ -172,12 +239,14 @@
   }
 
   function updateStats() {
-    let working = 0, waiting = 0, done = 0, total = 0, wsWith = 0, crew = 0;
+    let working = 0, waiting = 0, done = 0, total = 0, wsWith = 0, crew = 0, experts = 0;
     for (const ws of data.workspaces || []) {
       if ((ws.sessions || []).length) wsWith++;
       for (const s of ws.sessions || []) {
         total++;
         crew += (s.subagents || []).filter(k => k.state === 'working').length;
+        experts += (s.subagents || []).filter(k => k.expert && k.state === 'working').length
+                 + ((s.harness && s.harness.onDuty) || []).filter(d => d.state === 'working').length;
         if (s.state === 'working') working++;
         else if (s.state === 'blocked') waiting++;
         else if (s.state === 'done') done++;
@@ -190,6 +259,8 @@
     $('as-n-ws').textContent = wsWith;
     $('as-n-crew').textContent = crew;
     $('as-crew').hidden = crew === 0;
+    $('as-n-experts').textContent = experts;
+    $('as-garden').hidden = experts === 0;
   }
 
   // ── layout: a grid of zones, avatars in rows inside each ─────────────────
@@ -213,8 +284,9 @@
       const z = { ws, x: pad + c * (zw + gap), y: pad + r * (zh + gap), w: zw, h: zh, hue: hueOf(ws.path || ws.name) };
       const list = (ws.sessions || []).map(s => avatars.get(keyOf(ws, s))).filter(Boolean);
       const innerTop = z.y + 40, innerH = z.h - 52;
-      // An avatar with a crew needs a wider seat and room above it for the halo.
-      const crewed = list.some(a => a.kids && a.kids.size);
+      // An avatar with a crew needs a wider seat and room above it for the halo; one wearing
+      // experts at its sides needs the width too.
+      const crewed = list.some(a => (a.kids && a.kids.size) || (a.duties && a.duties.size));
       const per = Math.max(1, Math.floor(z.w / (crewed ? 190 : 120)));
       const lines = Math.max(1, Math.ceil(list.length / per));
       const cell = Math.min(z.w / Math.min(per, Math.max(1, list.length)), innerH / lines);
@@ -317,7 +389,15 @@
     ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
     ctx.fillStyle = z.ws.active ? '#4ec9b0' : '#d8dee9';
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    ctx.fillText(clip(z.ws.name, z.w - 130), z.x + 28, z.y + 19);
+    const title = clip(z.ws.name, z.w - 130);
+    ctx.fillText(title, z.x + 28, z.y + 19);
+    // the garden this workspace's Claude works in, beside its name
+    const garden = (z.ws.sessions || []).map(s => s.harness).find(Boolean);
+    if (garden) {
+      const gx = z.x + 28 + ctx.measureText(title).width + 10, room = z.x + z.w - 120 - gx;
+      ctx.font = '600 11px "Segoe UI", system-ui, sans-serif';
+      if (room > 40) { ctx.fillStyle = GARDEN.color; ctx.fillText(clip(`${GARDEN.mark} ${garden.name}`, room), gx, z.y + 19); }
+    }
     ctx.font = '11px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'right';
     const meta = [];
     if (z.counts.working) meta.push(`⚡ ${z.counts.working}`);
@@ -325,6 +405,16 @@
     meta.push(`${(z.ws.sessions || []).length} tab${(z.ws.sessions || []).length === 1 ? '' : 's'}`);
     ctx.fillStyle = z.counts.need ? STATES.blocked.color : '#8a93a3';
     ctx.fillText(meta.join('  '), z.x + z.w - 12, z.y + 19);
+  }
+
+  /** A flat-topped hexagon — the garden expert's shape (a plain sub-agent is a circle). */
+  function hexPath(x, y, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const ang = Math.PI / 3 * i;
+      i ? ctx.lineTo(x + Math.cos(ang) * r, y + Math.sin(ang) * r) : ctx.moveTo(x + r, y);
+    }
+    ctx.closePath();
   }
 
   function clip(text, max) {
@@ -352,6 +442,7 @@
     ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, glowR, 0, 6.29); ctx.fill();
 
     if (a.kids && a.kids.size) drawCrew(a, x, y, r, t, dt);
+    if (a.duties && a.duties.size) drawDuties(a, x, y, r, t, dt);
 
     if (working) {
       // thinking ring: two arcs counter-rotating
@@ -415,6 +506,26 @@
       ctx.fillStyle = st.color; ctx.beginPath(); ctx.arc(bx, by, br, 0, 6.29); ctx.fill();
       ctx.fillStyle = '#0d0f14'; ctx.font = `800 ${Math.round(br * 1.3)}px "Segoe UI", sans-serif`;
       ctx.fillText(blocked ? '!' : '✓', bx, by + (blocked ? 1 : 0.5));
+    }
+
+    // the garden's mark: this Claude works in a garden harness
+    if (a.garden) {
+      const gx = x - r * 0.78, gy = y + r * 0.78, gr = Math.max(6, r * 0.32);
+      hexPath(gx, gy, gr); ctx.fillStyle = '#16301d'; ctx.fill();
+      ctx.lineWidth = 1.2; ctx.strokeStyle = GARDEN.color; ctx.stroke();
+      ctx.fillStyle = GARDEN.color; ctx.font = `700 ${Math.round(gr * 1.25)}px "Segoe UI Symbol", "Segoe UI", sans-serif`;
+      ctx.fillText(GARDEN.mark, gx, gy + 0.5);
+
+      // experts past the cap: a "+N" chip above the mark, listed in the avatar's tooltip
+      const more = (a.moreExperts || []).length;
+      if (more) {
+        const label = `+${more}`, cy = y - r * 0.9;
+        ctx.font = '700 9px "Segoe UI", system-ui, sans-serif';
+        const w = ctx.measureText(label).width + 8, cx = x - r * 0.95;
+        ctx.fillStyle = '#16301d'; ctx.strokeStyle = GARDEN.gold; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(cx - w / 2, cy - 6.5, w, 13, 6.5); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = GARDEN.gold; ctx.fillText(label, cx, cy + 0.5);
+      }
     }
 
     // focused terminal: dashed ring in the sidebar's blue
@@ -482,10 +593,11 @@
       if (!isFinite(k.x)) { k.x = src.x; k.y = src.y; }          // launched from its parent: flies out to its seat
       k.x += (k.tx - k.x) * Math.min(1, dt * 4);
       k.y += (k.ty - k.y) * Math.min(1, dt * 4);
-      const color = kidColor(k.sub), fade = kidFade(k, wall);
+      // an expert hangs on a vine: the garden's green, a little stronger than a plain tether
+      const color = k.sub.expert ? GARDEN.color : kidColor(k.sub), fade = kidFade(k, wall);
       const mx = (src.x + k.x) / 2 + (k.y - src.y) * 0.15, my = (src.y + k.y) / 2 - (k.x - src.x) * 0.15;
-      ctx.globalAlpha = 0.35 * fade;
-      ctx.strokeStyle = color; ctx.lineWidth = 1.3;
+      ctx.globalAlpha = (k.sub.expert ? 0.55 : 0.35) * fade;
+      ctx.strokeStyle = color; ctx.lineWidth = k.sub.expert ? 1.8 : 1.3;
       if (k.state !== 'working') ctx.setLineDash([3, 4]);
       ctx.beginPath(); ctx.moveTo(src.x, src.y); ctx.quadraticCurveTo(mx, my, k.x, k.y); ctx.stroke();
       ctx.setLineDash([]);
@@ -520,8 +632,14 @@
         ctx.beginPath(); ctx.arc(k.x, k.y, cr + 4, t * 4 + k.spin, t * 4 + k.spin + 2.2); ctx.stroke();
       }
       ctx.fillStyle = k.state === 'stopped' ? '#4a4f5a' : color;
-      ctx.beginPath(); ctx.arc(k.x, k.y, cr, 0, 6.29); ctx.fill();
-      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.stroke();
+      if (sub.expert) {
+        // a garden expert: a hexagon one size up, rimmed in gold
+        hexPath(k.x, k.y, cr * 1.18); ctx.fill();
+        ctx.lineWidth = 1.6; ctx.strokeStyle = hexA(GARDEN.gold, 0.9); ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(k.x, k.y, cr, 0, 6.29); ctx.fill();
+        ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.stroke();
+      }
       ctx.fillStyle = '#0d0f14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = `700 ${Math.round(cr * 1.1)}px "Segoe UI Symbol", "Segoe UI", system-ui, sans-serif`;
       ctx.fillText(kidGlyph(sub), k.x, k.y + 0.5);
@@ -535,7 +653,7 @@
       if (showRole) {
         const above = k.y - cr - (small ? 6 : 8);
         ctx.font = `600 ${small ? 9 : 10}px "Segoe UI", system-ui, sans-serif`;
-        ctx.fillStyle = working ? '#e8d3a6' : '#9aa3b2';
+        ctx.fillStyle = sub.expert ? (working ? '#b9ecc0' : '#8fb596') : working ? '#e8d3a6' : '#9aa3b2';
         ctx.fillText(clip(kidRole(sub), small ? 64 : 110), k.x, above);
         if (showDesc && sub.description) {
           ctx.font = '10px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#8a93a3';
@@ -556,6 +674,56 @@
       ctx.fillStyle = '#0d0f14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(label, bx, by + 0.5);
     }
+  }
+
+  // ── the experts a Claude wears: the garden's experts its own conversation took on ──
+  // No tether — it is the same agent in another role — but an emblem at its side, linked by a short
+  // gold strap, right then left, then a row lower and higher. Put on → it slides out from the
+  // avatar; the turn ends → a comet back in, and it fades like a finished sub-agent.
+  function drawDuties(a, x, y, r, t, dt) {
+    const wall = Date.now(), list = [...a.duties.values()];
+    const er = Math.max(8, Math.min(12, r * 0.45)), R = r + 32, labels = list.length <= 4;
+    list.forEach((e, i) => {
+      const side = i % 2 ? -1 : 1, row = Math.floor(i / 2);
+      const tilt = row === 0 ? 0 : (row % 2 ? 1 : -1) * Math.ceil(row / 2) * 0.62;
+      const ang = side > 0 ? tilt : Math.PI - tilt;
+      const tx = x + Math.cos(ang) * R, ty = y + Math.sin(ang) * R * 0.9 + Math.sin(t * 1.5 + e.spin) * 2;
+      if (e.fresh || !isFinite(e.x)) { e.x = x; e.y = y; e.fresh = false; }
+      e.x += (tx - e.x) * Math.min(1, dt * 5);
+      e.y += (ty - e.y) * Math.min(1, dt * 5);
+      const d = e.duty, working = e.state === 'working';
+      const fade = working || !d.endedAt ? 1 : Math.max(0.3, 1 - (wall - d.endedAt) / KEEP_MS);
+      const color = d.name === GARDENER ? GARDEN.color : expertColor(d);
+      ctx.globalAlpha = fade;
+
+      // the strap: avatar edge → emblem edge
+      const dx = e.x - x, dy = e.y - y, len = Math.hypot(dx, dy) || 1;
+      ctx.strokeStyle = hexA(GARDEN.gold, working ? 0.7 : 0.35); ctx.lineWidth = 1.4;
+      if (!working) ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(x + dx / len * r, y + dy / len * r); ctx.lineTo(e.x - dx / len * er, e.y - dy / len * er); ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (working) {
+        const g = ctx.createRadialGradient(e.x, e.y, er * 0.4, e.x, e.y, er * 2.6);
+        g.addColorStop(0, hexA(GARDEN.color, 0.35)); g.addColorStop(1, hexA(GARDEN.color, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e.x, e.y, er * 2.6, 0, 6.29); ctx.fill();
+        ctx.strokeStyle = GARDEN.gold; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(e.x, e.y, er + 4, -t * 3 + e.spin, -t * 3 + e.spin + 2); ctx.stroke();
+      }
+      hexPath(e.x, e.y, er); ctx.fillStyle = e.state === 'stopped' ? '#4a4f5a' : color; ctx.fill();
+      ctx.lineWidth = 1.6; ctx.strokeStyle = hexA(GARDEN.gold, 0.9); ctx.stroke();
+      ctx.fillStyle = '#0d0f14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `700 ${Math.round(er * 1.05)}px "Segoe UI Symbol", "Segoe UI", system-ui, sans-serif`;
+      ctx.fillText(expertGlyph(d), e.x, e.y + 0.5);
+      if (labels) {
+        ctx.font = '600 9px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = working ? '#b9ecc0' : '#8fb596';
+        ctx.fillText(clip(expertLabel(d), 70), e.x, e.y + er + 9);
+      }
+      if (e.handback) { e.handback = false; comet(e.x, e.y, x, y, GARDEN.color); }
+      e.hit = { x: e.x, y: e.y, r: er + 5 };
+    });
+    ctx.globalAlpha = 1;
   }
 
   /** A finished one fades over the time the host keeps it; a working one is solid. */
@@ -648,6 +816,11 @@
         const h = k.hit; if (!h || !isFinite(k.ang)) continue;
         if (Math.hypot(mx - h.x, my - h.y) <= h.r) return { ...a, kid: k, hit: { ...a.hit, x: h.x, y: h.y, top: h.y - h.r - 4 } };
       }
+    for (const a of avatars.values())
+      for (const e of (a.duties ? a.duties.values() : [])) {
+        const h = e.hit; if (!h) continue;
+        if (Math.hypot(mx - h.x, my - h.y) <= h.r) return { ...a, duty: e.duty, hit: { ...a.hit, x: h.x, y: h.y, top: h.y - h.r - 4 } };
+      }
     for (const a of avatars.values()) {
       const h = a.hit; if (!h) continue;
       if (Math.hypot(mx - h.x, my - h.y) <= h.r || (Math.abs(mx - h.x) < 60 && my >= h.top && my <= h.bottom)) return a;
@@ -668,17 +841,41 @@
     tipEl.innerHTML = '';
     const line = document.createElement('div');
     const sub = document.createElement('small');
+    const extra = [];
+    const gardenLine = (g, text) => {
+      const el = document.createElement('small');
+      el.className = 'garden';
+      el.textContent = `${GARDEN.mark} ${g ? g.name + (g.version ? ` v${g.version}` : '') + ' · ' : ''}${text}`;
+      extra.push(el);
+    };
     if (hover.kid) {
       const k = hover.kid.sub;
       const tool = k.tool ? ` · ${k.tool}` : '';
-      line.textContent = `${k.type} · ${k.description || 'sub-agent'}`;
+      line.textContent = k.expert
+        ? `${expertLabel(k.expert)} · ${k.expert.name} — ${k.description || 'expert'}`
+        : `${k.type} · ${k.description || 'sub-agent'}`;
       sub.textContent = `${(KIDS[k.state] || KIDS.stopped).label} ${fmtAge((k.endedAt || Date.now()) - k.startedAt)}`
         + ` · ${k.tools} tool${k.tools === 1 ? '' : 's'}${tool} — ${hover.title} in ${hover.ws.name}${k.parentId ? ' (nested)' : ''}`;
+      if (k.expert) gardenLine(hover.garden, `expert sub-agent${k.expert.type ? ' · ' + k.expert.type : ''}`
+        + (k.expert.description ? ` — ${k.expert.description.slice(0, 80)}` : ''));
+    } else if (hover.duty) {
+      const d = hover.duty;
+      line.textContent = `${expertLabel(d)} · ${d.name} — worn by ${hover.title}`;
+      sub.textContent = `${d.state === 'working' ? 'on duty' : (KIDS[d.state] || KIDS.stopped).label} `
+        + `${fmtAge((d.endedAt || Date.now()) - d.startedAt)} · via ${VIA[d.via] || d.via} — in ${hover.ws.name}`;
+      gardenLine(hover.garden, `the conversation works as this expert itself${d.type ? ' · ' + d.type : ''}`);
     } else {
       line.textContent = `${hover.ws.name} / ${hover.title}`;
       sub.textContent = `${ag.name} · ${st.label}${hover.focused ? ' · focused' : ''} — click to open`;
+      if (hover.garden) {
+        const on = [...(hover.duties ? hover.duties.values() : [])].filter(e => e.state === 'working').map(e => expertLabel(e.duty));
+        gardenLine(hover.garden, `${hover.garden.experts} experts` + (on.length ? ` · on duty: ${on.join(', ')}` : ''));
+        const more = hover.moreExperts || [];
+        if (more.length) gardenLine(null, `+${more.length} not shown (cap ${MAX_EXPERTS}): `
+          + more.map(m => m.state === 'working' ? `${m.name} (working)` : m.name).join(', '));
+      }
     }
-    tipEl.append(line, sub);
+    tipEl.append(line, sub, ...extra);
     tipEl.style.left = `${hover.hit.x}px`; tipEl.style.top = `${hover.hit.top}px`;
     tipEl.hidden = false;
   });
@@ -716,6 +913,9 @@
         sessions: w.tabs.map(([title, agent], t) => ({ group: g, tab: t, title, agent, state: agent === 'shell' ? 'running' : 'idle', focused: g === 0 && t === 0, needsAttention: false })) }));
       // The first Claude opens at work, so the preview shows a crew from the start.
       demo[0].sessions[0].state = 'working';
+      // Two Claudes work in gardens (the harness-kakashi harness): this repository's and a music one.
+      demo[0].sessions[0].harness = { name: 'AgentZero Lite Harness', version: '1.15.0', experts: 11, onDuty: [] };
+      demo[3].sessions[2].harness = { name: 'Music Harness', version: '1.14.0', experts: 14, onDuty: [] };
     }
     const pool = ['working', 'working', 'working', 'blocked', 'done', 'done-seen', 'idle'];
     for (const w of demo)
@@ -724,8 +924,35 @@
           s.state = pool[(Math.random() * pool.length) | 0];
           s.needsAttention = s.state === 'blocked' || s.state === 'done';
         }
-    for (const w of demo) for (const s of w.sessions) if (s.agent === 'claude') demoCrew(s);
+    for (const w of demo) for (const s of w.sessions) if (s.agent === 'claude') { demoCrew(s); demoDuties(s); }
     return { supported: true, workspaces: JSON.parse(JSON.stringify(demo)) };
+  }
+  // Each garden's experts as their frontmatter names them.
+  const DEMO_GARDENS = {
+    'AgentZero Lite Harness': [['security-guard', 'Security Guard'], ['build-doctor', 'Build Doctor'],
+      ['test-sentinel', 'Test Sentinel'], ['code-coach', 'Code Coach'], ['voice-curator', 'Voice Curator']],
+    'Music Harness': [['lyricist', '작사가'], ['genre-scout', '장르 정찰병'], ['stage-director', '무대감독'],
+      ['choreographer', '안무가'], ['lore-scout', '소재 정찰병']],
+  };
+  const demoExpert = (s) => {
+    const list = DEMO_GARDENS[s.harness.name], [name, persona] = list[(Math.random() * list.length) | 0];
+    return { name, persona, type: 'specialist' };
+  };
+  // A garden Claude at work reads an expert's definition now and then (or /harness-creator puts the
+  // gardener on); the duty lasts until its turn ends.
+  function demoDuties(s) {
+    if (!s.harness) return;
+    const t = Date.now(), h = s.harness;
+    h.onDuty = h.onDuty.filter(d => !d.endedAt || t - d.endedAt < KEEP_MS);
+    const on = h.onDuty.filter(d => d.state === 'working');
+    if (s.state !== 'working') { for (const d of on) { d.state = 'done'; d.endedAt = t; } return; }
+    if (on.length < 3 && Math.random() < 0.15) {
+      const gardener = !h.onDuty.some(d => d.name === GARDENER) && Math.random() < 0.3;
+      const e = gardener ? { name: GARDENER, persona: '정원지기' } : demoExpert(s);
+      if (h.onDuty.some(d => d.name === e.name && d.state === 'working')) return;
+      h.onDuty = h.onDuty.filter(d => d.name !== e.name);
+      h.onDuty.push({ name: e.name, persona: e.persona, type: e.type, via: gardener ? 'command' : 'read', state: 'working', startedAt: t });
+    }
   }
   // A working Claude launches sub-agents now and then; they call tools, sometimes start one of
   // their own, and hand back. The host's keep window applies, so finished ones fade and leave.
@@ -741,10 +968,13 @@
     s.subagents = crew.filter(k => !k.endedAt || t - k.endedAt < KEEP_MS);
     const live = s.subagents.filter(k => k.state === 'working');
     if (s.state === 'working' && live.length < 4 && Math.random() < 0.22) {
-      const [type, description] = DEMO_TYPES[(Math.random() * DEMO_TYPES.length) | 0];
-      const parent = live.length && Math.random() < 0.3 ? live[(Math.random() * live.length) | 0] : null;
+      let [type, description] = DEMO_TYPES[(Math.random() * DEMO_TYPES.length) | 0];
+      // In a garden, half the launches are its experts ("lyricist review of …", as a harness writes them).
+      const expert = s.harness && Math.random() < 0.5 ? demoExpert(s) : undefined;
+      if (expert) { type = 'general-purpose'; description = `${expert.name} review of the latest change`; }
+      const parent = !expert && live.length && Math.random() < 0.3 ? live[(Math.random() * live.length) | 0] : null;
       s.subagents.push({ id: 'demo' + ++demoSeq, parentId: parent ? parent.id : undefined, type, description,
-        depth: parent ? parent.depth + 1 : 1, background: true, state: 'working', tool: undefined, tools: 0, startedAt: t });
+        depth: parent ? parent.depth + 1 : 1, background: true, state: 'working', tool: undefined, tools: 0, startedAt: t, expert });
     }
     for (const k of live) {
       if (Math.random() < 0.5) { k.tools++; k.tool = DEMO_TOOLS[(Math.random() * DEMO_TOOLS.length) | 0]; }

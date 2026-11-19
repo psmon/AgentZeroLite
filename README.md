@@ -117,7 +117,10 @@ agent in the terminal or to AgentBot.
 
 The **Plugins** page (🧩) runs web plugins inside the app. **Agent Stage** draws each workspace as a
 stage and each terminal as an agent that animates while it works, pulses when it needs you, and
-shows the sub-agents Claude Code, Codex and Hermes start as a crew around it. Click an agent to jump
+shows the sub-agents Claude Code, Codex and Hermes start as a crew around it. When a Claude works in a
+garden harness ([harness-kakashi](https://github.com/psmon/harness-kakashi)), its experts are drawn as
+experts: a sub-agent launched as one is a hexagon labelled with its persona, and an expert the
+conversation takes on itself is an emblem worn at the avatar's side. Click an agent to jump
 to its terminal. Other official plugins — Voice Note (speech-to-text with speaker labels), Agent
 Band (live music recognition), token dashboards — install from the list on the same page, or from a
 GitHub folder or a `.zip`. A plugin can be detached into its own window.

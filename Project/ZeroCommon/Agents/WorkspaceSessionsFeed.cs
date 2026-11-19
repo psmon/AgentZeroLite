@@ -2,9 +2,10 @@ namespace Agent.Common.Agents;
 
 /// <summary>One running terminal as a web plugin sees it (<c>sessions.list</c>).</summary>
 /// <param name="Subagents">Sub-agents its Claude, Codex or Hermes session is running or just ran (<see cref="ClaudeSubagentReader"/>, <see cref="CodexSubagentReader"/>, <see cref="HermesSubagentReader"/>); null for other agents.</param>
+/// <param name="Harness">The garden harness its Claude session works in and the experts on duty in the main conversation (<see cref="ClaudeHarnessDutyReader"/>); null for other agents and other folders.</param>
 public sealed record WorkspaceSessionView(
     int Group, int Tab, string Title, string Agent, string State, bool Focused, bool NeedsAttention,
-    IReadOnlyList<SubagentView>? Subagents = null);
+    IReadOnlyList<SubagentView>? Subagents = null, HarnessView? Harness = null);
 
 /// <summary>One workspace with its running terminals, in sidebar order.</summary>
 public sealed record WorkspaceView(

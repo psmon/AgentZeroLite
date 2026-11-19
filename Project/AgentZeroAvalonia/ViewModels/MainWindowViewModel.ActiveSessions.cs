@@ -83,7 +83,10 @@ public sealed partial class ActiveSessionItem : ObservableObject
 public partial class MainWindowViewModel
 {
     private readonly AgentActivityTracker _agentTracker = new();
-    private readonly ClaudeSubagentReader _subagents = new();
+    // One locator for both readers: a Claude tab's garden harness (Agent Stage draws its experts).
+    private static readonly HarnessLocator _harnessLocator = new();
+    private readonly ClaudeSubagentReader _subagents = new(harness: _harnessLocator);
+    private readonly ClaudeHarnessDutyReader _harnessDuty = new(_harnessLocator);
     private readonly HermesSubagentReader _hermesSubagents = new();
     private readonly CodexSubagentReader _codexSubagents = new();
     private DispatcherTimer? _agentTimer;
@@ -150,7 +153,8 @@ public partial class MainWindowViewModel
                         { Agent: "hermes" } hermes => _hermesSubagents.Read(hermes),
                         { Agent: "codex" } codex => _codexSubagents.Read(codex),
                         _ => null,
-                    }));
+                    },
+                    s?.Session is { Agent: "claude" } c ? _harnessDuty.Read(c) : null));
             }
             views.Add(new WorkspaceView(g, ws.DisplayName, ws.DirectoryPath, ReferenceEquals(ws, ActiveWorkspace), sessions));
         }
