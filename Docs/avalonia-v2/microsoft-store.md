@@ -495,6 +495,25 @@ ACTIVE SESSIONS가 워크스페이스 바로 아래, 현재 워크스페이스�
 진행을 판단했다 — 업로드+분석 약 40초. Save 뒤 1.27.1.0만 Validated. What's new를 `listing.md`에서 채우고 다시 열어
 915자 일치 확인(기능 15줄은 그대로), 첫 Submit 클릭에 In certification. 로그인은 살아 있었다.
 
+### 22차 제출 (1.27.2.0, 2026-11-19)
+
+내용: Agent Stage가 정원 하네스(harness-kakashi, `"$schema": "kakashi-harness"`) 안의 Claude가 쓰는 전문가를 보여 준다 —
+전문가 서브에이전트는 금색 헥사곤, 대화가 직접 맡은 전문가는 아바타 옆 엠블럼, 아바타당 최대 5개(+N). Partner Center는
+Submission 19. 개인정보 처리방침을 먼저 고쳤다: 앱이 새로 읽는 것(작업 폴더의 `harness/` config·agent 파일, 메인 대화
+기록의 끝부분 — 하네스 파일을 읽고 쓴 도구 호출만 본다)과 플러그인에 넘기는 것(정원 이름·버전·전문가 수, 일하는 전문가의
+이름·페르소나·유형·설명)을 적었다(`doc-v1.60.0`, Pages 배포 확인). GitHub 릴리스 `v0.27.2` 선행 — Windows·Linux 4개
+자산 게시(Latest),
+macOS 잡은 v0.27.1과 같은 `codesign` "The timestamp service is not available"로 실패(공증은 Apple 약관 동의가 아직
+필요할 수 있다). 패키지 151.7 MB를 CDP로 **한 번만** 넣고 목록에 `v1.27.2.0, X64`가 뜬 것으로 판단 — 업로드+분석 약 50초.
+Save 뒤 1.27.2.0만 Validated(1.27.1.0은 자동 제거 안내). What's new를 `listing.md`에서 채우고 다시 열어 533자 일치(기능
+15줄 그대로), 첫 Submit 클릭에 In certification.
+
+이번에 확인한 것:
+
+- 9333 Edge는 떠 있었지만 로그인 만료 시 **계정 선택 화면**("Pick an account")만 나왔다 — 이미 Signed in인 Partner Center
+  계정을 고르는 클릭 하나로 비밀번호 없이 돌아왔다.
+- `connectOverCDP` 스크립트는 `process.exit`로 끝내야 한다 — 연결이 살아 있으면 노드가 끝나지 않는다.
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>
