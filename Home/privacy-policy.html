@@ -30,7 +30,7 @@ footer { color: var(--muted); font-size: 14px; margin-top: 40px; border-top: 1px
 <body>
 <main>
   <h1>AgentZero Lite — Privacy Policy</h1>
-  <p class="updated">Last updated: 2026-11-03</p>
+  <p class="updated">Last updated: 2026-11-19</p>
 
   <p>AgentZero Lite (“the app”) is a desktop shell for command-line AI tools. It is open source:
     <a href="https://github.com/psmon/AgentZeroLite">github.com/psmon/AgentZeroLite</a>.</p>
@@ -67,8 +67,15 @@ footer { color: var(--muted); font-size: 14px; margin-top: 40px; border-top: 1px
     also names the sub-agents its conversation is running or just finished: each one's type, the task it was given,
     the last tool it called with a short hint (such as a file name or the command's description), how many tools it
     has called and when it started and ended. The app reads these from the session records Claude Code keeps on
-    your computer (<code>~/.claude/projects/…/subagents/</code>), only while that terminal is open. The plugin runs
-    inside the app; the app itself sends this list nowhere.</p>
+    your computer (<code>~/.claude/projects/…/subagents/</code>), only while that terminal is open. When the
+    terminal's folder holds a garden harness (a <code>harness/harness.config.json</code> made by the harness-kakashi
+    plugin for Claude Code), the list also names that harness (its name, version and how many experts it has) and
+    which of its experts are at work: the expert a sub-agent was launched as, and the experts the conversation itself
+    took on in its current turn (each one's name, persona, type and short description, how it was taken on and when).
+    To tell these, the app reads the harness's config and <code>harness/agents/</code> files in that folder, the
+    first message of each sub-agent's record, and the main conversation's session record
+    (<code>~/.claude/projects/…/&lt;session&gt;.jsonl</code>) — only the end of it and only to see which harness files
+    its tool calls read or wrote. The plugin runs inside the app; the app itself sends this list nowhere.</p>
 
   <h2>When the app connects to the internet</h2>
   <p>Only for features you use, and only to the service involved:</p>

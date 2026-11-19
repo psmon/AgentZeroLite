@@ -24,7 +24,13 @@ Your data stays on your PC: no account, no telemetry. The project is open source
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
-## What's new in this version (1.27.1.0 — submission 21)
+## What's new in this version (1.27.2.0 — submission 22)
+Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
+
+- Agent Stage shows the experts at work: when Claude Code works in a folder with a garden harness (made by the harness-kakashi plugin), the experts it launches appear as gold hexagons named after their role, and an expert the conversation takes on itself is shown as an emblem at its side for that turn. The harness's name is shown beside the workspace and the header counts the experts on duty.
+- At most five experts are drawn per agent; finished ones make room first, and a "+N" badge lists the rest when you hover over the agent.
+
+## What's new in version 1.27.1.0 (submission 21)
 Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
 
 - Settings now open on Terminal, with CLI definitions and Shortcuts next. The terminal font is picked from the fonts installed on your PC (monospace ones first) with a live preview.
