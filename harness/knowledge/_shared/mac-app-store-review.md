@@ -14,6 +14,7 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 | 제출 | **4차** — 0.27.1 (빌드 **5**) · submission `fe965f27-89ed-4738-b5ab-b0e82582fcb6`(빈 초안을 `asc review submit`이 재사용) · 2026-11-14 11:20 KST · `WAITING_FOR_REVIEW` |
 | 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d`(버전 문자열만 0.26.7 → 0.27.1) · 빌드 ID `fe79bc67-e699-44ea-b80b-a7be3e3cdfcc`(빌드 5) |
 | 소스 | 빌드 5 = 브랜치 `worktree-mas-review-2`의 `ddab379`(origin/main 0.27.1 병합 + Remote 제외를 `IncludeRemote` 전역 속성으로 바꾼 수정) · 태그 **`mas-0.27.1-b5`** |
+| TestFlight | 외부 그룹 **Public Beta** `cee51229-c726-489a-be68-d6820d944fb8` · 공개 링크 **https://testflight.apple.com/join/j6yhYKsa**(인원 제한 없음, 피드백 켬) · 빌드 5를 2026-11-22 22:04 KST 베타 심사 제출(`WAITING_FOR_REVIEW`; `asc builds beta-app-review-submission view --build-id <빌드 ID>`) — 승인 전에는 링크로 설치할 빌드가 없다. 베타 정보·심사 연락처는 `listing.md`에서 옮겼다. 새 빌드는 `asc builds add-groups --build-id … --group cee51229-… --submit --confirm` |
 | 출시 방식 | **MANUAL** — 승인돼도 운영자가 출시를 눌러야 공개 |
 | 판매 지역 | 전 지역 **중국 본토 제외**(가이드라인 5) |
 | 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다 |
