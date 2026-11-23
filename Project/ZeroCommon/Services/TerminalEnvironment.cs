@@ -128,6 +128,15 @@ public static class TerminalEnvironment
             // container HOME has no ~/.zprofile to add it.
             PrependPath(env, "/opt/homebrew/sbin", ':');
             PrependPath(env, "/opt/homebrew/bin", ':');
+            // Claude Code keeps its per-uid temp dir at /tmp/claude-<uid> unless told otherwise, and
+            // the sandbox denies /private/tmp — measured on 0.27.1: "EPERM: operation not permitted,
+            // open '/tmp/claude-501'" and no session. The container's own tmp (the TMPDIR the system
+            // gives a sandboxed app, 0700) is writable; with it Claude starts. Set after the
+            // CLAUDE_CODE_* filter above on purpose: this one is the host's, not an inherited marker.
+            var tmp = env.TryGetValue("TMPDIR", out var t) && t.Length > 0
+                ? t
+                : home.TrimEnd('/') + "/tmp/";
+            env["CLAUDE_CODE_TMPDIR"] = tmp;
         }
         return env;
     }

@@ -162,6 +162,19 @@ public class TerminalEnvironmentTests
         Assert.StartsWith("/opt/homebrew/bin:", env["PATH"]);
     }
 
+    /// <summary>The sandbox denies /tmp, where Claude Code puts /tmp/claude-&lt;uid&gt;: a tab points it at the container's tmp.</summary>
+    [Fact]
+    public void BuildPosix_PointsClaudeAtTheContainerTmpInsideTheAppSandbox()
+    {
+        const string container = "/Users/me/Library/Containers/com.psmon.agentzerolite/Data";
+        var withTmp = TerminalEnvironment.BuildPosix(Source(
+            ("HOME", container), ("TMPDIR", container + "/tmp/"), ("CLAUDE_CODE_TMPDIR", "/tmp")), canList: _ => false);
+        var withoutTmp = TerminalEnvironment.BuildPosix(Source(("HOME", container)), canList: _ => false);
+
+        Assert.Equal(container + "/tmp/", withTmp["CLAUDE_CODE_TMPDIR"]);
+        Assert.Equal(container + "/tmp/", withoutTmp["CLAUDE_CODE_TMPDIR"]);
+    }
+
     [Fact]
     public void BuildPosix_LeavesAnOrdinaryHomeAndPathAlone()
     {
@@ -169,6 +182,7 @@ public class TerminalEnvironmentTests
 
         Assert.Equal("/Users/me", env["HOME"]);
         Assert.Equal("/usr/bin", env["PATH"]);
+        Assert.False(env.ContainsKey("CLAUDE_CODE_TMPDIR"));
     }
 
     [Theory]

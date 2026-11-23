@@ -163,6 +163,7 @@ GitHub Secrets: `MACOS_DEVID_APP_P12`·`MACOS_DEVID_INSTALLER_P12`(base64), `MAC
 | `ps` | ❌ → 에이전트 상태 감지 일부 제한 |
 | zsh job control | ❌ `can't set tty pgrp` (tty ioctl 거부). 입력·명령 실행은 정상 |
 | claude·codex **대화형 실행** | ❌ claude: `EPERM open '/tmp/claude-501'`(`/private/tmp` 거부), codex: `Operation not permitted (os error 1)`. **사용자 쪽 문제로 둔다** — AgentZero는 동작하는 터미널을 띄우는 역할(운영자 결정, 2026-10-21) |
+| ↳ claude 해결 (2026-11-24, 0.27.1 실측) | ✅ claude는 `/tmp/claude-<uid>` 대신 `CLAUDE_CODE_TMPDIR`를 쓴다. `TerminalEnvironment.BuildPosix`가 샌드박스 탭에 컨테이너 tmp(`$TMPDIR`)를 넣는다 — 탭에서 `CLAUDE_CODE_TMPDIR=$TMPDIR claude`로 기동 확인. 컨테이너 HOME이면 `~/.claude`가 새로 생겨 로그인·테마 설정을 다시 한다. codex는 그대로 ❌ |
 
 ### 4.4 등록·제출 기록
 
