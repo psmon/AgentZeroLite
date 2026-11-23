@@ -148,7 +148,7 @@ public class TerminalEnvironmentTests
             ("PATH", "/usr/bin:/bin")), canList: _ => true);
 
         Assert.Equal("/Users/me", env["HOME"]);
-        Assert.Equal("/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin", env["PATH"]);
+        Assert.Equal("/opt/homebrew/bin:/opt/homebrew/sbin:/Users/me/.local/bin:/usr/bin:/bin", env["PATH"]);
     }
 
     /// <summary>Without a home-wide exception the real home is unreadable: the tab keeps the container.</summary>

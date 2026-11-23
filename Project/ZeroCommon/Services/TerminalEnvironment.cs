@@ -126,6 +126,8 @@ public static class TerminalEnvironment
             if ((canList ?? CanList)(real)) env["HOME"] = real;
             // The Homebrew prefix keeps its exception; a Dock-launched app has no PATH to it and the
             // container HOME has no ~/.zprofile to add it.
+            // uv / pipx tools (hermes) — the build reads ~/.local/ through a read-only exception.
+            PrependPath(env, real + "/.local/bin", ':');
             PrependPath(env, "/opt/homebrew/sbin", ':');
             PrependPath(env, "/opt/homebrew/bin", ':');
             // Claude Code keeps its per-uid temp dir at /tmp/claude-<uid> unless told otherwise, and

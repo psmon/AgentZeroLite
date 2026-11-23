@@ -37,5 +37,25 @@
     <array>
         <string>/opt/homebrew/</string>
     </array>
+
+    <!-- Tools installed with uv / pipx (hermes) live in ~/.local/bin, their Python in
+         ~/.local/share/uv. Read-only: running them needs nothing more (measured 2026-11-24,
+         hermes --version and the hermes TUI in a sandbox test bundle). -->
+    <key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+    <array>
+        <string>/.local/</string>
+    </array>
+
+    <!-- Terminal control on the tab's own pseudo-terminal. application.sb allows file-ioctl on
+         /dev/ptmx (the app's side) but only read/write on /dev/ttys* (the tab's side), so every
+         program in a tab got EPERM from tcsetattr (raw mode), tcsetpgrp and TIOCSCTTY: no
+         controlling terminal, Ctrl+C never became SIGINT, zsh said "can't set tty pgrp", Claude
+         Code read keys only after Enter and Codex exited with "Operation not permitted (os
+         error 1)". Measured 2026-11-24 on 0.27.1 (TestFlight) and fixed by this rule alone in a
+         sandbox test bundle. Scoped to the pseudo-terminal slaves; no other device. -->
+    <key>com.apple.security.temporary-exception.sbpl</key>
+    <array>
+        <string>(allow file-ioctl (regex #"^/dev/ttys[0-9]+$"))</string>
+    </array>
 </dict>
 </plist>

@@ -45,7 +45,7 @@ A built-in assistant can read what the terminals show, send them input, and rela
 • No account, no telemetry: settings and history stay on your Mac
 • Open source
 
-About this Mac App Store edition: the app runs in the macOS App Sandbox. Add each project with the folder dialog; the app keeps access to the folders you add, and their terminal tabs can read and write them. Tabs can run the tools you installed with Homebrew. Tools that keep their settings in your home folder cannot read them from this edition. Install Git with Homebrew (brew install git); the Git that comes with Xcode's command line tools cannot be started from a sandboxed app. Job control (Ctrl+Z) is not available in sandboxed shells.
+About this Mac App Store edition: the app runs in the macOS App Sandbox. Add each project with the folder dialog; the app keeps access to the folders you add, and their terminal tabs can read and write them. Tabs can run the tools you installed with Homebrew, and the ones uv or pipx put in ~/.local/bin (read-only). Tools that keep their settings in your home folder cannot read them from this edition. Install Git with Homebrew (brew install git); the Git that comes with Xcode's command line tools cannot be started from a sandboxed app. 
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
@@ -71,6 +71,10 @@ No account or sign-in is needed. Click "+" (Add workspace) and choose any folder
 How file access works (changed after the review of 0.25.8, guideline 2.4.5(i)): the home-folder and /usr/local/ temporary exceptions are gone. The app reaches a project only through the folder the user picks in the standard folder dialog (com.apple.security.files.user-selected.read-write) and keeps that access across launches with an app-scoped security-scoped bookmark (com.apple.security.files.bookmarks.app-scope). AgentZero Lite is a terminal host: each terminal tab starts /bin/zsh as a child process, which inherits the app's sandbox and therefore the folders the user picked.
 
 The one remaining temporary exception is com.apple.security.temporary-exception.files.absolute-path.read-write ["/opt/homebrew/"]: the user's own Homebrew installation, so a tab can start node and the command-line tools the user installed with Homebrew, as in any terminal. It is used only by commands the user types in a terminal tab.
+
+Two further temporary exceptions, both for the terminal tabs (added in 0.27.2):
+- com.apple.security.temporary-exception.files.home-relative-path.read-only ["/.local/"]: read-only, so a tab can start command-line tools the user installed with uv or pipx (~/.local/bin and the Python under ~/.local/share/uv). Nothing is written there.
+- com.apple.security.temporary-exception.sbpl ["(allow file-ioctl (regex #\"^/dev/ttys[0-9]+$\"))"]: terminal control (termios, foreground process group, controlling terminal) on the pseudo-terminal the app itself created for the tab. The App Sandbox profile allows ioctl on /dev/ptmx but not on its /dev/ttys* side, so without this no program in a tab can switch the terminal to raw mode and Ctrl+C never reaches it: interactive command-line tools either exit at start or read keys only after Return. The rule names only pseudo-terminal slaves and no other device.
 
 China mainland: the app is no longer offered on the China mainland storefront, and the metadata no longer mentions ChatGPT or OpenAI (guideline 5).
 
