@@ -40,7 +40,7 @@
 
     <!-- Tools installed with uv / pipx (hermes) live in ~/.local/bin, their Python in
          ~/.local/share/uv. Read-only: running them needs nothing more (measured 2026-11-24,
-         hermes --version and the hermes TUI in a sandbox test bundle). -->
+         the hermes version check and its TUI in a sandbox test bundle). -->
     <key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
     <array>
         <string>/.local/</string>
