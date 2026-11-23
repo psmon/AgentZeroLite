@@ -183,6 +183,7 @@ GitHub Secrets: `MACOS_DEVID_APP_P12`·`MACOS_DEVID_INSTALLER_P12`(base64), `MAC
 - 스크린샷 3장(`macos/appstore/screenshots/`, 1440×900): 샌드박스 테스트 빌드 창(1180×788)을 캡처해 1440×900 캔버스에 배치,
   알파 채널 제거(업로드가 알파 PNG를 거부). 이 앱은 창 크기를 저장하지 않는다.
 - **2026-10-21 17:46 KST 심사 제출** — submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a`, 상태 `WAITING_FOR_REVIEW`.
+- **2026-11-24 TestFlight 빌드 6 (0.27.2)** — tty ioctl sbpl 예외 + `~/.local/` 읽기 전용 예외가 처음 들어간 빌드. 공개 링크 사용자는 외부 그룹 *Public Beta*로 받으므로, 업로드만으로는 보이지 않는다 → `asc builds add-groups --build-id … --group <Public Beta> --submit --confirm`으로 그룹 추가 + 베타 앱 심사 제출(`WAITING_FOR_BETA_REVIEW`). 바로 시험하려면 내부 그룹(심사 없음)이 대안.
 
 ### 4.5 1차 반려와 대응 (2026-10-28 반려 → 2026-10-30 재제출)
 
