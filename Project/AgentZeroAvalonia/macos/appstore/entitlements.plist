@@ -38,6 +38,20 @@
         <string>/opt/homebrew/</string>
     </array>
 
+    <!-- The system's shell startup files. application.sb does not cover them: a bash tab opened
+         with "bash: /etc/profile: Operation not permitted", and zsh skipped /etc/zshrc and
+         /etc/zprofile without a word (measured 2026-11-25, build 6 entitlements). path_helper
+         reads /etc/paths and /etc/paths.d. Read-only, system-owned files, nothing else in /etc. -->
+    <key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+    <array>
+        <string>/private/etc/profile</string>
+        <string>/private/etc/bashrc</string>
+        <string>/private/etc/zshrc</string>
+        <string>/private/etc/zprofile</string>
+        <string>/private/etc/paths</string>
+        <string>/private/etc/paths.d/</string>
+    </array>
+
     <!-- Tools installed with uv / pipx (hermes) live in ~/.local/bin, their Python in
          ~/.local/share/uv. Read-only: running them needs nothing more (measured 2026-11-24,
          the hermes version check and its TUI in a sandbox test bundle). -->

@@ -118,6 +118,9 @@ public static class TerminalEnvironment
         env.TryAdd("TERM", "xterm-256color");
         if (!env.ContainsKey("LANG") && !env.ContainsKey("LC_ALL"))
             env["LANG"] = "en_US.UTF-8";
+        // macOS's /bin/bash opens every interactive session with "The default interactive shell is
+        // now zsh…". A bash tab is one the person chose; the notice is noise there. Their own value wins.
+        env.TryAdd("BASH_SILENCE_DEPRECATION_WARNING", "1");
         if (env.TryGetValue("HOME", out var home) && RealHomeFromSandbox(home) is { } real)
         {
             // Only when the sandbox lets the tab read it. The Mac App Store build no longer holds a

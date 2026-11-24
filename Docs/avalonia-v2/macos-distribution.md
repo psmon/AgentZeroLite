@@ -166,6 +166,7 @@ GitHub Secrets: `MACOS_DEVID_APP_P12`·`MACOS_DEVID_INSTALLER_P12`(base64), `MAC
 | ↳ claude 해결 (2026-11-24, 0.27.1 실측) | ✅ claude는 `/tmp/claude-<uid>` 대신 `CLAUDE_CODE_TMPDIR`를 쓴다. `TerminalEnvironment.BuildPosix`가 샌드박스 탭에 컨테이너 tmp(`$TMPDIR`)를 넣는다 — 탭에서 `CLAUDE_CODE_TMPDIR=$TMPDIR claude`로 기동 확인. 컨테이너 HOME이면 `~/.claude`가 새로 생겨 로그인·테마 설정을 다시 한다. codex는 그대로 ❌ |
 | ↳ tty 제어 원인·해결 (2026-11-24) | `application.sb`는 `/dev/ptmx`에는 file-ioctl을, `/dev/ttys*`에는 읽기·쓰기만 준다 → 탭 쪽 `tcsetattr`·`tcsetpgrp`·`TIOCSCTTY`가 전부 EPERM: 제어 터미널 없음(`/dev/tty` ENXIO), Ctrl+C가 SIGINT가 안 됨, claude는 Enter 전까지 키를 못 받음, codex는 raw 모드 실패로 `os error 1` 종료. `temporary-exception.sbpl` `(allow file-ioctl (regex #"^/dev/ttys[0-9]+$"))` 하나로 샌드박스 테스트 번들에서 셋 다 ✅(codex 로그인 화면 ↓키·Ctrl+C, claude 테마 ↓키, zsh 경고 사라짐). **심사에서 sbpl 예외가 받아들여질지는 미확인** |
 | ↳ hermes (2026-11-24) | `~/.local/bin`(uv 도구)·`~/.local/share/uv` Python이 막혀 `Operation not permitted` → `home-relative-path.read-only ["/.local/"]` + 탭 PATH에 `~/.local/bin`. 테스트 번들에서 `hermes --version`·TUI ✅. 설정(`~/.hermes`)은 컨테이너 HOME에 새로 생긴다 |
+| ↳ bash (2026-11-25) | 작업 제어·Ctrl+C는 sbpl 예외로 이미 ✅. 남은 것은 `/etc` 셸 시작 파일: `application.sb`가 `/private/etc/profile`·`bashrc`·`zshrc`·`zprofile`·`paths`를 막아 bash 탭이 `bash: /etc/profile: Operation not permitted`로 열리고 `bash-3.2$` 프롬프트만 남음(zsh는 같은 파일을 말없이 건너뜀) → 그 파일들과 `paths.d/`만 `absolute-path.read-only`. "default interactive shell is now zsh" 배너는 탭 환경 `BASH_SILENCE_DEPRECATION_WARNING=1`(사용자 값 우선). 테스트 번들에서 오류 없이 `호스트:폴더 사용자$` 프롬프트 ✅ |
 
 ### 4.4 등록·제출 기록
 

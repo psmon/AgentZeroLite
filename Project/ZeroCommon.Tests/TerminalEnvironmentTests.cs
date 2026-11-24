@@ -185,6 +185,14 @@ public class TerminalEnvironmentTests
         Assert.False(env.ContainsKey("CLAUDE_CODE_TMPDIR"));
     }
 
+    /// <summary>A bash tab is the person's choice: no "default shell is now zsh" notice, unless they set the variable.</summary>
+    [Fact]
+    public void BuildPosix_SilencesTheBashDeprecationNotice()
+    {
+        Assert.Equal("1", TerminalEnvironment.BuildPosix(Source())["BASH_SILENCE_DEPRECATION_WARNING"]);
+        Assert.Equal("0", TerminalEnvironment.BuildPosix(Source(("BASH_SILENCE_DEPRECATION_WARNING", "0")))["BASH_SILENCE_DEPRECATION_WARNING"]);
+    }
+
     [Theory]
     [InlineData("/Users/me", null)]
     [InlineData("/Users/me/Library/Containers/com.x.app/Data", "/Users/me")]
