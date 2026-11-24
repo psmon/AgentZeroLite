@@ -128,6 +128,19 @@ was blocked as a repeat), the prompt has a PEER-TO-PEER section (`AgentToolGramm
 <g> <t> <name>` (Avalonia) renames a tab — the title is the peer name and the `--from` identity. Not done: `wait`
 does not end when a screen-only peer finishes its turn, so that side is polled.
 
+**The bot transcript is components, not text** (`Agents/BotCards`, after A2UI — https://a2ui.org: the agent's
+output is data from a small fixed catalog, the host draws each node natively). The pane used to print a tool's
+arguments and result as the JSON they travelled in, 10–12 px, a line as wide as the window. The catalog is four
+nodes — `BotText` (body / heading / caption / code / quote), `BotField`, `BotList`, `BotDivider` — built by
+`BotMarkdown.Parse` (a model's answer), `BotJson.ToNodes` (any tool's arguments or result: scalars → fields, arrays
+→ lists of one-line summaries, long strings → paragraphs; MCP tools need no template of their own) and
+`BotScreen.Summary` (a terminal read, folded). Avalonia's `ChatItem` builds its `Nodes` / `DetailNodes` in the
+constructor and `AgentBotView.axaml` has one `DataTemplate` per node type; `Text` / `Detail` stay as the source
+strings (tests assert on them). A result opens by default when it failed or is ≤ 6 rows. Two things under it:
+`TerminalReadResult.Normalize` — both loops wrapped the host's own `{ok,…,text}` envelope as the `text` of another,
+so the model and the pane got JSON inside a JSON string with every line break a literal `\n`; and the view model
+must hand `BotJson` whole JSON (a 160-character prefix does not parse). WPF's bot window is not converted.
+
 Actor names sometimes contain user input (workspace names, terminal IDs). Route them through `ActorNameSanitizer` before constructing paths — Akka rejects characters like `/`, `:`, spaces.
 
 ### Akka shutdown quirk

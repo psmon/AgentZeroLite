@@ -43,7 +43,68 @@ public partial class ChatItem : ObservableObject
         Label = label;
         _text = text;
         _detail = detail;
+
+        // The card's components (ZeroCommon Agents/BotCards, after A2UI): what the agent produced
+        // is data, drawn here from a small catalog instead of printed as the JSON it travelled in.
+        switch (kind)
+        {
+            case ChatItemKind.Bot:
+                Nodes = BotMarkdown.Parse(text);
+                break;
+            case ChatItemKind.User:
+            case ChatItemKind.TerminalOut:
+                Nodes = [new BotText(text)];
+                break;
+            case ChatItemKind.TerminalIn:
+                // A screen read is reference material: folded, with a one-line summary.
+                DetailNodes = [new BotText(text, BotTextVariant.Code)];
+                DetailHeader = BotScreen.Summary(text);
+                break;
+            case ChatItemKind.Tool:
+                Nodes = BotJson.ToNodes(text);
+                DetailNodes = BotJson.ToNodes(detail);
+                Failed = BotJson.LooksFailed(detail);
+                DetailHeader = Failed ? "result — failed" : "result";
+                Headline = BotJson.Headline(text);
+                // A failure is the thing to read; a short result costs no space. Long ones stay folded.
+                // Counted in rows, not nodes: one list of ten workspaces is ten rows.
+                _detailOpen = Failed || DetailNodes.Sum(n => n switch
+                {
+                    BotList list => list.Items.Count,
+                    BotText t => t.Text.Count(c => c == '\n') + 1,
+                    _ => 1,
+                }) <= 6;
+                break;
+        }
     }
+
+    /// <summary>Whether the folded material is showing. A terminal's screen starts folded.</summary>
+    [ObservableProperty] private bool _detailOpen;
+
+    /// <summary>The body as components; empty for the kinds drawn from <see cref="Text"/> (notices, progress, links).</summary>
+    public IReadOnlyList<BotNode> Nodes { get; } = [];
+
+    /// <summary>Folded material under the body: a tool's result, a terminal's screen.</summary>
+    public IReadOnlyList<BotNode> DetailNodes { get; } = [];
+
+    /// <summary>The fold's caption.</summary>
+    public string DetailHeader { get; } = "";
+
+    /// <summary>A tool call's naming argument, shown beside its name ("web_search · 서울 날씨").</summary>
+    public string Headline { get; } = "";
+
+    /// <summary>A tool that reported failure.</summary>
+    public bool Failed { get; }
+
+    public bool HasNodes => Nodes.Count > 0;
+    public bool HasDetailNodes => DetailNodes.Count > 0;
+    public bool HasHeadline => Headline.Length > 0;
+
+    /// <summary>Drawn from <see cref="Text"/>: every kind without components, links aside.</summary>
+    public bool ShowText => Nodes.Count == 0 && DetailNodes.Count == 0 && !IsUrl;
+
+    /// <summary>A person's or an agent's words — these get the reading size; tool and system rows stay small.</summary>
+    public bool IsSpeech => Kind is ChatItemKind.User or ChatItemKind.Bot or ChatItemKind.TerminalOut;
 
     public bool IsUser => Kind == ChatItemKind.User;
     public bool IsBot => Kind == ChatItemKind.Bot;
@@ -673,7 +734,7 @@ public partial class AgentBotViewModel : ObservableObject
             case TerminalExchangeView x:
                 Add(x.Outgoing ? ChatItemKind.TerminalOut : ChatItemKind.TerminalIn,
                     $"{x.Arrow} {TerminalLabel(x.Group, x.Tab)}",
-                    Compact(x.Text, 1200));
+                    Compact(x.Text, 6000));
                 break;
 
             case WaitedView w:
@@ -685,7 +746,9 @@ public partial class AgentBotViewModel : ObservableObject
                 break;
 
             default:
-                Add(ChatItemKind.Tool, "🔧 " + call.Tool, Compact(call.ArgsJson, 160), Compact(call.Result, 1200));
+                // Whole JSON, not a prefix: the card draws fields and lists from it (BotJson), and
+                // a cut envelope does not parse — it would fall back to the raw text this replaces.
+                Add(ChatItemKind.Tool, "🔧 " + call.Tool, Compact(call.ArgsJson, 8000), Compact(call.Result, 40000));
                 break;
         }
     }
