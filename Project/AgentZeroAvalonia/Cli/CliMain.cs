@@ -72,6 +72,7 @@ internal static class CliMain
             "bot-ask" => TerminalVerbs.BotAsk(client, rest),
             "terminal-wait" => MoreVerbs.TerminalWait(client, rest),
             "terminal-alias" => MoreVerbs.TerminalAlias(client, rest),
+            "terminal-rename" => MoreVerbs.TerminalRename(client, rest),
             "web" => MoreVerbs.Web(client, rest),
             "mcp" => MoreVerbs.Mcp(client, rest),
             "plugin" => PluginVerbs.Run(client, rest),
@@ -387,6 +388,7 @@ internal static class CliMain
         Console.WriteLine("  terminal-read <g> <t> [--last N]  Read the screen text (or the last N chars)");
         Console.WriteLine("  terminal-wait <g> <t> [--until working|blocked|idle|done] [--agent <name>] [--timeout-ms N] [--idle-ms N]");
         Console.WriteLine("  terminal-alias list | set <g> <t> <name> | rm <name>   Name a terminal; then use --alias <name> as the target");
+        Console.WriteLine("  terminal-rename <g> <t> <name>    Rename a tab — its title is the peer name AgentBot and --from use");
         Console.WriteLine("  web open|search|read|tabs ...        Web surface (headless in this host); 'web help' for options");
         Console.WriteLine("  mcp list|import|refresh|allow|deny|call ...   MCP servers for AI mode; 'mcp help' for options");
         Console.WriteLine("  plugin list|open|call|capture ...    The Plugins page (WebDev plugins); 'plugin help' for options");

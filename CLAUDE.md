@@ -97,6 +97,37 @@ Settings → LLM → *AIMODE Turns* (WPF) and Settings → LLM → *AGENT LOOP (
 clamp through the settings object rather than repeating the bounds. The wearable host still runs the
 loop at its default — `wearable-settings.json` has no such key.
 
+**Two terminal agents talking through the bot** (measured 2026-11-24, Codex × Hermes in one workspace: the
+conversation never started). Five things were wrong and each has a name now; tests in `PeerRelayTests`:
+
+- **Enter after the echo, not after 50 ms** (`Services/TerminalSubmit`, used by both hosts' `WriteAndSubmit` and
+  `WriteAndEnter`). A
+  pseudo-console hands text over as key events and Codex draws a fast run only when it ends — 278 characters after
+  346 ms, 1,239 after 999 ms, 3,079 after 3,202 ms — so the CR that followed the 1,394-character handshake was a line
+  break in its composer and the message sat there unsent. The Enter waits for a floor of 1.2 ms a character, for
+  something drawn since the write (paste-sized text only) and for 250 ms with nothing drawn. "Drawn" excludes escape
+  sequences: Codex sends an empty `ESC[?2026h ESC[?2026l` frame every 100 ms, so raw output length never settles.
+- **A peer's reply that arrives mid-run is not lost** (`Llm/Tools/PeerSignalInbox`, owned by `AgentBotActor`). It
+  used to become a second `StartAgentLoop`, which a Running loop ignores. Now the loop's `wait` tool returns early
+  with `peer_signals`, and what the run never took starts the next cycle when its result comes back (only after a run
+  that ended well). `AgentLoopOptions.WaitForPeerSignals` is null for loops with no peer channel (the watch).
+- **`--from` is the sender** (`Actors/PeerEnvelope`, both hosts). `DONE(Codex, …) --from Hermes` is Hermes speaking
+  *to* Codex; reading the first word as the sender made the bot relay Hermes' words back to Hermes. The name inside
+  the envelope counts only without `--from`.
+- **The handshake names this GUI's exe by absolute path** (`Actors/PeerHandshake`, one text for both hosts). A bare
+  `AgentZeroLite.exe` is resolved by whoever runs it, and Codex runs commands in its shared app-server daemon, whose
+  PATH is not the tab's — with a Debug build beside the installed one the reply would reach the other window. The
+  exe decides the pipe, so the path decides the window.
+- **`read_terminal` is the screen** (both hosts' tool hosts, `Services/TerminalScreenText`): the raw tail of a TUI is the same reply redrawn
+  three times with its spaces gone. And `Agents/PeerCliFault` adds a note when that screen shows the agent cannot run
+  commands at all (Codex: `helper_sandbox_lock_failed` — its daemon cannot re-ACL `~/.codex/.sandbox-bin`; a fault
+  of that installation), so the bot reads that peer from the screen instead of waiting for a callback.
+
+`AgentLoopGuards` clears its wait / read_terminal repeat counts after a successful send (a relay's 4th `wait(20)`
+was blocked as a repeat), the prompt has a PEER-TO-PEER section (`AgentToolGrammar`), and `-cli terminal-rename
+<g> <t> <name>` (Avalonia) renames a tab — the title is the peer name and the `--from` identity. Not done: `wait`
+does not end when a screen-only peer finishes its turn, so that side is polled.
+
 Actor names sometimes contain user input (workspace names, terminal IDs). Route them through `ActorNameSanitizer` before constructing paths — Akka rejects characters like `/`, `:`, spaces.
 
 ### Akka shutdown quirk

@@ -145,13 +145,39 @@ public sealed class WebViewXtermTerminalSession : ITerminalSession, ITerminalTit
     public void WriteAndSubmit(string text)
     {
         Write(text.AsSpan());
-        _ = Task.Delay(50).ContinueWith(_ => Write("\r".AsSpan()), TaskScheduler.Default);
+        // Enter once the program has taken the text in (ZeroCommon TerminalSubmit) — a fixed 50 ms
+        // landed while Codex was still receiving a long message, and the CR became a line break.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var o = await TerminalSubmit.EnterWhenSettledAsync(
+                    () => OutputLength, () => Write("\r".AsSpan()), text.Length, ReadOutput);
+                AppLogger.Log($"[XtermSession] submit | id={_internalId} label={_sessionId} textLen={text.Length} enterAfter={o.WaitedMs}ms settled={o.Settled} echo={o.SawEcho}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Log($"[XtermSession] submit failed | id={_internalId} label={_sessionId} error={ex.GetType().Name}: {ex.Message}");
+            }
+        });
     }
 
     public void WriteAndEnter(string text)
     {
         Write(text.AsSpan());
-        _ = Task.Delay(200).ContinueWith(_ => SendControl(TerminalControl.Enter), TaskScheduler.Default);
+        // Same rule as WriteAndSubmit: 200 ms is as wrong for a page of text as 50 ms was.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await TerminalSubmit.EnterWhenSettledAsync(
+                    () => OutputLength, () => SendControl(TerminalControl.Enter), text.Length, ReadOutput);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Log($"[XtermSession] enter failed | id={_internalId} label={_sessionId} error={ex.GetType().Name}: {ex.Message}");
+            }
+        });
     }
 
     public async Task WriteAsync(ReadOnlyMemory<char> text, CancellationToken ct = default)

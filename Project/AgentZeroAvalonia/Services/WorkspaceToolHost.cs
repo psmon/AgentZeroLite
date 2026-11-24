@@ -56,20 +56,33 @@ internal sealed class WorkspaceToolHost : IAgentToolbelt
         if (!TryResolve(group, tab, out var session, out var errorJson)) return Task.FromResult(errorJson!);
         try
         {
-            string text;
-            if (lastN > 0)
+            // What is on the screen, not the last N characters the pipe produced. A TUI
+            // redraws: measured on a Codex tab, the raw tail was the same reply three times
+            // over with its spaces gone ("안녕하세요!세계평화는국가간전쟁을막는일뿐") while the
+            // screen read cleanly — and the bot, unable to find the answer in it, greeted
+            // Codex four times. The raw tail is only the fallback for a session whose
+            // renderer has not pushed a snapshot yet.
+            var text = TerminalScreenText.Tidy(session!.GetConsoleText());
+            if (text.Length == 0)
             {
-                var total = session!.OutputLength;
-                var start = Math.Max(0, total - lastN);
+                var total = session.OutputLength;
+                var start = Math.Max(0, total - Math.Max(lastN, 2000));
                 var len = total - start;
-                text = len > 0 ? session.ReadOutput(start, len) : "";
+                text = len > 0 ? ApprovalParser.StripAnsiCodes(session.ReadOutput(start, len)) : "";
             }
-            else
+            else if (lastN > 0 && text.Length > lastN)
             {
-                text = session!.GetConsoleText();
+                text = text[^lastN..];
             }
-            text = ApprovalParser.StripAnsiCodes(text);
-            return Task.FromResult($"{{\"ok\":true,\"group_index\":{group},\"tab_index\":{tab},\"length\":{text.Length},\"text\":\"{Agent.Common.Platform.CliIpcProtocol.Escape(text)}\"}}");
+            // A peer whose agent cannot run commands cannot call bot-chat either; say so, or the
+            // bot waits for a callback that will never come (Agents/PeerCliFault).
+            var note = "";
+            if (Agent.Common.Agents.PeerCliFault.NoteFor(text) is { } fault)
+            {
+                note = $",\"note\":\"{Agent.Common.Platform.CliIpcProtocol.Escape(fault)}\"";
+                AppLogger.Log($"[AIMODE] read_terminal [{group}:{tab}] peer cannot run its CLI — {fault[..Math.Min(fault.Length, 160)]}");
+            }
+            return Task.FromResult($"{{\"ok\":true,\"group_index\":{group},\"tab_index\":{tab},\"length\":{text.Length},\"text\":\"{Agent.Common.Platform.CliIpcProtocol.Escape(text)}\"{note}}}");
         }
         catch (Exception ex)
         {
@@ -138,31 +151,12 @@ internal sealed class WorkspaceToolHost : IAgentToolbelt
         }
     }
 
-    /// <summary>The WPF host's handshake text, verbatim — the peer's <c>--from</c> contract depends on it.</summary>
-    internal static string BuildFirstContactHeader(string peerName) =>
-        "[AgentBot Handshake — first contact, please read carefully]\n"
-        + "\n"
-        + "You are " + peerName + " and I am AgentBot, an on-device AI agent running inside the AgentZero Lite shell.\n"
-        + "\"" + peerName + "\" is the name of YOUR terminal tab — both of us will use that name to refer to you, and you will use it as your --from identity when replying.\n"
-        + "\n"
-        + "Step 1 — Verify the CLI channel exists.\n"
-        + "  Run this in your terminal RIGHT NOW to confirm the channel works:\n"
-        + "      AgentZeroLite.exe -cli help\n"
-        + "  If you see a usage list with a 'bot-chat' command, the reverse channel is available.\n"
-        + "\n"
-        + "Step 2 — Acknowledge using the same CLI.\n"
-        + "  Once Step 1 succeeds, send your handshake reply:\n"
-        + "      AgentZeroLite.exe -cli bot-chat \"DONE(handshake-ok)\" --from " + peerName + "\n"
-        + "  The DONE(...) wrapper is the signal envelope. --from " + peerName + " names you so I know who answered. After this acknowledgement, the user can ask me to relay real tasks to you.\n"
-        + "\n"
-        + "Ongoing replies use the same shape:\n"
-        + "      AgentZeroLite.exe -cli bot-chat \"DONE(your reply text)\" --from " + peerName + "\n"
-        + "  PowerShell wrapper if PATH-friendly: AgentZeroLite.ps1 bot-chat \"DONE(...)\" --from " + peerName + "\n"
-        + "\n"
-        + "Fallback: if AgentZeroLite.exe is not reachable from your terminal, just reply normally here and I will fall back to polling read_terminal — but the CLI path is more reliable.\n"
-        + "\n"
-        + "You'll only see this introduction once per AIMODE session.\n"
-        + "─── original message follows ───";
+    /// <summary>
+    /// The handshake text (ZeroCommon <see cref="PeerHandshake"/>, one for both hosts), naming this
+    /// GUI's own exe so a peer's reply cannot land in another AgentZero window.
+    /// </summary>
+    internal static string BuildFirstContactHeader(string peerName)
+        => PeerHandshake.BuildFirstContactHeader(peerName, Environment.ProcessPath);
 
     private string ResolvePeerName(int group, int tab)
     {

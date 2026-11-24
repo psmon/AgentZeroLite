@@ -41,9 +41,15 @@ public sealed class AgentLoopActor : ReceiveActor
     // reason. Exactly one AgentLoopResult per StartAgentLoop depends on it.
     private int _generation;
 
-    public AgentLoopActor(AgentLoopBindings bindings)
+    // Peer replies that arrive mid-run (owned by AgentBotActor). The loop's
+    // `wait` tool waits on it, so a bot-chat answer ends the wait instead of
+    // being ignored until the model gives up polling the screen.
+    private readonly PeerSignalInbox? _peerInbox;
+
+    public AgentLoopActor(AgentLoopBindings bindings, PeerSignalInbox? peerInbox = null)
     {
         _bindings = bindings;
+        _peerInbox = peerInbox;
         BecomeIdle();
     }
 
@@ -100,6 +106,7 @@ public sealed class AgentLoopActor : ReceiveActor
                         OnTurnCompleted = turn => self.Tell(new TurnCompletedInternal(turn)),
                         OnGenerationProgress = (phase, tokens) =>
                             self.Tell(new GenerationProgressInternal(phase, tokens)),
+                        WaitForPeerSignals = _peerInbox is { } inbox ? inbox.WaitAsync : null,
                     };
 
                     var loop = _bindings.AgentLoopFactory(wired, host);

@@ -712,38 +712,19 @@ public partial class AgentBotViewModel : ObservableObject
 
     // ── bot-chat (peer → bot) ────────────────────────────────────────────────
 
-    private static readonly Regex DoneWithFrom = new(@"^DONE\((?<from>[^,]+),\s*(?<msg>.+)\)$", RegexOptions.Singleline);
-    private static readonly Regex DoneSimple = new(@"^DONE\((?<msg>.+)\)$", RegexOptions.Singleline);
-
     /// <summary>
     /// A message from the CLI (<c>bot-chat</c>): shown in the chat and forwarded to the bot
     /// actor as a peer signal so an active agent loop can react — the WPF <c>HandleBotChat</c>.
     /// </summary>
     public void ReceiveExternalChat(string from, string message)
     {
-        string? doneFrom = null, doneMsg = null;
-        var m = DoneWithFrom.Match(message);
-        if (m.Success)
-        {
-            doneFrom = m.Groups["from"].Value.Trim();
-            doneMsg = m.Groups["msg"].Value.Trim();
-        }
-        else
-        {
-            var s = DoneSimple.Match(message);
-            if (s.Success)
-            {
-                doneFrom = from;
-                doneMsg = s.Groups["msg"].Value.Trim();
-            }
-        }
-        if (doneFrom is not null && doneMsg is not null)
-            Add(ChatItemKind.Bot, $"DONE({doneFrom})", doneMsg);
-        else
-            Add(ChatItemKind.Bot, from, message);
+        // --from names the sender; "DONE(Codex, …) --from Hermes" is Hermes speaking TO Codex
+        // (see PeerEnvelope — reading the first word as the sender made Hermes answer itself).
+        var parsed = PeerEnvelope.Parse(from, message);
+        Add(ChatItemKind.Bot, parsed.IsDone ? $"DONE({parsed.Peer})" : parsed.Peer, parsed.Text);
 
-        var peer = doneFrom ?? from;
-        var payload = doneMsg ?? message;
+        var peer = parsed.Peer;
+        var payload = parsed.Text;
         try
         {
             if (ActorSystemManager.IsInitialized)

@@ -505,8 +505,7 @@ public sealed class ExternalAgentLoop : IAgentLoop
             {
                 var requested = ReadInt(call.Args, "seconds", 5);
                 var seconds = Math.Clamp(requested, 1, 30);
-                await Task.Delay(TimeSpan.FromSeconds(seconds), ct);
-                return JsonSerializer.Serialize(new { ok = true, waited_seconds = seconds });
+                return await PeerSignalInbox.WaitToolAsync(_opts, seconds, ct);
             }
 
             // ---- OS-control bridge (mission M0014) -----------------------

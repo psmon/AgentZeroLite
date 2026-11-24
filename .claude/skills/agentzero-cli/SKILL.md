@@ -140,6 +140,7 @@ Full, version-matched listing: `-cli help`. Grouped here by what they touch:
 | App | `status`, `open-win`, `close-win`, `version` | version/open-win: no · rest: yes | both |
 | App (WPF) | `console`, `copy`, `log` | console/log: no · copy: yes | WPF |
 | **Terminals** | `terminal-list`, `terminal-read`, `terminal-send`, `terminal-key`, `terminal-wait`, `terminal-alias` | **yes** | both |
+| Terminals (Avalonia) | `terminal-rename <g> <t> <name>` (the tab title is the peer / `--from` name) | yes | Avalonia |
 | Layout | `layout status\|split-right\|split-down\|close-tab\|…\|workspace <name>` | yes | both |
 | Agent state | `agent-state` | yes | both |
 | Agent resume | `agent-resume`, `agent-resume-launch`, `agent-resume-cmd` | resume-cmd: no · rest: yes | WPF (Avalonia asks in a dialog when a tab starts) |

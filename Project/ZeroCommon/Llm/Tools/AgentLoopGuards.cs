@@ -90,7 +90,21 @@ public sealed class AgentLoopGuards
             LooksFailed(toolResult)));
         if (_recent.Count > RecentBufferSize)
             _recent.RemoveFirst();
+
+        // Something was typed into a terminal: waiting and reading again is
+        // new work, not a repeat. Without this a relay between two terminals
+        // ran out on its 4th identical wait(20) — one per message — while
+        // every one of them was waiting for a different reply.
+        if (call.Tool is "send_to_terminal" or "send_key" && !LooksFailed(toolResult))
+        {
+            foreach (var key in _callCounts.Keys.Where(IsLook).ToList())
+                _callCounts.Remove(key);
+        }
     }
+
+    private static bool IsLook(string key)
+        => key.StartsWith("wait:", StringComparison.Ordinal)
+        || key.StartsWith("read_terminal:", StringComparison.Ordinal);
 
     /// <summary>
     /// Whether a tool result says the tool did not do what it was asked.
