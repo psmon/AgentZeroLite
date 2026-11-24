@@ -24,7 +24,14 @@ Your data stays on your PC: no account, no telemetry. The project is open source
 
 Support: psmon@live.co.kr, or open an issue at https://github.com/psmon/AgentZeroLite/issues
 
-## What's new in this version (1.27.2.0 — submission 22)
+## What's new in this version (1.27.3.0 — submission 23)
+Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
+
+- The assistant's conversation is easier to read: its answers are shown with headings, lists and code blocks, and what a tool was asked and what it returned appear as labelled fields and short lists instead of raw JSON. A failed tool stands out in red with its error open, long results fold away, and what you and the agents say is shown in a larger size.
+- Two terminal agents can talk to each other through the assistant: ask it to have, for example, Codex and Hermes discuss a topic, and it passes each one's reply to the other, turn by turn. Long messages are now reliably sent to Codex, a reply that arrives while the assistant is busy is no longer lost, and each reply is attributed to the agent that sent it.
+- When an agent in a terminal cannot run commands itself, the assistant notices and reads that agent's reply from its screen instead of waiting.
+
+## What's new in version 1.27.2.0 (submission 22)
 Paste into Store listings → English → "What's new in this version" (≤ 1500 chars).
 
 - Agent Stage shows the experts at work: when Claude Code works in a folder with a garden harness (made by the harness-kakashi plugin), the experts it launches appear as gold hexagons named after their role, and an expert the conversation takes on itself is shown as an emblem at its side for that turn. The harness's name is shown beside the workspace and the header counts the experts on duty.

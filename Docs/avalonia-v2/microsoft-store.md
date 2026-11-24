@@ -514,6 +514,26 @@ Save 뒤 1.27.2.0만 Validated(1.27.1.0은 자동 제거 안내). What's new를 
   계정을 고르는 클릭 하나로 비밀번호 없이 돌아왔다.
 - `connectOverCDP` 스크립트는 `process.exit`로 끝내야 한다 — 연결이 살아 있으면 노드가 끝나지 않는다.
 
+### 23차 제출 (1.27.3.0, 2026-11-24)
+
+내용: AgentBot 대화창을 컴포넌트로 그린다(A2UI 개념 — 답변은 제목·목록·코드 블록, 도구의 인자와 결과는 원시 JSON 대신
+필드와 목록, 실패한 도구는 붉은 테두리, 긴 결과는 접힘, 사람·에이전트의 말은 큰 글씨). 봇이 두 터미널 에이전트의 대화를
+중계한다(Codex × Hermes — 긴 메시지가 Codex에 전송되지 않던 문제, 실행 중에 도착한 답이 사라지던 문제, 발신자 오인 수정).
+명령을 실행하지 못하는 에이전트는 화면에서 답을 읽는다. Partner Center는 Submission 20. 개인정보 처리방침은 그대로 —
+새로 읽는 파일(`~/.codex/.sandbox/setup_error.json`)은 이미 적혀 있는 `.codex` 폴더 안이고 새 네트워크 흐름이 없다.
+GitHub 릴리스 `v0.27.3` 선행 — 5개 자산 모두 게시(macOS `.pkg` 포함, 이번에는 codesign·공증 통과). 패키지 151.7 MB를
+CDP로 **한 번만** 넣고 목록에 `v1.27.3.0, X64`가 뜬 것으로 판단 — 업로드+분석 약 40초. Save 뒤 1.27.3.0만 Validated.
+What's new를 `listing.md`에서 채우고 다시 열어 860자 일치(기능 15줄 그대로), 첫 Submit 클릭에 In certification.
+
+이번에 확인한 것:
+
+- 9333 Edge는 꺼져 있었다. `pw-edge-partner` 프로필로 다시 띄우니 "Pick an account"가 나왔고, Signed in인 계정을 고르는
+  클릭 하나로 들어갔다.
+- **자동화 프로필을 띄우자 확장 13개가 한꺼번에 설치됐다**(프로필에 Edge 동기화가 켜져 있다). 그중 CORS Unblock이 설치 직후
+  자기 소개 페이지(`webextension.org/listing/access-control.html`)를 열었고, McAfee 웹어드바이저가 "의심스러움"으로 막은
+  탭이 떴다 — 앱이나 제출과 무관하다. 다음에도 뜨면 닫으면 된다(프로필의 동기화를 끄면 다시 생기지 않는다).
+- Playwright `page.screenshot`이 Partner Center 개요에서 30초 타임아웃에 걸릴 때가 있다 — 상태는 화면 글자로 판단했다.
+
 ## 참고
 
 - 개인 개발자 무료 등록: <https://learn.microsoft.com/en-us/windows/apps/publish/whats-new-individual-developer>
