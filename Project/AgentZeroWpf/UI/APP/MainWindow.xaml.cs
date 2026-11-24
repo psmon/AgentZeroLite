@@ -1633,14 +1633,6 @@ public partial class MainWindow : Window
     private const string BotChatMmfName = "AgentZeroLite_BotChat_Response";
     private const int BotChatMmfSize = 1024;
 
-    // DONE 파싱: "DONE(from, msg)" 또는 "DONE(msg)" 두 형태 모두 지원
-    private static readonly System.Text.RegularExpressions.Regex DonePatternWithFrom = new(
-        @"^DONE\((?<from>[^,]+),\s*(?<msg>.+)\)$",
-        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.Singleline);
-    private static readonly System.Text.RegularExpressions.Regex DonePatternSimple = new(
-        @"^DONE\((?<msg>.+)\)$",
-        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.Singleline);
-
     private void HandleBotChat(string from, string message)
     {
         string resultJson;
@@ -1659,24 +1651,12 @@ public partial class MainWindow : Window
         else
         {
             // DONE 프로토콜 감지: "DONE(from, msg)" 또는 "DONE(msg)"
-            var doneMatch = DonePatternWithFrom.Match(message);
-            string? doneFrom = null;
-            string? doneMsg = null;
-
-            if (doneMatch.Success)
-            {
-                doneFrom = doneMatch.Groups["from"].Value.Trim();
-                doneMsg = doneMatch.Groups["msg"].Value.Trim();
-            }
-            else
-            {
-                var simpleMatch = DonePatternSimple.Match(message);
-                if (simpleMatch.Success)
-                {
-                    doneFrom = from; // use bot-chat's --from parameter
-                    doneMsg = simpleMatch.Groups["msg"].Value.Trim();
-                }
-            }
+            // --from names the sender; the name inside the envelope counts only without it
+            // (ZeroCommon PeerEnvelope: "DONE(Codex, …) --from Hermes" is Hermes speaking TO
+            // Codex, and reading "Codex" as the sender made Hermes answer itself).
+            var parsed = Agent.Common.Actors.PeerEnvelope.Parse(from, message);
+            string? doneFrom = parsed.IsDone ? parsed.Peer : null;
+            string? doneMsg = parsed.IsDone ? parsed.Text : null;
 
             if (doneFrom is not null && doneMsg is not null)
             {

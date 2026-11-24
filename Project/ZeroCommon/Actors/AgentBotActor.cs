@@ -10,6 +10,7 @@
 
 using Akka.Actor;
 using Akka.Event;
+using Agent.Common.Llm.Tools;
 
 namespace Agent.Common.Actors;
 
@@ -51,6 +52,16 @@ public sealed class AgentBotActor : ReceiveActor
     // talk to are noise, not an invitation.
     private readonly HashSet<string> _activeConversations = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HandshakeState> _handshakeStates = new(StringComparer.OrdinalIgnoreCase);
+
+    // A run is in flight between the StartAgentLoop we forward and the one
+    // AgentLoopResult that answers it. A peer signal that arrives in between
+    // used to become a second StartAgentLoop, which a Running loop ignores —
+    // the reply was lost and the run kept polling the screen for it (measured
+    // 2026-11-24, Hermes' handshake ack). It goes to the inbox instead: the
+    // run's `wait` returns with it, and whatever the run did not take starts
+    // the next cycle when the result comes back.
+    private readonly PeerSignalInbox _peerInbox = new();
+    private bool _loopRunning;
 
     // ── Delegation mode (M0017 — voice mode for visually impaired users) ──
     // When true, every incoming StartAgentLoop has its UserRequest rewritten
@@ -158,6 +169,7 @@ public sealed class AgentBotActor : ReceiveActor
                 ? new StartAgentLoop(WrapForDelegation(msg.UserRequest))
                 : msg;
             _agentLoop!.Tell(outgoing);
+            _loopRunning = true;
         });
 
         Receive<CancelAgentLoop>(_ => _agentLoop?.Tell(new CancelAgentLoop()));
@@ -205,6 +217,8 @@ public sealed class AgentBotActor : ReceiveActor
             _activeConversations.Clear();
             var nHand = _handshakeStates.Count;
             _handshakeStates.Clear();
+            _peerInbox.Clear();
+            _loopRunning = false;
             _log.Info("[Bot] AgentLoop session reset (intros={0}, conversations={1}, handshakes={2})",
                 nIntro, nConv, nHand);
         });
@@ -320,18 +334,23 @@ public sealed class AgentBotActor : ReceiveActor
             // gives the model the prior exchange history; the prompt
             // already teaches "one cycle per run" so this becomes one
             // short reaction.
-            _log.Info("[Bot] Peer signal from ACTIVE peer=\"{0}\" → continuation StartAgentLoop",
-                msg.PeerName);
             if (_agentLoopBindings is null)
             {
                 _log.Warning("[Bot] Cannot route peer signal — bindings not registered");
                 return;
             }
-            EnsureAgentLoopChild();
-            // Frame the synthetic prompt so the model knows this is a
-            // peer-signal continuation, not a fresh user request.
-            var synth = $"[peer signal from {msg.PeerName} via bot-chat] {msg.Text}";
-            _agentLoop!.Tell(new StartAgentLoop(synth));
+            if (_loopRunning)
+            {
+                // The run in flight hears it through its `wait` tool; if it
+                // ends first, the AgentLoopResult handler starts the next cycle.
+                _peerInbox.Post(new PeerSignal(msg.PeerName, msg.Text ?? ""));
+                _log.Info("[Bot] Peer signal from ACTIVE peer=\"{0}\" → inbox (run in flight, waiting={1})",
+                    msg.PeerName, _peerInbox.Count);
+                return;
+            }
+            _log.Info("[Bot] Peer signal from ACTIVE peer=\"{0}\" → continuation StartAgentLoop",
+                msg.PeerName);
+            StartContinuation([new PeerSignal(msg.PeerName, msg.Text ?? "")]);
         });
 
         // Progress + Result messages bubble UP from the child to here.
@@ -343,16 +362,44 @@ public sealed class AgentBotActor : ReceiveActor
 
         Receive<AgentLoopResult>(msg =>
         {
+            _loopRunning = false;
             try { _agentLoopOnResult?.Invoke(msg); }
             catch (Exception ex) { _log.Warning("[Bot] OnResult callback threw: {0}", ex.Message); }
+
+            // Peers that spoke while the run was busy and were not picked up
+            // by a `wait`. A run that ended well reacts to them in a new
+            // cycle; one that failed or was cancelled does not restart itself.
+            var unheard = _peerInbox.Drain();
+            if (unheard.Count == 0) return;
+            if (!msg.Success || _agentLoopBindings is null)
+            {
+                _log.Info("[Bot] {0} unheard peer signal(s) dropped — the run did not end cleanly", unheard.Count);
+                return;
+            }
+            _log.Info("[Bot] {0} unheard peer signal(s) → continuation StartAgentLoop", unheard.Count);
+            StartContinuation(unheard);
         });
+    }
+
+    /// <summary>
+    /// Wakes the agent loop with what peers said as the prompt. The loop keeps
+    /// the earlier exchange (KV cache / messages[]), so this is one more cycle
+    /// of the same conversation, framed so the model knows it is a peer
+    /// speaking and not a fresh user request.
+    /// </summary>
+    private void StartContinuation(IReadOnlyList<PeerSignal> signals)
+    {
+        EnsureAgentLoopChild();
+        _agentLoop!.Tell(new StartAgentLoop(PeerSignalInbox.ContinuationPrompt(signals)));
+        _loopRunning = true;
     }
 
     private void EnsureAgentLoopChild()
     {
         if (_agentLoop is not null) return;
+        var inbox = _peerInbox;
         _agentLoop = Context.ActorOf(
-            Props.Create(() => new AgentLoopActor(_agentLoopBindings!)),
+            Props.Create(() => new AgentLoopActor(_agentLoopBindings!, inbox)),
             "loop");
         _log.Info("[Bot] AgentLoop child created at {0}", _agentLoop.Path);
     }

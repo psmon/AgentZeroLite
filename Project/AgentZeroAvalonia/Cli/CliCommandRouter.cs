@@ -37,6 +37,9 @@ internal sealed class CliCommandRouter
     /// <summary><c>layout workspace &lt;name|index&gt;</c>: show that workspace. Returns an error, or null.</summary>
     public Func<string, string?>? ActivateWorkspace { get; set; }
 
+    /// <summary><c>terminal-rename</c>: (group, tab, new title) → the old title, or an error. Runs on the UI thread.</summary>
+    public Func<int, int, string, Task<(string? Old, string? Error)>>? RenameTab { get; set; }
+
     /// <summary>The active workspace's split layout as stored JSON (null while unsplit), plus its pane count.</summary>
     public Func<(string? Json, int Panes, string? Workspace)>? LayoutStatus { get; set; }
 
@@ -111,6 +114,9 @@ internal sealed class CliCommandRouter
 
                     case "terminal-alias":
                         return Task.FromResult(TerminalAlias(root));
+
+                    case "terminal-rename":
+                        return TerminalRenameAsync(root);
 
                     case "layout":
                         return Task.FromResult(Layout(root));
@@ -335,6 +341,20 @@ internal sealed class CliCommandRouter
         text = ApprovalParser.StripAnsiCodes(text);
         AppLogger.Log($"[IPC] terminal-read [{g}:{t}] | label=\"{session.SessionId}\" last_n={lastN} returned={text.Length}");
         return $"{{\"ok\":true,\"group_index\":{g},\"tab_index\":{t},\"length\":{text.Length},\"text\":\"{CliIpcProtocol.Escape(text)}\"}}";
+    }
+
+    // ── terminal-rename ──
+
+    private async Task<string> TerminalRenameAsync(JsonElement root)
+    {
+        if (RenameTab is null) return CliIpcProtocol.ErrorJson("tab renaming is not wired");
+        if (!TryTarget(root, out var g, out var t, out var err)) return CliIpcProtocol.ErrorJson(err!);
+        var name = Str(root, "name").Trim();
+        if (name.Length == 0) return CliIpcProtocol.ErrorJson("name is empty");
+        var (old, error) = await RenameTab(g, t, name);
+        if (error is not null) return CliIpcProtocol.ErrorJson(error);
+        AppLogger.Log($"[IPC] terminal-rename [{g}:{t}] '{old}' -> '{name}'");
+        return $"{{\"ok\":true,\"group_index\":{g},\"tab_index\":{t},\"old\":\"{CliIpcProtocol.Escape(old ?? "")}\",\"title\":\"{CliIpcProtocol.Escape(name)}\"}}";
     }
 
     // ── terminal-alias (WPF HandleTerminalAlias, same replies) ──

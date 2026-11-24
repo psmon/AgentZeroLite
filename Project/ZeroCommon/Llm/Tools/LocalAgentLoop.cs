@@ -217,8 +217,8 @@ public sealed class LocalAgentLoop : IAgentLoop
             {
                 var (g, t) = ReadIntPair(call.Args, "group", "tab");
                 var n = ReadInt(call.Args, "last_n", 2000);
-                var text = await _host.ReadTerminalAsync(g, t, n, ct);
-                return JsonSerializer.Serialize(new { ok = true, text });
+                // One flat {ok,text}: the host's own envelope is unwrapped, not nested in a string.
+                return TerminalReadResult.Normalize(await _host.ReadTerminalAsync(g, t, n, ct));
             }
 
             case "send_to_terminal":
@@ -239,14 +239,14 @@ public sealed class LocalAgentLoop : IAgentLoop
 
             case "wait":
             {
-                // Pure time delay — no host involvement. Clamped to [1, 30]
-                // so the model can't accidentally stall the loop with wait(9999).
-                // Returns a synthesized result so the next turn sees confirmation
-                // and decides what to do next.
+                // A time delay, cut short when a peer answers through bot-chat
+                // (PeerSignalInbox). Clamped to [1, 30] so the model can't
+                // accidentally stall the loop with wait(9999). Returns a
+                // synthesized result so the next turn sees confirmation and
+                // decides what to do next.
                 var requested = ReadInt(call.Args, "seconds", 5);
                 var seconds = Math.Clamp(requested, 1, 30);
-                await Task.Delay(TimeSpan.FromSeconds(seconds), ct);
-                return JsonSerializer.Serialize(new { ok = true, waited_seconds = seconds });
+                return await PeerSignalInbox.WaitToolAsync(_opts, seconds, ct);
             }
 
             // ---- OS-control bridge (mission M0014) -----------------------
@@ -643,4 +643,11 @@ public sealed record AgentLoopOptions
     /// once, when the loop is built: a change in Settings reaches the next session, not a running one.
     /// </summary>
     public IReadOnlyList<DynamicToolSpec> DynamicTools { get; init; } = [];
+
+    /// <summary>
+    /// What the <c>wait</c> tool waits on besides the clock: peers' <c>bot-chat</c> replies
+    /// (<see cref="PeerSignalInbox.WaitAsync"/>, wired by <c>AgentLoopActor</c>). Null — a loop
+    /// with no peer channel, like the watch's — keeps <c>wait</c> a plain sleep.
+    /// </summary>
+    public Func<TimeSpan, CancellationToken, Task<IReadOnlyList<PeerSignal>>>? WaitForPeerSignals { get; init; }
 }

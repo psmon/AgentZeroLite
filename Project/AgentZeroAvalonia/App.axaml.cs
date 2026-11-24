@@ -107,6 +107,18 @@ public partial class App : Application
                     vm.ActiveWorkspace = ws;
                     return null;
                 },
+                RenameTab = (g, t, name) => Dispatcher.UIThread.InvokeAsync<(string?, string?)>(() =>
+                {
+                    if (g < 0 || g >= vm.Workspaces.Count) return (null, $"Invalid group_index {g}.");
+                    var ws = vm.Workspaces[g];
+                    if (t < 0 || t >= ws.Tabs.Count) return (null, $"Invalid tab_index {t} in group {g}.");
+                    var tab = ws.Tabs[t];
+                    var old = tab.Title;
+                    if (ws.Tabs.Any(x => !ReferenceEquals(x, tab) && x.Title == name))
+                        return (old, $"A tab named '{name}' already exists in '{ws.DisplayName}'.");
+                    vm.RenameTab(ws, tab, name);
+                    return (old, null);
+                }).GetTask(),
                 AgentState = () => Dispatcher.UIThread.InvokeAsync(vm.AgentStateJson).GetTask(),
                 LayoutStatus = () => (vm.ActiveWorkspace?.DockLayoutJson, vm.ActiveWorkspace?.Layout.PaneCount ?? 0, vm.ActiveWorkspace?.DisplayName),
                 FloatingCount = () => vm.FloatingCount,

@@ -93,6 +93,36 @@ internal static class MoreVerbs
         return 2;
     }
 
+    // ── terminal-rename ──
+
+    /// <summary>
+    /// Rename a tab. The title is not cosmetic: it is the peer name AgentBot greets the terminal
+    /// with and the <c>--from</c> value its replies are routed by, so two agents started in tabs
+    /// still called "CMD" and "PW5" need real names before they can be told apart.
+    /// </summary>
+    public static int TerminalRename(CliClient client, string[] args)
+    {
+        if (args.Length < 3 || !int.TryParse(args[0], out var g) || !int.TryParse(args[1], out var t))
+        {
+            Console.Error.WriteLine("Usage: terminal-rename <group_index> <tab_index> <name>");
+            return 1;
+        }
+        var name = string.Join(' ', args.Skip(2));
+        var reply = client.Send($"{{\"command\":\"terminal-rename\",\"group_index\":{g},\"tab_index\":{t},\"name\":\"{CliIpcProtocol.Escape(name)}\"}}");
+        if (reply is null) return client.NoWait ? 0 : 1;
+        var root = CliClient.Parse(reply);
+        if (!CliClient.Ok(root))
+        {
+            Console.Error.WriteLine($"Error: {CliClient.Str(root, "error", "unknown")}");
+            return 1;
+        }
+        Console.WriteLine($"Renamed [{g}:{t}] '{CliClient.Str(root, "old")}' -> '{CliClient.Str(root, "title")}'.");
+        Console.WriteLine();
+        Console.WriteLine("--- JSON ---");
+        Console.WriteLine(reply);
+        return 0;
+    }
+
     // ── terminal-alias ──
 
     public static int TerminalAlias(CliClient client, string[] args)

@@ -58,9 +58,58 @@ Mode 2 — TERMINAL RELAY.
     read_terminal — this is the fallback path).
 
   When the user says "토론해/discuss" or any substantive task BEFORE
-  handshake has been confirmed, do the handshake greeting first this
-  cycle, mention in `done` that handshake is now in flight, and let the
-  user trigger the substantive cycle next.
+  handshake has been confirmed, do the handshake greeting first. If the
+  peer's "handshake-ok" comes back while you wait (see `wait` below), go
+  on to the substantive message in the same run; if it does not, say in
+  `done` that the handshake is in flight.
+
+  PEER REPLIES ARRIVE TWO WAYS — check both before deciding a peer is silent:
+    (a) bot-chat: `wait` returns early with "peer_signals":[{from,text}].
+        That text IS the peer's reply. Do not read_terminal for it again.
+    (b) on screen: read_terminal shows the reply under your message.
+  If read_terminal still shows YOUR message sitting in the peer's input box
+  (typed but not submitted, no reply and no working indicator after it),
+  the Enter did not register: send_key {"key":"cr"} to that terminal, then
+  wait. Do NOT send the text again.
+
+  PEER-TO-PEER — two terminal AIs talking to each other through you
+  ("Codex랑 Hermes 서로 대화시켜", "둘이 티키타카", "토론시켜", "let A and B
+  talk / debate / go back and forth"):
+    You are the relay; the peers cannot see each other's terminals.
+    1. Greet BOTH peers first, one short message each (the handshake header
+       rides on it), then wait once for "handshake-ok" signals. A peer whose
+       screen shows a reply to your greeting is connected too, even with no
+       signal (its CLI may be blocked): from then on read THAT peer's replies
+       with read_terminal. Greet each peer ONCE — never a second greeting.
+    2. Give peer A the topic and ask for an opening message addressed to B.
+    3. Relay every reply to the OTHER peer with send_to_terminal, the text
+       prefixed "[<speaker>의 메시지]" (or "[from <speaker>]"), quoted as
+       they wrote it, ending with a request to answer through bot-chat
+       DONE(...). Never answer on a peer's behalf and never rewrite a reply.
+    4. After each relay, wait for the reply. A peer that answers through
+       bot-chat: wait(seconds=20), up to 3 times, then read_terminal once
+       before concluding anything. A peer you read from the screen:
+       wait(seconds=10) then read_terminal THAT peer, up to 4 times; its
+       reply is the newest text under your message (it may show a failed
+       bot-chat command and then the reply as plain text — use that text).
+       Relay each reply exactly ONCE.
+    WHO SAID IT: whatever is on peer X's screen under your message was
+    written BY X — also when it opens with the other peer's name or reads
+    "DONE(<other name>, …)": that is X ADDRESSING them. A peer_signal's
+    "from" is its author. So a reply read on Codex's screen goes to Hermes
+    as "[Codex의 메시지]", never back to Codex. Before every relay check:
+    the terminal you send to is NOT the one the text came from.
+    Keep count: after A's opening and B's answer (round 1), relay B's
+    answer to A, A's new message to B, and B's answer back (round 2). Do
+    not call done before the last round's answer is in your hands, and say
+    in done how many rounds really completed.
+    5. Rounds: one round = A speaks and B answers. Run the number the user
+       asked for, default 3. Then call done with a 1–2 sentence summary and
+       the round count.
+    In this mode the ONE CYCLE PER RUN rule below does NOT apply: keep
+    relaying in the same run. If a run does end mid-conversation, the next
+    [peer signal from <name> via bot-chat] prompt is the reply you were
+    waiting for — relay it to the other peer and carry on from there.
   Trigger phrases (English): "send to terminal", "tell Claude",
     "ask Claude / Codex / ...", "talk to Claude", "discuss with Claude",
     "start a discussion with ...", "chat with the terminal", "have
@@ -182,7 +231,7 @@ not with a terminal AI.
 
 Available tools:
   - list_terminals             returns the catalog of terminal groups and tabs (no args).
-  - read_terminal              returns the last N chars of a terminal's output.
+  - read_terminal              returns what is on a terminal's screen now (its last N chars).
                                args: { "group": <int>, "tab": <int>, "last_n": <int> }
   - send_to_terminal           writes text + Enter to a terminal.
                                args: { "group": <int>, "tab": <int>, "text": <string> }
@@ -193,6 +242,8 @@ Available tools:
                                      it to cycle its accept-mode (default ↔ auto-accept ↔ plan).
   - wait                       sleep for N seconds, then return. Use BETWEEN send_to_terminal
                                and read_terminal to give the terminal AI time to actually respond.
+                               Returns EARLY when a peer replies through bot-chat: the result
+                               then carries "peer_signals":[{"from":<tab name>,"text":<reply>}].
                                args: { "seconds": <int 1..30> }
 
   --- OS-control (mission M0014, read-only) — only use when the user EXPLICITLY

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:AgentZeroAvalonia.ViewModels"
              xmlns:views="using:AgentZeroAvalonia.Views"
+             xmlns:agents="using:Agent.Common.Agents"
              x:Class="AgentZeroAvalonia.Views.AgentBotView"
              x:DataType="vm:AgentBotViewModel">
 
@@ -181,7 +182,164 @@
             <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
             <Setter Property="Margin" Value="0,4,0,0" />
         </Style>
+
+        <!-- ── Transcript cards (A2UI-style components; see Agents/BotCards) ──
+             Reading size for what a person or an agent SAID, a smaller one for tool and
+             reference rows; a capped line length, because the pane is often 2,000 px wide. -->
+        <Style Selector="Border.bubble">
+            <Setter Property="MaxWidth" Value="980" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="Border.bubble.user">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style Selector="Border.bubble.system, Border.bubble.progress">
+            <Setter Property="Padding" Value="6,3" />
+        </Style>
+        <Style Selector="Border.bubble.failed">
+            <Setter Property="BorderBrush" Value="#B05A5A" />
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+        <Style Selector="TextBlock.label.headline">
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="MaxWidth" Value="620" />
+        </Style>
+        <Style Selector="TextBlock.label.failedtag">
+            <Setter Property="Foreground" Value="#E57373" />
+        </Style>
+
+        <Style Selector="SelectableTextBlock.node">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="LineHeight" Value="19" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="Margin" Value="0,2" />
+        </Style>
+        <Style Selector="Border.bubble.speech SelectableTextBlock.node">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="LineHeight" Value="22" />
+        </Style>
+        <Style Selector="SelectableTextBlock.node.heading">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,6,0,2" />
+        </Style>
+        <Style Selector="Border.bubble.speech SelectableTextBlock.node.heading">
+            <Setter Property="FontSize" Value="15" />
+        </Style>
+        <Style Selector="SelectableTextBlock.node.caption">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+        <Style Selector="Border.bubble.speech SelectableTextBlock.node.caption">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="LineHeight" Value="16" />
+        </Style>
+        <Style Selector="SelectableTextBlock.node.listmarker">
+            <Setter Property="Margin" Value="6,2,8,2" />
+            <Setter Property="MinWidth" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+        </Style>
+        <Style Selector="Border.quotebar">
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="Padding" Value="8,0,0,0" />
+            <Setter Property="Margin" Value="0,2" />
+        </Style>
+        <Style Selector="Border.codebox">
+            <Setter Property="Background" Value="#14181F" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0,4" />
+        </Style>
+        <Style Selector="SelectableTextBlock.code">
+            <Setter Property="FontFamily" Value="JetBrains Mono, Cascadia Mono, Consolas, Menlo, monospace" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LineHeight" Value="17" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        </Style>
+        <Style Selector="TextBlock.fieldlabel">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,2,10,2" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+        <Style Selector="SelectableTextBlock.fieldvalue">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="LineHeight" Value="18" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="Margin" Value="0,2" />
+        </Style>
+        <Style Selector="Border.nodedivider">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource BorderColor}" />
+            <Setter Property="Margin" Value="0,6" />
+        </Style>
+        <Style Selector="ToggleButton.fold">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="MaxWidth" Value="900" />
+        </Style>
+        <Style Selector="SelectableTextBlock.body">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="LineHeight" Value="18" />
+        </Style>
     </UserControl.Styles>
+
+    <!-- The component catalog: one template per node type (Agents/BotCards). -->
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="agents:BotText">
+            <Panel>
+                <SelectableTextBlock Classes="node" Text="{Binding Text}"
+                                     Classes.heading="{Binding IsHeading}" Classes.caption="{Binding IsCaption}"
+                                     IsVisible="{Binding IsProse}" />
+                <Border Classes="codebox" IsVisible="{Binding IsCode}">
+                    <SelectableTextBlock Classes="code" Text="{Binding Text}" />
+                </Border>
+            </Panel>
+        </DataTemplate>
+        <DataTemplate DataType="agents:BotField">
+            <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Classes="fieldlabel" Text="{Binding Label}" />
+                <SelectableTextBlock Grid.Column="1" Classes="fieldvalue" Text="{Binding Value}" />
+            </Grid>
+        </DataTemplate>
+        <DataTemplate DataType="agents:BotList">
+            <!-- Marker and text in two columns: a wrapped item hangs under its own text. -->
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="agents:BotListRow">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <SelectableTextBlock Classes="node listmarker" Text="{Binding Marker}" />
+                            <SelectableTextBlock Grid.Column="1" Classes="node" Text="{Binding Text}" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DataTemplate>
+        <DataTemplate DataType="agents:BotDivider">
+            <Border Classes="nodedivider" />
+        </DataTemplate>
+    </UserControl.DataTemplates>
 
     <DockPanel Margin="8">
         <!-- Header: session (group / tab) + options toggle + AI controls -->
@@ -278,31 +436,46 @@
                 <ItemsControl ItemsSource="{Binding Items}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ChatItem">
+                            <!-- One card per entry. Its body is a list of components (Agents/BotCards,
+                                 after A2UI) drawn by the node templates above; notices, the progress
+                                 row and links keep their single line of text. -->
                             <Border Classes="bubble"
                                     Classes.user="{Binding IsUser}" Classes.bot="{Binding IsBot}"
                                     Classes.system="{Binding IsSystem}" Classes.tool="{Binding IsTool}"
                                     Classes.progress="{Binding IsProgress}"
                                     Classes.termout="{Binding IsTerminalOut}" Classes.termin="{Binding IsTerminalIn}"
-                                    Classes.url="{Binding IsUrl}">
+                                    Classes.url="{Binding IsUrl}" Classes.speech="{Binding IsSpeech}"
+                                    Classes.failed="{Binding Failed}">
                                 <StackPanel>
                                     <DockPanel IsVisible="{Binding !IsSystem}">
-                                        <TextBlock DockPanel.Dock="Right" Classes="label" Text="{Binding TimeLabel}" />
+                                        <TextBlock DockPanel.Dock="Right" Classes="label" Text="{Binding TimeLabel}" Margin="12,0,0,2" />
                                         <Button DockPanel.Dock="Right" Classes="report" Content="⚑ Report"
                                                 IsVisible="{Binding CanReport}"
                                                 ToolTip.Tip="Report this AI answer (inappropriate, harmful or wrong)"
                                                 AutomationProperties.Name="Report this AI answer"
                                                 Command="{Binding $parent[ItemsControl].((vm:AgentBotViewModel)DataContext).ReportAnswerCommand}"
                                                 CommandParameter="{Binding}" />
-                                        <TextBlock Classes="label" Text="{Binding Label}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Classes="label" Text="{Binding Label}" />
+                                            <TextBlock Classes="label headline" Text="{Binding Headline}"
+                                                       IsVisible="{Binding HasHeadline}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="label failedtag" Text="FAILED" IsVisible="{Binding Failed}" />
+                                        </StackPanel>
                                     </DockPanel>
+                                    <ItemsControl ItemsSource="{Binding Nodes}" IsVisible="{Binding HasNodes}" />
                                     <SelectableTextBlock Classes="body" Text="{Binding Text}"
-                                                         IsVisible="{Binding !IsUrl}" />
+                                                         IsVisible="{Binding ShowText}" />
                                     <Button Classes="linkbtn" Content="{Binding Text}" IsVisible="{Binding IsUrl}"
                                             ToolTip.Tip="Open in the browser"
                                             Command="{Binding $parent[ItemsControl].((vm:AgentBotViewModel)DataContext).OpenLinkCommand}"
                                             CommandParameter="{Binding}" />
-                                    <SelectableTextBlock Classes="detail" Text="{Binding Detail}"
-                                                         IsVisible="{Binding HasDetail}" />
+                                    <StackPanel IsVisible="{Binding HasDetailNodes}">
+                                        <ToggleButton Classes="fold" IsChecked="{Binding DetailOpen}"
+                                                      Content="{Binding DetailHeader}"
+                                                      ToolTip.Tip="Show / hide" />
+                                        <ItemsControl ItemsSource="{Binding DetailNodes}"
+                                                      IsVisible="{Binding DetailOpen}" Margin="0,4,0,0" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

@@ -56,21 +56,26 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
 
         try
         {
-            string text;
-            if (lastN > 0)
+            // The screen, not the raw tail of the pipe (same as the Avalonia host): a TUI
+            // redraws, and the tail was the same reply three times over with its spaces gone.
+            // The raw tail stays as the fallback until the renderer has pushed a snapshot.
+            var text = Agent.Common.Services.TerminalScreenText.Tidy(session!.GetConsoleText());
+            if (text.Length == 0)
             {
-                int totalLen = session!.OutputLength;
-                int start = System.Math.Max(0, totalLen - lastN);
+                int totalLen = session.OutputLength;
+                int start = System.Math.Max(0, totalLen - System.Math.Max(lastN, 2000));
                 int len = totalLen - start;
-                text = len > 0 ? session.ReadOutput(start, len) : "";
+                text = len > 0 ? ApprovalParser.StripAnsiCodes(session.ReadOutput(start, len)) : "";
             }
-            else
+            else if (lastN > 0 && text.Length > lastN)
             {
-                text = session!.GetConsoleText();
+                text = text[^lastN..];
             }
 
-            text = ApprovalParser.StripAnsiCodes(text);
-            var resp = $"{{\"ok\":true,\"group_index\":{group},\"tab_index\":{tab},\"length\":{text.Length},\"text\":\"{EscapeJson(text)}\"}}";
+            var note = Agent.Common.Agents.PeerCliFault.NoteFor(text) is { } fault
+                ? $",\"note\":\"{EscapeJson(fault)}\""
+                : "";
+            var resp = $"{{\"ok\":true,\"group_index\":{group},\"tab_index\":{tab},\"length\":{text.Length},\"text\":\"{EscapeJson(text)}\"{note}}}";
             return Task.FromResult(resp);
         }
         catch (System.Exception ex)
@@ -167,30 +172,10 @@ public sealed class WorkspaceTerminalToolHost : IAgentToolbelt
     // Handshake flow: VERIFY CLI exists → ACKNOWLEDGE via that same CLI.
     // Two explicit steps so the peer commits to the channel before the
     // bot trusts it.
-    private static string BuildFirstContactHeader(string peerName = "Claude") =>
-        "[AgentBot Handshake — first contact, please read carefully]\n"
-        + "\n"
-        + "You are " + peerName + " and I am AgentBot, an on-device AI agent running inside the AgentZero Lite shell.\n"
-        + "\"" + peerName + "\" is the name of YOUR terminal tab — both of us will use that name to refer to you, and you will use it as your --from identity when replying.\n"
-        + "\n"
-        + "Step 1 — Verify the CLI channel exists.\n"
-        + "  Run this in your terminal RIGHT NOW to confirm the channel works:\n"
-        + "      AgentZeroLite.exe -cli help\n"
-        + "  If you see a usage list with a 'bot-chat' command, the reverse channel is available.\n"
-        + "\n"
-        + "Step 2 — Acknowledge using the same CLI.\n"
-        + "  Once Step 1 succeeds, send your handshake reply:\n"
-        + "      AgentZeroLite.exe -cli bot-chat \"DONE(handshake-ok)\" --from " + peerName + "\n"
-        + "  The DONE(...) wrapper is the signal envelope. --from " + peerName + " names you so I know who answered. After this acknowledgement, the user can ask me to relay real tasks to you.\n"
-        + "\n"
-        + "Ongoing replies use the same shape:\n"
-        + "      AgentZeroLite.exe -cli bot-chat \"DONE(your reply text)\" --from " + peerName + "\n"
-        + "  PowerShell wrapper if PATH-friendly: AgentZeroLite.ps1 bot-chat \"DONE(...)\" --from " + peerName + "\n"
-        + "\n"
-        + "Fallback: if AgentZeroLite.exe is not reachable from your terminal, just reply normally here and I will fall back to polling read_terminal — but the CLI path is more reliable.\n"
-        + "\n"
-        + "You'll only see this introduction once per AIMODE session.\n"
-        + "─── original message follows ───";
+    private static string BuildFirstContactHeader(string peerName = "Claude")
+        // One text for both hosts (ZeroCommon PeerHandshake); it names this GUI's own exe so
+        // a peer's reply cannot land in another AgentZero window.
+        => Agent.Common.Actors.PeerHandshake.BuildFirstContactHeader(peerName, Environment.ProcessPath);
 
     public Task<bool> SendKeyAsync(int group, int tab, string key, CancellationToken ct)
     {

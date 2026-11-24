@@ -43,6 +43,7 @@ options are the same.
 | `terminal-read <G> <T> [--last N]` | Console output text; `--last N` = last N chars (default all). Accepts `--alias <name>`. |
 | `terminal-wait <G> <T> [flags]` | Block until settled/state. See below. |
 | `terminal-alias <list\|set <G> <T> <name>\|rm <name>>` | Stable name → terminal. `set` names the tab; then any send/key/read can target it with `--alias <name>` instead of volatile indices. Aliases persist to `terminal-aliases.json`. |
+| `terminal-rename <G> <T> <name>` | **Avalonia only.** Rename a tab. The title is the peer name AgentBot greets the terminal with and the `--from` identity its replies are routed by — rename a tab still called "CMD"/"PW5" before two agents in it talk through the bot. Refuses a name another tab of the workspace has. |
 
 `terminal-wait` flags:
 - `--idle-ms N` (default 1500) — consider settled after output is unchanged this long.

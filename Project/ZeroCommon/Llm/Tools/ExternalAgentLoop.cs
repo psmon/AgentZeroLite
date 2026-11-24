@@ -481,8 +481,8 @@ public sealed class ExternalAgentLoop : IAgentLoop
             {
                 var (g, t) = ReadIntPair(call.Args, "group", "tab");
                 var n = ReadInt(call.Args, "last_n", 2000);
-                var text = await _host.ReadTerminalAsync(g, t, n, ct);
-                return JsonSerializer.Serialize(new { ok = true, text });
+                // One flat {ok,text}: the host's own envelope is unwrapped, not nested in a string.
+                return TerminalReadResult.Normalize(await _host.ReadTerminalAsync(g, t, n, ct));
             }
 
             case "send_to_terminal":
@@ -505,8 +505,7 @@ public sealed class ExternalAgentLoop : IAgentLoop
             {
                 var requested = ReadInt(call.Args, "seconds", 5);
                 var seconds = Math.Clamp(requested, 1, 30);
-                await Task.Delay(TimeSpan.FromSeconds(seconds), ct);
-                return JsonSerializer.Serialize(new { ok = true, waited_seconds = seconds });
+                return await PeerSignalInbox.WaitToolAsync(_opts, seconds, ct);
             }
 
             // ---- OS-control bridge (mission M0014) -----------------------
