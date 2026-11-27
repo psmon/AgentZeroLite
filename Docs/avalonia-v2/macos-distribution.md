@@ -187,6 +187,8 @@ GitHub Secrets: `MACOS_DEVID_APP_P12`·`MACOS_DEVID_INSTALLER_P12`(base64), `MAC
 - **2026-11-24 TestFlight 빌드 6 (0.27.2)** — tty ioctl sbpl 예외 + `~/.local/` 읽기 전용 예외가 처음 들어간 빌드. 공개 링크 사용자는 외부 그룹 *Public Beta*로 받으므로, 업로드만으로는 보이지 않는다 → `asc builds add-groups --build-id … --group <Public Beta> --submit --confirm`으로 그룹 추가 + 베타 앱 심사 제출(`WAITING_FOR_BETA_REVIEW`). 바로 시험하려면 내부 그룹(심사 없음)이 대안.
   - 2026-11-25 베타 심사 통과(sbpl·`~/.local/` 예외 포함).
 - **2026-11-25 TestFlight 빌드 7 (0.27.3)** — bash 탭: `/private/etc` 셸 시작 파일 읽기 전용 예외 + `BASH_SILENCE_DEPRECATION_WARNING`. 같은 절차로 Public Beta에 추가 + 베타 심사 제출(`WAITING_FOR_BETA_REVIEW`).
+  - 2026-11-27 베타 심사 통과, 내부 테스트(claude·codex·hermes·zsh·bash 탭) 후 정식 심사로.
+- **2026-11-27 정식 심사 4차 — 0.27.3 (빌드 7)**: 11-14부터 대기하던 0.27.1 (빌드 5, `fe965f27`)은 위 탭 문제를 가진 빌드라 운영자가 철회(`submissions-update --canceled`). 같은 버전 레코드를 0.27.3으로 바꾸고 빌드 7을 붙여 재제출(`470c4654`, `WAITING_FOR_REVIEW`). 심사 메모 맨 앞에 철회·재제출 사유와 TestFlight 베타 심사 통과·내부 테스트 사실, 새 임시 예외 3종을 적었다(원문 `macos/appstore/listing.md` Notes). 절차·이력: `harness/knowledge/_shared/mac-app-store-review.md` §0·§4.
 
 ### 4.5 1차 반려와 대응 (2026-10-28 반려 → 2026-10-30 재제출)
 

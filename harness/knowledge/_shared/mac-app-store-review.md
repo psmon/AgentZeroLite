@@ -6,13 +6,13 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 
 ---
 
-## 0. 현재 상태 (2026-10-30)
+## 0. 현재 상태 (2026-11-27)
 
 | 항목 | 값 |
 |---|---|
 | 앱 | AgentZero Lite · App Store Connect 앱 ID **6825237056** · 번들 ID `com.psmon.agentzerolite` · 팀 `HA39FQRUZG`(sang man park, 개인) |
-| 제출 | **2차** — 0.26.6 (빌드 **3**) · 같은 submission `38e8bb1c-45f0-4cee-b073-0e7f9089f54a` 재제출 · 2026-10-30 16:02 KST · `WAITING_FOR_REVIEW` |
-| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d` · 빌드 ID `3d82af5b-80eb-448d-b06b-c9dc366a271b` |
+| 제출 | **4차** — 0.27.3 (빌드 **7**) · submission `470c4654-9dd1-4210-8663-c0e4fae6eaf9` · 2026-11-27 12:15 KST · `WAITING_FOR_REVIEW` |
+| 버전 ID | `ec895cda-2710-4017-a0c7-dfaa1cc52f1d`(첫 출시라 0.25.8부터 같은 버전 레코드, 문자열만 바뀜) · 빌드 ID `fa5f606e-3f78-4b1c-9157-a9f26fd24513` · 심사 메모(review detail) `87f61568-ec0b-4507-988b-67ee3eb1d369` |
 | 출시 방식 | **MANUAL** — 승인돼도 운영자가 출시를 눌러야 공개 |
 | 판매 지역 | 전 지역 **중국 본토 제외**(가이드라인 5) |
 | 남은 일 | 대한민국 연락처 확인(App Store Connect → 비즈니스) — Apple 측 오류로 미완. 제출은 막지 않았다. 빈 초안 submission `fe965f27-…`(항목 0, 취소 불가 상태) — 무시 |
@@ -22,7 +22,9 @@ Windows 쪽 선례는 `Docs/avalonia-v2/microsoft-store.md` §6(4차 만에 통�
 | 차수 | 버전(빌드) | 결과 | 사유 → 조치 |
 |---|---|---|---|
 | 1 | 0.25.8 (2), 10-21 제출 | **반려** 2026-10-28 (MacBook Pro 14 Nov 2024) | **2.4.5(i)** 임시 예외 `home-relative-path.read-write "/"`·`absolute-path.read-write "/usr/local/"` 거부(`/opt/homebrew/`는 지적 없음) → 두 예외 삭제, 폴더 선택 + security-scoped bookmark(`SandboxFolderAccess`, `files.bookmarks.app-scope`). **5 Legal(중국)** 메타데이터의 "OpenAI" → 단어 삭제 + 중국 본토 판매 제외. Resolution Center에 조치 답변 |
-| 2 | 0.26.6 (3), 10-30 재제출 | 대기 | — |
+| 2 | 0.26.6 (3), 10-30 재제출 | 제출 `38e8bb1c` `COMPLETE`, 항목 `REMOVED` | 11-03 이 submission으로 빌드 교체 재제출 기록만 남음(세부 미기록) |
+| 3 | 0.27.1 (5), 11-14 제출 `fe965f27` | **운영자 철회** 2026-11-27 (13일 대기 중) | TestFlight에서 탭의 대화형 CLI가 샌드박스에서 동작하지 않음을 발견(claude `/tmp` EPERM, codex raw 모드 실패, Ctrl+C 무시, bash `/etc/profile`) → 0.27.2/0.27.3에서 수정 |
+| 4 | 0.27.3 (7), 11-27 제출 `470c4654` | 대기 | 빌드 6·7 모두 **TestFlight 베타 심사 통과 + 내부 테스트** 후 제출. 새 예외 3종(`~/.local/` 읽기 전용, `/private/etc` 셸 시작 파일 읽기 전용, tty `sbpl`)을 심사 메모 맨 앞 재제출 문단과 함께 설명. **sbpl이 정식 심사에서 받아들여지는지가 관건** — 반려되면 §3의 2.4.5(i) 행처럼 Resolution Center 답변이 1차 대응(없으면 터미널 키 입력 자체가 불가) |
 
 확인 기록: 2026-10-25 웹(App Store Connect → 앱 심사)으로 확인 — 여전히 `심사 대기 중`, 메시지 없음.
 
@@ -62,6 +64,16 @@ Playwright로 연다: 스크래치패드의 `apple-pw/browser.mjs`(정식 Chrome
 재제출된다. 바이너리를 바꾸면 빌드 번호를 올린다.
 
 ## 4. 재빌드·재제출 절차
+
+**대기 중인 제출을 새 빌드로 바꾸기** (2026-11-27 실측 — 반려가 아니라 우리가 철회하는 경우):
+```sh
+asc review submissions-update --id <대기 submission> --canceled=true --confirm   # CANCELING → COMPLETE, 버전은 DEVELOPER_REJECTED
+asc versions update --version-id <버전ID> --version <ver>
+asc versions attach-build --app 6825237056 --platform MAC_OS --version-id <버전ID> --build-id <새 빌드ID>
+asc review details-update --id <review detail ID> --notes "$(cat notes.txt)"     # 4000자 이하, listing.md Notes와 같게
+asc review submit --app 6825237056 --version-id <버전ID> --build-id <새 빌드ID> --dry-run → --confirm
+```
+첫 출시 전 버전에는 What's New가 없다(로캘에 whatsNew 필드 없음 — 정상).
 
 ```sh
 export DOTNET_ROOT=$HOME/.dotnet PATH=$HOME/.dotnet:$PATH          # 이 맥: PATH의 dotnet은 9.0뿐
